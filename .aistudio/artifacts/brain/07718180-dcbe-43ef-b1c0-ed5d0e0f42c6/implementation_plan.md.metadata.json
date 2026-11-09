@@ -1,6 +1,6 @@
 {
-  "summary":  "Plano de implementação revisado incorporando os campos de Chave de Recuperação BitLocker e Sistema Operacional simples para ativos de hardware, além da gestão completa de Softwares/SaaS (assentos, alocação e liberação 360°), atributos dinâmicos por categoria e vínculo em chamados técnicos.",
-  "updatedAt":  "2026-11-09T14:33:43.042793899Z",
+  "summary":  "Plano abrangente para implantação de Diálogos Modais de Confirmação em Ações Críticas, Bloqueio de Descarte sem Salvar, Eliminação de Auto-save com Botões Explícitos (Salvar/Cancelar), Ferramenta de Zerar Dados de Exemplo (Reset de Fábrica com Segurança) e Guia Prático de Sincronização do Firestore e Auth Google na Vercel/GitHub.",
+  "updatedAt":  "2026-11-09T19:09:47.638237565Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
