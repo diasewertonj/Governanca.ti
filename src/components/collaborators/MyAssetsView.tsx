@@ -1,0 +1,186 @@
+import React from 'react';
+import { useApp } from '../../context/AppContext.tsx';
+import { formatDate } from '../../utils/formatters.ts';
+import { Laptop, Key, FileText, LifeBuoy, QrCode, ExternalLink, ShieldCheck } from 'lucide-react';
+
+interface MyAssetsViewProps {
+  onOpenNewTicketForAsset: (assetId: string) => void;
+}
+
+export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAsset }) => {
+  const {
+    currentUser,
+    assets,
+    licenses,
+    terms,
+    setSelectedAssetIdFor360,
+    setSelectedTermForPrint,
+    setSelectedAssetForQrCode,
+  } = useApp();
+
+  if (!currentUser) return null;
+
+  const myAssets = assets.filter((a) => a.custodianteId === currentUser.id);
+  const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(currentUser.id));
+  const myTerms = terms.filter((t) => t.colaboradorId === currentUser.id);
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
+        <h2 className="text-sm font-semibold text-slate-900">Meus Equipamentos e Licenças sob Custódia</h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Lista de patrimônio corporativo de T.I. atualmente vinculada à sua matrícula ({currentUser.matricula})
+        </p>
+      </div>
+
+      {/* Grid de Equipamentos Físicos */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Laptop className="w-4 h-4 text-blue-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            Equipamentos Físicos ({myAssets.length})
+          </h3>
+        </div>
+
+        {myAssets.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myAssets.map((asset) => (
+              <div
+                key={asset.id}
+                className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between space-y-4"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {asset.tag}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAssetForQrCode(asset)}
+                      title="Ver etiqueta com QR Code"
+                      className="text-slate-400 hover:text-slate-700 p-1 rounded"
+                    >
+                      <QrCode className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <h4 className="font-semibold text-sm text-slate-900 mt-2">{asset.nome}</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {asset.marca} {asset.modelo}
+                  </p>
+                  <p className="font-mono text-[11px] text-slate-600 mt-1">
+                    S/N: {asset.serialNumber}
+                  </p>
+
+                  <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-0.5">
+                    <p>
+                      Em posse desde: <span className="font-medium text-slate-700">{formatDate(asset.dataEntregaAtual)}</span>
+                    </p>
+                    <p>
+                      Localização: <span className="font-medium text-slate-700">{asset.localizacaoFisica}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAssetIdFor360(asset.id)}
+                    className="flex-1 py-1.5 px-2 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-center"
+                  >
+                    Ver Detalhes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenNewTicketForAsset(asset.id)}
+                    className="flex-1 py-1.5 px-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100/70 rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <LifeBuoy className="w-3.5 h-3.5" />
+                    <span>Reportar Defeito</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
+            Você não possui nenhum equipamento físico atribuído no momento.
+          </div>
+        )}
+      </div>
+
+      {/* Licenças Ativas */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Key className="w-4 h-4 text-slate-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            Softwares e Contas Liberadas ({myLicenses.length})
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {myLicenses.map((lic) => (
+            <div
+              key={lic.id}
+              className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between text-xs"
+            >
+              <div>
+                <p className="font-semibold text-slate-900">{lic.nome}</p>
+                <p className="text-[11px] text-slate-500">{lic.fornecedor}</p>
+              </div>
+              <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-medium">
+                Acesso Liberado
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Meus Termos de Responsabilidade */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-slate-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            Meus Termos de Responsabilidade ({myTerms.length})
+          </h3>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs divide-y divide-slate-100 overflow-hidden">
+          {myTerms.length > 0 ? (
+            myTerms.map((term) => (
+              <div key={term.id} className="p-4 flex items-center justify-between text-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-blue-700">{term.codigo}</span>
+                    <span className="font-semibold text-slate-900 capitalize">
+                      Termo de {term.tipo === 'entrega' ? 'Entrega' : 'Devolução'}
+                    </span>
+                    <span className="text-emerald-700 bg-emerald-50 text-[10px] px-2 py-0.5 rounded border border-emerald-200">
+                      Assinado
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Emitido em {formatDate(term.dataEmissao)} · Responsável TI: {term.responsavelTINome}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTermForPrint(term)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Visualizar Termo A4
+                </button>
+              </div>
+            ))
+          ) : (
+            <div className="p-4 text-center text-slate-400 text-xs">
+              Nenhum termo gerado até o momento.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
