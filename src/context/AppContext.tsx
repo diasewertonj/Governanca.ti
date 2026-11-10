@@ -31,10 +31,36 @@ import {
   SupabaseAuthUser,
 } from '../services/supabase.ts';
 
+import {
+  fetchDepartmentsFromDb,
+  upsertDepartmentDb,
+  deleteDepartmentDb,
+  fetchEmployeesFromDb,
+  upsertEmployeeDb,
+  deleteEmployeeDb,
+  fetchAssetsFromDb,
+  upsertAssetDb,
+  deleteAssetDb,
+  fetchLicensesFromDb,
+  upsertLicenseDb,
+  deleteLicenseDb,
+  fetchTicketsFromDb,
+  upsertTicketDb,
+  fetchTermsFromDb,
+  upsertTermDb,
+  fetchSettingsFromDb,
+  upsertSettingsDb,
+  checkSupabaseHealth,
+  clearAllDatabaseTables,
+  SupabaseHealthStatus,
+} from '../services/supabaseDb.ts';
+
 interface AppContextType {
   // Autenticação e Usuário Atual (Supabase + Perfis)
   supabaseUser: SupabaseAuthUser | null;
   isSupabaseConnected: boolean;
+  supabaseHealth: SupabaseHealthStatus | null;
+  refreshSupabaseData: () => Promise<void>;
   authLoading: boolean;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   currentUser: Employee | null;
@@ -103,7 +129,7 @@ interface AppContextType {
   // Configurações e Reset
   updateSettings: (updates: Partial<CompanySettings>) => void;
   resetToInitialData: () => void;
-  clearAllDataToProduction: () => void;
+  clearAllDataToProduction: () => Promise<void>;
 
   // Navegação Relacional 360° e Modais
   selectedAssetIdFor360: string | null;
@@ -137,59 +163,216 @@ const STORAGE_KEYS = {
   SETTINGS: 'nexus_settings_v1',
 };
 
+// Funções utilitárias para descartar dados mock legados caso Supabase esteja configurado
+function parseStoredOrNull<T>(key: string, isDemoDetector?: (data: T) => boolean): T | null {
+  const saved = localStorage.getItem(key);
+  if (!saved) return null;
+  try {
+    const parsed = JSON.parse(saved);
+    if (isSupabaseConfigured && isDemoDetector && isDemoDetector(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Carregar dados com fallback para o initialData
+  // Quando conectado ao Supabase, a base de produção inicia ZERADA (limpa)!
+  // Apenas em modo offline/sem chaves o sistema carrega os dados de teste (INITIAL_*).
+  const isProduction = isSupabaseConfigured;
+
   const [employees, setEmployees] = useState<Employee[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
-    return saved ? JSON.parse(saved) : INITIAL_EMPLOYEES;
+    const saved = parseStoredOrNull<Employee[]>(STORAGE_KEYS.EMPLOYEES, (emps) =>
+      emps.some((e) => e.id === 'emp-1' && e.nome === 'Carlos Eduardo Mendes')
+    );
+    if (saved) return saved;
+    return isProduction ? [] : INITIAL_EMPLOYEES;
   });
 
   const [departments, setDepartments] = useState<Department[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.DEPARTMENTS);
-    return saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
+    const saved = parseStoredOrNull<Department[]>(STORAGE_KEYS.DEPARTMENTS);
+    if (saved && saved.length > 0) return saved;
+    return INITIAL_DEPARTMENTS;
   });
 
   const [assets, setAssets] = useState<Asset[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.ASSETS);
-    return saved ? JSON.parse(saved) : INITIAL_ASSETS;
+    const saved = parseStoredOrNull<Asset[]>(STORAGE_KEYS.ASSETS, (ast) =>
+      ast.some((a) => a.id === 'ast-001')
+    );
+    if (saved) return saved;
+    return isProduction ? [] : INITIAL_ASSETS;
   });
 
   const [licenses, setLicenses] = useState<SoftwareLicense[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.LICENSES);
-    return saved ? JSON.parse(saved) : INITIAL_LICENSES;
+    const saved = parseStoredOrNull<SoftwareLicense[]>(STORAGE_KEYS.LICENSES, (lic) =>
+      lic.some((l) => l.id === 'lic-001')
+    );
+    if (saved) return saved;
+    return isProduction ? [] : INITIAL_LICENSES;
   });
 
   const [tickets, setTickets] = useState<Ticket[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TICKETS);
-    return saved ? JSON.parse(saved) : INITIAL_TICKETS;
+    const saved = parseStoredOrNull<Ticket[]>(STORAGE_KEYS.TICKETS, (tkt) =>
+      tkt.some((t) => t.id === 'tkt-001')
+    );
+    if (saved) return saved;
+    return isProduction ? [] : INITIAL_TICKETS;
   });
 
   const [terms, setTerms] = useState<ResponsibilityTerm[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TERMS);
-    return saved ? JSON.parse(saved) : INITIAL_TERMS;
+    const saved = parseStoredOrNull<ResponsibilityTerm[]>(STORAGE_KEYS.TERMS, (trm) =>
+      trm.some((t) => t.id === 'tr-001')
+    );
+    if (saved) return saved;
+    return isProduction ? [] : INITIAL_TERMS;
   });
 
   const [settings, setSettings] = useState<CompanySettings>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return saved ? JSON.parse(saved) : INITIAL_COMPANY_SETTINGS;
+    const saved = parseStoredOrNull<CompanySettings>(STORAGE_KEYS.SETTINGS);
+    return saved ? saved : INITIAL_COMPANY_SETTINGS;
   });
 
   // Usuário Supabase real e Usuário corporativo
   const [supabaseUser, setSupabaseUser] = useState<SupabaseAuthUser | null>(null);
+  const [supabaseHealth, setSupabaseHealth] = useState<SupabaseHealthStatus | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
-    return localStorage.getItem(STORAGE_KEYS.USER) || 'emp-1'; // Padrão: Carlos Eduardo (Admin TI)
+    const saved = localStorage.getItem(STORAGE_KEYS.USER);
+    if (isProduction && (!saved || saved === 'emp-1')) {
+      return null;
+    }
+    return saved || (isProduction ? null : 'emp-1');
   });
 
-  // Listener de Autenticação Supabase (se configurado)
-  useEffect(() => {
-    if (!supabase) {
-      setAuthLoading(false);
-      return;
-    }
+  // Função central para vincular usuário do Supabase Auth com colaborador do sistema
+  const vincularUsuarioComColaborador = async (
+    user: SupabaseAuthUser,
+    activeEmployees?: Employee[]
+  ) => {
+    if (!user.email) return;
+    const cleanEmail = user.email.toLowerCase();
+    const currentList = activeEmployees || employees;
+    const existing = currentList.find((e) => e.email.toLowerCase() === cleanEmail);
 
-    // Obter sessão atual
+    if (existing) {
+      setCurrentUserId(existing.id);
+      return existing;
+    } else {
+      const isFirst = currentList.length === 0;
+      const isAdmin =
+        cleanEmail.includes('admin') ||
+        cleanEmail.includes('ti') ||
+        cleanEmail.includes('governance') ||
+        isFirst;
+
+      const newId = `emp-${user.id.slice(0, 8)}`;
+      const newColab: Employee = {
+        id: newId,
+        matricula: `NX-${Date.now().toString().slice(-4)}`,
+        nome: user.nome || cleanEmail.split('@')[0].toUpperCase(),
+        email: cleanEmail,
+        cargo: isAdmin ? 'Administrador de T.I. & Governança' : 'Colaborador',
+        setorId: 'dep-1',
+        status: 'ativo',
+        role: isAdmin ? 'ti_admin' : 'colaborador',
+        dataAdmissao: new Date().toISOString().split('T')[0],
+        avatarUrl: user.avatarUrl || undefined,
+      };
+
+      setEmployees((prev) => {
+        const filtered = prev.filter((e) => e.id !== newId && e.email !== cleanEmail);
+        return [newColab, ...filtered];
+      });
+      setCurrentUserId(newColab.id);
+
+      if (isSupabaseConfigured) {
+        await upsertEmployeeDb(newColab);
+      }
+      return newColab;
+    }
+  };
+
+  // Carregar dados das tabelas do Supabase (Modo Fullstack)
+  const loadDataFromSupabase = async () => {
+    if (!isSupabaseConfigured) return;
+
+    try {
+      const health = await checkSupabaseHealth();
+      setSupabaseHealth(health);
+
+      if (health.tablesExist) {
+        const [dbDepts, dbEmps, dbAssets, dbLics, dbTickets, dbTerms, dbSettings] =
+          await Promise.all([
+            fetchDepartmentsFromDb(),
+            fetchEmployeesFromDb(),
+            fetchAssetsFromDb(),
+            fetchLicensesFromDb(),
+            fetchTicketsFromDb(),
+            fetchTermsFromDb(),
+            fetchSettingsFromDb(),
+          ]);
+
+        // Sincronizar departamentos
+        if (dbDepts && dbDepts.length > 0) {
+          setDepartments(dbDepts);
+        } else {
+          for (const d of INITIAL_DEPARTMENTS) {
+            await upsertDepartmentDb(d);
+          }
+          setDepartments(INITIAL_DEPARTMENTS);
+        }
+
+        // Sincronizar colaboradores
+        if (dbEmps) {
+          setEmployees(dbEmps);
+          if (supabaseUser) {
+            vincularUsuarioComColaborador(supabaseUser, dbEmps);
+          }
+        }
+
+        // Ativos (se a tabela estiver vazia, define [] limpo para produção)
+        if (dbAssets !== null) {
+          setAssets(dbAssets);
+        }
+
+        // Licenças
+        if (dbLics !== null) {
+          setLicenses(dbLics);
+        }
+
+        // Chamados
+        if (dbTickets !== null) {
+          setTickets(dbTickets);
+        }
+
+        // Termos
+        if (dbTerms !== null) {
+          setTerms(dbTerms);
+        }
+
+        // Configurações
+        if (dbSettings) {
+          setSettings(dbSettings);
+        } else {
+          await upsertSettingsDb(INITIAL_COMPANY_SETTINGS);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao sincronizar dados com o Supabase:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadDataFromSupabase();
+  }, [isSupabaseConfigured]);
+
+  // Listener de sessão do Supabase Auth para manter login persistente
+  useEffect(() => {
+    if (!supabase) return;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const u = session.user;
@@ -202,7 +385,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSupabaseUser(authUser);
         vincularUsuarioComColaborador(authUser);
       }
-      setAuthLoading(false);
     });
 
     const {
@@ -223,37 +405,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const vincularUsuarioComColaborador = (user: SupabaseAuthUser) => {
-    if (!user.email) return;
-    const cleanEmail = user.email.toLowerCase();
-    const existing = employees.find((e) => e.email.toLowerCase() === cleanEmail);
-    if (existing) {
-      setCurrentUserId(existing.id);
-    } else {
-      const newId = `emp-${user.id.slice(0, 8)}`;
-      const foundCreated = employees.find((e) => e.id === newId);
-      if (!foundCreated) {
-        const newColab: Employee = {
-          id: newId,
-          matricula: `NX-${Date.now().toString().slice(-4)}`,
-          nome: user.nome || user.email.split('@')[0],
-          email: cleanEmail,
-          cargo: 'Administrador de T.I. & Governança',
-          setorId: 'dep-1',
-          status: 'ativo',
-          dataAdmissao: new Date().toISOString().split('T')[0],
-          avatarUrl: user.avatarUrl || undefined,
-        };
-        setEmployees((prev) => [newColab, ...prev]);
-        setCurrentUserId(newColab.id);
-      } else {
-        setCurrentUserId(foundCreated.id);
-      }
-    }
-  };
 
   // Modais de Rastreabilidade Relacional 360°
   const [selectedAssetIdFor360, setSelectedAssetIdFor360] = useState<string | null>(null);
@@ -431,23 +587,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `emp-${Date.now().toString().slice(-6)}`;
     const newEmployee: Employee = { ...data, id };
     setEmployees((prev) => [newEmployee, ...prev]);
+    upsertEmployeeDb(newEmployee);
     return newEmployee;
   };
 
   const updateEmployee = (id: string, updates: Partial<Employee>) => {
     setEmployees((prev) =>
-      prev.map((emp) => (emp.id === id ? { ...emp, ...updates } : emp))
+      prev.map((emp) => {
+        if (emp.id === id) {
+          const updated = { ...emp, ...updates };
+          upsertEmployeeDb(updated);
+          return updated;
+        }
+        return emp;
+      })
     );
   };
 
   const updateEmployeeRole = (id: string, role: UserRole) => {
     setEmployees((prev) =>
-      prev.map((emp) => (emp.id === id ? { ...emp, role } : emp))
+      prev.map((emp) => {
+        if (emp.id === id) {
+          const updated = { ...emp, role };
+          upsertEmployeeDb(updated);
+          return updated;
+        }
+        return emp;
+      })
     );
   };
 
   const deleteEmployee = (id: string): { success: boolean; message?: string } => {
-    // Proteção: não excluir se o colaborador tiver ativos sob custódia
     const assetsWithUser = assets.filter((a) => a.custodianteId === id);
     if (assetsWithUser.length > 0) {
       return {
@@ -457,6 +627,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setEmployees((prev) => prev.filter((emp) => emp.id !== id));
+    deleteEmployeeDb(id);
     return { success: true };
   };
 
@@ -465,17 +636,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `dep-${Date.now().toString().slice(-4)}`;
     const newDepartment: Department = { ...data, id };
     setDepartments((prev) => [...prev, newDepartment]);
+    upsertDepartmentDb(newDepartment);
     return newDepartment;
   };
 
   const updateDepartment = (id: string, updates: Partial<Department>) => {
     setDepartments((prev) =>
-      prev.map((dep) => (dep.id === id ? { ...dep, ...updates } : dep))
+      prev.map((dep) => {
+        if (dep.id === id) {
+          const updated = { ...dep, ...updates };
+          upsertDepartmentDb(updated);
+          return updated;
+        }
+        return dep;
+      })
     );
   };
 
   const deleteDepartment = (id: string): { success: boolean; message?: string } => {
-    // Regra Inegociável: setor com colaboradores vinculados não pode ser excluído
     const linkedEmployees = employees.filter((e) => e.setorId === id);
     if (linkedEmployees.length > 0) {
       return {
@@ -484,6 +662,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     setDepartments((prev) => prev.filter((dep) => dep.id !== id));
+    deleteDepartmentDb(id);
     return { success: true };
   };
 
@@ -492,12 +671,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `ast-${Date.now().toString().slice(-6)}`;
     const newAsset: Asset = { ...data, id };
     setAssets((prev) => [newAsset, ...prev]);
+    upsertAssetDb(newAsset);
     return newAsset;
   };
 
   const updateAsset = (id: string, updates: Partial<Asset>) => {
     setAssets((prev) =>
-      prev.map((ast) => (ast.id === id ? { ...ast, ...updates } : ast))
+      prev.map((ast) => {
+        if (ast.id === id) {
+          const updated = { ...ast, ...updates };
+          upsertAssetDb(updated);
+          return updated;
+        }
+        return ast;
+      })
     );
   };
 
@@ -515,7 +702,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const currentCustody = ast.historicoCustodia;
         let updatedCustody = [...currentCustody];
 
-        // Se havia alguém usando e está devolvendo ou transferindo
         if (ast.custodianteId && ast.custodianteId !== newColaboradorId) {
           const lastEntry = updatedCustody[updatedCustody.length - 1];
           if (lastEntry && !lastEntry.dataDevolucao) {
@@ -527,7 +713,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
 
-        // Se está alocando para um novo colaborador
         if (newColaboradorId) {
           const newEmp = employees.find((e) => e.id === newColaboradorId);
           updatedCustody.push({
@@ -539,13 +724,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
 
-        return {
+        const updated: Asset = {
           ...ast,
           custodianteId: newColaboradorId || undefined,
           status: newColaboradorId ? 'em_uso' : 'disponivel',
           dataEntregaAtual: newColaboradorId ? today : undefined,
           historicoCustodia: updatedCustody,
         };
+        upsertAssetDb(updated);
+        return updated;
       })
     );
   };
@@ -560,6 +747,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       colaboradoresIds: data.colaboradoresIds || [],
     };
     setLicenses((prev) => [newLicense, ...prev]);
+    upsertLicenseDb(newLicense);
     return newLicense;
   };
 
@@ -571,6 +759,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (updates.colaboradoresIds) {
           updated.assentosAlocados = updates.colaboradoresIds.length;
         }
+        upsertLicenseDb(updated);
         return updated;
       })
     );
@@ -586,6 +775,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     setLicenses((prev) => prev.filter((l) => l.id !== id));
+    deleteLicenseDb(id);
     return { success: true };
   };
 
@@ -595,15 +785,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (lic.id !== licenseId) return lic;
         if (lic.colaboradoresIds.includes(employeeId)) return lic;
         if (lic.colaboradoresIds.length >= lic.assentosTotais) {
-          // Bloquear se já atingiu o limite de assentos contratados
           return lic;
         }
         const updatedColabs = [...lic.colaboradoresIds, employeeId];
-        return {
+        const updated: SoftwareLicense = {
           ...lic,
           assentosAlocados: updatedColabs.length,
           colaboradoresIds: updatedColabs,
         };
+        upsertLicenseDb(updated);
+        return updated;
       })
     );
   };
@@ -614,11 +805,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (lic.id !== licenseId) return lic;
         if (!lic.colaboradoresIds.includes(employeeId)) return lic;
         const updatedColabs = lic.colaboradoresIds.filter((id) => id !== employeeId);
-        return {
+        const updated: SoftwareLicense = {
           ...lic,
           assentosAlocados: updatedColabs.length,
           colaboradoresIds: updatedColabs,
         };
+        upsertLicenseDb(updated);
+        return updated;
       })
     );
   };
@@ -653,6 +846,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setTickets((prev) => [newTicket, ...prev]);
+    upsertTicketDb(newTicket);
     return newTicket;
   };
 
@@ -678,11 +872,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           data: now,
           anexos,
         };
-        return {
+        const updated: Ticket = {
           ...tkt,
           dataAtualizacao: now,
           mensagens: [...tkt.mensagens, newMessage],
         };
+        upsertTicketDb(updated);
+        return updated;
       })
     );
   };
@@ -690,50 +886,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateTicketStatus = (ticketId: string, status: TicketStatus) => {
     const now = new Date().toISOString();
     setTickets((prev) =>
-      prev.map((tkt) =>
-        tkt.id === ticketId
-          ? {
-              ...tkt,
-              status,
-              dataAtualizacao: now,
-              dataResolucao: status === 'resolvido' ? now : tkt.dataResolucao,
-            }
-          : tkt
-      )
+      prev.map((tkt) => {
+        if (tkt.id !== ticketId) return tkt;
+        const updated: Ticket = {
+          ...tkt,
+          status,
+          dataAtualizacao: now,
+          dataResolucao: status === 'resolvido' ? now : tkt.dataResolucao,
+        };
+        upsertTicketDb(updated);
+        return updated;
+      })
     );
   };
 
   const assignTicketTechnician = (ticketId: string, technicianId: string) => {
     const tech = employees.find((e) => e.id === technicianId);
+    const now = new Date().toISOString();
     setTickets((prev) =>
-      prev.map((tkt) =>
-        tkt.id === ticketId
-          ? {
-              ...tkt,
-              tecnicoResponsavelId: technicianId,
-              tecnicoResponsavelNome: tech?.nome || 'Técnico de TI',
-              dataAtualizacao: new Date().toISOString(),
-            }
-          : tkt
-      )
+      prev.map((tkt) => {
+        if (tkt.id !== ticketId) return tkt;
+        const updated: Ticket = {
+          ...tkt,
+          tecnicoResponsavelId: technicianId,
+          tecnicoResponsavelNome: tech?.nome || 'Técnico de TI',
+          dataAtualizacao: now,
+        };
+        upsertTicketDb(updated);
+        return updated;
+      })
     );
   };
 
   const toggleOffboardingChecklist = (ticketId: string, checklistItemId: string) => {
+    const now = new Date().toISOString();
     setTickets((prev) =>
       prev.map((tkt) => {
         if (tkt.id !== ticketId || !tkt.offboarding) return tkt;
         const updatedChecklist = tkt.offboarding.checklist.map((item) =>
           item.id === checklistItemId ? { ...item, concluido: !item.concluido } : item
         );
-        return {
+        const updated: Ticket = {
           ...tkt,
           offboarding: {
             ...tkt.offboarding,
             checklist: updatedChecklist,
           },
-          dataAtualizacao: new Date().toISOString(),
+          dataAtualizacao: now,
         };
+        upsertTicketDb(updated);
+        return updated;
       })
     );
   };
@@ -755,25 +957,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setTerms((prev) => [newTerm, ...prev]);
+    upsertTermDb(newTerm);
     return newTerm;
   };
 
   const markTermSigned = (termId: string, arquivoUrl?: string) => {
     setTerms((prev) =>
-      prev.map((t) =>
-        t.id === termId
-          ? {
-              ...t,
-              statusAssinatura: 'assinado',
-              arquivoAssinadoUrl: arquivoUrl || 'https://cdn.nexuscorp.com.br/termos/assinado-scan.pdf',
-            }
-          : t
-      )
+      prev.map((t) => {
+        if (t.id !== termId) return t;
+        const updated: ResponsibilityTerm = {
+          ...t,
+          statusAssinatura: 'assinado',
+          arquivoAssinadoUrl:
+            arquivoUrl || 'https://cdn.nexuscorp.com.br/termos/assinado-scan.pdf',
+        };
+        upsertTermDb(updated);
+        return updated;
+      })
     );
   };
 
   const updateSettings = (updates: Partial<CompanySettings>) => {
-    setSettings((prev) => ({ ...prev, ...updates }));
+    setSettings((prev) => {
+      const updated = { ...prev, ...updates };
+      upsertSettingsDb(updated);
+      return updated;
+    });
   };
 
   const resetToInitialData = () => {
@@ -788,8 +997,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ZERAR DADOS: Remove todos os ativos, licenças, chamados e termos para modo de produção limpo
-  const clearAllDataToProduction = () => {
-    // Mantém setores padrão para o sistema não quebrar os dropdowns
+  const clearAllDataToProduction = async () => {
+    // 1. Limpar no banco Supabase se estiver conectado
+    if (isSupabaseConfigured) {
+      await clearAllDatabaseTables(currentUser?.email);
+    }
+
+    // 2. Setores padrão de governança para dropdowns não ficarem vazios
     const defaultDepartments: Department[] = [
       { id: 'dep-1', nome: 'Tecnologia da Informação', codigo: 'TI', ativo: true },
       { id: 'dep-2', nome: 'Recursos Humanos', codigo: 'RH', ativo: true },
@@ -798,35 +1012,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       { id: 'dep-5', nome: 'Financeiro & Controladoria', codigo: 'FIN', ativo: true },
     ];
 
-    // Mantém o usuário administrador atual (ou cria admin padrão)
-    const adminUser: Employee = currentUser || {
-      id: 'emp-1',
-      matricula: 'NX-0001',
-      nome: 'Administrador de T.I.',
-      email: 'admin.ti@nexuscorp.com.br',
-      cargo: 'Coordenador de TI & Governança',
-      setorId: 'dep-1',
-      status: 'ativo',
-      role: 'ti_admin',
-      dataAdmissao: new Date().toISOString().split('T')[0],
-    };
+    // 3. Manter o usuário logado atual
+    const activeAdmin: Employee | null = currentUser
+      ? currentUser
+      : supabaseUser
+      ? {
+          id: `emp-${supabaseUser.id.slice(0, 8)}`,
+          matricula: 'NX-0001',
+          nome: supabaseUser.nome || supabaseUser.email.split('@')[0].toUpperCase(),
+          email: supabaseUser.email,
+          cargo: 'Administrador de T.I. & Governança',
+          setorId: 'dep-1',
+          status: 'ativo',
+          role: 'ti_admin',
+          dataAdmissao: new Date().toISOString().split('T')[0],
+        }
+      : null;
 
-    setEmployees([adminUser]);
+    const remainingEmployees = activeAdmin ? [activeAdmin] : [];
+
+    setEmployees(remainingEmployees);
     setDepartments(defaultDepartments);
     setAssets([]);
     setLicenses([]);
     setTickets([]);
     setTerms([]);
-    setCurrentUserId(adminUser.id);
+    if (activeAdmin) {
+      setCurrentUserId(activeAdmin.id);
+      localStorage.setItem(STORAGE_KEYS.USER, activeAdmin.id);
+    }
 
     // Salva explicitamente arrays vazios no localStorage para não voltar o INITIAL_DATA
-    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify([adminUser]));
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(remainingEmployees));
     localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(defaultDepartments));
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.USER, adminUser.id);
+
+    if (activeAdmin && isSupabaseConfigured) {
+      await upsertEmployeeDb(activeAdmin);
+    }
   };
 
   return (
@@ -834,6 +1060,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         supabaseUser,
         isSupabaseConnected: isSupabaseConfigured,
+        supabaseHealth,
+        refreshSupabaseData: loadDataFromSupabase,
         authLoading,
         loginWithGoogle,
         currentUser,

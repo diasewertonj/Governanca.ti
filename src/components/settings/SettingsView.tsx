@@ -18,6 +18,9 @@ import {
   Save,
   Shield,
   Search,
+  Copy,
+  RefreshCw,
+  Check,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -33,11 +36,16 @@ export const SettingsView: React.FC = () => {
     resetToInitialData,
     clearAllDataToProduction,
     isSupabaseConnected,
+    supabaseHealth,
+    refreshSupabaseData,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'empresa' | 'setores' | 'campos' | 'equipe' | 'banco'>('empresa');
   const [resetConfirmText, setResetConfirmText] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -795,7 +803,7 @@ export const SettingsView: React.FC = () => {
       {activeTab === 'banco' && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                   <Database className="w-4 h-4 text-emerald-600" />
@@ -806,28 +814,95 @@ export const SettingsView: React.FC = () => {
                 </p>
               </div>
 
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${
-                  isSupabaseConnected
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    : 'bg-amber-50 text-amber-800 border-amber-200'
-                }`}
-              >
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isRefreshing}
+                  onClick={async () => {
+                    setIsRefreshing(true);
+                    await refreshSupabaseData();
+                    setIsRefreshing(false);
+                    setSuccessMsg('Verificação com o Supabase concluída.');
+                    setTimeout(() => setSuccessMsg(null), 3000);
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  title="Testar conexão e recarregar dados do banco"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
+                  <span>{isRefreshing ? 'Verificando...' : 'Atualizar Status'}</span>
+                </button>
+
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    isSupabaseConnected ? 'bg-emerald-600 animate-pulse' : 'bg-amber-500'
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${
+                    isSupabaseConnected && supabaseHealth?.tablesExist
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : isSupabaseConnected
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
                   }`}
-                />
-                {isSupabaseConnected ? 'Supabase Conectado' : 'Modo Local (Aguardando Chaves)'}
-              </span>
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isSupabaseConnected && supabaseHealth?.tablesExist
+                        ? 'bg-emerald-600 animate-pulse'
+                        : isSupabaseConnected
+                        ? 'bg-amber-500'
+                        : 'bg-slate-400'
+                    }`}
+                  />
+                  {isSupabaseConnected && supabaseHealth?.tablesExist
+                    ? 'Supabase Conectado (Tabelas Ativas)'
+                    : isSupabaseConnected
+                    ? 'Conectado (Schema Pendente)'
+                    : 'Modo Local (Aguardando Chaves)'}
+                </span>
+              </div>
             </div>
+
+            {/* Aviso especial se conectado mas tabelas ainda não criadas */}
+            {isSupabaseConnected && supabaseHealth && !supabaseHealth.tablesExist && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <h4 className="text-xs font-bold text-amber-900">
+                    Ação Necessária no Supabase: Criar Tabelas via SQL Editor
+                  </h4>
+                </div>
+                <p className="text-xs text-amber-800">
+                  Suas credenciais de conexão estão ativas, mas o PostgreSQL no Supabase ainda não possui as tabelas (ativos, chamados, colaboradores, etc.). Para ativar a persistência em nuvem, copie o arquivo <code className="bg-white/80 px-1 py-0.5 rounded font-mono font-semibold">supabase-schema.sql</code> e execute no <strong>SQL Editor</strong> do painel do Supabase.
+                </p>
+              </div>
+            )}
 
             {/* Chaves e Instruções de Configuração */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-slate-600" />
-                Como conectar seu Supabase em 3 Passos
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-slate-600" />
+                  Como conectar seu Supabase em 3 Passos
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText('-- Execute o arquivo supabase-schema.sql localizado na raiz do projeto Nexus IT & HR');
+                    setCopiedSql(true);
+                    setTimeout(() => setCopiedSql(false), 2500);
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                >
+                  {copiedSql ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700 font-semibold">Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copiar Dica do Schema</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
               <div className="space-y-3 text-xs text-slate-700">
                 <div className="flex items-start gap-2.5">
@@ -837,7 +912,7 @@ export const SettingsView: React.FC = () => {
                   <div>
                     <p className="font-semibold text-slate-900">Execute o Schema no Supabase SQL Editor:</p>
                     <p className="text-slate-500 mt-0.5">
-                      Copie o conteúdo do arquivo <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-[11px]">supabase-schema.sql</code> já criado na raiz do projeto e cole na aba <strong>SQL Editor</strong> do painel do Supabase.
+                      Copie o conteúdo do arquivo <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-[11px]">supabase-schema.sql</code> já criado na raiz do projeto e cole na aba <strong>SQL Editor</strong> do painel do Supabase. Em seguida, clique em <strong>Run</strong>.
                     </p>
                   </div>
                 </div>
@@ -881,16 +956,16 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
                     Zona de Produção: Zerar Dados de Exemplo
                   </h4>
                   <p className="text-xs text-rose-700 mt-0.5">
-                    Utilize esta opção quando quiser iniciar a operação real da empresa, limpando dados fictícios de ativos, colaboradores e chamados.
+                    Utilize esta opção para iniciar a operação real da sua empresa, limpando ativos fictícios, licenças e chamados de demonstração.
                   </p>
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center gap-3">
+              <div className="pt-2 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setShowResetModal(true)}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors flex items-center gap-2"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Zerar Dados de Exemplo (Reset de Fábrica)</span>
@@ -898,13 +973,13 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm('Restaurar a base completa de demonstração?')) {
+                    if (window.confirm('Restaurar a base completa de demonstração fictícia?')) {
                       resetToInitialData();
-                      setSuccessMsg('Base de demonstração restaurada.');
+                      setSuccessMsg('Base de demonstração restaurada no navegador.');
                       setTimeout(() => setSuccessMsg(null), 3000);
                     }
                   }}
-                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Restaurar Base de Demonstração</span>
@@ -926,26 +1001,28 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
             <div className="text-center">
               <h3 className="text-sm font-bold text-slate-900">Confirmar Limpeza Completa da Base</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Esta ação apagará todos os ativos, licenças, colaboradores e chamados de teste para iniciar a base limpa de produção.
+                Esta ação apagará todos os ativos, licenças e chamados de teste tanto do sistema quanto do Supabase (se conectado), deixando a plataforma zerada e pronta para seus dados reais.
               </p>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-2">
+            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs space-y-2">
               <label className="block text-[11px] font-semibold text-slate-700">
-                Para confirmar, digite <span className="font-mono font-bold text-rose-600">ZERAR</span> abaixo:
+                Digite <span className="font-mono font-bold text-rose-600">ZERAR</span> para liberar a limpeza:
               </label>
               <input
                 type="text"
+                autoFocus
                 value={resetConfirmText}
                 onChange={(e) => setResetConfirmText(e.target.value)}
                 placeholder="Digite ZERAR"
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-md font-mono text-center text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-md font-mono text-center font-bold tracking-wider text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-rose-500"
               />
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
+                disabled={isResetting}
                 onClick={() => {
                   setShowResetModal(false);
                   setResetConfirmText('');
@@ -956,17 +1033,32 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
               </button>
               <button
                 type="button"
-                disabled={resetConfirmText.trim().toUpperCase() !== 'ZERAR'}
-                onClick={() => {
-                  clearAllDataToProduction();
-                  setShowResetModal(false);
-                  setResetConfirmText('');
-                  setSuccessMsg('Base zerada com sucesso! O sistema está pronto para produção.');
-                  setTimeout(() => setSuccessMsg(null), 4000);
+                disabled={resetConfirmText.trim().toUpperCase() !== 'ZERAR' || isResetting}
+                onClick={async () => {
+                  setIsResetting(true);
+                  try {
+                    await clearAllDataToProduction();
+                    setShowResetModal(false);
+                    setResetConfirmText('');
+                    setSuccessMsg('Base zerada com sucesso! O sistema está limpo e pronto para produção.');
+                    setTimeout(() => setSuccessMsg(null), 4000);
+                  } catch (err) {
+                    console.error('Erro ao zerar base:', err);
+                    setErrorMsg('Ocorreu um erro ao limpar o banco. Verifique o console.');
+                  } finally {
+                    setIsResetting(false);
+                  }
                 }}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-40"
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
               >
-                Confirmar e Limpar Base
+                {isResetting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Limpando banco...</span>
+                  </>
+                ) : (
+                  <span>Confirmar e Limpar Base</span>
+                )}
               </button>
             </div>
           </div>

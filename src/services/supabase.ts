@@ -1,20 +1,31 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Variáveis de ambiente configuráveis na Vercel ou localmente
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/^["']|["']$/g, '');
+const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim().replace(/^["']|["']$/g, '');
+
+// Garantir URL limpa (remover barra no final se houver)
+const supabaseUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+const supabaseAnonKey = rawKey;
 
 // Verifica se as chaves do Supabase foram configuradas
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
   supabaseAnonKey &&
-  supabaseUrl !== 'https://seu-projeto.supabase.co' &&
-  !supabaseUrl.includes('placeholder')
+  supabaseUrl.startsWith('http') &&
+  !supabaseUrl.includes('placeholder') &&
+  !supabaseUrl.includes('seu-projeto')
 );
 
 // Cria o cliente Supabase se as credenciais estiverem preenchidas
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
   : null;
 
 /**

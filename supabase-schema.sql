@@ -1,9 +1,9 @@
-# ==============================================================================
-# NEXUS IT & HR - SCHEMA DE PRODUÇÃO POSTGRESQL (SUPABASE DDL)
-# ==============================================================================
-# Execute este script no SQL Editor do seu Dashboard Supabase:
-# https://supabase.com/dashboard/project/_/sql
-# ==============================================================================
+-- ==============================================================================
+-- NEXUS IT & HR - SCHEMA DE PRODUÇÃO POSTGRESQL (SUPABASE DDL)
+-- ==============================================================================
+-- Execute este script no SQL Editor do seu Dashboard Supabase:
+-- https://supabase.com/dashboard/project/_/sql
+-- ==============================================================================
 
 -- 1. Habilitar extensão UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
