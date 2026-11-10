@@ -1,6 +1,5 @@
 {
   "name": "Nexus IT & HR - Governança de TI e Ativos",
   "description": "Sistema integrado de gestão de ativos de TI, service desk corporativo e ciclo de vida do colaborador com rastreabilidade 360°.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": []
 }

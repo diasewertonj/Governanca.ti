@@ -52,6 +52,8 @@ import {
   upsertSettingsDb,
   checkSupabaseHealth,
   clearAllDatabaseTables,
+  upsertCustodyEntryDb,
+  addTicketMessageDb,
   SupabaseHealthStatus,
 } from '../services/supabaseDb.ts';
 
@@ -185,7 +187,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [employees, setEmployees] = useState<Employee[]>(() => {
     const saved = parseStoredOrNull<Employee[]>(STORAGE_KEYS.EMPLOYEES, (emps) =>
-      emps.some((e) => e.id === 'emp-1' && e.nome === 'Carlos Eduardo Mendes')
+      emps.some((e) => (e.id === 'emp-1' || e.id === 'emp-001') && e.nome === 'Carlos Eduardo Mendes')
     );
     if (saved) return saved;
     return isProduction ? [] : INITIAL_EMPLOYEES;
@@ -199,7 +201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [assets, setAssets] = useState<Asset[]>(() => {
     const saved = parseStoredOrNull<Asset[]>(STORAGE_KEYS.ASSETS, (ast) =>
-      ast.some((a) => a.id === 'ast-001')
+      ast.some((a) => a.id === 'ast-1' || a.id === 'ast-001')
     );
     if (saved) return saved;
     return isProduction ? [] : INITIAL_ASSETS;
@@ -207,7 +209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [licenses, setLicenses] = useState<SoftwareLicense[]>(() => {
     const saved = parseStoredOrNull<SoftwareLicense[]>(STORAGE_KEYS.LICENSES, (lic) =>
-      lic.some((l) => l.id === 'lic-001')
+      lic.some((l) => l.id === 'lic-1' || l.id === 'lic-001')
     );
     if (saved) return saved;
     return isProduction ? [] : INITIAL_LICENSES;
@@ -215,7 +217,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [tickets, setTickets] = useState<Ticket[]>(() => {
     const saved = parseStoredOrNull<Ticket[]>(STORAGE_KEYS.TICKETS, (tkt) =>
-      tkt.some((t) => t.id === 'tkt-001')
+      tkt.some((t) => t.id === 'tkt-1' || t.id === 'tkt-001')
     );
     if (saved) return saved;
     return isProduction ? [] : INITIAL_TICKETS;
@@ -223,7 +225,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [terms, setTerms] = useState<ResponsibilityTerm[]>(() => {
     const saved = parseStoredOrNull<ResponsibilityTerm[]>(STORAGE_KEYS.TERMS, (trm) =>
-      trm.some((t) => t.id === 'tr-001')
+      trm.some((t) => t.id === 'tr-1' || t.id === 'tr-001')
     );
     if (saved) return saved;
     return isProduction ? [] : INITIAL_TERMS;
@@ -261,12 +263,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentUserId(existing.id);
       return existing;
     } else {
+      // Governança RBAC segura: Apenas o 1º usuário registrado do sistema ganha permissão de Administrador bootstrap
       const isFirst = currentList.length === 0;
-      const isAdmin =
-        cleanEmail.includes('admin') ||
-        cleanEmail.includes('ti') ||
-        cleanEmail.includes('governance') ||
-        isFirst;
+      const isAdmin = isFirst;
 
       const newId = `emp-${user.id.slice(0, 8)}`;
       const newColab: Employee = {
@@ -504,16 +503,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = email.trim().toLowerCase();
 
-    // Se o Supabase estiver configurado e houver senha, autenticar no Supabase Auth
-    if (supabase && password) {
+    // 1. Se o Supabase estiver configurado, autenticação real e estrita no Supabase Auth
+    if (supabase) {
+      if (!password) {
+        return {
+          success: false,
+          error: 'Por favor, informe a senha corporativa de acesso.',
+        };
+      }
+
       const res = await signInWithPasswordSupabase(cleanEmail, password);
       if (res.error) {
-        // Tentar autenticação pelo cadastro corporativo se a senha for padrão de primeiro acesso
-        const localUser = employees.find((e) => e.email.toLowerCase() === cleanEmail);
-        if (!localUser) {
-          return { success: false, error: res.error };
-        }
-      } else if (res.data?.user) {
+        return {
+          success: false,
+          error: `Falha na autenticação: ${res.error}`,
+        };
+      }
+
+      if (res.data?.user) {
         const u = res.data.user;
         const authUser: SupabaseAuthUser = {
           id: u.id,
@@ -526,17 +533,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // Validação com a base corporativa de colaboradores
+    // 2. Modo Offline / Demonstração: Exige senha padrão segura (nexus@2026)
     const found = employees.find((e) => e.email.toLowerCase() === cleanEmail);
-    if (found) {
-      setCurrentUserId(found.id);
-      return { success: true };
+    if (!found) {
+      return {
+        success: false,
+        error: 'E-mail corporativo não cadastrado no sistema.',
+      };
     }
 
-    return {
-      success: false,
-      error: 'E-mail ou credenciais corporativas não encontradas no sistema.',
-    };
+    if (password !== 'nexus@2026') {
+      return {
+        success: false,
+        error: 'Senha incorreta. No modo de demonstração utilize a credencial padrão nexus@2026.',
+      };
+    }
+
+    setCurrentUserId(found.id);
+    return { success: true };
   };
 
   const registerUser = async (
@@ -705,23 +719,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (ast.custodianteId && ast.custodianteId !== newColaboradorId) {
           const lastEntry = updatedCustody[updatedCustody.length - 1];
           if (lastEntry && !lastEntry.dataDevolucao) {
-            updatedCustody[updatedCustody.length - 1] = {
+            const closedEntry = {
               ...lastEntry,
               dataDevolucao: today,
               motivoDevolucao: motivoDevolucao || 'Devolução/Transferência para o estoque de TI',
             };
+            updatedCustody[updatedCustody.length - 1] = closedEntry;
+            upsertCustodyEntryDb(assetId, closedEntry);
           }
         }
 
         if (newColaboradorId) {
           const newEmp = employees.find((e) => e.id === newColaboradorId);
-          updatedCustody.push({
+          const newEntry = {
             id: `cust-${Date.now().toString().slice(-6)}`,
             colaboradorId: newColaboradorId,
             colaboradorNome: newEmp?.nome || 'Colaborador',
             dataEntrega: today,
             observacoes: 'Transferência de custódia realizada pelo setor de TI',
-          });
+          };
+          updatedCustody.push(newEntry);
+          upsertCustodyEntryDb(assetId, newEntry);
         }
 
         const updated: Asset = {
@@ -847,6 +865,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setTickets((prev) => [newTicket, ...prev]);
     upsertTicketDb(newTicket);
+    addTicketMessageDb(newTicket.id, newTicket.mensagens[0]);
     return newTicket;
   };
 
@@ -859,19 +878,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) return;
     const now = new Date().toISOString();
 
+    const newMessage = {
+      id: `msg-${Date.now().toString().slice(-6)}`,
+      autorId: currentUser.id,
+      autorNome: currentUser.nome,
+      autorRole: currentRole,
+      texto,
+      ehNotaInterna,
+      data: now,
+      anexos,
+    };
+
+    addTicketMessageDb(ticketId, newMessage);
+
     setTickets((prev) =>
       prev.map((tkt) => {
         if (tkt.id !== ticketId) return tkt;
-        const newMessage = {
-          id: `msg-${Date.now().toString().slice(-6)}`,
-          autorId: currentUser.id,
-          autorNome: currentUser.nome,
-          autorRole: currentRole,
-          texto,
-          ehNotaInterna,
-          data: now,
-          anexos,
-        };
         const updated: Ticket = {
           ...tkt,
           dataAtualizacao: now,

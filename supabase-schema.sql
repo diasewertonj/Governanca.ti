@@ -180,24 +180,77 @@ ALTER TABLE public.chamado_mensagens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.termos_responsabilidade ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.configuracoes_empresa ENABLE ROW LEVEL SECURITY;
 
--- Políticas de Leitura Pública/Autenticada para o Nexus IT & HR
-CREATE POLICY "Leitura autenticada de setores" ON public.departamentos FOR SELECT USING (true);
-CREATE POLICY "Leitura pública configuracoes" ON public.configuracoes_empresa FOR SELECT USING (true);
-CREATE POLICY "Leitura autenticada colaboradores" ON public.colaboradores FOR SELECT USING (true);
-CREATE POLICY "Leitura ativos" ON public.ativos FOR SELECT USING (true);
-CREATE POLICY "Leitura historico" ON public.historico_custodia FOR SELECT USING (true);
-CREATE POLICY "Leitura licencas" ON public.licencas_software FOR SELECT USING (true);
-CREATE POLICY "Leitura chamados" ON public.chamados FOR SELECT USING (true);
-CREATE POLICY "Leitura mensagens" ON public.chamado_mensagens FOR SELECT USING (true);
-CREATE POLICY "Leitura termos" ON public.termos_responsabilidade FOR SELECT USING (true);
+-- Limpeza de políticas existentes
+DROP POLICY IF EXISTS "Leitura autenticada de setores" ON public.departamentos;
+DROP POLICY IF EXISTS "Leitura pública configuracoes" ON public.configuracoes_empresa;
+DROP POLICY IF EXISTS "Leitura autenticada colaboradores" ON public.colaboradores;
+DROP POLICY IF EXISTS "Leitura ativos" ON public.ativos;
+DROP POLICY IF EXISTS "Leitura historico" ON public.historico_custodia;
+DROP POLICY IF EXISTS "Leitura licencas" ON public.licencas_software;
+DROP POLICY IF EXISTS "Leitura chamados" ON public.chamados;
+DROP POLICY IF EXISTS "Leitura mensagens" ON public.chamado_mensagens;
+DROP POLICY IF EXISTS "Leitura termos" ON public.termos_responsabilidade;
 
--- Permissões de gravação para a aplicação
-CREATE POLICY "Gravacao departamentos" ON public.departamentos FOR ALL USING (true);
-CREATE POLICY "Gravacao colaboradores" ON public.colaboradores FOR ALL USING (true);
-CREATE POLICY "Gravacao ativos" ON public.ativos FOR ALL USING (true);
-CREATE POLICY "Gravacao historico" ON public.historico_custodia FOR ALL USING (true);
-CREATE POLICY "Gravacao licencas" ON public.licencas_software FOR ALL USING (true);
-CREATE POLICY "Gravacao chamados" ON public.chamados FOR ALL USING (true);
-CREATE POLICY "Gravacao mensagens" ON public.chamado_mensagens FOR ALL USING (true);
-CREATE POLICY "Gravacao termos" ON public.termos_responsabilidade FOR ALL USING (true);
-CREATE POLICY "Gravacao configuracoes" ON public.configuracoes_empresa FOR ALL USING (true);
+DROP POLICY IF EXISTS "Gravacao departamentos" ON public.departamentos;
+DROP POLICY IF EXISTS "Gravacao colaboradores" ON public.colaboradores;
+DROP POLICY IF EXISTS "Gravacao ativos" ON public.ativos;
+DROP POLICY IF EXISTS "Gravacao historico" ON public.historico_custodia;
+DROP POLICY IF EXISTS "Gravacao licencas" ON public.licencas_software;
+DROP POLICY IF EXISTS "Gravacao chamados" ON public.chamados;
+DROP POLICY IF EXISTS "Gravacao mensagens" ON public.chamado_mensagens;
+DROP POLICY IF EXISTS "Gravacao termos" ON public.termos_responsabilidade;
+DROP POLICY IF EXISTS "Gravacao configuracoes" ON public.configuracoes_empresa;
+
+-- 1. Configurações da Empresa (Leitura pública para tela de login/branding, gravação autenticada)
+CREATE POLICY "Leitura pública configuracoes" ON public.configuracoes_empresa 
+    FOR SELECT USING (true);
+CREATE POLICY "Gravacao autenticada configuracoes" ON public.configuracoes_empresa 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 2. Departamentos (Leitura e gravação para usuários autenticados)
+CREATE POLICY "Leitura autenticada departamentos" ON public.departamentos 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada departamentos" ON public.departamentos 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 3. Colaboradores
+CREATE POLICY "Leitura autenticada colaboradores" ON public.colaboradores 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada colaboradores" ON public.colaboradores 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 4. Ativos
+CREATE POLICY "Leitura autenticada ativos" ON public.ativos 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada ativos" ON public.ativos 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 5. Histórico de Custódia
+CREATE POLICY "Leitura autenticada historico" ON public.historico_custodia 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada historico" ON public.historico_custodia 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 6. Licenças de Software
+CREATE POLICY "Leitura autenticada licencas" ON public.licencas_software 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada licencas" ON public.licencas_software 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 7. Chamados (Service Desk)
+CREATE POLICY "Leitura autenticada chamados" ON public.chamados 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada chamados" ON public.chamados 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 8. Mensagens de Chamados
+CREATE POLICY "Leitura autenticada mensagens" ON public.chamado_mensagens 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada mensagens" ON public.chamado_mensagens 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 9. Termos de Responsabilidade
+CREATE POLICY "Leitura autenticada termos" ON public.termos_responsabilidade 
+    FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gravacao autenticada termos" ON public.termos_responsabilidade 
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);

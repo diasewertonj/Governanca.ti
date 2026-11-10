@@ -2,11 +2,13 @@ import { supabase } from './supabase.ts';
 import {
   Asset,
   CompanySettings,
+  CustodyHistoryEntry,
   Department,
   Employee,
   ResponsibilityTerm,
   SoftwareLicense,
   Ticket,
+  TicketMessage,
 } from '../types/index.ts';
 
 /**
@@ -103,6 +105,32 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     console.error('Erro ao buscar ativos do Supabase:', error);
     return null;
   }
+
+  // Buscar histórico de custódia vinculado
+  const { data: custodyData } = await supabase
+    .from('historico_custodia')
+    .select('*')
+    .order('data_entrega', { ascending: true });
+
+  const custodyByAssetId: Record<string, CustodyHistoryEntry[]> = {};
+  if (custodyData) {
+    custodyData.forEach((c: any) => {
+      if (!custodyByAssetId[c.ativo_id]) {
+        custodyByAssetId[c.ativo_id] = [];
+      }
+      custodyByAssetId[c.ativo_id].push({
+        id: c.id,
+        colaboradorId: c.colaborador_id,
+        colaboradorNome: c.colaborador_nome,
+        dataEntrega: c.data_entrega,
+        dataDevolucao: c.data_devolucao || undefined,
+        motivoDevolucao: c.motivo_devolucao || undefined,
+        termoId: c.termo_id || undefined,
+        observacoes: c.observacoes || undefined,
+      });
+    });
+  }
+
   return data ? data.map((a: any) => ({
     id: a.id,
     tag: a.tag,
@@ -119,9 +147,24 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     bitlockerKey: a.bitlocker_key || undefined,
     fiscal: a.fiscal || undefined,
     customFields: a.custom_fields || {},
-    historicoCustodia: [],
+    historicoCustodia: custodyByAssetId[a.id] || [],
     historicoManutencao: [],
   })) : [];
+}
+
+export async function upsertCustodyEntryDb(ativoId: string, entry: CustodyHistoryEntry) {
+  if (!supabase) return;
+  await supabase.from('historico_custodia').upsert({
+    id: entry.id,
+    ativo_id: ativoId,
+    colaborador_id: entry.colaboradorId,
+    colaborador_nome: entry.colaboradorNome,
+    data_entrega: entry.dataEntrega,
+    data_devolucao: entry.dataDevolucao || null,
+    motivo_devolucao: entry.motivoDevolucao || null,
+    termo_id: entry.termoId || null,
+    observacoes: entry.observacoes || null,
+  });
 }
 
 export async function upsertAssetDb(asset: Asset) {
@@ -204,6 +247,32 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     console.error('Erro ao buscar chamados do Supabase:', error);
     return null;
   }
+
+  // Buscar mensagens vinculadas aos chamados
+  const { data: msgsData } = await supabase
+    .from('chamado_mensagens')
+    .select('*')
+    .order('data_envio', { ascending: true });
+
+  const messagesByTicketId: Record<string, TicketMessage[]> = {};
+  if (msgsData) {
+    msgsData.forEach((m: any) => {
+      if (!messagesByTicketId[m.chamado_id]) {
+        messagesByTicketId[m.chamado_id] = [];
+      }
+      messagesByTicketId[m.chamado_id].push({
+        id: m.id,
+        autorId: m.autor_id,
+        autorNome: m.autor_nome,
+        autorRole: m.autor_papel || 'colaborador',
+        texto: m.texto,
+        ehNotaInterna: Boolean(m.eh_nota_interna),
+        data: m.data_envio,
+        anexos: m.anexos || [],
+      });
+    });
+  }
+
   return data ? data.map((t: any) => ({
     id: t.id,
     codigo: t.codigo,
@@ -226,10 +295,25 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     onboarding: t.onboarding || undefined,
     offboarding: t.offboarding || undefined,
     anexos: t.anexos || [],
-    mensagens: [],
+    mensagens: messagesByTicketId[t.id] || [],
     dataCriacao: t.data_criacao,
     dataAtualizacao: t.data_atualizacao,
   })) : [];
+}
+
+export async function addTicketMessageDb(chamadoId: string, msg: TicketMessage) {
+  if (!supabase) return;
+  await supabase.from('chamado_mensagens').upsert({
+    id: msg.id,
+    chamado_id: chamadoId,
+    autor_id: msg.autorId,
+    autor_nome: msg.autorNome,
+    autor_papel: msg.autorRole,
+    texto: msg.texto,
+    eh_nota_interna: msg.ehNotaInterna,
+    data_envio: msg.data,
+    anexos: msg.anexos || [],
+  });
 }
 
 export async function upsertTicketDb(t: Ticket) {

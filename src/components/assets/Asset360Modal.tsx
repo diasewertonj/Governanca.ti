@@ -17,6 +17,7 @@ import {
   Calendar,
   ExternalLink,
   Edit2,
+  Lock,
 } from 'lucide-react';
 
 interface Asset360ModalProps {
@@ -393,7 +394,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                       <span className="text-[10px] uppercase font-semibold text-slate-400">
                         Chave de Recuperação BitLocker / Criptografia
                       </span>
-                      {asset.bitlockerKey && (
+                      {isTI && asset.bitlockerKey && (
                         <button
                           type="button"
                           onClick={handleCopyBitlocker}
@@ -414,13 +415,20 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                       )}
                     </div>
 
-                    {asset.bitlockerKey ? (
-                      <p className="font-mono text-xs font-medium text-slate-800 bg-white p-2 rounded border border-slate-200 tracking-wider break-all select-all">
-                        {asset.bitlockerKey}
-                      </p>
+                    {isTI ? (
+                      asset.bitlockerKey ? (
+                        <p className="font-mono text-xs font-medium text-slate-800 bg-white p-2 rounded border border-slate-200 tracking-wider break-all select-all">
+                          {asset.bitlockerKey}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">
+                          Nenhuma chave de recuperação BitLocker registrada para este equipamento.
+                        </p>
+                      )
                     ) : (
-                      <p className="text-xs text-slate-400 italic">
-                        Nenhuma chave de recuperação BitLocker registrada para este equipamento.
+                      <p className="text-xs text-slate-500 italic flex items-center gap-1.5 py-1">
+                        <Lock className="w-3.5 h-3.5 text-slate-400" />
+                        Chave confidencial de criptografia de disco (acesso restrito à equipe de TI).
                       </p>
                     )}
                   </div>
