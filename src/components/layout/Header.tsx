@@ -75,20 +75,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
         </h1>
       </div>
 
-      {/* Zona 3: Ações de Perfil e Alternador de Demonstração */}
+      {/* Zona 3: Informações do Usuário Autenticado & Logout */}
       <div className="flex items-center gap-3 shrink-0">
-        {/* Botão sutil de restaurar dados */}
-        <button
-          type="button"
-          onClick={handleResetData}
-          title="Restaurar dados iniciais da demonstração"
-          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span className="text-[11px]">Restaurar Demo</span>
-        </button>
-
-        {/* Dropdown de Alternância de Perfil e Conta Real */}
         <div className="relative">
           <button
             type="button"
@@ -108,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
               </div>
             )}
             <div className="text-left hidden sm:block">
-              <p className="font-semibold text-slate-800 leading-none truncate max-w-[120px]">
+              <p className="font-semibold text-slate-800 leading-none truncate max-w-[140px]">
                 {currentUser?.nome || supabaseUser?.nome || 'Usuário'}
               </p>
               <span className="text-[10px] text-slate-500 leading-none mt-0.5 block">
@@ -119,75 +107,37 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
           </button>
 
           {showSwitchMenu && (
-            <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
-              {supabaseUser && (
-                <div className="px-3 py-2 bg-emerald-50/70 border-b border-emerald-100 mb-1">
-                  <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-800 tracking-wider">
-                    <span>Supabase Auth Conectado</span>
-                  </div>
-                  <p className="text-xs font-semibold text-slate-800 truncate mt-0.5">
-                    {supabaseUser.email}
-                  </p>
-                </div>
-              )}
-
-              {/* AUDITORIA RBAC: Somente Administradores de TI podem alternar livremente entre identidades para teste */}
-              {currentRole === 'ti_admin' ? (
-                <>
-                  <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                      Simulação de Perfil (Admin TI)
+            <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-3.5 py-2.5 border-b border-slate-100">
+                <p className="font-semibold text-slate-900 text-xs truncate">
+                  {currentUser?.nome || supabaseUser?.nome}
+                </p>
+                <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                  {currentUser?.email || supabaseUser?.email}
+                </p>
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${roleLabels[currentRole]?.badgeClass}`}>
+                    {roleLabels[currentRole]?.label}
+                  </span>
+                  {supabaseUser && (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-medium">
+                      Google OAuth
                     </span>
-                    <p className="text-[11px] text-slate-500">
-                      Alternar visualização para testes de auditoria
-                    </p>
-                  </div>
-
-                  <div className="space-y-0.5 px-1 max-h-48 overflow-y-auto">
-                    {employees.map((emp) => {
-                      const isSelected = emp.id === currentUser?.id;
-                      return (
-                        <button
-                          key={emp.id}
-                          type="button"
-                          onClick={() => {
-                            switchUser(emp.id);
-                            setShowSwitchMenu(false);
-                          }}
-                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors ${
-                            isSelected
-                              ? 'bg-blue-50 text-blue-900 font-medium'
-                              : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="min-w-0 pr-2">
-                            <p className="font-medium truncate">{emp.nome}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{emp.cargo}</p>
-                          </div>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <div className="px-3 py-2 text-xs text-slate-500 border-b border-slate-100">
-                  <p className="font-medium text-slate-700">{currentUser?.nome}</p>
-                  <p className="text-[11px] text-slate-400">{currentUser?.email}</p>
+                  )}
                 </div>
-              )}
+              </div>
 
-              <div className="mt-1 pt-1 border-t border-slate-100 px-1">
+              <div className="pt-1 px-1">
                 <button
                   type="button"
                   onClick={() => {
                     setShowSwitchMenu(false);
                     logout();
                   }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-rose-600 hover:bg-rose-50 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-600 hover:bg-rose-50 transition-colors font-medium text-left"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sair (Ir para Tela de Login)</span>
+                  <LogOut className="w-4 h-4" />
+                  <span>Sair da Conta (Logout)</span>
                 </button>
               </div>
             </div>

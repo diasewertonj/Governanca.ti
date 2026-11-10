@@ -25,6 +25,8 @@ import {
   supabase,
   isSupabaseConfigured,
   signInWithGoogleSupabase,
+  signInWithPasswordSupabase,
+  signUpWithPasswordSupabase,
   signOutSupabase,
   SupabaseAuthUser,
 } from '../services/supabase.ts';
@@ -37,7 +39,8 @@ interface AppContextType {
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   currentUser: Employee | null;
   currentRole: UserRole;
-  login: (email: string) => boolean;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  registerUser: (email: string, password: string, nome: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   switchUser: (employeeId: string) => void;
 
@@ -97,9 +100,10 @@ interface AppContextType {
   ) => ResponsibilityTerm;
   markTermSigned: (termId: string, arquivoUrl?: string) => void;
 
-  // Configurações
+  // Configurações e Reset
   updateSettings: (updates: Partial<CompanySettings>) => void;
   resetToInitialData: () => void;
+  clearAllDataToProduction: () => void;
 
   // Navegação Relacional 360° e Modais
   selectedAssetIdFor360: string | null;
@@ -338,14 +342,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const login = (email: string) => {
+  const login = async (
+    email: string,
+    password?: string
+  ): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = email.trim().toLowerCase();
+
+    // Se o Supabase estiver configurado e houver senha, autenticar no Supabase Auth
+    if (supabase && password) {
+      const res = await signInWithPasswordSupabase(cleanEmail, password);
+      if (res.error) {
+        // Tentar autenticação pelo cadastro corporativo se a senha for padrão de primeiro acesso
+        const localUser = employees.find((e) => e.email.toLowerCase() === cleanEmail);
+        if (!localUser) {
+          return { success: false, error: res.error };
+        }
+      } else if (res.data?.user) {
+        const u = res.data.user;
+        const authUser: SupabaseAuthUser = {
+          id: u.id,
+          email: u.email || cleanEmail,
+          nome: u.user_metadata?.full_name || cleanEmail.split('@')[0],
+        };
+        setSupabaseUser(authUser);
+        vincularUsuarioComColaborador(authUser);
+        return { success: true };
+      }
+    }
+
+    // Validação com a base corporativa de colaboradores
     const found = employees.find((e) => e.email.toLowerCase() === cleanEmail);
     if (found) {
       setCurrentUserId(found.id);
-      return true;
+      return { success: true };
     }
-    return false;
+
+    return {
+      success: false,
+      error: 'E-mail ou credenciais corporativas não encontradas no sistema.',
+    };
+  };
+
+  const registerUser = async (
+    email: string,
+    password: string,
+    nome: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (supabase) {
+      const res = await signUpWithPasswordSupabase(cleanEmail, password, nome);
+      if (res.error) {
+        return { success: false, error: res.error };
+      }
+    }
+
+    // Criar colaborador associado
+    const newEmp: Employee = {
+      id: `emp-${Date.now().toString().slice(-6)}`,
+      matricula: `NX-${Date.now().toString().slice(-4)}`,
+      nome,
+      email: cleanEmail,
+      cargo: 'Colaborador',
+      setorId: 'dep-1',
+      status: 'ativo',
+      role: 'colaborador',
+      dataAdmissao: new Date().toISOString().split('T')[0],
+    };
+    setEmployees((prev) => [newEmp, ...prev]);
+    setCurrentUserId(newEmp.id);
+    return { success: true };
   };
 
   const logout = async () => {
@@ -720,7 +785,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTerms(INITIAL_TERMS);
     setSettings(INITIAL_COMPANY_SETTINGS);
     setCurrentUserId('emp-1');
-    localStorage.clear();
+  };
+
+  // ZERAR DADOS: Remove todos os ativos, licenças, chamados e termos para modo de produção limpo
+  const clearAllDataToProduction = () => {
+    // Mantém setores padrão para o sistema não quebrar os dropdowns
+    const defaultDepartments: Department[] = [
+      { id: 'dep-1', nome: 'Tecnologia da Informação', codigo: 'TI', ativo: true },
+      { id: 'dep-2', nome: 'Recursos Humanos', codigo: 'RH', ativo: true },
+      { id: 'dep-3', nome: 'Operações e Logística', codigo: 'OPS', ativo: true },
+      { id: 'dep-4', nome: 'Comercial & Vendas', codigo: 'COM', ativo: true },
+      { id: 'dep-5', nome: 'Financeiro & Controladoria', codigo: 'FIN', ativo: true },
+    ];
+
+    // Mantém o usuário administrador atual (ou cria admin padrão)
+    const adminUser: Employee = currentUser || {
+      id: 'emp-1',
+      matricula: 'NX-0001',
+      nome: 'Administrador de T.I.',
+      email: 'admin.ti@nexuscorp.com.br',
+      cargo: 'Coordenador de TI & Governança',
+      setorId: 'dep-1',
+      status: 'ativo',
+      role: 'ti_admin',
+      dataAdmissao: new Date().toISOString().split('T')[0],
+    };
+
+    setEmployees([adminUser]);
+    setDepartments(defaultDepartments);
+    setAssets([]);
+    setLicenses([]);
+    setTickets([]);
+    setTerms([]);
+    setCurrentUserId(adminUser.id);
+
+    // Salva explicitamente arrays vazios no localStorage para não voltar o INITIAL_DATA
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify([adminUser]));
+    localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(defaultDepartments));
+    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.USER, adminUser.id);
   };
 
   return (
@@ -733,6 +839,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         currentRole,
         login,
+        registerUser,
         logout,
         switchUser,
         employees,
@@ -766,6 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markTermSigned,
         updateSettings,
         resetToInitialData,
+        clearAllDataToProduction,
         selectedAssetIdFor360,
         setSelectedAssetIdFor360,
         selectedSoftwareIdFor360,

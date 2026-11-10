@@ -31,6 +31,7 @@ export const SettingsView: React.FC = () => {
     employees,
     updateEmployeeRole,
     resetToInitialData,
+    clearAllDataToProduction,
     isSupabaseConnected,
   } = useApp();
 
@@ -957,8 +958,11 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
                 type="button"
                 disabled={resetConfirmText.trim().toUpperCase() !== 'ZERAR'}
                 onClick={() => {
-                  localStorage.clear();
-                  window.location.reload();
+                  clearAllDataToProduction();
+                  setShowResetModal(false);
+                  setResetConfirmText('');
+                  setSuccessMsg('Base zerada com sucesso! O sistema está pronto para produção.');
+                  setTimeout(() => setSuccessMsg(null), 4000);
                 }}
                 className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-40"
               >

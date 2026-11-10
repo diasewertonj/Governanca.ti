@@ -9,12 +9,16 @@ export const LoginView: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    const success = login(email);
-    if (!success) {
-      setErrorMessage('E-mail corporativo não encontrado na base de colaboradores.');
+    setSubmitting(true);
+    const res = await login(email, password);
+    setSubmitting(false);
+    if (!res.success && res.error) {
+      setErrorMessage(res.error);
     }
   };
 
@@ -140,66 +144,23 @@ export const LoginView: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+              disabled={submitting}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
-              <span>Acessar com E-mail</span>
-              <ArrowRight className="w-4 h-4" />
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>Acessar com E-mail</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
-
-          {/* Perfis Pré-Configurados para Demonstração */}
-          <div className="pt-4 border-t border-slate-100">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider mb-2 text-center">
-              Preenchimento Rápido de Perfis de Teste
-            </span>
-            <div className="grid grid-cols-1 gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin.ti@nexuscorp.com.br')}
-                className="flex items-center justify-between p-2 rounded-lg text-xs border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 text-slate-700 transition-colors text-left"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">Carlos Eduardo Mendes</p>
-                  <p className="text-[11px] text-slate-500">Coordenador / Admin de T.I. (Acesso Total)</p>
-                </div>
-                <span className="text-[10px] font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                  Admin TI
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('rh@nexuscorp.com.br')}
-                className="flex items-center justify-between p-2 rounded-lg text-xs border border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 text-slate-700 transition-colors text-left"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">Patrícia Andrade Silva</p>
-                  <p className="text-[11px] text-slate-500">Especialista de RH (On/Offboarding Inteligente)</p>
-                </div>
-                <span className="text-[10px] font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                  RH
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('lucas.souza@nexuscorp.com.br')}
-                className="flex items-center justify-between p-2 rounded-lg text-xs border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 text-slate-700 transition-colors text-left"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">Lucas Gabriel Souza</p>
-                  <p className="text-[11px] text-slate-500">Colaborador Solicitante (3 Ativos em Posse)</p>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Solicitante
-                </span>
-              </button>
-            </div>
-          </div>
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-400">
-          Autenticação real via Google Firebase Auth · Governança corporativa 360°
+          Autenticação corporativa segura via Supabase PostgreSQL · Governança 360°
         </p>
       </div>
     </div>

@@ -66,6 +66,29 @@ export async function signInWithPasswordSupabase(email: string, password: string
 }
 
 /**
+ * Cadastra um novo usuário com e-mail e senha no Supabase Auth
+ */
+export async function signUpWithPasswordSupabase(email: string, password: string, nome?: string) {
+  if (!supabase) {
+    return {
+      error: 'Supabase não configurado.',
+    };
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: nome,
+      },
+    },
+  });
+
+  return { data, error: error?.message };
+}
+
+/**
  * Realiza logout no Supabase
  */
 export async function signOutSupabase() {
