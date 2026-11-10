@@ -12,6 +12,9 @@ import {
   Plus,
   Trash2,
   Edit2,
+  Database,
+  Key,
+  RotateCcw,
   Save,
   Shield,
   Search,
@@ -27,9 +30,13 @@ export const SettingsView: React.FC = () => {
     deleteDepartment,
     employees,
     updateEmployeeRole,
+    resetToInitialData,
+    isSupabaseConnected,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'empresa' | 'setores' | 'campos' | 'equipe'>('empresa');
+  const [activeTab, setActiveTab] = useState<'empresa' | 'setores' | 'campos' | 'equipe' | 'banco'>('empresa');
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [showResetModal, setShowResetModal] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -199,6 +206,18 @@ export const SettingsView: React.FC = () => {
             }`}
           >
             Equipe TI & RH
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('banco')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+              activeTab === 'banco'
+                ? 'bg-white text-emerald-900 font-semibold shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Banco & Supabase</span>
           </button>
         </div>
       </div>
@@ -766,6 +785,185 @@ export const SettingsView: React.FC = () => {
                     })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Aba: Banco de Dados & Conexão Supabase */}
+      {activeTab === 'banco' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-600" />
+                  Status da Conexão com Supabase (PostgreSQL)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Conexão direta com banco relacional na nuvem e suporte a Row Level Security (RLS)
+                </p>
+              </div>
+
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${
+                  isSupabaseConnected
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isSupabaseConnected ? 'bg-emerald-600 animate-pulse' : 'bg-amber-500'
+                  }`}
+                />
+                {isSupabaseConnected ? 'Supabase Conectado' : 'Modo Local (Aguardando Chaves)'}
+              </span>
+            </div>
+
+            {/* Chaves e Instruções de Configuração */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-slate-600" />
+                Como conectar seu Supabase em 3 Passos
+              </h4>
+
+              <div className="space-y-3 text-xs text-slate-700">
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    1
+                  </span>
+                  <div>
+                    <p className="font-semibold text-slate-900">Execute o Schema no Supabase SQL Editor:</p>
+                    <p className="text-slate-500 mt-0.5">
+                      Copie o conteúdo do arquivo <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-[11px]">supabase-schema.sql</code> já criado na raiz do projeto e cole na aba <strong>SQL Editor</strong> do painel do Supabase.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    2
+                  </span>
+                  <div>
+                    <p className="font-semibold text-slate-900">Obtenha as Chaves de API:</p>
+                    <p className="text-slate-500 mt-0.5">
+                      No Supabase, acesse <strong>Project Settings &gt; API</strong> e copie a <strong>Project URL</strong> e a chave <strong>anon public</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    3
+                  </span>
+                  <div>
+                    <p className="font-semibold text-slate-900">Configure na Vercel ou no arquivo .env:</p>
+                    <p className="text-slate-500 mt-0.5">
+                      Na Vercel, vá em <strong>Settings &gt; Environment Variables</strong> e adicione:
+                    </p>
+                    <pre className="mt-2 bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">
+{`VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Zona de Perigo: Zerar Dados de Exemplo */}
+            <div className="border border-rose-200 bg-rose-50/40 rounded-xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                <div>
+                  <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wide">
+                    Zona de Produção: Zerar Dados de Exemplo
+                  </h4>
+                  <p className="text-xs text-rose-700 mt-0.5">
+                    Utilize esta opção quando quiser iniciar a operação real da empresa, limpando dados fictícios de ativos, colaboradores e chamados.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(true)}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors flex items-center gap-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Zerar Dados de Exemplo (Reset de Fábrica)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Restaurar a base completa de demonstração?')) {
+                      resetToInitialData();
+                      setSuccessMsg('Base de demonstração restaurada.');
+                      setTimeout(() => setSuccessMsg(null), 3000);
+                    }
+                  }}
+                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restaurar Base de Demonstração</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Seguro para Zerar Dados */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-sm font-bold text-slate-900">Confirmar Limpeza Completa da Base</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Esta ação apagará todos os ativos, licenças, colaboradores e chamados de teste para iniciar a base limpa de produção.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-2">
+              <label className="block text-[11px] font-semibold text-slate-700">
+                Para confirmar, digite <span className="font-mono font-bold text-rose-600">ZERAR</span> abaixo:
+              </label>
+              <input
+                type="text"
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="Digite ZERAR"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-md font-mono text-center text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResetModal(false);
+                  setResetConfirmText('');
+                }}
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={resetConfirmText.trim().toUpperCase() !== 'ZERAR'}
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-40"
+              >
+                Confirmar e Limpar Base
+              </button>
             </div>
           </div>
         </div>

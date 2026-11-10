@@ -1,137 +1,117 @@
-# Sistema de Confirmações Críticas, Bloqueio de Perda de Dados, Reset de Fábrica e Sincronização Vercel/Firebase
+# Auditoria de Permissões (RBAC Estrito), Desacoplamento Firebase e Preparação Completa para Supabase
 
-Este plano estabelece a governança de ações sensíveis no **Nexus IT & HR**, eliminando qualquer salvamento automático acidental, inserindo alertas e modais elegantes de confirmação, fornecendo a funcionalidade de zerar dados de exemplo e detalhando a sincronização do banco Firestore e Google Auth na Vercel.
-
----
-
-## Decisões Confirmadas com o Usuário
-
-> [!IMPORTANT]
-> As escolhas abaixo foram alinhadas diretamente nas perguntas de esclarecimento:
-
-1. **Formato Visual das Confirmações:** Diálogo modal centralizado e elegante com visual corporativo limpo, ícone contextual de alerta (amarelo/vermelho), resumo do impacto da ação e botões explícitos **Cancelar** e **Confirmar**.
-2. **Proteção Contra Perda de Dados em Formulários:** Bloquear fechamento ou cancelamento quando houver alterações pendentes, exibindo o modal *"Deseja descartar as alterações não salvas?"* com opções *"Continuar Editando"* e *"Descartar Alterações"*.
-3. **Ações Críticas que Exigem Confirmação Obrigatória:**
-   - Exclusão ou desvinculação de ativos e liberação de assentos de licenças/SaaS.
-   - Conclusão definitiva de desligamento / checklist de Offboarding no RH.
-   - Transferência de custódia patrimonial de equipamentos entre colaboradores.
-   - Remoção de setores e exclusão de cadastros.
-4. **Sem Salvamento Automático:** Todas as telas e modais devem exigir clique explícito em **"Salvar Alterações"** ou **"Cancelar"** (ex.: configurações da empresa, segurança BitLocker na ficha 360°, atribuições de perfil, etc.).
-5. **Zerar Dados de Exemplo:** Recurso de "Reset de Fábrica" / "Zerar Base de Demonstração" nas Configurações, protegido por modal com digitação de confirmação (ex.: digitar `ZERAR` ou `LIMPAR`), permitindo ao administrador começar uma base limpa de produção na empresa.
+Este plano define a arquitetura de segurança e banco de dados para eliminar vazamentos de dados entre perfis, implementar controle de acesso rigoroso por função (`currentRole`), remover completamente qualquer dependência do Firebase/Firestore e preparar a integração nativa com o **Supabase** (PostgreSQL com Row Level Security).
 
 ---
 
-## 1. Visão Geral e Conceito das Melhorias
+## 1. Auditoria Completa de Segurança e Falhas Encontradas ("Travas Frouxas")
+
+Durante a auditoria profunda da árvore de componentes, foram identificadas as seguintes vulnerabilidades de isolamento entre perfis:
+
+### Falhas Detectadas:
+1. **Vazamento na Ficha 360° do Ativo (`Asset360Modal`):**
+   - **Problema:** Um colaborador comum que abre os detalhes do seu próprio notebook vê a lista de custodiantes anteriores e consegue **clicar no nome do colaborador anterior**, abrindo o `Employee360Modal` com dados institucionais, cargo, e-mail e histórico de terceiros.
+   - **Correção:** Quando `currentRole === 'colaborador'`, desativar completamente cliques em outros usuários. Exibir apenas o nome como texto estático (sem link relacional) ou ocultar dados sensíveis de terceiros. Além disso, a aba de "Mudar Custódia" já foi restringida, mas o botão e campos fiscais/BitLocker não devem ser editáveis nem visíveis para o colaborador comum.
+2. **Vazamento no `Employee360Modal`:**
+   - **Problema:** O modal de ficha 360° do colaborador não verifica se quem está abrindo é ele mesmo ou um administrador. Se um colaborador comum recebesse ou descobrisse o ID de outro colega, o modal abria com histórico completo.
+   - **Correção:** Adicionar trava rígida: Colaboradores comuns só podem abrir a própria ficha (`employeeId === currentUser.id`). Se tentar abrir o perfil de outro colaborador, o sistema bloqueia e exibe aviso de permissão negada.
+3. **Vazamento no `TicketDetailModal`:**
+   - **Problema:** Ao abrir um chamado, o link do solicitante no card lateral chamava `setSelectedEmployeeIdFor360(ticket.solicitanteId)`. Se o colaborador clicasse, ele acessava o perfil do solicitante caso o chamado não fosse dele.
+   - **Correção:** Link clicável de solicitante habilitado apenas para administradores de T.I. e RH. Para colaboradores, é exibido apenas texto não clicável.
+4. **Vazamento no Seletor de Perfis do Cabeçalho (`Header`):**
+   - **Problema:** O menu do cabeçalho listava todos os colaboradores da empresa no dropdown para alternância livre de usuário sem restrição.
+   - **Correção:** A alternância rápida de perfil deve ser restrita apenas a usuários com perfil `ti_admin` (modo simulação/teste) ou em tela de login. Colaboradores comuns não podem alternar para a identidade de outros usuários.
+5. **Travamento de Rotas no `App.tsx`:**
+   - **Problema:** Se o estado `currentView` for manipulado para `'collaborators'`, `'settings'` ou `'assets'`, a renderização no `main` não checava permissão.
+   - **Correção:** Implementar uma camada de guarda de rotas (`RoleGuard`) que valida se a tela requer `ti_admin`, `ti_suporte`, `rh` ou `colaborador`, redirecionando imediatamente para a área permitida.
+
+---
+
+## 2. Eliminação do Firebase / Firestore & Preparação Nativa para Supabase
+
+Conforme sua decisão expressa (*"somente supabase, retire tudo do firestore ou firebase"*), faremos o seguinte:
+
+### A. Remoção Completa do Firebase
+1. Remover arquivos e configurações do Firebase:
+   - `firebase-applet-config.json`
+   - `firebase-blueprint.json`
+   - `firestore.rules`
+   - Remoção do SDK `firebase` e imports em `src/services/firebase.ts`.
+2. Criar a nova camada de serviço em `src/services/supabase.ts` usando o cliente oficial `@supabase/supabase-js`.
+
+### B. Arquitetura do Supabase (`src/services/supabase.ts`)
+- Variáveis de ambiente padronizadas no `.env.example`:
+  ```env
+  VITE_SUPABASE_URL="https://seu-projeto.supabase.co"
+  VITE_SUPABASE_ANON_KEY="sua-chave-anon-publica"
+  ```
+- O cliente Supabase gerencia:
+  - Autenticação nativa (Email/Password ou OAuth Google via Supabase).
+  - Persistência das tabelas relacionais com Row Level Security (RLS).
+  - Fallback offline inteligente para continuar funcionando perfeitamente mesmo antes de você inserir as chaves de produção.
+
+### C. Script SQL DDL de Produção para Supabase
+Forneceremos um script SQL pronto para você executar no **SQL Editor do Supabase** em 1 clique, criando as tabelas com integridade referencial e políticas RLS:
+- `departamentos`
+- `colaboradores`
+- `ativos`
+- `historico_custodia`
+- `licencas_software`
+- `chamados`
+- `chamado_mensagens`
+- `termos_responsabilidade`
+- `configuracoes_empresa`
+
+---
+
+## 3. Matriz de Permissões Rígida (RBAC Matrix)
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        NEXUS GOVERNANCE ENGINE                         │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                        │
-│   ┌────────────────────────────────────────────────────────────────┐   │
-│   │               MODAL CENTRAL DE CONFIRMAÇÃO                     │   │
-│   ├────────────────────────────────────────────────────────────────┤   │
-│   │  [!] Atenção: Ação Irreversível                                │   │
-│   │                                                                │   │
-│   │  Você está prestes a transferir a custódia do notebook         │   │
-│   │  Dell Latitude (#PAT-1042) para Maria Souza.                   │   │
-│   │  Um novo Termo de Responsabilidade será gerado.                │   │
-│   │                                                                │   │
-│   │  [ Cancelar ]                              [ Confirmar Ação ]  │   │
-│   └────────────────────────────────────────────────────────────────┘   │
-│                                                                        │
-│   ┌───────────────────────────┐    ┌───────────────────────────────┐   │
-│   │  Descarte de Formulário   │    │  Zerar Base de Exemplo        │   │
-│   ├───────────────────────────┤    ├───────────────────────────────┤   │
-│   │ "Existem dados não salvos.│    │ [Reset de Fábrica]            │   │
-│   │  Deseja descartar?"       │    │ Digite 'ZERAR' para confirmar │   │
-│   │ [Continuar] [Descartar]   │    │ [Cancelar] [Limpar Tudo]      │   │
-│   └───────────────────────────┘    └───────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ Funcionalidade / Tela   │ ti_admin     │ ti_suporte   │ rh           │ colaborador  │
+├─────────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤
+│ Dashboard Geral         │ Total        │ Total        │ Limitado     │ Bloqueado    │
+│ Ativos & Estoque TI     │ Total        │ Total        │ Consulta     │ Bloqueado    │
+│ Ficha 360° do Ativo     │ Total + BitL │ Total + BitL │ Leitura Bás. │ Apenas Posse │
+│ Licenças / SaaS         │ Total        │ Total        │ Consulta     │ Bloqueado    │
+│ Colaboradores (Lista)   │ Total        │ Consulta     │ Total        │ Bloqueado    │
+│ Ficha 360° Colaborador  │ Total        │ Leitura      │ Total        │ Apenas Próp. │
+│ Service Desk Unificado  │ Total        │ Total        │ Apenas RH    │ Bloqueado    │
+│ Notas Internas TI       │ Sim          │ Sim          │ Não          │ Não          │
+│ On/Offboarding (RH)     │ Atendimento  │ Atendimento  │ Solicitação  │ Bloqueado    │
+│ Termos de Resp. A4      │ Emissão/Ass. │ Emissão/Ass. │ Consulta     │ Apenas Seus  │
+│ Configurações / Reset   │ Total        │ Bloqueado    │ Bloqueado    │ Bloqueado    │
+└─────────────────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
 ```
 
 ---
 
-## 2. Experiência do Usuário & Componentes
+## 4. Guia Passo a Passo: Configuração do Supabase & Chaves
 
-### A. Componente Global: `ConfirmDialogModal`
-- Um modal centralizado reutilizável com:
-  - Título claro (ex.: *"Confirmar Transferência de Custódia"*, *"Liberar Assento de Licença"*, *"Concluir Desligamento Definitivo"*).
-  - Nível de severidade visual:
-    - **Perigo / Destrutivo (Vermelho):** exclusão, desligamento irreversível, zerar banco.
-    - **Atenção / Mudança de Estado (Âmbar/Azul):** transferência patrimonial, liberação de assento, encerramento de chamado.
-  - Mensagem explicativa contextual destacando o impacto.
-  - Botão secundário neutro (`Cancelar`) e botão primário enfático (`Confirmar`, `Sim, Liberar`, `Sim, Excluir`).
-  - Fechamento com tecla `Esc` ou clique fora aciona o cancelamento seguro.
-
-### B. Componente: `UnsavedChangesModal`
-- Disparado sempre que o usuário preenche ou edita um formulário (Ativo, Licença, Chamado, Colaborador, Configurações) e clica no botão `X` de fechar ou `Cancelar`:
-  - Se o formulário estiver "dirty" (modificado), exibe:
-    - *"Você tem alterações não salvas. Deseja realmente sair e descartar o que preencheu?"*
-    - Botão `Continuar Editando` (retorna ao formulário).
-    - Botão `Descartar Alterações` (fecha o modal e limpa os campos).
-
-### C. Eliminação de Salvamento Automático (No Auto-Save)
-- **Ficha 360° do Ativo (`Asset360Modal`):**
-  - O bloco de Sistema Operacional e BitLocker passa a ter botões explícitos **"Salvar Alterações de Segurança"** e **"Cancelar Edição"**, em vez de mutações instantâneas.
-- **Configurações Gerais (`SettingsView`):**
-  - Alteração de papéis/roles de colaboradores na aba de Equipe recebe botão de confirmação e salvamento por colaborador.
-- **Ficha 360° do Software (`Software360Modal`):**
-  - Ajuste de assentos totais e liberação de assentos passam pelo diálogo de confirmação.
-
-### D. Ferramenta "Zerar Dados de Exemplo" (Reset de Fábrica)
-- Na aba de Configurações (`SettingsView` $\rightarrow$ submenu "Dados & Sistema"):
-  - Card corporativo: **"Gerenciamento da Base de Dados & Modo de Produção"**.
-  - Botão **"Zerar Dados de Exemplo (Iniciar Produção)"**:
-    - Abre um modal de alta segurança.
-    - O usuário deve digitar a palavra de segurança **`ZERAR`**.
-    - Mantém apenas a empresa e o usuário administrador logado atual (ou estrutura limpa pré-configurada).
-    - Remove todos os ativos mockados, licenças mockadas, chamados mockados, termos e colaboradores de teste.
-  - Botão alternativo **"Restaurar Dados de Exemplo"** (para caso queira testar novamente a qualquer momento).
+Ao final da implementação, você receberá:
+1. Onde pegar sua `SUPABASE_URL` e `SUPABASE_ANON_KEY` no painel do Supabase (`Project Settings` $\rightarrow$ `API`).
+2. Como ativar o Google OAuth no Supabase em 3 passos (`Authentication` $\rightarrow$ `Providers` $\rightarrow$ `Google`).
+3. O script SQL executável para rodar no editor do Supabase.
 
 ---
 
-## 3. Guia de Integração: Vercel + GitHub + Firebase Firestore & Auth Google
+## 5. Plano de Execução
 
-> [!NOTE]
-> Você enviou o projeto para o GitHub e Vercel. Abaixo está a arquitetura exata de como os dados e a autenticação Google operam no ambiente de produção Vercel:
-
-### 1. Como Funciona a Autenticação Google no Firebase (Vercel)
-1. No [Firebase Console](https://console.firebase.google.com/), acesse seu projeto `studio-3112068630-7fb36`:
-   - Vá em **Authentication** $\rightarrow$ **Settings** $\rightarrow$ **Authorized domains** (Domínios Autorizados).
-   - Clique em **Add domain** e adicione o domínio da sua Vercel:
-     - Exemplo: `seu-projeto.vercel.app` (e seu domínio customizado, se houver).
-   - *Sem isso, o Google Auth bloqueará o pop-up com o erro `auth/unauthorized-domain`.*
-2. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
-   - Localize o OAuth 2.0 Client ID associado ao Firebase.
-   - Em **Origens JavaScript autorizadas**, adicione a URL da Vercel (`https://seu-projeto.vercel.app`).
-
-### 2. Sincronização do Banco Firestore (LocalStorage vs Nuvem)
-- Atualmente, para garantir velocidade máxima no protótipo, o sistema salva os dados no `localStorage` do navegador e inicializa o cliente Firestore em `src/services/firebase.ts`.
-- Vamos implementar no `AppContext` um **sincronizador bidirecional com Firestore**:
-  - Salva e carrega coleções em tempo real (`assets`, `employees`, `licenses`, `tickets`, `terms`, `companySettings`) no Firestore se houver conexão online.
-  - Mantém fallback automático no `localStorage` offline para resiliência.
-- As variáveis de ambiente do Firebase podem ser configuradas no painel da Vercel (`Settings` $\rightarrow$ `Environment Variables`) utilizando o `firebase-applet-config.json` já existente.
-
----
-
-## 4. Plano de Implementação Passo a Passo
-
-1. **Criação do `ConfirmDialogModal.tsx`**:
-   - Componente flexível e acessível de diálogo de confirmação (perigo, aviso, neutro).
-2. **Criação do Hook / Helper de Proteção de Formulários (`useUnsavedChanges` ou modal inline)**:
-   - Gerenciamento de estado `isDirty` nos modais principais (`NewAssetModal`, `SoftwareFormModal`, `NewTicketModal`, etc.).
-3. **Revisão e Aplicação de Confirmações nas Ações Críticas**:
-   - `Software360Modal`: confirmação ao liberar assento de um colaborador.
-   - `Asset360Modal`: confirmação ao transferir equipamento de custódia e salvar BitLocker.
-   - `TicketDetailModal`: confirmação ao encerrar chamado ou checklist de offboarding.
-   - `SettingsView`: confirmação ao excluir setor ou campo personalizado.
-4. **Criação da Ferramenta "Zerar Dados de Exemplo"**:
-   - Adicionar função `resetToEmptyState()` e `restoreDemoState()` em `AppContext.tsx`.
-   - Adicionar painel de Gestão da Base em `SettingsView.tsx` com verificação por digitação `ZERAR`.
-5. **Aprimoramento da Sincronização com Firestore**:
-   - Garantir que as operações leiam e gravem tanto no Firestore quando online quanto no `localStorage`.
-   - Adicionar banner informativo discreto nas Configurações com o status de sincronização e o checklist de configuração para Vercel.
+1. **Instalação do Pacote `@supabase/supabase-js`** e desinstalação de dependências do Firebase.
+2. **Criação do Módulo de Serviço Supabase (`src/services/supabase.ts`)**:
+   - Inicialização do cliente com validação de chaves.
+   - Métodos de sincronização e autenticação.
+3. **Refatoração do `AppContext.tsx`**:
+   - Remover todo o código Firebase.
+   - Integrar persistência Supabase com sincronização automática e fallback em `localStorage`.
+   - Adicionar trava de auditoria nas funções de modificação de estado.
+4. **Blindagem dos Componentes de Visualização**:
+   - `Asset360Modal.tsx`: Colaborador não clica em usuários anteriores; BitLocker e dados fiscais protegidos.
+   - `Employee360Modal.tsx`: Verificação estrita de autorização (colaborador só abre a própria ficha).
+   - `TicketDetailModal.tsx`: Links de colaborador desabilitados para solicitantes comuns.
+   - `App.tsx`: Middleware de verificação de rotas por `currentRole`.
+   - `Header.tsx`: Alternador de usuários restrito ao administrador de TI.
+5. **Criação do Script SQL para Supabase**:
+   - Arquivo `supabase-schema.sql` com todas as tabelas e políticas RLS.
 6. **Verificação & Compilação**:
-   - Executar `compile_applet` e `lint_applet` juntos.
-   - Reiniciar dev server e verificar ausência de bugs visuais ou quebras de fluxo.
+   - Execução de `compile_applet` e `lint_applet` para assegurar 0 erros.

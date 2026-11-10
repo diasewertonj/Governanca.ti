@@ -574,17 +574,23 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 Solicitante
               </span>
               <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    setSelectedEmployeeIdFor360(ticket.solicitanteId);
-                  }}
-                  className="font-bold text-slate-900 hover:text-blue-700 flex items-center gap-1"
-                >
-                  {ticket.solicitanteNome}
-                  <ExternalLink className="w-3 h-3 text-slate-400" />
-                </button>
+                {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
+                  <span className="font-bold text-slate-900 block">
+                    {ticket.solicitanteNome}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      setSelectedEmployeeIdFor360(ticket.solicitanteId);
+                    }}
+                    className="font-bold text-slate-900 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    {ticket.solicitanteNome}
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                  </button>
+                )}
                 <p className="text-[11px] text-slate-600 mt-0.5">{ticket.solicitanteCargo}</p>
                 <p className="text-[11px] text-slate-500">{ticket.solicitanteSetorNome}</p>
                 <p className="text-[11px] text-slate-400 mt-1">{ticket.solicitanteEmail}</p>

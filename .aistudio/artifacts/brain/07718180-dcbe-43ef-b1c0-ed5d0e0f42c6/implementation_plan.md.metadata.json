@@ -1,6 +1,6 @@
 {
-  "summary":  "Plano abrangente para implantação de Diálogos Modais de Confirmação em Ações Críticas, Bloqueio de Descarte sem Salvar, Eliminação de Auto-save com Botões Explícitos (Salvar/Cancelar), Ferramenta de Zerar Dados de Exemplo (Reset de Fábrica com Segurança) e Guia Prático de Sincronização do Firestore e Auth Google na Vercel/GitHub.",
-  "updatedAt":  "2026-11-09T19:09:47.638237565Z",
+  "summary":  "Plano abrangente para Auditoria e Travamento Rigoroso de Permissões RBAC (Zero Vazamento entre Perfis), Blindagem dos Modais 360°, Migração Completa para Supabase (eliminação do Firebase/Firestore), Preparação do Cliente Supabase com Tipos TypeScript e Script SQL DDL de Produção com RLS.",
+  "updatedAt":  "2026-11-10T11:44:00.369712625Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

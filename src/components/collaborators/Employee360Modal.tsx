@@ -41,7 +41,35 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
 
   const employee = employees.find((e) => e.id === employeeId);
 
+  // AUDITORIA RBAC: Colaborador comum só pode visualizar a sua própria ficha cadastral
+  const isUnauthorized = currentRole === 'colaborador' && employeeId !== currentUser?.id;
+
   if (!employee) return null;
+
+  if (isUnauthorized) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="bg-white rounded-xl max-w-md w-full p-6 text-center space-y-4 shadow-xl border border-slate-200">
+          <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Acesso Restrito ao Perfil</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Por políticas de governança e privacidade de dados da empresa, colaboradores comuns têm acesso apenas à sua própria ficha e inventário pessoal.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const department = departments.find((d) => d.id === employee.setorId);
   const manager = employees.find((e) => e.id === employee.gestorId);

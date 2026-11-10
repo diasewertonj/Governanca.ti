@@ -19,7 +19,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
   const {
     currentUser,
     currentRole,
-    firebaseUser,
+    supabaseUser,
+    isSupabaseConnected,
     logout,
     switchUser,
     employees,
@@ -52,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
     }
   };
 
-  const userAvatar = currentUser?.avatarUrl || firebaseUser?.photoURL;
+  const userAvatar = currentUser?.avatarUrl || supabaseUser?.avatarUrl;
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-8 px-6 py-3.5 bg-white border-b border-slate-200/80">
@@ -108,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
             )}
             <div className="text-left hidden sm:block">
               <p className="font-semibold text-slate-800 leading-none truncate max-w-[120px]">
-                {currentUser?.nome || firebaseUser?.displayName || 'Usuário'}
+                {currentUser?.nome || supabaseUser?.nome || 'Usuário'}
               </p>
               <span className="text-[10px] text-slate-500 leading-none mt-0.5 block">
                 {roleLabels[currentRole]?.label || 'Colaborador'}
@@ -119,52 +120,62 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
 
           {showSwitchMenu && (
             <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
-              {firebaseUser && (
-                <div className="px-3 py-2 bg-blue-50/70 border-b border-blue-100 mb-1">
-                  <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-blue-800 tracking-wider">
-                    <span>Google Auth Conectado</span>
+              {supabaseUser && (
+                <div className="px-3 py-2 bg-emerald-50/70 border-b border-emerald-100 mb-1">
+                  <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-800 tracking-wider">
+                    <span>Supabase Auth Conectado</span>
                   </div>
                   <p className="text-xs font-semibold text-slate-800 truncate mt-0.5">
-                    {firebaseUser.email}
+                    {supabaseUser.email}
                   </p>
                 </div>
               )}
 
-              <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                  Alternar Perfil de Acesso
-                </span>
-                <p className="text-[11px] text-slate-500">
-                  Teste o sistema sob as diferentes visões e regras
-                </p>
-              </div>
+              {/* AUDITORIA RBAC: Somente Administradores de TI podem alternar livremente entre identidades para teste */}
+              {currentRole === 'ti_admin' ? (
+                <>
+                  <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                      Simulação de Perfil (Admin TI)
+                    </span>
+                    <p className="text-[11px] text-slate-500">
+                      Alternar visualização para testes de auditoria
+                    </p>
+                  </div>
 
-              <div className="space-y-0.5 px-1">
-                {employees.map((emp) => {
-                  const isSelected = emp.id === currentUser?.id;
-                  return (
-                    <button
-                      key={emp.id}
-                      type="button"
-                      onClick={() => {
-                        switchUser(emp.id);
-                        setShowSwitchMenu(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors ${
-                        isSelected
-                          ? 'bg-blue-50 text-blue-900 font-medium'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="font-medium truncate">{emp.nome}</p>
-                        <p className="text-[10px] text-slate-400 truncate">{emp.cargo}</p>
-                      </div>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
+                  <div className="space-y-0.5 px-1 max-h-48 overflow-y-auto">
+                    {employees.map((emp) => {
+                      const isSelected = emp.id === currentUser?.id;
+                      return (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => {
+                            switchUser(emp.id);
+                            setShowSwitchMenu(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors ${
+                            isSelected
+                              ? 'bg-blue-50 text-blue-900 font-medium'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="font-medium truncate">{emp.nome}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{emp.cargo}</p>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="px-3 py-2 text-xs text-slate-500 border-b border-slate-100">
+                  <p className="font-medium text-slate-700">{currentUser?.nome}</p>
+                  <p className="text-[11px] text-slate-400">{currentUser?.email}</p>
+                </div>
+              )}
 
               <div className="mt-1 pt-1 border-t border-slate-100 px-1">
                 <button

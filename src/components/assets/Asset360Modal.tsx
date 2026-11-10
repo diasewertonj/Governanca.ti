@@ -35,6 +35,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
     terms,
     transferAssetCustody,
     updateAsset,
+    currentUser,
     currentRole,
   } = useApp();
 
@@ -81,6 +82,11 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   };
 
   const handleOpenCustodian = (empId: string) => {
+    // AUDITORIA RBAC: Colaborador comum não pode abrir perfis de outros colaboradores
+    if (currentRole === 'colaborador' && empId !== currentUser?.id) {
+      alert('Acesso restrito: Colaboradores não têm permissão para acessar o cadastro de outros colaboradores.');
+      return;
+    }
     onClose();
     setSelectedEmployeeIdFor360(empId);
   };
@@ -253,15 +259,22 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               {currentCustodian ? (
                 <div className="mt-1 flex items-center justify-between">
                   <div>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCustodian(currentCustodian.id)}
-                      className="text-sm font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1.5"
-                    >
-                      <User className="w-4 h-4 text-blue-600" />
-                      {currentCustodian.nome}
-                      <ExternalLink className="w-3 h-3 text-blue-500" />
-                    </button>
+                    {currentRole === 'colaborador' && currentCustodian.id !== currentUser?.id ? (
+                      <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                        <User className="w-4 h-4 text-slate-400" />
+                        {currentCustodian.nome}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCustodian(currentCustodian.id)}
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1.5"
+                      >
+                        <User className="w-4 h-4 text-blue-600" />
+                        {currentCustodian.nome}
+                        <ExternalLink className="w-3 h-3 text-blue-500" />
+                      </button>
+                    )}
                     <p className="text-xs text-slate-600 mt-0.5">
                       {currentCustodian.cargo} · {department?.nome || 'Setor'}
                     </p>
@@ -541,14 +554,20 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 {asset.historicoCustodia.map((entry) => (
                   <div key={entry.id} className="py-2.5 flex items-start justify-between text-xs">
                     <div>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenCustodian(entry.colaboradorId)}
-                        className="font-semibold text-blue-700 hover:underline flex items-center gap-1"
-                      >
-                        {entry.colaboradorNome}
-                        <ExternalLink className="w-3 h-3 text-blue-500" />
-                      </button>
+                      {currentRole === 'colaborador' && entry.colaboradorId !== currentUser?.id ? (
+                        <span className="font-semibold text-slate-800">
+                          {entry.colaboradorNome}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCustodian(entry.colaboradorId)}
+                          className="font-semibold text-blue-700 hover:underline flex items-center gap-1"
+                        >
+                          {entry.colaboradorNome}
+                          <ExternalLink className="w-3 h-3 text-blue-500" />
+                        </button>
+                      )}
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         Entrega: {formatDate(entry.dataEntrega)}
                         {entry.dataDevolucao ? ` · Devolução: ${formatDate(entry.dataDevolucao)}` : ' · (Custódia Ativa)'}

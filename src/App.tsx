@@ -52,17 +52,22 @@ function MainApp() {
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
 
-  // Ajustar visualização padrão de acordo com o papel do usuário
+  // AUDITORIA RBAC: Impedir navegação ou desvios de rotas não autorizadas por papel
   useEffect(() => {
     if (!currentUser) return;
+
     if (currentRole === 'colaborador') {
-      setCurrentView('my_assets');
-    } else if (currentRole === 'rh' && currentView === 'my_assets') {
-      setCurrentView('rh_processes');
-    } else if ((currentRole === 'ti_admin' || currentRole === 'ti_suporte') && currentView === 'my_assets') {
-      setCurrentView('dashboard');
+      const allowedColaboradorViews = ['my_assets', 'my_tickets'];
+      if (!allowedColaboradorViews.includes(currentView)) {
+        setCurrentView('my_assets');
+      }
+    } else if (currentRole === 'rh') {
+      const forbiddenRhViews = ['settings', 'dashboard'];
+      if (forbiddenRhViews.includes(currentView)) {
+        setCurrentView('rh_processes');
+      }
     }
-  }, [currentRole, currentUser]);
+  }, [currentRole, currentUser, currentView]);
 
   if (authLoading) {
     return (

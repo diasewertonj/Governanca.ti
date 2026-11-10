@@ -53,7 +53,7 @@ export const LoginView: React.FC = () => {
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 shadow-sm border border-slate-200/90 rounded-2xl sm:px-10 space-y-6">
-          {/* BOTÃO DE LOGIN REAL COM GOOGLE (FIREBASE AUTH) */}
+          {/* BOTÃO DE LOGIN REAL COM GOOGLE (SUPABASE AUTH) */}
           <div>
             <button
               type="button"
@@ -62,7 +62,7 @@ export const LoginView: React.FC = () => {
               className="w-full flex items-center justify-center gap-3 py-2.5 px-4 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
               {googleLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
               ) : (
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path
@@ -83,10 +83,10 @@ export const LoginView: React.FC = () => {
                   />
                 </svg>
               )}
-              <span>{googleLoading ? 'Autenticando...' : 'Entrar com Conta Google (Real)'}</span>
+              <span>{googleLoading ? 'Autenticando...' : 'Entrar com Conta Google (Supabase)'}</span>
             </button>
             <p className="text-[10px] text-slate-400 text-center mt-1.5">
-              Autenticação segura via Firebase Auth com provisionamento corporativo
+              Autenticação corporativa integrada com Supabase PostgreSQL
             </p>
           </div>
 

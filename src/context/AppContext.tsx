@@ -22,17 +22,17 @@ import {
 } from '../data/initialData.ts';
 
 import {
-  auth,
-  googleProvider,
-  signInWithPopup,
-  firebaseSignOut,
-  onAuthStateChanged,
-  FirebaseUser,
-} from '../services/firebase.ts';
+  supabase,
+  isSupabaseConfigured,
+  signInWithGoogleSupabase,
+  signOutSupabase,
+  SupabaseAuthUser,
+} from '../services/supabase.ts';
 
 interface AppContextType {
-  // Autenticação e Usuário Atual (Real Firebase + Perfis)
-  firebaseUser: FirebaseUser | null;
+  // Autenticação e Usuário Atual (Supabase + Perfis)
+  supabaseUser: SupabaseAuthUser | null;
+  isSupabaseConnected: boolean;
   authLoading: boolean;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   currentUser: Employee | null;
@@ -170,53 +170,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_COMPANY_SETTINGS;
   });
 
-  // Usuário Firebase real e Usuário corporativo
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  // Usuário Supabase real e Usuário corporativo
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseAuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     return localStorage.getItem(STORAGE_KEYS.USER) || 'emp-1'; // Padrão: Carlos Eduardo (Admin TI)
   });
 
-  // Listener de Autenticação Real do Firebase
+  // Listener de Autenticação Supabase (se configurado)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
+    if (!supabase) {
       setAuthLoading(false);
+      return;
+    }
 
-      if (user && user.email) {
-        const cleanEmail = user.email.toLowerCase();
-        // Verificar se já existe colaborador com esse email
-        const existing = employees.find((e) => e.email.toLowerCase() === cleanEmail);
-        if (existing) {
-          setCurrentUserId(existing.id);
-        } else {
-          // Criar perfil corporativo conectado à conta Google real
-          const newId = `emp-${user.uid.slice(0, 8)}`;
-          const foundCreated = employees.find((e) => e.id === newId);
-          if (!foundCreated) {
-            const newColab: Employee = {
-              id: newId,
-              matricula: `NX-${Date.now().toString().slice(-4)}`,
-              nome: user.displayName || user.email.split('@')[0],
-              email: cleanEmail,
-              cargo: 'Administrador de T.I. & Governança',
-              setorId: 'dep-1',
-              status: 'ativo',
-              dataAdmissao: new Date().toISOString().split('T')[0],
-              avatarUrl: user.photoURL || undefined,
-            };
-            setEmployees((prev) => [newColab, ...prev]);
-            setCurrentUserId(newColab.id);
-          } else {
-            setCurrentUserId(foundCreated.id);
-          }
-        }
+    // Obter sessão atual
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const u = session.user;
+        const authUser: SupabaseAuthUser = {
+          id: u.id,
+          email: u.email || '',
+          nome: u.user_metadata?.full_name || u.email?.split('@')[0],
+          avatarUrl: u.user_metadata?.avatar_url,
+        };
+        setSupabaseUser(authUser);
+        vincularUsuarioComColaborador(authUser);
+      }
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const u = session.user;
+        const authUser: SupabaseAuthUser = {
+          id: u.id,
+          email: u.email || '',
+          nome: u.user_metadata?.full_name || u.email?.split('@')[0],
+          avatarUrl: u.user_metadata?.avatar_url,
+        };
+        setSupabaseUser(authUser);
+        vincularUsuarioComColaborador(authUser);
+      } else {
+        setSupabaseUser(null);
       }
     });
 
-    return () => unsubscribe();
-  }, [employees]);
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const vincularUsuarioComColaborador = (user: SupabaseAuthUser) => {
+    if (!user.email) return;
+    const cleanEmail = user.email.toLowerCase();
+    const existing = employees.find((e) => e.email.toLowerCase() === cleanEmail);
+    if (existing) {
+      setCurrentUserId(existing.id);
+    } else {
+      const newId = `emp-${user.id.slice(0, 8)}`;
+      const foundCreated = employees.find((e) => e.id === newId);
+      if (!foundCreated) {
+        const newColab: Employee = {
+          id: newId,
+          matricula: `NX-${Date.now().toString().slice(-4)}`,
+          nome: user.nome || user.email.split('@')[0],
+          email: cleanEmail,
+          cargo: 'Administrador de T.I. & Governança',
+          setorId: 'dep-1',
+          status: 'ativo',
+          dataAdmissao: new Date().toISOString().split('T')[0],
+          avatarUrl: user.avatarUrl || undefined,
+        };
+        setEmployees((prev) => [newColab, ...prev]);
+        setCurrentUserId(newColab.id);
+      } else {
+        setCurrentUserId(foundCreated.id);
+      }
+    }
+  };
 
   // Modais de Rastreabilidade Relacional 360°
   const [selectedAssetIdFor360, setSelectedAssetIdFor360] = useState<string | null>(null);
@@ -291,16 +324,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   })();
 
   const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
-        return { success: true };
-      }
-      return { success: false, error: 'Usuário não autenticado.' };
-    } catch (err: any) {
-      console.error('Erro no login com Google:', err);
-      return { success: false, error: err.message || 'Falha ao autenticar com Google.' };
+    if (!isSupabaseConfigured) {
+      return {
+        success: false,
+        error:
+          'Supabase ainda não configurado no .env. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para ativar autenticação em nuvem.',
+      };
     }
+    const res = await signInWithGoogleSupabase();
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true };
   };
 
   const login = (email: string) => {
@@ -314,13 +349,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async () => {
-    try {
-      await firebaseSignOut(auth);
-    } catch (err) {
-      console.error('Erro ao deslogar do Firebase:', err);
-    }
+    await signOutSupabase();
     setCurrentUserId(null);
-    setFirebaseUser(null);
+    setSupabaseUser(null);
   };
 
   const switchUser = (employeeId: string) => {
@@ -695,7 +726,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
-        firebaseUser,
+        supabaseUser,
+        isSupabaseConnected: isSupabaseConfigured,
         authLoading,
         loginWithGoogle,
         currentUser,
