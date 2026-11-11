@@ -75,8 +75,7 @@ $$;
 
 revoke all on function public.guard_colaborador_role() from public, anon, authenticated;
 
-drop trigger if exists trg_guard_colaborador_role on public.colaboradores;
-create trigger trg_guard_colaborador_role
+create or replace trigger trg_guard_colaborador_role
   before insert or update on public.colaboradores
   for each row
   execute function public.guard_colaborador_role();
