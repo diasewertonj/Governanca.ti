@@ -112,6 +112,14 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     .select('*')
     .order('data_entrega', { ascending: true });
 
+  // Chaves BitLocker ficam em ativos_segredos (só TI enxerga; para os demais a RLS
+  // devolve vazio). Em bancos ainda sem a tabela, o erro é ignorado.
+  const { data: segredosData } = await supabase.from('ativos_segredos').select('ativo_id, bitlocker_key');
+  const bitlockerByAssetId: Record<string, string> = {};
+  (segredosData || []).forEach((s: any) => {
+    if (s.bitlocker_key) bitlockerByAssetId[s.ativo_id] = s.bitlocker_key;
+  });
+
   const custodyByAssetId: Record<string, CustodyHistoryEntry[]> = {};
   if (custodyData) {
     custodyData.forEach((c: any) => {
@@ -144,7 +152,7 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     custodianteId: a.custodiante_id || null,
     dataEntregaAtual: a.data_entrega_atual || undefined,
     sistemaOperacional: a.sistema_operacional || undefined,
-    bitlockerKey: a.bitlocker_key || undefined,
+    bitlockerKey: bitlockerByAssetId[a.id] || a.bitlocker_key || undefined,
     fiscal: a.fiscal || undefined,
     customFields: a.custom_fields || {},
     historicoCustodia: custodyByAssetId[a.id] || [],
@@ -182,10 +190,18 @@ export async function upsertAssetDb(asset: Asset) {
     custodiante_id: asset.custodianteId || null,
     data_entrega_atual: asset.dataEntregaAtual || null,
     sistema_operacional: asset.sistemaOperacional || null,
-    bitlocker_key: asset.bitlockerKey || null,
     fiscal: asset.fiscal || {},
     custom_fields: asset.customFields || {},
   });
+
+  // Segredo separado, depois do ativo (FK)
+  if (asset.bitlockerKey) {
+    await supabase
+      .from('ativos_segredos')
+      .upsert({ ativo_id: asset.id, bitlocker_key: asset.bitlockerKey, updated_at: new Date().toISOString() });
+  } else {
+    await supabase.from('ativos_segredos').delete().eq('ativo_id', asset.id);
+  }
 }
 
 export async function deleteAssetDb(id: string) {
@@ -201,11 +217,17 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     console.error('Erro ao buscar licenças do Supabase:', error);
     return null;
   }
+  // Chaves de contrato ficam em licencas_segredos (só TI)
+  const { data: segredosData } = await supabase.from('licencas_segredos').select('licenca_id, chave_contrato');
+  const chaveByLicId: Record<string, string> = {};
+  (segredosData || []).forEach((s: any) => {
+    if (s.chave_contrato) chaveByLicId[s.licenca_id] = s.chave_contrato;
+  });
   return data ? data.map((l: any) => ({
     id: l.id,
     nome: l.nome,
     fornecedor: l.fornecedor,
-    chaveContrato: l.chave_contrato,
+    chaveContrato: chaveByLicId[l.id] || l.chave_contrato || '',
     assentosTotais: l.assentos_totais,
     assentosAlocados: (l.colaboradores_ids || []).length,
     colaboradoresIds: l.colaboradores_ids || [],
@@ -223,7 +245,6 @@ export async function upsertLicenseDb(lic: SoftwareLicense) {
     id: lic.id,
     nome: lic.nome,
     fornecedor: lic.fornecedor,
-    chave_contrato: lic.chaveContrato,
     assentos_totais: lic.assentosTotais,
     colaboradores_ids: lic.colaboradoresIds,
     valor_mensal: lic.valorMensal,
@@ -232,6 +253,15 @@ export async function upsertLicenseDb(lic: SoftwareLicense) {
     url_painel: lic.urlPainel || null,
     observacoes: lic.observacoes || null,
   });
+
+  // Segredo separado, depois da licença (FK)
+  if (lic.chaveContrato) {
+    await supabase
+      .from('licencas_segredos')
+      .upsert({ licenca_id: lic.id, chave_contrato: lic.chaveContrato, updated_at: new Date().toISOString() });
+  } else {
+    await supabase.from('licencas_segredos').delete().eq('licenca_id', lic.id);
+  }
 }
 
 export async function deleteLicenseDb(id: string) {

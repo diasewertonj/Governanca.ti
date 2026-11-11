@@ -26,7 +26,6 @@ import {
   isSupabaseConfigured,
   signInWithGoogleSupabase,
   signInWithPasswordSupabase,
-  signUpWithPasswordSupabase,
   signOutSupabase,
   SupabaseAuthUser,
 } from '../services/supabase.ts';
@@ -64,13 +63,12 @@ interface AppContextType {
   supabaseHealth: SupabaseHealthStatus | null;
   refreshSupabaseData: () => Promise<void>;
   authLoading: boolean;
+  authError: string | null;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   currentUser: Employee | null;
   currentRole: UserRole;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  registerUser: (email: string, password: string, nome: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  switchUser: (employeeId: string) => void;
 
   // Entidades
   employees: Employee[];
@@ -165,8 +163,23 @@ const STORAGE_KEYS = {
   SETTINGS: 'nexus_settings_v1',
 };
 
+// Fase 1: com Supabase (produção), dados de negócio NÃO ficam no navegador.
+// O cache só existe no modo demonstração (sem Supabase).
+function limparCacheLocal() {
+  try {
+    Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // armazenamento indisponível (modo privado etc.): nada a limpar
+  }
+}
+
+if (isSupabaseConfigured) {
+  limparCacheLocal();
+}
+
 // Funções utilitárias para descartar dados mock legados caso Supabase esteja configurado
 function parseStoredOrNull<T>(key: string, isDemoDetector?: (data: T) => boolean): T | null {
+  if (isSupabaseConfigured) return null;
   const saved = localStorage.getItem(key);
   if (!saved) return null;
   try {
@@ -239,64 +252,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Usuário Supabase real e Usuário corporativo
   const [supabaseUser, setSupabaseUser] = useState<SupabaseAuthUser | null>(null);
   const [supabaseHealth, setSupabaseHealth] = useState<SupabaseHealthStatus | null>(null);
-  const [authLoading, setAuthLoading] = useState<boolean>(false);
+  // Em produção, a tela fica em "carregando" até o Supabase dizer se há sessão
+  const [authLoading, setAuthLoading] = useState<boolean>(isSupabaseConfigured);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USER);
-    if (isProduction && (!saved || saved === 'emp-1')) {
-      return null;
-    }
-    return saved || (isProduction ? null : 'emp-1');
+    if (isProduction) return null;
+    return localStorage.getItem(STORAGE_KEYS.USER) || 'emp-1';
   });
 
-  // Função central para vincular usuário do Supabase Auth com colaborador do sistema
-  const vincularUsuarioComColaborador = async (
-    user: SupabaseAuthUser,
-    activeEmployees?: Employee[]
-  ) => {
-    if (!user.email) return;
-    const cleanEmail = user.email.toLowerCase();
-    const currentList = activeEmployees || employees;
-    const existing = currentList.find((e) => e.email.toLowerCase() === cleanEmail);
-
-    if (existing) {
+  // Fase 1 (CRIT-02): o login só ENCONTRA o perfil já cadastrado pela TI/RH.
+  // Nunca cria perfil nem define papel pelo navegador.
+  const vincularUsuarioComColaborador = (user: SupabaseAuthUser, lista: Employee[]) => {
+    const cleanEmail = (user.email || '').toLowerCase();
+    const existing = lista.find((e) => e.email.toLowerCase() === cleanEmail);
+    if (existing && existing.status !== 'desligado') {
+      setAuthError(null);
       setCurrentUserId(existing.id);
       return existing;
-    } else {
-      // Governança RBAC segura: Apenas o 1º usuário registrado do sistema ganha permissão de Administrador bootstrap
-      const isFirst = currentList.length === 0;
-      const isAdmin = isFirst;
-
-      const newId = `emp-${user.id.slice(0, 8)}`;
-      const newColab: Employee = {
-        id: newId,
-        matricula: `NX-${Date.now().toString().slice(-4)}`,
-        nome: user.nome || cleanEmail.split('@')[0].toUpperCase(),
-        email: cleanEmail,
-        cargo: isAdmin ? 'Administrador de T.I. & Governança' : 'Colaborador',
-        setorId: 'dep-1',
-        status: 'ativo',
-        role: isAdmin ? 'ti_admin' : 'colaborador',
-        dataAdmissao: new Date().toISOString().split('T')[0],
-        avatarUrl: user.avatarUrl || undefined,
-      };
-
-      setEmployees((prev) => {
-        const filtered = prev.filter((e) => e.id !== newId && e.email !== cleanEmail);
-        return [newColab, ...filtered];
-      });
-      setCurrentUserId(newColab.id);
-
-      if (isSupabaseConfigured) {
-        await upsertEmployeeDb(newColab);
-      }
-      return newColab;
     }
+    setCurrentUserId(null);
+    setAuthError(
+      existing
+        ? 'Seu acesso foi encerrado. Fale com a equipe de T.I.'
+        : 'Seu login ainda não tem um perfil liberado no sistema. Peça à equipe de T.I. para cadastrar seu e-mail em Colaboradores.'
+    );
+    return null;
   };
 
-  // Carregar dados das tabelas do Supabase (Modo Fullstack)
-  const loadDataFromSupabase = async () => {
-    if (!isSupabaseConfigured) return;
+  // Limpa todo o estado de negócio (logout, sessão expirada)
+  const limparEstado = () => {
+    setEmployees(isProduction ? [] : INITIAL_EMPLOYEES);
+    setAssets([]);
+    setLicenses([]);
+    setTickets([]);
+    setTerms([]);
+    setCurrentUserId(null);
+    setSupabaseUser(null);
+    limparCacheLocal();
+  };
+
+  // Carregar dados das tabelas do Supabase (Modo Fullstack).
+  // Só faz sentido com sessão: sem login a RLS devolve listas vazias.
+  // Retorna a lista de colaboradores lida (ou null se não leu).
+  const loadDataFromSupabase = async (): Promise<Employee[] | null> => {
+    if (!isSupabaseConfigured) return null;
+    let empsLidos: Employee[] | null = null;
 
     try {
       const health = await checkSupabaseHealth();
@@ -327,9 +328,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Sincronizar colaboradores
         if (dbEmps) {
           setEmployees(dbEmps);
-          if (supabaseUser) {
-            vincularUsuarioComColaborador(supabaseUser, dbEmps);
-          }
+          empsLidos = dbEmps;
         }
 
         // Ativos (se a tabela estiver vazia, define [] limpo para produção)
@@ -362,49 +361,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.error('Erro ao sincronizar dados com o Supabase:', err);
     }
+    return empsLidos;
   };
 
-  useEffect(() => {
-    loadDataFromSupabase();
-  }, [isSupabaseConfigured]);
-
-  // Listener de sessão do Supabase Auth para manter login persistente
+  // Sessão do Supabase Auth é a única fonte de verdade do login (ALTO-02).
+  // INITIAL_SESSION / SIGNED_IN -> carrega dados e encontra o perfil;
+  // SIGNED_OUT (logout ou sessão expirada) -> limpa tudo.
   useEffect(() => {
     if (!supabase) return;
+    let ativo = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const u = session.user;
-        const authUser: SupabaseAuthUser = {
-          id: u.id,
-          email: u.email || '',
-          nome: u.user_metadata?.full_name || u.email?.split('@')[0],
-          avatarUrl: u.user_metadata?.avatar_url,
-        };
-        setSupabaseUser(authUser);
-        vincularUsuarioComColaborador(authUser);
-      }
+    // Sem sessão, só a configuração (razão social) é pública: usada na tela de login
+    fetchSettingsFromDb().then((st) => {
+      if (ativo && st) setSettings(st);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const u = session.user;
-        const authUser: SupabaseAuthUser = {
-          id: u.id,
-          email: u.email || '',
-          nome: u.user_metadata?.full_name || u.email?.split('@')[0],
-          avatarUrl: u.user_metadata?.avatar_url,
-        };
-        setSupabaseUser(authUser);
-        vincularUsuarioComColaborador(authUser);
-      } else {
-        setSupabaseUser(null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+
+      if (!session?.user) {
+        limparEstado();
+        setAuthLoading(false);
+        return;
       }
+
+      const u = session.user;
+      const authUser: SupabaseAuthUser = {
+        id: u.id,
+        email: u.email || '',
+        nome: u.user_metadata?.full_name || u.email?.split('@')[0],
+        avatarUrl: u.user_metadata?.avatar_url,
+      };
+      setSupabaseUser(authUser);
+
+      // Chamadas ao Supabase fora do callback (recomendação da supabase-js
+      // para evitar travamento dentro do onAuthStateChange)
+      setTimeout(async () => {
+        const lista = await loadDataFromSupabase();
+        if (!ativo) return;
+        const perfil = vincularUsuarioComColaborador(authUser, lista || []);
+        if (!perfil) {
+          // Login válido, mas sem perfil liberado: encerra a sessão e mostra o motivo
+          await signOutSupabase();
+        }
+        setAuthLoading(false);
+      }, 0);
     });
 
     return () => {
+      ativo = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -420,44 +427,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedTermForPrint, setSelectedTermForPrint] = useState<ResponsibilityTerm | null>(null);
   const [selectedAssetForQrCode, setSelectedAssetForQrCode] = useState<Asset | null>(null);
 
-  // Sincronizar com localStorage
+  // Cache em localStorage SÓ no modo demonstração (sem Supabase). Em produção,
+  // nada de negócio fica no navegador (ALTO-01: chaves, notas internas etc.).
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
-  }, [employees]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(departments));
-  }, [departments]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets));
-  }, [assets]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify(licenses));
-  }, [licenses]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
-  }, [tickets]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify(terms));
-  }, [terms]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-  }, [settings]);
-
-  useEffect(() => {
-    if (currentUserId) {
-      localStorage.setItem(STORAGE_KEYS.USER, currentUserId);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.USER);
+    if (isProduction) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(departments));
+      localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets));
+      localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify(licenses));
+      localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+      localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify(terms));
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+      if (currentUserId) {
+        localStorage.setItem(STORAGE_KEYS.USER, currentUserId);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.USER);
+      }
+    } catch {
+      // armazenamento indisponível: o modo demo segue só em memória
     }
-  }, [currentUserId]);
+  }, [isProduction, employees, departments, assets, licenses, tickets, terms, settings, currentUserId]);
 
-  const currentUser = employees.find((e) => e.id === currentUserId) || null;
+  // Em produção, sem sessão do Supabase não há usuário (ALTO-02)
+  const currentUser =
+    isProduction && !supabaseUser ? null : employees.find((e) => e.id === currentUserId) || null;
 
   // Derivação do papel atual
   const currentRole: UserRole = (() => {
@@ -512,6 +506,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
 
+      setAuthError(null);
       const res = await signInWithPasswordSupabase(cleanEmail, password);
       if (res.error) {
         return {
@@ -519,18 +514,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           error: `Falha na autenticação: ${res.error}`,
         };
       }
-
-      if (res.data?.user) {
-        const u = res.data.user;
-        const authUser: SupabaseAuthUser = {
-          id: u.id,
-          email: u.email || cleanEmail,
-          nome: u.user_metadata?.full_name || cleanEmail.split('@')[0],
-        };
-        setSupabaseUser(authUser);
-        vincularUsuarioComColaborador(authUser);
-        return { success: true };
-      }
+      // O listener onAuthStateChange (SIGNED_IN) carrega os dados e encontra o perfil
+      return { success: true };
     }
 
     // 2. Modo Offline / Demonstração: Exige senha padrão segura (nexus@2026)
@@ -553,47 +538,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const registerUser = async (
-    email: string,
-    password: string,
-    nome: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (supabase) {
-      const res = await signUpWithPasswordSupabase(cleanEmail, password, nome);
-      if (res.error) {
-        return { success: false, error: res.error };
-      }
-    }
-
-    // Criar colaborador associado
-    const newEmp: Employee = {
-      id: `emp-${Date.now().toString().slice(-6)}`,
-      matricula: `NX-${Date.now().toString().slice(-4)}`,
-      nome,
-      email: cleanEmail,
-      cargo: 'Colaborador',
-      setorId: 'dep-1',
-      status: 'ativo',
-      role: 'colaborador',
-      dataAdmissao: new Date().toISOString().split('T')[0],
-    };
-    setEmployees((prev) => [newEmp, ...prev]);
-    setCurrentUserId(newEmp.id);
-    return { success: true };
-  };
-
   const logout = async () => {
     await signOutSupabase();
-    setCurrentUserId(null);
-    setSupabaseUser(null);
-  };
-
-  const switchUser = (employeeId: string) => {
-    const found = employees.find((e) => e.id === employeeId);
-    if (found) {
-      setCurrentUserId(found.id);
-    }
+    setAuthError(null);
+    limparEstado();
   };
 
   // CRUD de Colaboradores
@@ -864,8 +812,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setTickets((prev) => [newTicket, ...prev]);
-    upsertTicketDb(newTicket);
-    addTicketMessageDb(newTicket.id, newTicket.mensagens[0]);
+    // A mensagem depende do chamado (FK): grava em sequência (MED-02)
+    upsertTicketDb(newTicket).then(() => addTicketMessageDb(newTicket.id, newTicket.mensagens[0]));
     return newTicket;
   };
 
@@ -894,12 +842,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTickets((prev) =>
       prev.map((tkt) => {
         if (tkt.id !== ticketId) return tkt;
+        // Não regrava o chamado: o banco atualiza data_atualizacao ao receber a mensagem
+        // (e colaborador não tem permissão de alterar chamados).
         const updated: Ticket = {
           ...tkt,
           dataAtualizacao: now,
           mensagens: [...tkt.mensagens, newMessage],
         };
-        upsertTicketDb(updated);
         return updated;
       })
     );
@@ -1083,15 +1032,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabaseUser,
         isSupabaseConnected: isSupabaseConfigured,
         supabaseHealth,
-        refreshSupabaseData: loadDataFromSupabase,
+        refreshSupabaseData: async () => {
+          await loadDataFromSupabase();
+        },
         authLoading,
+        authError,
         loginWithGoogle,
         currentUser,
         currentRole,
         login,
-        registerUser,
         logout,
-        switchUser,
         employees,
         departments,
         assets,
