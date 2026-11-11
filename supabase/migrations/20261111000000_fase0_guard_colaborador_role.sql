@@ -12,7 +12,9 @@
 --   * Não fecha as policies using(true): qualquer logado ainda lê e grava o resto.
 --   * Não corrige o bug de login no front (CRIT-02); só impede que ele grave ti_admin no banco.
 --
--- Não é bloqueado: SQL Editor / postgres / service_role (auth.uid() nulo ou role service_role).
+-- Não é bloqueado: SQL Editor / postgres (sem JWT na requisição) e service_role.
+-- É bloqueado: anon (requisição sem login, só com a anon key) e qualquer
+-- authenticated que não seja ti_admin ativo.
 --
 -- Efeito colateral conhecido: o primeiro login de um usuário novo tenta gravar
 -- role = 'ti_admin' (bug CRIT-02) e passa a ser rejeitado, então o perfil dele
@@ -33,8 +35,17 @@ declare
   v_caller_email text    := lower(coalesce(v_claims ->> 'email', ''));
   v_caller_admin boolean := false;
 begin
-  -- Execução administrativa (SQL Editor, postgres, service_role): não bloqueia.
-  if auth.uid() is null or coalesce(v_claims ->> 'role', '') = 'service_role' then
+  -- Execução administrativa: sem JWT (SQL Editor, postgres) ou service_role.
+  if v_claims is null or coalesce(v_claims ->> 'role', '') = 'service_role' then
+    return new;
+  end if;
+
+  -- Requisição anônima (anon key, sem login): nunca cria nem altera papéis.
+  if auth.uid() is null then
+    if tg_op = 'INSERT' or new.role is distinct from old.role then
+      raise exception 'Requisição sem login não pode definir papéis de acesso'
+        using errcode = '42501';
+    end if;
     return new;
   end if;
 
