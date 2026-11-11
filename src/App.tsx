@@ -56,6 +56,13 @@ function MainApp() {
   useEffect(() => {
     if (!currentUser) return;
 
+    // Fase 0: Configurações (papéis, banco, reset) apenas para ti_admin.
+    // Proteção só de interface; a real fica no banco (trigger da Fase 0 e RLS da Fase 1).
+    if (currentView === 'settings' && currentRole !== 'ti_admin') {
+      setCurrentView(currentRole === 'colaborador' ? 'my_assets' : currentRole === 'rh' ? 'rh_processes' : 'dashboard');
+      return;
+    }
+
     if (currentRole === 'colaborador') {
       const allowedColaboradorViews = ['my_assets', 'my_tickets'];
       if (!allowedColaboradorViews.includes(currentView)) {
