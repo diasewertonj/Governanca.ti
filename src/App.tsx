@@ -47,6 +47,8 @@ function MainApp() {
     setSelectedTermForPrint,
     selectedAssetForQrCode,
     setSelectedAssetForQrCode,
+    dbErro,
+    limparDbErro,
   } = useApp();
 
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -98,6 +100,24 @@ function MainApp() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Barra Superior Corporativa (Zone Contract) */}
       <Header currentView={currentView} />
+
+      {/* Fase 2 (CRIT-04): falha de gravação no banco nunca mais passa em silêncio */}
+      {dbErro && (
+        <div
+          role="alert"
+          className="fixed bottom-4 right-4 z-[60] max-w-md flex items-start gap-3 p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 shadow-lg"
+        >
+          <span className="text-xs leading-relaxed flex-1">{dbErro}</span>
+          <button
+            type="button"
+            onClick={limparDbErro}
+            className="text-xs font-semibold text-rose-700 hover:text-rose-900 shrink-0"
+            aria-label="Fechar aviso de erro"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 flex min-h-[calc(100vh-57px)]">
         {/* Menu Lateral Adaptativo por Perfil */}

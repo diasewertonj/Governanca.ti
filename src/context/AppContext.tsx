@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Asset,
   CompanySettings,
+  CustodyHistoryEntry,
   Department,
   Employee,
   ResponsibilityTerm,
@@ -32,27 +33,36 @@ import {
 
 import {
   fetchDepartmentsFromDb,
-  upsertDepartmentDb,
+  insertDepartmentDb,
+  updateDepartmentDb,
   deleteDepartmentDb,
   fetchEmployeesFromDb,
-  upsertEmployeeDb,
+  insertEmployeeDb,
+  updateEmployeeDb,
   deleteEmployeeDb,
   fetchAssetsFromDb,
-  upsertAssetDb,
-  deleteAssetDb,
+  insertAssetDb,
+  updateAssetDb,
   fetchLicensesFromDb,
-  upsertLicenseDb,
+  insertLicenseDb,
+  updateLicenseDb,
   deleteLicenseDb,
+  alocarLicencaDb,
+  revogarLicencaDb,
   fetchTicketsFromDb,
-  upsertTicketDb,
+  insertTicketDb,
+  updateTicketDb,
+  insertTicketMessageDb,
   fetchTermsFromDb,
-  upsertTermDb,
+  insertTermDb,
+  updateTermDb,
   fetchSettingsFromDb,
-  upsertSettingsDb,
+  saveSettingsDb,
   checkSupabaseHealth,
   clearAllDatabaseTables,
-  upsertCustodyEntryDb,
-  addTicketMessageDb,
+  insertCustodyEntryDb,
+  updateCustodyEntryDb,
+  mensagemDeErro,
   SupabaseHealthStatus,
 } from '../services/supabaseDb.ts';
 
@@ -64,6 +74,9 @@ interface AppContextType {
   refreshSupabaseData: () => Promise<void>;
   authLoading: boolean;
   authError: string | null;
+  // Último erro de gravação no banco (a alteração na tela já foi desfeita)
+  dbErro: string | null;
+  limparDbErro: () => void;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   currentUser: Employee | null;
   currentRole: UserRole;
@@ -107,9 +120,10 @@ interface AppContextType {
   revokeLicense: (licenseId: string, employeeId: string) => void;
 
   // Ações de Chamados (Service Desk)
+  // Assíncrono: o código (#CH-AAAA-NNNN) vem do banco. Devolve null se falhar.
   createTicket: (
     ticket: Omit<Ticket, 'id' | 'codigo' | 'dataCriacao' | 'dataAtualizacao' | 'mensagens'>
-  ) => Ticket;
+  ) => Promise<Ticket | null>;
   addTicketMessage: (
     ticketId: string,
     texto: string,
@@ -121,9 +135,10 @@ interface AppContextType {
   toggleOffboardingChecklist: (ticketId: string, checklistItemId: string) => void;
 
   // Ações de Termos
+  // Assíncrono: o código (#TR-AAAA-NNNN) vem do banco. Devolve null se falhar.
   createTerm: (
     term: Omit<ResponsibilityTerm, 'id' | 'codigo' | 'dataEmissao'>
-  ) => ResponsibilityTerm;
+  ) => Promise<ResponsibilityTerm | null>;
   markTermSigned: (termId: string, arquivoUrl?: string) => void;
 
   // Configurações e Reset
@@ -319,8 +334,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbDepts && dbDepts.length > 0) {
           setDepartments(dbDepts);
         } else {
-          for (const d of INITIAL_DEPARTMENTS) {
-            await upsertDepartmentDb(d);
+          // Banco sem setores: semeia os padrões (só ti_admin tem permissão; os demais ignoram)
+          try {
+            for (const d of INITIAL_DEPARTMENTS) {
+              await insertDepartmentDb(d);
+            }
+          } catch (err) {
+            console.warn('Setores padrão não semeados:', mensagemDeErro(err));
           }
           setDepartments(INITIAL_DEPARTMENTS);
         }
@@ -355,7 +375,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbSettings) {
           setSettings(dbSettings);
         } else {
-          await upsertSettingsDb(INITIAL_COMPANY_SETTINGS);
+          try {
+            await saveSettingsDb(INITIAL_COMPANY_SETTINGS);
+          } catch (err) {
+            console.warn('Configuração padrão não gravada:', mensagemDeErro(err));
+          }
         }
       }
     } catch (err) {
@@ -544,39 +568,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     limparEstado();
   };
 
-  // CRUD de Colaboradores
-  const addEmployee = (data: Omit<Employee, 'id'>): Employee => {
-    const id = `emp-${Date.now().toString().slice(-6)}`;
-    const newEmployee: Employee = { ...data, id };
-    setEmployees((prev) => [newEmployee, ...prev]);
-    upsertEmployeeDb(newEmployee);
-    return newEmployee;
+  // ---------------------------------------------------------------------------
+  // Gravação com verificação de erro (Fase 2 · CRIT-04)
+  // A tela muda na hora (otimista); se o banco recusar, a mudança é desfeita
+  // e o motivo aparece no aviso de erro.
+  // ---------------------------------------------------------------------------
+  const [dbErro, setDbErro] = useState<string | null>(null);
+
+  const persistir = (op: Promise<unknown>, desfazer: () => void, contexto: string) => {
+    op.catch((err) => {
+      console.error(contexto, err);
+      desfazer();
+      setDbErro(`${contexto}: ${mensagemDeErro(err)}. A alteração foi desfeita.`);
+    });
   };
 
-  const updateEmployee = (id: string, updates: Partial<Employee>) => {
-    setEmployees((prev) =>
-      prev.map((emp) => {
-        if (emp.id === id) {
-          const updated = { ...emp, ...updates };
-          upsertEmployeeDb(updated);
-          return updated;
-        }
-        return emp;
-      })
+  // IDs aleatórios (ALTO-05: Date.now().slice(-6) repetia a cada ~17 minutos)
+  const novoId = (prefixo: string) => `${prefixo}-${crypto.randomUUID()}`;
+
+  function trocar<T extends { id: string }>(lista: T[], item: T): T[] {
+    return lista.map((x) => (x.id === item.id ? item : x));
+  }
+
+  // CRUD de Colaboradores
+  const addEmployee = (data: Omit<Employee, 'id'>): Employee => {
+    const novo: Employee = { ...data, email: data.email.trim().toLowerCase(), id: novoId('emp') };
+    setEmployees((prev) => [novo, ...prev]);
+    persistir(
+      insertEmployeeDb(novo),
+      () => setEmployees((prev) => prev.filter((e) => e.id !== novo.id)),
+      `Não foi possível cadastrar ${novo.nome}`
     );
+    return novo;
+  };
+
+  const updateEmployee = (id: string, updates: Partial<Employee>, contexto = 'Não foi possível salvar o colaborador') => {
+    const antes = employees.find((e) => e.id === id);
+    if (!antes) return;
+    const depois: Employee = { ...antes, ...updates };
+    setEmployees((prev) => trocar(prev, depois));
+    persistir(updateEmployeeDb(antes, depois), () => setEmployees((prev) => trocar(prev, antes)), contexto);
   };
 
   const updateEmployeeRole = (id: string, role: UserRole) => {
-    setEmployees((prev) =>
-      prev.map((emp) => {
-        if (emp.id === id) {
-          const updated = { ...emp, role };
-          upsertEmployeeDb(updated);
-          return updated;
-        }
-        return emp;
-      })
-    );
+    updateEmployee(id, { role }, 'Não foi possível alterar o papel de acesso');
   };
 
   const deleteEmployee = (id: string): { success: boolean; message?: string } => {
@@ -587,31 +622,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: `Não é possível excluir. O colaborador possui ${assetsWithUser.length} equipamento(s) sob sua custódia. Faça a devolução primeiro.`,
       };
     }
-
+    const antes = employees.find((e) => e.id === id);
+    if (!antes) return { success: false, message: 'Colaborador não encontrado.' };
     setEmployees((prev) => prev.filter((emp) => emp.id !== id));
-    deleteEmployeeDb(id);
+    persistir(
+      deleteEmployeeDb(id),
+      () => setEmployees((prev) => [antes, ...prev]),
+      `Não foi possível excluir ${antes.nome}`
+    );
     return { success: true };
   };
 
   // CRUD de Setores com Proteção Referencial
   const addDepartment = (data: Omit<Department, 'id'>): Department => {
-    const id = `dep-${Date.now().toString().slice(-4)}`;
-    const newDepartment: Department = { ...data, id };
-    setDepartments((prev) => [...prev, newDepartment]);
-    upsertDepartmentDb(newDepartment);
-    return newDepartment;
+    const novo: Department = { ...data, id: novoId('dep') };
+    setDepartments((prev) => [...prev, novo]);
+    persistir(
+      insertDepartmentDb(novo),
+      () => setDepartments((prev) => prev.filter((d) => d.id !== novo.id)),
+      `Não foi possível cadastrar o setor ${novo.nome}`
+    );
+    return novo;
   };
 
   const updateDepartment = (id: string, updates: Partial<Department>) => {
-    setDepartments((prev) =>
-      prev.map((dep) => {
-        if (dep.id === id) {
-          const updated = { ...dep, ...updates };
-          upsertDepartmentDb(updated);
-          return updated;
-        }
-        return dep;
-      })
+    const antes = departments.find((d) => d.id === id);
+    if (!antes) return;
+    const depois: Department = { ...antes, ...updates };
+    setDepartments((prev) => trocar(prev, depois));
+    persistir(
+      updateDepartmentDb(antes, depois),
+      () => setDepartments((prev) => trocar(prev, antes)),
+      'Não foi possível salvar o setor'
     );
   };
 
@@ -623,31 +665,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: `Ação bloqueada: O setor possui ${linkedEmployees.length} colaborador(es) vinculado(s). Você pode inativá-lo, mas não excluí-lo.`,
       };
     }
+    const antes = departments.find((d) => d.id === id);
+    if (!antes) return { success: false, message: 'Setor não encontrado.' };
     setDepartments((prev) => prev.filter((dep) => dep.id !== id));
-    deleteDepartmentDb(id);
+    persistir(
+      deleteDepartmentDb(id),
+      () => setDepartments((prev) => [...prev, antes]),
+      `Não foi possível excluir o setor ${antes.nome}`
+    );
     return { success: true };
   };
 
   // CRUD de Ativos & Gestão de Custódia 1:1
   const addAsset = (data: Omit<Asset, 'id'>): Asset => {
-    const id = `ast-${Date.now().toString().slice(-6)}`;
-    const newAsset: Asset = { ...data, id };
-    setAssets((prev) => [newAsset, ...prev]);
-    upsertAssetDb(newAsset);
-    return newAsset;
+    const novo: Asset = {
+      ...data,
+      id: novoId('ast'),
+      historicoCustodia: (data.historicoCustodia || []).map((c) => ({ ...c, id: novoId('cust') })),
+    };
+    setAssets((prev) => [novo, ...prev]);
+    persistir(
+      insertAssetDb(novo),
+      () => setAssets((prev) => prev.filter((a) => a.id !== novo.id)),
+      `Não foi possível cadastrar o ativo ${novo.tag}`
+    );
+    return novo;
   };
 
   const updateAsset = (id: string, updates: Partial<Asset>) => {
-    setAssets((prev) =>
-      prev.map((ast) => {
-        if (ast.id === id) {
-          const updated = { ...ast, ...updates };
-          upsertAssetDb(updated);
-          return updated;
-        }
-        return ast;
-      })
-    );
+    const antes = assets.find((a) => a.id === id);
+    if (!antes) return;
+    const depois: Asset = { ...antes, ...updates };
+    setAssets((prev) => trocar(prev, depois));
+    persistir(updateAssetDb(antes, depois), () => setAssets((prev) => trocar(prev, antes)), 'Não foi possível salvar o ativo');
   };
 
   const transferAssetCustody = (
@@ -655,80 +705,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     newColaboradorId: string | null,
     motivoDevolucao?: string
   ) => {
+    const antes = assets.find((a) => a.id === assetId);
+    if (!antes) return;
     const today = new Date().toISOString().split('T')[0];
+    const historico = [...antes.historicoCustodia];
 
-    setAssets((prev) =>
-      prev.map((ast) => {
-        if (ast.id !== assetId) return ast;
-
-        const currentCustody = ast.historicoCustodia;
-        let updatedCustody = [...currentCustody];
-
-        if (ast.custodianteId && ast.custodianteId !== newColaboradorId) {
-          const lastEntry = updatedCustody[updatedCustody.length - 1];
-          if (lastEntry && !lastEntry.dataDevolucao) {
-            const closedEntry = {
-              ...lastEntry,
-              dataDevolucao: today,
-              motivoDevolucao: motivoDevolucao || 'Devolução/Transferência para o estoque de TI',
-            };
-            updatedCustody[updatedCustody.length - 1] = closedEntry;
-            upsertCustodyEntryDb(assetId, closedEntry);
-          }
-        }
-
-        if (newColaboradorId) {
-          const newEmp = employees.find((e) => e.id === newColaboradorId);
-          const newEntry = {
-            id: `cust-${Date.now().toString().slice(-6)}`,
-            colaboradorId: newColaboradorId,
-            colaboradorNome: newEmp?.nome || 'Colaborador',
-            dataEntrega: today,
-            observacoes: 'Transferência de custódia realizada pelo setor de TI',
-          };
-          updatedCustody.push(newEntry);
-          upsertCustodyEntryDb(assetId, newEntry);
-        }
-
-        const updated: Asset = {
-          ...ast,
-          custodianteId: newColaboradorId || undefined,
-          status: newColaboradorId ? 'em_uso' : 'disponivel',
-          dataEntregaAtual: newColaboradorId ? today : undefined,
-          historicoCustodia: updatedCustody,
+    let entradaAberta: CustodyHistoryEntry | undefined;
+    let entradaFechada: CustodyHistoryEntry | undefined;
+    if (antes.custodianteId && antes.custodianteId !== newColaboradorId) {
+      const ultima = historico[historico.length - 1];
+      if (ultima && !ultima.dataDevolucao) {
+        entradaAberta = ultima;
+        entradaFechada = {
+          ...ultima,
+          dataDevolucao: today,
+          motivoDevolucao: motivoDevolucao || 'Devolução/Transferência para o estoque de TI',
         };
-        upsertAssetDb(updated);
-        return updated;
-      })
-    );
+        historico[historico.length - 1] = entradaFechada;
+      }
+    }
+
+    let entradaNova: CustodyHistoryEntry | undefined;
+    if (newColaboradorId) {
+      const newEmp = employees.find((e) => e.id === newColaboradorId);
+      entradaNova = {
+        id: novoId('cust'),
+        colaboradorId: newColaboradorId,
+        colaboradorNome: newEmp?.nome || 'Colaborador',
+        dataEntrega: today,
+        observacoes: 'Transferência de custódia realizada pelo setor de TI',
+      };
+      historico.push(entradaNova);
+    }
+
+    const depois: Asset = {
+      ...antes,
+      custodianteId: newColaboradorId || undefined,
+      status: newColaboradorId ? 'em_uso' : 'disponivel',
+      dataEntregaAtual: newColaboradorId ? today : undefined,
+      historicoCustodia: historico,
+    };
+    setAssets((prev) => trocar(prev, depois));
+
+    const gravar = async () => {
+      if (entradaAberta && entradaFechada) await updateCustodyEntryDb(assetId, entradaAberta, entradaFechada);
+      if (entradaNova) await insertCustodyEntryDb(assetId, entradaNova);
+      await updateAssetDb(antes, depois);
+    };
+    persistir(gravar(), () => setAssets((prev) => trocar(prev, antes)), `Não foi possível transferir a custódia de ${antes.tag}`);
   };
 
   // Licenças de Softwares & SaaS
   const addLicense = (data: Omit<SoftwareLicense, 'id' | 'assentosAlocados'>): SoftwareLicense => {
-    const id = `lic-${Date.now().toString().slice(-6)}`;
-    const newLicense: SoftwareLicense = {
+    const nova: SoftwareLicense = {
       ...data,
-      id,
+      id: novoId('lic'),
       assentosAlocados: data.colaboradoresIds ? data.colaboradoresIds.length : 0,
       colaboradoresIds: data.colaboradoresIds || [],
     };
-    setLicenses((prev) => [newLicense, ...prev]);
-    upsertLicenseDb(newLicense);
-    return newLicense;
+    setLicenses((prev) => [nova, ...prev]);
+    persistir(
+      insertLicenseDb(nova),
+      () => setLicenses((prev) => prev.filter((l) => l.id !== nova.id)),
+      `Não foi possível cadastrar a licença ${nova.nome}`
+    );
+    return nova;
   };
 
   const updateLicense = (id: string, updates: Partial<SoftwareLicense>) => {
-    setLicenses((prev) =>
-      prev.map((lic) => {
-        if (lic.id !== id) return lic;
-        const updated = { ...lic, ...updates };
-        if (updates.colaboradoresIds) {
-          updated.assentosAlocados = updates.colaboradoresIds.length;
-        }
-        upsertLicenseDb(updated);
-        return updated;
-      })
-    );
+    const antes = licenses.find((l) => l.id === id);
+    if (!antes) return;
+    const depois: SoftwareLicense = { ...antes, ...updates };
+    if (updates.colaboradoresIds) depois.assentosAlocados = updates.colaboradoresIds.length;
+    setLicenses((prev) => trocar(prev, depois));
+    persistir(updateLicenseDb(antes, depois), () => setLicenses((prev) => trocar(prev, antes)), 'Não foi possível salvar a licença');
   };
 
   const deleteLicense = (id: string): { success: boolean; message?: string } => {
@@ -741,65 +791,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     setLicenses((prev) => prev.filter((l) => l.id !== id));
-    deleteLicenseDb(id);
+    persistir(deleteLicenseDb(id), () => setLicenses((prev) => [found, ...prev]), `Não foi possível excluir a licença ${found.nome}`);
     return { success: true };
   };
 
-  const allocateLicense = (licenseId: string, employeeId: string) => {
+  // Alocação e revogação vão por RPC atômica no banco (ALTO-04); a lista
+  // devolvida pelo banco substitui a da tela.
+  const aplicarAssentos = (licenseId: string, ids: string[] | null) => {
+    if (!ids) return;
     setLicenses((prev) =>
-      prev.map((lic) => {
-        if (lic.id !== licenseId) return lic;
-        if (lic.colaboradoresIds.includes(employeeId)) return lic;
-        if (lic.colaboradoresIds.length >= lic.assentosTotais) {
-          return lic;
-        }
-        const updatedColabs = [...lic.colaboradoresIds, employeeId];
-        const updated: SoftwareLicense = {
-          ...lic,
-          assentosAlocados: updatedColabs.length,
-          colaboradoresIds: updatedColabs,
-        };
-        upsertLicenseDb(updated);
-        return updated;
-      })
+      prev.map((l) => (l.id === licenseId ? { ...l, colaboradoresIds: ids, assentosAlocados: ids.length } : l))
+    );
+  };
+
+  const allocateLicense = (licenseId: string, employeeId: string) => {
+    const antes = licenses.find((l) => l.id === licenseId);
+    if (!antes || antes.colaboradoresIds.includes(employeeId)) return;
+    if (antes.colaboradoresIds.length >= antes.assentosTotais) return;
+    const ids = [...antes.colaboradoresIds, employeeId];
+    setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
+    persistir(
+      alocarLicencaDb(licenseId, employeeId).then((doBanco) => aplicarAssentos(licenseId, doBanco)),
+      () => setLicenses((prev) => trocar(prev, antes)),
+      `Não foi possível alocar assento em ${antes.nome}`
     );
   };
 
   const revokeLicense = (licenseId: string, employeeId: string) => {
-    setLicenses((prev) =>
-      prev.map((lic) => {
-        if (lic.id !== licenseId) return lic;
-        if (!lic.colaboradoresIds.includes(employeeId)) return lic;
-        const updatedColabs = lic.colaboradoresIds.filter((id) => id !== employeeId);
-        const updated: SoftwareLicense = {
-          ...lic,
-          assentosAlocados: updatedColabs.length,
-          colaboradoresIds: updatedColabs,
-        };
-        upsertLicenseDb(updated);
-        return updated;
-      })
+    const antes = licenses.find((l) => l.id === licenseId);
+    if (!antes || !antes.colaboradoresIds.includes(employeeId)) return;
+    const ids = antes.colaboradoresIds.filter((x) => x !== employeeId);
+    setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
+    persistir(
+      revogarLicencaDb(licenseId, employeeId).then((doBanco) => aplicarAssentos(licenseId, doBanco)),
+      () => setLicenses((prev) => trocar(prev, antes)),
+      `Não foi possível liberar o assento em ${antes.nome}`
     );
   };
 
   // Service Desk / Chamados
-  const createTicket = (
+  const createTicket = async (
     ticketData: Omit<Ticket, 'id' | 'codigo' | 'dataCriacao' | 'dataAtualizacao' | 'mensagens'>
-  ): Ticket => {
-    const year = new Date().getFullYear();
-    const count = tickets.length + 1;
-    const codigo = `#CH-${year}-${count.toString().padStart(3, '0')}`;
+  ): Promise<Ticket | null> => {
     const now = new Date().toISOString();
+    const id = novoId('tkt');
+    // Código definitivo vem do banco; o local só vale no modo demonstração
+    const codigoLocal = `#CH-${new Date().getFullYear()}-${(tickets.length + 1).toString().padStart(4, '0')}`;
 
     const newTicket: Ticket = {
       ...ticketData,
-      id: `tkt-${Date.now().toString().slice(-6)}`,
-      codigo,
+      id,
+      codigo: codigoLocal,
       dataCriacao: now,
       dataAtualizacao: now,
       mensagens: [
         {
-          id: `msg-${Date.now().toString().slice(-6)}`,
+          id: novoId('msg'),
           autorId: ticketData.solicitanteId,
           autorNome: ticketData.solicitanteNome,
           autorRole: currentRole,
@@ -811,10 +858,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ],
     };
 
-    setTickets((prev) => [newTicket, ...prev]);
-    // A mensagem depende do chamado (FK): grava em sequência (MED-02)
-    upsertTicketDb(newTicket).then(() => addTicketMessageDb(newTicket.id, newTicket.mensagens[0]));
-    return newTicket;
+    try {
+      const doBanco = await insertTicketDb(newTicket);
+      const salvo: Ticket = { ...newTicket, codigo: doBanco?.codigo || newTicket.codigo };
+      setTickets((prev) => [salvo, ...prev]);
+      // A mensagem depende do chamado (FK): grava depois dele (MED-02)
+      try {
+        await insertTicketMessageDb(id, newTicket.mensagens[0]);
+      } catch (err) {
+        setDbErro(
+          `O chamado ${salvo.codigo} foi aberto, mas a descrição inicial não foi salva como mensagem: ${mensagemDeErro(err)}`
+        );
+      }
+      return salvo;
+    } catch (err) {
+      console.error('Erro ao abrir chamado', err);
+      setDbErro(`Não foi possível abrir o chamado: ${mensagemDeErro(err)}.`);
+      return null;
+    }
   };
 
   const addTicketMessage = (
@@ -825,9 +886,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     if (!currentUser) return;
     const now = new Date().toISOString();
-
     const newMessage = {
-      id: `msg-${Date.now().toString().slice(-6)}`,
+      id: novoId('msg'),
       autorId: currentUser.id,
       autorNome: currentUser.nome,
       autorRole: currentRole,
@@ -837,123 +897,107 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       anexos,
     };
 
-    addTicketMessageDb(ticketId, newMessage);
-
+    // Não regrava o chamado: o banco atualiza data_atualizacao ao receber a mensagem
     setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId) return tkt;
-        // Não regrava o chamado: o banco atualiza data_atualizacao ao receber a mensagem
-        // (e colaborador não tem permissão de alterar chamados).
-        const updated: Ticket = {
-          ...tkt,
-          dataAtualizacao: now,
-          mensagens: [...tkt.mensagens, newMessage],
-        };
-        return updated;
-      })
+      prev.map((tkt) =>
+        tkt.id === ticketId ? { ...tkt, dataAtualizacao: now, mensagens: [...tkt.mensagens, newMessage] } : tkt
+      )
+    );
+    persistir(
+      insertTicketMessageDb(ticketId, newMessage),
+      () =>
+        setTickets((prev) =>
+          prev.map((tkt) =>
+            tkt.id === ticketId ? { ...tkt, mensagens: tkt.mensagens.filter((m) => m.id !== newMessage.id) } : tkt
+          )
+        ),
+      'Não foi possível enviar a mensagem'
     );
   };
 
+  const alterarChamado = (ticketId: string, mudar: (t: Ticket) => Ticket, contexto: string) => {
+    const antes = tickets.find((t) => t.id === ticketId);
+    if (!antes) return;
+    const depois = { ...mudar(antes), dataAtualizacao: new Date().toISOString() };
+    setTickets((prev) => trocar(prev, depois));
+    persistir(updateTicketDb(antes, depois), () => setTickets((prev) => trocar(prev, antes)), contexto);
+  };
+
   const updateTicketStatus = (ticketId: string, status: TicketStatus) => {
-    const now = new Date().toISOString();
-    setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId) return tkt;
-        const updated: Ticket = {
-          ...tkt,
-          status,
-          dataAtualizacao: now,
-          dataResolucao: status === 'resolvido' ? now : tkt.dataResolucao,
-        };
-        upsertTicketDb(updated);
-        return updated;
-      })
+    alterarChamado(
+      ticketId,
+      (t) => ({ ...t, status, dataResolucao: status === 'resolvido' ? new Date().toISOString() : t.dataResolucao }),
+      'Não foi possível alterar o status do chamado'
     );
   };
 
   const assignTicketTechnician = (ticketId: string, technicianId: string) => {
     const tech = employees.find((e) => e.id === technicianId);
-    const now = new Date().toISOString();
-    setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId) return tkt;
-        const updated: Ticket = {
-          ...tkt,
-          tecnicoResponsavelId: technicianId,
-          tecnicoResponsavelNome: tech?.nome || 'Técnico de TI',
-          dataAtualizacao: now,
-        };
-        upsertTicketDb(updated);
-        return updated;
-      })
+    alterarChamado(
+      ticketId,
+      (t) => ({ ...t, tecnicoResponsavelId: technicianId, tecnicoResponsavelNome: tech?.nome || 'Técnico de TI' }),
+      'Não foi possível atribuir o técnico'
     );
   };
 
   const toggleOffboardingChecklist = (ticketId: string, checklistItemId: string) => {
-    const now = new Date().toISOString();
-    setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId || !tkt.offboarding) return tkt;
-        const updatedChecklist = tkt.offboarding.checklist.map((item) =>
-          item.id === checklistItemId ? { ...item, concluido: !item.concluido } : item
-        );
-        const updated: Ticket = {
-          ...tkt,
-          offboarding: {
-            ...tkt.offboarding,
-            checklist: updatedChecklist,
-          },
-          dataAtualizacao: now,
-        };
-        upsertTicketDb(updated);
-        return updated;
-      })
+    alterarChamado(
+      ticketId,
+      (t) =>
+        t.offboarding
+          ? {
+              ...t,
+              offboarding: {
+                ...t.offboarding,
+                checklist: t.offboarding.checklist.map((item) =>
+                  item.id === checklistItemId ? { ...item, concluido: !item.concluido } : item
+                ),
+              },
+            }
+          : t,
+      'Não foi possível atualizar o checklist'
     );
   };
 
   // Termos de Responsabilidade
-  const createTerm = (
+  const createTerm = async (
     data: Omit<ResponsibilityTerm, 'id' | 'codigo' | 'dataEmissao'>
-  ): ResponsibilityTerm => {
-    const year = new Date().getFullYear();
-    const count = terms.length + 1;
-    const codigo = `#TR-${year}-${count.toString().padStart(4, '0')}`;
-    const now = new Date().toISOString().split('T')[0];
-
-    const newTerm: ResponsibilityTerm = {
+  ): Promise<ResponsibilityTerm | null> => {
+    const novo: ResponsibilityTerm = {
       ...data,
-      id: `tr-${Date.now().toString().slice(-6)}`,
-      codigo,
-      dataEmissao: now,
+      id: novoId('tr'),
+      codigo: `#TR-${new Date().getFullYear()}-${(terms.length + 1).toString().padStart(4, '0')}`,
+      dataEmissao: new Date().toISOString().split('T')[0],
     };
-
-    setTerms((prev) => [newTerm, ...prev]);
-    upsertTermDb(newTerm);
-    return newTerm;
+    try {
+      const doBanco = await insertTermDb(novo);
+      const salvo: ResponsibilityTerm = { ...novo, codigo: doBanco?.codigo || novo.codigo };
+      setTerms((prev) => [salvo, ...prev]);
+      return salvo;
+    } catch (err) {
+      console.error('Erro ao gerar termo', err);
+      setDbErro(`Não foi possível gerar o termo: ${mensagemDeErro(err)}.`);
+      return null;
+    }
   };
 
   const markTermSigned = (termId: string, arquivoUrl?: string) => {
-    setTerms((prev) =>
-      prev.map((t) => {
-        if (t.id !== termId) return t;
-        const updated: ResponsibilityTerm = {
-          ...t,
-          statusAssinatura: 'assinado',
-          arquivoAssinadoUrl:
-            arquivoUrl || 'https://cdn.nexuscorp.com.br/termos/assinado-scan.pdf',
-        };
-        upsertTermDb(updated);
-        return updated;
-      })
-    );
+    const antes = terms.find((t) => t.id === termId);
+    if (!antes) return;
+    const depois: ResponsibilityTerm = {
+      ...antes,
+      statusAssinatura: 'assinado',
+      arquivoAssinadoUrl: arquivoUrl || 'https://cdn.nexuscorp.com.br/termos/assinado-scan.pdf',
+    };
+    setTerms((prev) => trocar(prev, depois));
+    persistir(updateTermDb(antes, depois), () => setTerms((prev) => trocar(prev, antes)), `Não foi possível registrar a assinatura de ${antes.codigo}`);
   };
 
   const updateSettings = (updates: Partial<CompanySettings>) => {
-    setSettings((prev) => {
-      const updated = { ...prev, ...updates };
-      upsertSettingsDb(updated);
-      return updated;
-    });
+    const antes = settings;
+    const depois = { ...settings, ...updates };
+    setSettings(depois);
+    persistir(saveSettingsDb(depois), () => setSettings(antes), 'Não foi possível salvar as configurações');
   };
 
   const resetToInitialData = () => {
@@ -1021,9 +1065,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify([]));
 
-    if (activeAdmin && isSupabaseConfigured) {
-      await upsertEmployeeDb(activeAdmin);
-    }
   };
 
   return (
@@ -1037,6 +1078,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
         authLoading,
         authError,
+        dbErro,
+        limparDbErro: () => setDbErro(null),
         loginWithGoogle,
         currentUser,
         currentRole,

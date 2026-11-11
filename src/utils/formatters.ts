@@ -2,6 +2,26 @@
  * Utilitários de Formatação e Regras de Negócio
  */
 
+// Rótulos de chamados. Os valores seguem os CHECKs do banco (critica,
+// aguardando_terceiro); o texto exibido mantém a linguagem da equipe.
+const ROTULO_STATUS: Record<string, string> = {
+  aberto: 'Aberto',
+  em_andamento: 'Em andamento',
+  aguardando_terceiro: 'Aguardando peça',
+  resolvido: 'Resolvido',
+  cancelado: 'Cancelado',
+};
+
+const ROTULO_PRIORIDADE: Record<string, string> = {
+  baixa: 'Baixa',
+  media: 'Média',
+  alta: 'Alta',
+  critica: 'Urgente',
+};
+
+export const rotuloStatus = (status: string): string => ROTULO_STATUS[status] || status.replace(/_/g, ' ');
+export const rotuloPrioridade = (prioridade: string): string => ROTULO_PRIORIDADE[prioridade] || prioridade;
+
 export const formatCurrency = (val: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

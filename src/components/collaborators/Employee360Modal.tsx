@@ -107,13 +107,13 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     }, 50);
   };
 
-  const handleGenerateTerm = (tipo: 'entrega' | 'devolucao') => {
+  const handleGenerateTerm = async (tipo: 'entrega' | 'devolucao') => {
     if (currentAssets.length === 0 && tipo === 'entrega') {
       alert('O colaborador não possui equipamentos vinculados para gerar o termo.');
       return;
     }
 
-    const newTerm = createTerm({
+    const newTerm = await createTerm({
       tipo,
       colaboradorId: employee.id,
       colaboradorNome: employee.nome,
@@ -125,6 +125,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
       responsavelTIId: currentUser?.id || 'emp-1',
       responsavelTINome: currentUser?.nome || 'Responsável T.I.',
     });
+    if (!newTerm) return; // o erro já aparece no aviso global
 
     setTermSuccess(`Termo ${newTerm.codigo} gerado com sucesso!`);
     setTimeout(() => setTermSuccess(null), 3000);

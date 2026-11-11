@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { TicketStatus, TicketPriority } from '../../types/index.ts';
-import { formatDateTime, formatDate } from '../../utils/formatters.ts';
+import { formatDateTime, formatDate, rotuloStatus, rotuloPrioridade } from '../../utils/formatters.ts';
 import {
   X,
   User,
@@ -77,7 +77,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     }
 
     const newEmp = addEmployee({
-      matricula: `NX-${Math.floor(1000 + Math.random() * 9000)}`,
+      matricula: `NX-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
       nome: onb.nomeColaborador,
       email: onb.emailColaborador,
       cargo: onb.cargo,
@@ -117,7 +117,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   const statusColors = {
     aberto: 'text-blue-700 bg-blue-50 border-blue-200',
     em_andamento: 'text-amber-700 bg-amber-50 border-amber-200',
-    aguardando_peca: 'text-purple-700 bg-purple-50 border-purple-200',
+    aguardando_terceiro: 'text-purple-700 bg-purple-50 border-purple-200',
     resolvido: 'text-emerald-700 bg-emerald-50 border-emerald-200',
     cancelado: 'text-slate-500 bg-slate-100 border-slate-200',
   }[ticket.status];
@@ -126,7 +126,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     baixa: 'text-slate-600 bg-slate-100',
     media: 'text-blue-700 bg-blue-50',
     alta: 'text-amber-700 bg-amber-50',
-    urgente: 'text-rose-700 bg-rose-50 font-bold',
+    critica: 'text-rose-700 bg-rose-50 font-bold',
   }[ticket.prioridade];
 
   return (
@@ -150,10 +150,10 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
-              {ticket.status.replace('_', ' ').toUpperCase()}
+              {rotuloStatus(ticket.status).toUpperCase()}
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-md ${priorityColors}`}>
-              Prioridade: {ticket.prioridade.toUpperCase()}
+              Prioridade: {rotuloPrioridade(ticket.prioridade).toUpperCase()}
             </span>
             <button
               onClick={onClose}
@@ -482,7 +482,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   >
                     <option value="aberto">Aberto (Na Fila)</option>
                     <option value="em_andamento">Em Andamento</option>
-                    <option value="aguardando_peca">Aguardando Peça / Fornecedor</option>
+                    <option value="aguardando_terceiro">Aguardando Peça / Fornecedor</option>
                     <option value="resolvido">Resolvido / Finalizado</option>
                     <option value="cancelado">Cancelado</option>
                   </select>

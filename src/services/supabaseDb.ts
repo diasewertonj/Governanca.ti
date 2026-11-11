@@ -12,10 +12,205 @@ import {
 } from '../types/index.ts';
 
 /**
- * SERVIÇO DE PERSISTÊNCIA EM BANCO SUPABASE POSTGRESQL (FULLSTACK)
+ * SERVIÇO DE PERSISTÊNCIA EM BANCO SUPABASE POSTGRESQL
+ *
+ * Fase 2 (CRIT-04 / ALTO-04 / ALTO-05):
+ * - toda gravação verifica o `error` do Supabase e lança DbError;
+ * - criação usa INSERT (nunca sobrescreve outro registro);
+ * - edição usa UPDATE só com os campos que mudaram, e confirma que 1 linha
+ *   foi afetada (a RLS recusa em silêncio, devolvendo 0 linhas);
+ * - códigos de chamado/termo são gerados pelo banco e devolvidos aqui.
+ * Sem Supabase (modo demonstração) as funções não fazem nada.
  */
 
+type Linha = Record<string, unknown>;
+
+export class DbError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'DbError';
+    this.code = code;
+  }
+}
+
+function lancar(error: { message: string; code?: string }): never {
+  throw new DbError(error.message, error.code);
+}
+
+async function checar<T>(op: PromiseLike<{ data: T; error: any }>): Promise<T> {
+  const { data, error } = await op;
+  if (error) lancar(error);
+  return data;
+}
+
+function camposAlterados(antes: Linha, depois: Linha): Linha {
+  const diff: Linha = {};
+  Object.keys(depois).forEach((k) => {
+    if (JSON.stringify(antes[k] ?? null) !== JSON.stringify(depois[k] ?? null)) diff[k] = depois[k];
+  });
+  return diff;
+}
+
+const SEM_PERMISSAO = 'Sem permissão para alterar este registro, ou ele não existe mais.';
+
+async function atualizar(tabela: string, id: string, campos: Linha, chave = 'id') {
+  if (!supabase || Object.keys(campos).length === 0) return;
+  const data = await checar(supabase.from(tabela).update(campos).eq(chave, id).select(chave));
+  if (!data || (data as unknown[]).length === 0) throw new DbError(SEM_PERMISSAO, '42501');
+}
+
+async function excluir(tabela: string, id: string, chave = 'id') {
+  if (!supabase) return;
+  const data = await checar(supabase.from(tabela).delete().eq(chave, id).select(chave));
+  if (!data || (data as unknown[]).length === 0) throw new DbError(SEM_PERMISSAO, '42501');
+}
+
+/** Mensagem curta para o usuário a partir de um erro do banco */
+export function mensagemDeErro(err: unknown): string {
+  const e = err as { code?: string; message?: string };
+  switch (e?.code) {
+    case '42501':
+      return 'sem permissão para esta ação';
+    case '23505':
+      return 'já existe um registro com esses dados (e-mail, matrícula, tag, série ou código repetido)';
+    case '23503':
+      return 'o registro está vinculado a outros dados (histórico, chamados ou termos) e não pode ser removido';
+    case '23514':
+      return e.message?.includes('assento') ? e.message : 'valor não aceito pelo banco';
+    case '23502':
+      return 'campo obrigatório não preenchido';
+    default:
+      return e?.message || 'falha de comunicação com o banco';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mapeamento entidade -> linha do banco
+// ---------------------------------------------------------------------------
+const linhaSetor = (d: Department): Linha => ({
+  id: d.id,
+  nome: d.nome,
+  codigo: d.codigo,
+  descricao: d.descricao || null,
+  ativo: d.ativo,
+  responsavel_id: d.responsavelId || null,
+});
+
+const linhaColaborador = (e: Employee): Linha => ({
+  id: e.id,
+  matricula: e.matricula,
+  nome: e.nome,
+  email: e.email.trim().toLowerCase(),
+  cargo: e.cargo,
+  setor_id: e.setorId || null,
+  gestor_id: e.gestorId || null,
+  status: e.status,
+  role: e.role || 'colaborador',
+  data_admissao: e.dataAdmissao,
+  telefone: e.telefone || null,
+  avatar_url: e.avatarUrl || null,
+});
+
+const linhaAtivo = (a: Asset): Linha => ({
+  id: a.id,
+  tag: a.tag,
+  nome: a.nome,
+  categoria: a.categoria,
+  marca: a.marca,
+  modelo: a.modelo,
+  serial_number: a.serialNumber,
+  status: a.status,
+  localizacao_fisica: a.localizacaoFisica,
+  setor_id: a.setorId || null,
+  custodiante_id: a.custodianteId || null,
+  data_entrega_atual: a.dataEntregaAtual || null,
+  sistema_operacional: a.sistemaOperacional || null,
+  fiscal: a.fiscal || {},
+  custom_fields: a.customFields || {},
+});
+
+const linhaCustodia = (ativoId: string, c: CustodyHistoryEntry): Linha => ({
+  id: c.id,
+  ativo_id: ativoId,
+  colaborador_id: c.colaboradorId,
+  colaborador_nome: c.colaboradorNome,
+  data_entrega: c.dataEntrega,
+  data_devolucao: c.dataDevolucao || null,
+  motivo_devolucao: c.motivoDevolucao || null,
+  termo_id: c.termoId || null,
+  observacoes: c.observacoes || null,
+});
+
+const linhaLicenca = (l: SoftwareLicense): Linha => ({
+  id: l.id,
+  nome: l.nome,
+  fornecedor: l.fornecedor,
+  assentos_totais: l.assentosTotais,
+  colaboradores_ids: l.colaboradoresIds || [],
+  valor_mensal: l.valorMensal,
+  tipo_cobranca: l.tipoCobranca || 'mensal',
+  data_renovacao: l.dataRenovacao,
+  url_painel: l.urlPainel || null,
+  observacoes: l.observacoes || null,
+});
+
+const linhaChamado = (t: Ticket): Linha => ({
+  id: t.id,
+  codigo: t.codigo,
+  titulo: t.titulo,
+  descricao: t.descricao,
+  tipo: t.tipo,
+  categoria: t.categoria,
+  prioridade: t.prioridade,
+  status: t.status,
+  solicitante_id: t.solicitanteId,
+  solicitante_nome: t.solicitanteNome,
+  solicitante_email: t.solicitanteEmail,
+  solicitante_cargo: t.solicitanteCargo,
+  solicitante_setor_nome: t.solicitanteSetorNome,
+  tecnico_responsavel_id: t.tecnicoResponsavelId || null,
+  tecnico_responsavel_nome: t.tecnicoResponsavelNome || null,
+  ativo_id: t.ativoId || null,
+  software_id: t.softwareId || null,
+  software_nome: t.softwareNome || null,
+  onboarding: t.onboarding || null,
+  offboarding: t.offboarding || null,
+  anexos: t.anexos || [],
+});
+
+const linhaMensagem = (chamadoId: string, m: TicketMessage): Linha => ({
+  id: m.id,
+  chamado_id: chamadoId,
+  autor_id: m.autorId,
+  autor_nome: m.autorNome,
+  autor_papel: m.autorRole,
+  texto: m.texto,
+  eh_nota_interna: m.ehNotaInterna,
+  data_envio: m.data,
+  anexos: m.anexos || [],
+});
+
+const linhaTermo = (tm: ResponsibilityTerm): Linha => ({
+  id: tm.id,
+  codigo: tm.codigo,
+  tipo: tm.tipo,
+  colaborador_id: tm.colaboradorId,
+  colaborador_nome: tm.colaboradorNome,
+  colaborador_matricula: tm.colaboradorMatricula,
+  colaborador_cargo: tm.colaboradorCargo,
+  colaborador_setor_nome: tm.colaboradorSetorNome,
+  ativo_ids: tm.ativoIds,
+  data_emissao: tm.dataEmissao,
+  status_assinatura: tm.statusAssinatura,
+  arquivo_url: tm.arquivoAssinadoUrl || null,
+  responsavel_ti_id: tm.responsavelTIId,
+  responsavel_ti_nome: tm.responsavelTINome,
+});
+
+// ---------------------------------------------------------------------------
 // 1. Departamentos
+// ---------------------------------------------------------------------------
 export async function fetchDepartmentsFromDb(): Promise<Department[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('departamentos').select('*').order('nome');
@@ -33,24 +228,22 @@ export async function fetchDepartmentsFromDb(): Promise<Department[] | null> {
   })) : [];
 }
 
-export async function upsertDepartmentDb(dept: Department) {
+export async function insertDepartmentDb(dept: Department) {
   if (!supabase) return;
-  await supabase.from('departamentos').upsert({
-    id: dept.id,
-    nome: dept.nome,
-    codigo: dept.codigo,
-    descricao: dept.descricao || null,
-    ativo: dept.ativo,
-    responsavel_id: dept.responsavelId || null,
-  });
+  await checar(supabase.from('departamentos').insert(linhaSetor(dept)));
+}
+
+export async function updateDepartmentDb(antes: Department, depois: Department) {
+  await atualizar('departamentos', depois.id, camposAlterados(linhaSetor(antes), linhaSetor(depois)));
 }
 
 export async function deleteDepartmentDb(id: string) {
-  if (!supabase) return;
-  await supabase.from('departamentos').delete().eq('id', id);
+  await excluir('departamentos', id);
 }
 
+// ---------------------------------------------------------------------------
 // 2. Colaboradores
+// ---------------------------------------------------------------------------
 export async function fetchEmployeesFromDb(): Promise<Employee[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('colaboradores').select('*').order('nome');
@@ -74,30 +267,22 @@ export async function fetchEmployeesFromDb(): Promise<Employee[] | null> {
   })) : [];
 }
 
-export async function upsertEmployeeDb(emp: Employee) {
+export async function insertEmployeeDb(emp: Employee) {
   if (!supabase) return;
-  await supabase.from('colaboradores').upsert({
-    id: emp.id,
-    matricula: emp.matricula,
-    nome: emp.nome,
-    email: emp.email,
-    cargo: emp.cargo,
-    setor_id: emp.setorId,
-    gestor_id: emp.gestorId || null,
-    status: emp.status,
-    role: emp.role || 'colaborador',
-    data_admissao: emp.dataAdmissao,
-    telefone: emp.telefone || null,
-    avatar_url: emp.avatarUrl || null,
-  });
+  await checar(supabase.from('colaboradores').insert(linhaColaborador(emp)));
+}
+
+export async function updateEmployeeDb(antes: Employee, depois: Employee) {
+  await atualizar('colaboradores', depois.id, camposAlterados(linhaColaborador(antes), linhaColaborador(depois)));
 }
 
 export async function deleteEmployeeDb(id: string) {
-  if (!supabase) return;
-  await supabase.from('colaboradores').delete().eq('id', id);
+  await excluir('colaboradores', id);
 }
 
-// 3. Ativos
+// ---------------------------------------------------------------------------
+// 3. Ativos e custódia
+// ---------------------------------------------------------------------------
 export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('ativos').select('*').order('tag');
@@ -106,14 +291,13 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     return null;
   }
 
-  // Buscar histórico de custódia vinculado
-  const { data: custodyData } = await supabase
+  const { data: custodyData, error: custodyError } = await supabase
     .from('historico_custodia')
     .select('*')
     .order('data_entrega', { ascending: true });
+  if (custodyError) console.error('Erro ao buscar histórico de custódia:', custodyError);
 
-  // Chaves BitLocker ficam em ativos_segredos (só TI enxerga; para os demais a RLS
-  // devolve vazio). Em bancos ainda sem a tabela, o erro é ignorado.
+  // Chaves BitLocker ficam em ativos_segredos (só TI enxerga; para os demais a RLS devolve vazio)
   const { data: segredosData } = await supabase.from('ativos_segredos').select('ativo_id, bitlocker_key');
   const bitlockerByAssetId: Record<string, string> = {};
   (segredosData || []).forEach((s: any) => {
@@ -121,23 +305,19 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
   });
 
   const custodyByAssetId: Record<string, CustodyHistoryEntry[]> = {};
-  if (custodyData) {
-    custodyData.forEach((c: any) => {
-      if (!custodyByAssetId[c.ativo_id]) {
-        custodyByAssetId[c.ativo_id] = [];
-      }
-      custodyByAssetId[c.ativo_id].push({
-        id: c.id,
-        colaboradorId: c.colaborador_id,
-        colaboradorNome: c.colaborador_nome,
-        dataEntrega: c.data_entrega,
-        dataDevolucao: c.data_devolucao || undefined,
-        motivoDevolucao: c.motivo_devolucao || undefined,
-        termoId: c.termo_id || undefined,
-        observacoes: c.observacoes || undefined,
-      });
+  (custodyData || []).forEach((c: any) => {
+    if (!custodyByAssetId[c.ativo_id]) custodyByAssetId[c.ativo_id] = [];
+    custodyByAssetId[c.ativo_id].push({
+      id: c.id,
+      colaboradorId: c.colaborador_id,
+      colaboradorNome: c.colaborador_nome,
+      dataEntrega: c.data_entrega,
+      dataDevolucao: c.data_devolucao || undefined,
+      motivoDevolucao: c.motivo_devolucao || undefined,
+      termoId: c.termo_id || undefined,
+      observacoes: c.observacoes || undefined,
     });
-  }
+  });
 
   return data ? data.map((a: any) => ({
     id: a.id,
@@ -149,10 +329,11 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     serialNumber: a.serial_number,
     status: a.status,
     localizacaoFisica: a.localizacao_fisica,
-    custodianteId: a.custodiante_id || null,
+    setorId: a.setor_id || undefined,
+    custodianteId: a.custodiante_id || undefined,
     dataEntregaAtual: a.data_entrega_atual || undefined,
     sistemaOperacional: a.sistema_operacional || undefined,
-    bitlockerKey: bitlockerByAssetId[a.id] || a.bitlocker_key || undefined,
+    bitlockerKey: bitlockerByAssetId[a.id] || undefined,
     fiscal: a.fiscal || undefined,
     customFields: a.custom_fields || {},
     historicoCustodia: custodyByAssetId[a.id] || [],
@@ -160,56 +341,56 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
   })) : [];
 }
 
-export async function upsertCustodyEntryDb(ativoId: string, entry: CustodyHistoryEntry) {
+async function gravarSegredoAtivo(ativoId: string, chave?: string) {
   if (!supabase) return;
-  await supabase.from('historico_custodia').upsert({
-    id: entry.id,
-    ativo_id: ativoId,
-    colaborador_id: entry.colaboradorId,
-    colaborador_nome: entry.colaboradorNome,
-    data_entrega: entry.dataEntrega,
-    data_devolucao: entry.dataDevolucao || null,
-    motivo_devolucao: entry.motivoDevolucao || null,
-    termo_id: entry.termoId || null,
-    observacoes: entry.observacoes || null,
-  });
+  if (chave) {
+    await checar(
+      supabase
+        .from('ativos_segredos')
+        .upsert({ ativo_id: ativoId, bitlocker_key: chave, updated_at: new Date().toISOString() })
+    );
+  } else {
+    await checar(supabase.from('ativos_segredos').delete().eq('ativo_id', ativoId));
+  }
 }
 
-export async function upsertAssetDb(asset: Asset) {
+/** Cria o ativo, a chave BitLocker e o histórico de custódia inicial (MED-01) */
+export async function insertAssetDb(asset: Asset) {
   if (!supabase) return;
-  await supabase.from('ativos').upsert({
-    id: asset.id,
-    tag: asset.tag,
-    nome: asset.nome,
-    categoria: asset.categoria,
-    marca: asset.marca,
-    modelo: asset.modelo,
-    serial_number: asset.serialNumber,
-    status: asset.status,
-    localizacao_fisica: asset.localizacaoFisica,
-    custodiante_id: asset.custodianteId || null,
-    data_entrega_atual: asset.dataEntregaAtual || null,
-    sistema_operacional: asset.sistemaOperacional || null,
-    fiscal: asset.fiscal || {},
-    custom_fields: asset.customFields || {},
-  });
+  await checar(supabase.from('ativos').insert(linhaAtivo(asset)));
+  if (asset.bitlockerKey) await gravarSegredoAtivo(asset.id, asset.bitlockerKey);
+  for (const entrada of asset.historicoCustodia || []) {
+    await insertCustodyEntryDb(asset.id, entrada);
+  }
+}
 
-  // Segredo separado, depois do ativo (FK)
-  if (asset.bitlockerKey) {
-    await supabase
-      .from('ativos_segredos')
-      .upsert({ ativo_id: asset.id, bitlocker_key: asset.bitlockerKey, updated_at: new Date().toISOString() });
-  } else {
-    await supabase.from('ativos_segredos').delete().eq('ativo_id', asset.id);
+export async function updateAssetDb(antes: Asset, depois: Asset) {
+  await atualizar('ativos', depois.id, camposAlterados(linhaAtivo(antes), linhaAtivo(depois)));
+  if ((antes.bitlockerKey || '') !== (depois.bitlockerKey || '')) {
+    await gravarSegredoAtivo(depois.id, depois.bitlockerKey);
   }
 }
 
 export async function deleteAssetDb(id: string) {
-  if (!supabase) return;
-  await supabase.from('ativos').delete().eq('id', id);
+  await excluir('ativos', id);
 }
 
-// 4. Licenças / Softwares
+export async function insertCustodyEntryDb(ativoId: string, entry: CustodyHistoryEntry) {
+  if (!supabase) return;
+  await checar(supabase.from('historico_custodia').insert(linhaCustodia(ativoId, entry)));
+}
+
+export async function updateCustodyEntryDb(ativoId: string, antes: CustodyHistoryEntry, depois: CustodyHistoryEntry) {
+  await atualizar(
+    'historico_custodia',
+    depois.id,
+    camposAlterados(linhaCustodia(ativoId, antes), linhaCustodia(ativoId, depois))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4. Licenças
+// ---------------------------------------------------------------------------
 export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('licencas_software').select('*').order('nome');
@@ -227,7 +408,7 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     id: l.id,
     nome: l.nome,
     fornecedor: l.fornecedor,
-    chaveContrato: chaveByLicId[l.id] || l.chave_contrato || '',
+    chaveContrato: chaveByLicId[l.id] || '',
     assentosTotais: l.assentos_totais,
     assentosAlocados: (l.colaboradores_ids || []).length,
     colaboradoresIds: l.colaboradores_ids || [],
@@ -239,37 +420,57 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
   })) : [];
 }
 
-export async function upsertLicenseDb(lic: SoftwareLicense) {
+async function gravarSegredoLicenca(licencaId: string, chave?: string) {
   if (!supabase) return;
-  await supabase.from('licencas_software').upsert({
-    id: lic.id,
-    nome: lic.nome,
-    fornecedor: lic.fornecedor,
-    assentos_totais: lic.assentosTotais,
-    colaboradores_ids: lic.colaboradoresIds,
-    valor_mensal: lic.valorMensal,
-    tipo_cobranca: lic.tipoCobranca || 'mensal',
-    data_renovacao: lic.dataRenovacao,
-    url_painel: lic.urlPainel || null,
-    observacoes: lic.observacoes || null,
-  });
-
-  // Segredo separado, depois da licença (FK)
-  if (lic.chaveContrato) {
-    await supabase
-      .from('licencas_segredos')
-      .upsert({ licenca_id: lic.id, chave_contrato: lic.chaveContrato, updated_at: new Date().toISOString() });
+  if (chave) {
+    await checar(
+      supabase
+        .from('licencas_segredos')
+        .upsert({ licenca_id: licencaId, chave_contrato: chave, updated_at: new Date().toISOString() })
+    );
   } else {
-    await supabase.from('licencas_segredos').delete().eq('licenca_id', lic.id);
+    await checar(supabase.from('licencas_segredos').delete().eq('licenca_id', licencaId));
+  }
+}
+
+export async function insertLicenseDb(lic: SoftwareLicense) {
+  if (!supabase) return;
+  await checar(supabase.from('licencas_software').insert(linhaLicenca(lic)));
+  if (lic.chaveContrato) await gravarSegredoLicenca(lic.id, lic.chaveContrato);
+}
+
+/** Edição de dados da licença. Assentos de colaboradores vão pelas RPCs abaixo. */
+export async function updateLicenseDb(antes: SoftwareLicense, depois: SoftwareLicense) {
+  const diff = camposAlterados(linhaLicenca(antes), linhaLicenca(depois));
+  delete diff.colaboradores_ids;
+  await atualizar('licencas_software', depois.id, diff);
+  if ((antes.chaveContrato || '') !== (depois.chaveContrato || '')) {
+    await gravarSegredoLicenca(depois.id, depois.chaveContrato);
   }
 }
 
 export async function deleteLicenseDb(id: string) {
-  if (!supabase) return;
-  await supabase.from('licencas_software').delete().eq('id', id);
+  await excluir('licencas_software', id);
 }
 
-// 5. Chamados (Tickets)
+/** Aloca um assento de forma atômica no banco; devolve a lista atualizada */
+export async function alocarLicencaDb(licencaId: string, colaboradorId: string): Promise<string[] | null> {
+  if (!supabase) return null;
+  return (await checar(
+    supabase.rpc('alocar_licenca', { p_licenca: licencaId, p_colaborador: colaboradorId })
+  )) as string[];
+}
+
+export async function revogarLicencaDb(licencaId: string, colaboradorId: string): Promise<string[] | null> {
+  if (!supabase) return null;
+  return (await checar(
+    supabase.rpc('revogar_licenca', { p_licenca: licencaId, p_colaborador: colaboradorId })
+  )) as string[];
+}
+
+// ---------------------------------------------------------------------------
+// 5. Chamados e mensagens
+// ---------------------------------------------------------------------------
 export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('chamados').select('*').order('data_criacao', { ascending: false });
@@ -278,30 +479,26 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     return null;
   }
 
-  // Buscar mensagens vinculadas aos chamados
-  const { data: msgsData } = await supabase
+  const { data: msgsData, error: msgsError } = await supabase
     .from('chamado_mensagens')
     .select('*')
     .order('data_envio', { ascending: true });
+  if (msgsError) console.error('Erro ao buscar mensagens dos chamados:', msgsError);
 
   const messagesByTicketId: Record<string, TicketMessage[]> = {};
-  if (msgsData) {
-    msgsData.forEach((m: any) => {
-      if (!messagesByTicketId[m.chamado_id]) {
-        messagesByTicketId[m.chamado_id] = [];
-      }
-      messagesByTicketId[m.chamado_id].push({
-        id: m.id,
-        autorId: m.autor_id,
-        autorNome: m.autor_nome,
-        autorRole: m.autor_papel || 'colaborador',
-        texto: m.texto,
-        ehNotaInterna: Boolean(m.eh_nota_interna),
-        data: m.data_envio,
-        anexos: m.anexos || [],
-      });
+  (msgsData || []).forEach((m: any) => {
+    if (!messagesByTicketId[m.chamado_id]) messagesByTicketId[m.chamado_id] = [];
+    messagesByTicketId[m.chamado_id].push({
+      id: m.id,
+      autorId: m.autor_id,
+      autorNome: m.autor_nome,
+      autorRole: m.autor_papel || 'colaborador',
+      texto: m.texto,
+      ehNotaInterna: Boolean(m.eh_nota_interna),
+      data: m.data_envio,
+      anexos: m.anexos || [],
     });
-  }
+  });
 
   return data ? data.map((t: any) => ({
     id: t.id,
@@ -331,51 +528,26 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
   })) : [];
 }
 
-export async function addTicketMessageDb(chamadoId: string, msg: TicketMessage) {
-  if (!supabase) return;
-  await supabase.from('chamado_mensagens').upsert({
-    id: msg.id,
-    chamado_id: chamadoId,
-    autor_id: msg.autorId,
-    autor_nome: msg.autorNome,
-    autor_papel: msg.autorRole,
-    texto: msg.texto,
-    eh_nota_interna: msg.ehNotaInterna,
-    data_envio: msg.data,
-    anexos: msg.anexos || [],
-  });
+/** Cria o chamado e devolve o código gerado pelo banco (#CH-AAAA-NNNN) */
+export async function insertTicketDb(t: Ticket): Promise<{ codigo: string } | null> {
+  if (!supabase) return null;
+  return (await checar(
+    supabase.from('chamados').insert(linhaChamado(t)).select('codigo').single()
+  )) as { codigo: string };
 }
 
-export async function upsertTicketDb(t: Ticket) {
-  if (!supabase) return;
-  await supabase.from('chamados').upsert({
-    id: t.id,
-    codigo: t.codigo,
-    titulo: t.titulo,
-    descricao: t.descricao,
-    tipo: t.tipo,
-    categoria: t.categoria,
-    prioridade: t.prioridade,
-    status: t.status,
-    solicitante_id: t.solicitanteId,
-    solicitante_nome: t.solicitanteNome,
-    solicitante_email: t.solicitanteEmail,
-    solicitante_cargo: t.solicitanteCargo,
-    solicitante_setor_nome: t.solicitanteSetorNome,
-    tecnico_responsavel_id: t.tecnicoResponsavelId || null,
-    tecnico_responsavel_nome: t.tecnicoResponsavelNome || null,
-    ativo_id: t.ativoId || null,
-    software_id: t.softwareId || null,
-    software_nome: t.softwareNome || null,
-    onboarding: t.onboarding || null,
-    offboarding: t.offboarding || null,
-    anexos: t.anexos || [],
-    data_criacao: t.dataCriacao,
-    data_atualizacao: t.dataAtualizacao,
-  });
+export async function updateTicketDb(antes: Ticket, depois: Ticket) {
+  await atualizar('chamados', depois.id, camposAlterados(linhaChamado(antes), linhaChamado(depois)));
 }
 
+export async function insertTicketMessageDb(chamadoId: string, msg: TicketMessage) {
+  if (!supabase) return;
+  await checar(supabase.from('chamado_mensagens').insert(linhaMensagem(chamadoId, msg)));
+}
+
+// ---------------------------------------------------------------------------
 // 6. Termos
+// ---------------------------------------------------------------------------
 export async function fetchTermsFromDb(): Promise<ResponsibilityTerm[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('termos_responsabilidade').select('*').order('data_emissao', { ascending: false });
@@ -401,28 +573,23 @@ export async function fetchTermsFromDb(): Promise<ResponsibilityTerm[] | null> {
   })) : [];
 }
 
-export async function upsertTermDb(tm: ResponsibilityTerm) {
-  if (!supabase) return;
-  await supabase.from('termos_responsabilidade').upsert({
-    id: tm.id,
-    codigo: tm.codigo,
-    tipo: tm.tipo,
-    colaborador_id: tm.colaboradorId,
-    colaborador_nome: tm.colaboradorNome,
-    colaborador_matricula: tm.colaboradorMatricula,
-    colaborador_cargo: tm.colaboradorCargo,
-    colaborador_setor_nome: tm.colaboradorSetorNome,
-    ativo_ids: tm.ativoIds,
-    data_emissao: tm.dataEmissao,
-    data_assinatura: tm.statusAssinatura === 'assinado' ? new Date().toISOString() : null,
-    status_assinatura: tm.statusAssinatura,
-    arquivo_url: tm.arquivoAssinadoUrl || null,
-    responsavel_ti_id: tm.responsavelTIId,
-    responsavel_ti_nome: tm.responsavelTINome,
-  });
+/** Cria o termo e devolve o código gerado pelo banco (#TR-AAAA-NNNN) */
+export async function insertTermDb(tm: ResponsibilityTerm): Promise<{ codigo: string } | null> {
+  if (!supabase) return null;
+  return (await checar(
+    supabase.from('termos_responsabilidade').insert(linhaTermo(tm)).select('codigo').single()
+  )) as { codigo: string };
 }
 
-// 7. Configurações da Empresa
+export async function updateTermDb(antes: ResponsibilityTerm, depois: ResponsibilityTerm) {
+  const diff = camposAlterados(linhaTermo(antes), linhaTermo(depois));
+  if (diff.status_assinatura === 'assinado') diff.data_assinatura = new Date().toISOString();
+  await atualizar('termos_responsabilidade', depois.id, diff);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Configurações da empresa (linha única)
+// ---------------------------------------------------------------------------
 export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('configuracoes_empresa').select('*').limit(1).maybeSingle();
@@ -444,25 +611,34 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
   };
 }
 
-export async function upsertSettingsDb(st: CompanySettings) {
+export async function saveSettingsDb(st: CompanySettings) {
   if (!supabase) return;
-  await supabase.from('configuracoes_empresa').upsert({
-    id: 'config_principal',
-    razao_social: st.razaoSocial,
-    nome_fantasia: st.nomeFantasia,
-    cnpj: st.cnpj,
-    endereco: st.endereco,
-    cidade_uf: st.cidadeUF,
-    cep: st.cep,
-    email_ti: st.emailTI,
-    telefone_ti: st.telefoneTI,
-    texto_termo_entrega: st.textoTermoEntrega,
-    texto_termo_devolucao: st.textoTermoDevolucao,
-    campos_personalizados: st.camposPersonalizados || [],
-  });
+  const data = await checar(
+    supabase
+      .from('configuracoes_empresa')
+      .upsert({
+        id: 'config_principal',
+        razao_social: st.razaoSocial,
+        nome_fantasia: st.nomeFantasia,
+        cnpj: st.cnpj,
+        endereco: st.endereco,
+        cidade_uf: st.cidadeUF,
+        cep: st.cep,
+        email_ti: st.emailTI,
+        telefone_ti: st.telefoneTI,
+        texto_termo_entrega: st.textoTermoEntrega,
+        texto_termo_devolucao: st.textoTermoDevolucao,
+        campos_personalizados: st.camposPersonalizados || [],
+        updated_at: new Date().toISOString(),
+      })
+      .select('id')
+  );
+  if (!data || (data as unknown[]).length === 0) throw new DbError(SEM_PERMISSAO, '42501');
 }
 
-// 8. Health Check e Validação das Tabelas
+// ---------------------------------------------------------------------------
+// 8. Health check
+// ---------------------------------------------------------------------------
 export interface SupabaseHealthStatus {
   connected: boolean;
   tablesExist: boolean;
@@ -507,21 +683,23 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthStatus> {
   }
 }
 
-// 9. Limpeza Completa das Tabelas para Produção (Zerar Banco)
+// ---------------------------------------------------------------------------
+// 9. Limpeza completa (zerar base) — só ti_admin pela RLS; oculta em produção
+// ---------------------------------------------------------------------------
 export async function clearAllDatabaseTables(keepEmployeeEmail?: string) {
   if (!supabase) return;
-  try {
-    await supabase.from('chamado_mensagens').delete().neq('id', 'dummy_zero');
-    await supabase.from('chamados').delete().neq('id', 'dummy_zero');
-    await supabase.from('termos_responsabilidade').delete().neq('id', 'dummy_zero');
-    await supabase.from('historico_custodia').delete().neq('id', 'dummy_zero');
-    await supabase.from('ativos').delete().neq('id', 'dummy_zero');
-    await supabase.from('licencas_software').delete().neq('id', 'dummy_zero');
-    if (keepEmployeeEmail) {
-      await supabase.from('colaboradores').delete().neq('email', keepEmployeeEmail.toLowerCase());
-    }
-  } catch (err) {
-    console.error('Erro ao limpar tabelas do Supabase:', err);
+  const tabelas = [
+    'chamado_mensagens',
+    'chamados',
+    'termos_responsabilidade',
+    'historico_custodia',
+    'ativos',
+    'licencas_software',
+  ];
+  for (const t of tabelas) {
+    await checar(supabase.from(t).delete().neq('id', 'dummy_zero'));
+  }
+  if (keepEmployeeEmail) {
+    await checar(supabase.from('colaboradores').delete().neq('email', keepEmployeeEmail.toLowerCase()));
   }
 }
-
