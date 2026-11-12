@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { AssetCategory, Employee, UserRole } from '../../types/index.ts';
+import { AssetCategory, Employee, ModeloDocumento, UserRole } from '../../types/index.ts';
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
+import { CatalogoSettings } from './CatalogoSettings.tsx';
+import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import {
   CheckCircle2,
@@ -55,7 +57,9 @@ export const SettingsView: React.FC = () => {
     refreshSupabaseData,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'empresa' | 'setores' | 'campos' | 'equipe' | 'banco'>('empresa');
+  const [activeTab, setActiveTab] = useState<'empresa' | 'setores' | 'campos' | 'catalogo' | 'equipe' | 'banco'>(
+    'empresa'
+  );
   const [resetConfirmText, setResetConfirmText] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -79,6 +83,14 @@ export const SettingsView: React.FC = () => {
   const [telefoneTI, setTelefoneTI] = useState(settings.telefoneTI);
   const [textoTermoEntrega, setTextoTermoEntrega] = useState(settings.textoTermoEntrega);
   const [textoTermoDevolucao, setTextoTermoDevolucao] = useState(settings.textoTermoDevolucao);
+  // Fase 6: documentos controlados da Qualidade (código, versão, referência ao POP)
+  const docEntregaSalvo = settings.docEntrega || DOC_ENTREGA_PADRAO;
+  const docDevolucaoSalvo = settings.docDevolucao || DOC_DEVOLUCAO_PADRAO;
+  const [docEntrega, setDocEntrega] = useState<ModeloDocumento>(docEntregaSalvo);
+  const [docDevolucao, setDocDevolucao] = useState<ModeloDocumento>(docDevolucaoSalvo);
+  const docsAlterados =
+    JSON.stringify(docEntrega) !== JSON.stringify(docEntregaSalvo) ||
+    JSON.stringify(docDevolucao) !== JSON.stringify(docDevolucaoSalvo);
 
   // Estados para Novo Setor
   const [novoSetorNome, setNovoSetorNome] = useState('');
@@ -127,6 +139,7 @@ export const SettingsView: React.FC = () => {
     ...(camposEmpresaAlterados.length > 0
       ? [`Dados da empresa: ${camposEmpresaAlterados.map((k) => ROTULO_CAMPO_EMPRESA[k]).join(', ')}`]
       : []),
+    ...(docsAlterados ? ['Documentos da Qualidade (código/versão dos termos)'] : []),
   ];
   useRegistrarPendencias('configuracoes', itensPendentes);
 
@@ -143,6 +156,8 @@ export const SettingsView: React.FC = () => {
     setTelefoneTI(settings.telefoneTI);
     setTextoTermoEntrega(settings.textoTermoEntrega);
     setTextoTermoDevolucao(settings.textoTermoDevolucao);
+    setDocEntrega(docEntregaSalvo);
+    setDocDevolucao(docDevolucaoSalvo);
   };
 
   const salvarTudo = () => {
@@ -163,7 +178,9 @@ export const SettingsView: React.FC = () => {
     }
     Object.entries(papeisPendentes).forEach(([id, papel]) => updateEmployeeRole(id, papel));
     Object.entries(setoresPendentes).forEach(([id, ativo]) => updateDepartment(id, { ativo }));
-    if (camposEmpresaAlterados.length > 0) updateSettings(empresaRascunho);
+    if (camposEmpresaAlterados.length > 0 || docsAlterados) {
+      updateSettings({ ...empresaRascunho, docEntrega, docDevolucao });
+    }
     setPapeisPendentes({});
     setSetoresPendentes({});
     setSuccessMsg('Alterações salvas.');
@@ -333,6 +350,15 @@ export const SettingsView: React.FC = () => {
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab('catalogo')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              activeTab === 'catalogo' ? 'bg-white text-slate-900 font-semibold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Catálogo de admissão
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('banco')}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
               activeTab === 'banco'
@@ -488,6 +514,43 @@ export const SettingsView: React.FC = () => {
                 className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-800 leading-relaxed"
               />
             </div>
+          </div>
+
+          {/* Fase 6: identificação dos documentos controlados (Qualidade) */}
+          <div className="space-y-3 pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Documentos controlados (Qualidade)
+            </h4>
+            <p className="text-[11px] text-slate-500">
+              Aparecem no cabeçalho dos termos. Mantenha igual à versão aprovada pela Qualidade no POP.
+            </p>
+            {(
+              [
+                ['Termo de entrega', docEntrega, setDocEntrega],
+                ['Recibo de devolução', docDevolucao, setDocDevolucao],
+              ] as const
+            ).map(([nome, doc, setDoc]) => (
+              <div key={nome} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                <span className="col-span-2 md:col-span-6 text-xs font-semibold text-slate-700">{nome}</span>
+                {(
+                  [
+                    ['codigo', 'Código', 'md:col-span-1'],
+                    ['versao', 'Versão', 'md:col-span-1'],
+                    ['referencia', 'Ref. (POP)', 'md:col-span-1'],
+                    ['titulo', 'Título', 'col-span-2 md:col-span-3'],
+                  ] as const
+                ).map(([chave, rotulo, cols]) => (
+                  <label key={chave} className={`block ${cols}`}>
+                    <span className="block text-[11px] text-slate-500 mb-0.5">{rotulo}</span>
+                    <input
+                      value={doc[chave]}
+                      onChange={(e) => setDoc({ ...doc, [chave]: e.target.value })}
+                      className="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                    />
+                  </label>
+                ))}
+              </div>
+            ))}
           </div>
 
           <p className="pt-4 border-t border-slate-100 text-[11px] text-slate-500">
@@ -722,6 +785,8 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'catalogo' && <CatalogoSettings />}
 
       {/* ABA 4: EQUIPE TI & RH / DEFINIÇÃO DE QUEM OPERA O SISTEMA */}
       {activeTab === 'equipe' && (

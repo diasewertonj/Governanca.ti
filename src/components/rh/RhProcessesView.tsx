@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
+import type { CatalogoItem } from '../../types/index.ts';
 import {
   UserPlus,
   UserMinus,
@@ -19,6 +20,7 @@ export const RhProcessesView: React.FC = () => {
     departments,
     assets,
     licenses,
+    catalogo,
     currentUser,
     createTicket,
     setSelectedTicketIdForDetail,
@@ -53,13 +55,25 @@ export const RhProcessesView: React.FC = () => {
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [onbTipoComputador, setOnbTipoComputador] = useState('Notebook Padrão (16GB RAM / Core i5)');
-  const [onbPerifericos, setOnbPerifericos] = useState<string[]>(['Monitor 27"', 'Kit Teclado/Mouse']);
-  const [onbAcessos, setOnbAcessos] = useState<string[]>([
-    'Google Workspace',
-    'Microsoft 365 E5',
-    'Slack Corporativo',
-  ]);
+  // Fase 6: kit e acessos vêm do catálogo da T.I. Os sugeridos já vêm marcados;
+  // o RH marca/desmarca e a T.I. decide o pacote final no checklist.
+  const [kitEscolha, setKitEscolha] = useState<Record<string, boolean>>({});
+  const [onbGruposEmail, setOnbGruposEmail] = useState('');
+  const [onbOutrosAcessos, setOnbOutrosAcessos] = useState('');
   const [onbObservacoes, setOnbObservacoes] = useState('');
+
+  const separarLista = (texto: string) =>
+    texto
+      .split(/[,;\n]/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  const catalogoAtivo = catalogo.filter((c) => c.ativo).sort((a, b) => a.ordem - b.ordem);
+  const marcado = (c: CatalogoItem) => kitEscolha[c.id] ?? c.sugeridoOnboarding;
+  const alternar = (c: CatalogoItem) => setKitEscolha((p) => ({ ...p, [c.id]: !marcado(c) }));
+  const itensKit = catalogoAtivo.filter((c) => c.tipo === 'equipamento' || c.tipo === 'acessorio');
+  const itensAcesso = catalogoAtivo.filter((c) => c.tipo === 'conta');
+  const onbPerifericos = itensKit.filter(marcado).map((c) => c.nome);
+  const onbAcessos = [...itensAcesso.filter(marcado).map((c) => c.nome), ...separarLista(onbOutrosAcessos)];
 
   const activeEmployees = employees.filter((e) => e.status === 'ativo');
   const selectedColaborador = employees.find((e) => e.id === selectedColabId);
@@ -68,75 +82,15 @@ export const RhProcessesView: React.FC = () => {
   const colabAssets = assets.filter((a) => a.custodianteId === selectedColabId);
   const colabLicenses = licenses.filter((l) => l.colaboradoresIds.includes(selectedColabId));
 
-  const handleTogglePeriferico = (item: string) => {
-    setOnbPerifericos((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    );
-  };
-
-  const handleToggleAcesso = (item: string) => {
-    setOnbAcessos((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    );
-  };
-
   // Submissão do Offboarding Inteligente
   const handleOffboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedColaborador) return;
 
-    const emailDest = employees.find((e) => e.id === destinatarioEmailId);
-    const driveDest = employees.find((e) => e.id === destinatarioDriveId);
-
-    // Gerar o checklist técnico interativo automático com base nos itens sob custódia
-    const checklistItems = [
-      ...(redirecionarEmail && emailDest
-        ? [
-            {
-              id: 'chk-email',
-              texto: `Redirecionar e-mails corporativos de ${selectedColaborador.nome} para ${emailDest.nome}`,
-              concluido: false,
-              categoria: 'acesso' as const,
-            },
-          ]
-        : []),
-      ...(transferirDrive && driveDest
-        ? [
-            {
-              id: 'chk-drive',
-              texto: `Transferir propriedade dos arquivos e pastas do Google Drive para ${driveDest.nome}`,
-              concluido: false,
-              categoria: 'acesso' as const,
-            },
-          ]
-        : []),
-      ...colabLicenses.map((lic) => ({
-        id: `chk-lic-${lic.id}`,
-        texto: `Revogar licença e desativar usuário em: ${lic.nome}`,
-        concluido: false,
-        categoria: 'acesso' as const,
-      })),
-      ...colabAssets.map((ast) => ({
-        id: `chk-ast-${ast.id}`,
-        texto: `Recolher, inspecionar fisicamente e retornar ao almoxarifado: ${ast.nome} (${ast.tag})`,
-        concluido: false,
-        categoria: 'equipamento' as const,
-      })),
-      {
-        id: 'chk-termo',
-        texto: `Emitir, colher assinatura formal e anexar o Termo de Devolução A4`,
-        concluido: false,
-        categoria: 'termo' as const,
-      },
-      {
-        id: 'chk-bloqueio',
-        texto: `Bloquear conta de domínio e revogar acessos de VPN corporativa`,
-        concluido: false,
-        categoria: 'geral' as const,
-      },
-    ];
-
+    // Fase 6: o checklist é montado pela T.I. no chamado, a partir do inventário
+    // real da pessoa (contas, grupos, equipamentos, acessórios e licenças).
     const ticket = await createTicket({
+      colaboradorId: selectedColaborador.id,
       tipo: 'offboarding',
       solicitanteId: currentUser?.id || 'emp-2',
       solicitanteNome: `${currentUser?.nome || 'RH'} (Gente & Gestão)`,
@@ -164,7 +118,7 @@ export const RhProcessesView: React.FC = () => {
         transferirDriveParaId: destinatarioDriveId || undefined,
         recolhimentoInstrucoes,
         observacoes: observacoesOff,
-        checklist: checklistItems,
+        checklist: [],
       },
     });
     if (!ticket) return; // o erro já aparece no aviso global
@@ -210,7 +164,9 @@ export const RhProcessesView: React.FC = () => {
           : 'Colaborador Padrão (Solicitante)'
       }. Perfil de máquina sugerido: ${onbTipoComputador} (A T.I. selecionará o ativo físico no estoque). Periféricos (${onbPerifericos.join(
         ', '
-      )}) e provisionamento das contas (${onbAcessos.join(', ')}). ${onbObservacoes}`,
+      )}), contas (${onbAcessos.join(', ')})${
+        separarLista(onbGruposEmail).length ? ` e grupos de e-mail (${separarLista(onbGruposEmail).join(', ')})` : ''
+      }. ${onbObservacoes}`,
       anexos: [],
       onboarding: {
         nomeColaborador: onbNome,
@@ -223,6 +179,7 @@ export const RhProcessesView: React.FC = () => {
         tipoComputador: onbTipoComputador,
         perifericos: onbPerifericos,
         acessosSoftwares: onbAcessos,
+        gruposEmail: separarLista(onbGruposEmail),
         observacoes: onbObservacoes,
       },
     });
@@ -232,6 +189,9 @@ export const RhProcessesView: React.FC = () => {
     setOnbNome('');
     setOnbEmail('');
     setOnbCargo('');
+    setKitEscolha({});
+    setOnbGruposEmail('');
+    setOnbOutrosAcessos('');
     setTimeout(() => {
       setSuccessMessage(null);
       setSelectedTicketIdForDetail(ticket.id);
@@ -717,25 +677,21 @@ export const RhProcessesView: React.FC = () => {
               </div>
             </div>
 
-            {/* Periféricos Desejados */}
+            {/* Fase 6: kit sugerido (catálogo da T.I.) */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Periféricos & Acessórios Necessários
-              </label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Equipamentos e acessórios</label>
+              <p className="text-[10px] text-slate-400 mb-2">
+                Sugestão padrão da T.I. — desmarque o que não precisa. A T.I. confirma o kit final.
+              </p>
               <div className="flex flex-wrap gap-2">
-                {[
-                  'Monitor 27" 4K',
-                  'Kit Teclado/Mouse Sem Fio',
-                  'Headset Jabra com Microfone',
-                  'Docking Station USB-C',
-                  'Mochila Corporativa',
-                ].map((item) => {
-                  const selected = onbPerifericos.includes(item);
+                {itensKit.map((c) => {
+                  const selected = marcado(c);
                   return (
                     <button
-                      key={item}
+                      key={c.id}
                       type="button"
-                      onClick={() => handleTogglePeriferico(item)}
+                      onClick={() => alternar(c)}
+                      aria-pressed={selected}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                         selected
                           ? 'bg-blue-50 text-blue-700 border-blue-300'
@@ -743,33 +699,25 @@ export const RhProcessesView: React.FC = () => {
                       }`}
                     >
                       {selected ? '✓ ' : '+ '}
-                      {item}
+                      {c.nome}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Acessos a Sistemas & Softwares */}
+            {/* Fase 6: contas (catálogo) + outros acessos + grupos de e-mail */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Acessos a Softwares e Licenças Corporativas
-              </label>
+              <label className="block text-xs font-semibold text-slate-700 mb-2">Contas e acessos</label>
               <div className="flex flex-wrap gap-2">
-                {[
-                  'Google Workspace Enterprise',
-                  'Microsoft 365 E5',
-                  'Figma Enterprise',
-                  'JetBrains All Products',
-                  'Slack Corporativo',
-                  'Acesso VPN Corporativa',
-                ].map((item) => {
-                  const selected = onbAcessos.includes(item);
+                {itensAcesso.map((c) => {
+                  const selected = marcado(c);
                   return (
                     <button
-                      key={item}
+                      key={c.id}
                       type="button"
-                      onClick={() => handleToggleAcesso(item)}
+                      onClick={() => alternar(c)}
+                      aria-pressed={selected}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                         selected
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
@@ -777,10 +725,32 @@ export const RhProcessesView: React.FC = () => {
                       }`}
                     >
                       {selected ? '✓ ' : '+ '}
-                      {item}
+                      {c.nome}
                     </button>
                   );
                 })}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Outros sistemas (opcional)</label>
+                  <input
+                    value={onbOutrosAcessos}
+                    onChange={(e) => setOnbOutrosAcessos(e.target.value)}
+                    placeholder="Ex.: Figma, VPN, ERP (separe por vírgula)"
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Grupos de e-mail sugeridos (opcional)
+                  </label>
+                  <input
+                    value={onbGruposEmail}
+                    onChange={(e) => setOnbGruposEmail(e.target.value)}
+                    placeholder="Ex.: comercial@empresa.com.br, todos@..."
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
               </div>
             </div>
 

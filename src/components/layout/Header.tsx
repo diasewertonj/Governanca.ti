@@ -29,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
     servicedesk: 'Service Desk & Fila Unificada',
     rh_processes: 'Onboarding & Offboarding (RH)',
     terms: 'Termos de Responsabilidade A4',
+    lembretes: 'Lembretes da T.I.',
     settings: 'Configurações Institucionais',
     my_assets: 'Meus Equipamentos & Termos',
     my_tickets: 'Meus Chamados de Suporte',

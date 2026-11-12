@@ -159,6 +159,7 @@ export interface OnboardingData {
   tipoComputador: string;
   perifericos: string[];
   acessosSoftwares: string[];
+  gruposEmail?: string[]; // Fase 6: sugestão do RH, a TI confirma
   observacoes?: string;
 }
 
@@ -188,6 +189,137 @@ export interface Ticket {
   mensagens: TicketMessage[];
   offboarding?: OffboardingData;
   onboarding?: OnboardingData;
+  colaboradorId?: string; // Fase 6: a pessoa que entra/sai
+}
+
+// -----------------------------------------------------------------------------
+// Fase 6 · Processos guiados de onboarding e offboarding
+// -----------------------------------------------------------------------------
+export type TipoCatalogo = 'conta' | 'grupo_email' | 'equipamento' | 'acessorio' | 'tarefa';
+
+export interface CatalogoItem {
+  id: string;
+  tipo: TipoCatalogo;
+  nome: string;
+  descricao?: string;
+  sugeridoOnboarding: boolean;
+  ativo: boolean;
+  ordem: number;
+}
+
+export type TipoItemProcesso =
+  | 'cadastro'
+  | 'conta'
+  | 'grupo_email'
+  | 'equipamento'
+  | 'acessorio'
+  | 'licenca'
+  | 'termo'
+  | 'acesso_nexus'
+  | 'encerrar_recurso'
+  | 'devolver_equipamento'
+  | 'liberar_licenca'
+  | 'dados_drive'
+  | 'email'
+  | 'tarefa';
+
+export type StatusItemProcesso = 'pendente' | 'feito' | 'nao_se_aplica';
+export type DestinoRecurso = 'suspender' | 'excluir' | 'manter' | 'transferir' | 'outro';
+export type CondicaoItem = 'bom' | 'avaria';
+
+export interface ProcessoItem {
+  id: string;
+  chamadoId: string;
+  tipo: TipoItemProcesso;
+  titulo: string;
+  detalhe?: string;
+  sugeridoPor: 'rh' | 'ti' | 'sistema';
+  status: StatusItemProcesso;
+  observacao?: string;
+  catalogoId?: string;
+  recursoId?: string;
+  ativoId?: string;
+  licencaId?: string;
+  identificador?: string;
+  destino?: DestinoRecurso;
+  destinoColaboradorId?: string;
+  condicao?: CondicaoItem;
+  lembreteEm?: string;
+  ordem: number;
+  criadoPor?: string;
+  criadoEm: string;
+  concluidoPor?: string;
+  concluidoEm?: string;
+}
+
+/** Item ainda em montagem (antes de "Salvar checklist") */
+export type ProcessoItemRascunho = Pick<
+  ProcessoItem,
+  'tipo' | 'titulo' | 'detalhe' | 'sugeridoPor' | 'catalogoId' | 'recursoId' | 'ativoId' | 'licencaId' | 'identificador'
+> & { chave: string };
+
+export type StatusRecurso = 'ativo' | 'suspenso' | 'excluido' | 'mantido' | 'transferido' | 'devolvido';
+
+export interface ColaboradorRecurso {
+  id: string;
+  colaboradorId: string;
+  tipo: 'conta' | 'grupo_email' | 'acessorio';
+  catalogoId?: string;
+  nome: string;
+  identificador?: string;
+  status: StatusRecurso;
+  concedidoEm: string;
+  concedidoPor?: string;
+  chamadoConcessao?: string;
+  encerradoEm?: string;
+  encerradoPor?: string;
+  chamadoEncerramento?: string;
+  observacao?: string;
+}
+
+export interface Lembrete {
+  id: string;
+  titulo: string;
+  descricao?: string;
+  venceEm: string;
+  status: 'aberto' | 'feito' | 'cancelado';
+  chamadoId?: string;
+  colaboradorId?: string;
+  itemId?: string;
+  criadoPor?: string;
+  criadoEm: string;
+  concluidoPor?: string;
+  concluidoEm?: string;
+  observacaoConclusao?: string;
+}
+
+export interface ProcessoEvento {
+  id: number;
+  chamadoId: string;
+  itemId?: string;
+  acao: string;
+  detalhe?: Record<string, unknown>;
+  por?: string;
+  em: string;
+}
+
+/** Documento controlado da Qualidade (ex.: RG.TI.002, versão 02, POP.TI.013) */
+export interface ModeloDocumento {
+  codigo: string;
+  versao: string;
+  referencia: string;
+  titulo: string;
+}
+
+/** Linha do termo: equipamento ou acessório, com condição e situação */
+export interface ItemTermo {
+  descricao: string;
+  patrimonio?: string;
+  marcaModelo?: string;
+  condicao?: CondicaoItem;
+  situacao: 'entregue' | 'devolvido' | 'pendente' | 'na';
+  observacao?: string;
+  ativoId?: string;
 }
 
 export interface ResponsibilityTerm {
@@ -206,6 +338,22 @@ export interface ResponsibilityTerm {
   observacoes?: string;
   responsavelTIId: string;
   responsavelTINome: string;
+  // Fase 6: modelo da Qualidade, itens com condição/situação e aceite eletrônico
+  chamadoId?: string;
+  itens?: ItemTermo[];
+  localUnidade?: string;
+  docCodigo?: string;
+  docVersao?: string;
+  docReferencia?: string;
+  docTitulo?: string;
+  textoClausula?: string;
+  hashConteudo?: string;
+  aceiteColaboradorEm?: string;
+  aceiteTiEm?: string;
+  aceiteTiPor?: string;
+  formaAssinatura?: 'pendente' | 'eletronica' | 'documento' | 'dispensada';
+  motivoDispensa?: string;
+  dataAssinatura?: string;
 }
 
 export interface CustomFieldDefinition {
@@ -231,4 +379,6 @@ export interface CompanySettings {
   textoTermoEntrega: string;
   textoTermoDevolucao: string;
   camposPersonalizados: CustomFieldDefinition[];
+  docEntrega?: ModeloDocumento; // Fase 6: documento controlado da Qualidade
+  docDevolucao?: ModeloDocumento;
 }

@@ -7,7 +7,7 @@ import type { UserRole } from '../types/index.ts';
  */
 export function vistaPermitida(papel: UserRole, view: string): string {
   if (papel === 'colaborador') return ['my_assets', 'my_tickets'].includes(view) ? view : 'my_assets';
-  if (papel === 'rh') return ['settings', 'dashboard'].includes(view) ? 'rh_processes' : view;
+  if (papel === 'rh') return ['settings', 'dashboard', 'lembretes'].includes(view) ? 'rh_processes' : view;
   if (papel === 'ti_suporte') return view === 'settings' ? 'dashboard' : view;
   return view; // ti_admin
 }

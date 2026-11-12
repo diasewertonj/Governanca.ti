@@ -136,10 +136,13 @@ export async function solicitarRecuperacaoSenhaSupabase(email: string) {
   return { error: undefined };
 }
 
-/** Define a senha da sessão atual (link de convite ou de recuperação) */
+/**
+ * Define a senha da sessão atual (link de convite/recuperação ou primeiro acesso
+ * com senha provisória). Desliga o aviso "precisa trocar a senha" (Fase 6).
+ */
 export async function definirSenhaSupabase(senha: string) {
   if (!supabase) return { error: 'Supabase não configurado.' };
-  const { error } = await supabase.auth.updateUser({ password: senha });
+  const { error } = await supabase.auth.updateUser({ password: senha, data: { precisa_trocar_senha: false } });
   return { error: error?.message };
 }
 
