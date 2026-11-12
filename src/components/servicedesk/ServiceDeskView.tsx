@@ -19,6 +19,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
   const {
     tickets,
     assets,
+    employees,
     currentUser,
     currentRole,
     setSelectedTicketIdForDetail,
@@ -186,6 +187,14 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
           filteredTickets.map((tkt) => {
             const statusInfo = statusBadges[tkt.status];
             const priorityInfo = priorityBadges[tkt.prioridade];
+            // Fase 9: vínculos em texto no cartão (os links ficam dentro do chamado)
+            const vinculos = [
+              assets.find((a) => a.id === tkt.ativoId)?.tag,
+              tkt.softwareNome,
+              tkt.tipo === 'suporte' && tkt.colaboradorId && tkt.colaboradorId !== tkt.solicitanteId
+                ? `Relacionado: ${employees.find((e) => e.id === tkt.colaboradorId)?.nome || 'colaborador'}`
+                : undefined,
+            ].filter(Boolean);
             return (
               <li key={tkt.id}>
                 <button
@@ -208,6 +217,9 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                   <span className="block text-xs text-slate-600">
                     Técnico: {tkt.tecnicoResponsavelNome || 'pendente'}
                   </span>
+                  {vinculos.length > 0 && (
+                    <span className="block text-xs text-slate-600 break-words">{vinculos.join(' · ')}</span>
+                  )}
                 </button>
               </li>
             );
@@ -280,6 +292,18 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                           <span>{tkt.solicitanteNome}</span>
                         </button>
                         <span className="text-xs text-slate-500 block">{tkt.solicitanteSetorNome}</span>
+                        {tkt.tipo === 'suporte' && tkt.colaboradorId && tkt.colaboradorId !== tkt.solicitanteId && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEmployeeIdFor360(tkt.colaboradorId!);
+                            }}
+                            className="text-xs text-slate-600 hover:text-blue-700"
+                          >
+                            Relacionado: {employees.find((e) => e.id === tkt.colaboradorId)?.nome || 'colaborador'}
+                          </button>
+                        )}
                       </td>
 
                       {/* Ativo Físico ou Software com link contextual 360° */}

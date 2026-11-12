@@ -34,7 +34,9 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
   const [titulo, setTitulo] = useState('');
   const [categoria, setCategoria] = useState('Hardware / Equipamento');
   const [prioridade, setPrioridade] = useState<TicketPriority>('media');
-  const [objetoSelecionado, setObjetoSelecionado] = useState<string>('');
+  // Fase 9: equipamento e software são vínculos separados (dá para informar os dois)
+  const [ativoSel, setAtivoSel] = useState('');
+  const [softwareSel, setSoftwareSel] = useState('');
   const [descricao, setDescricao] = useState('');
   const [anexos, setAnexos] = useState<AnexoPendente[]>([]);
 
@@ -101,16 +103,9 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
     e.preventDefault();
     if (!titulo.trim() || !descricao.trim()) return;
 
-    let ativoId: string | undefined = undefined;
-    let softwareId: string | undefined = undefined;
-    let softwareNome: string | undefined = undefined;
-
-    if (objetoSelecionado.startsWith('asset:')) {
-      ativoId = objetoSelecionado.replace('asset:', '');
-    } else if (objetoSelecionado.startsWith('software:')) {
-      softwareId = objetoSelecionado.replace('software:', '');
-      softwareNome = licenses.find((l) => l.id === softwareId)?.nome;
-    }
+    const ativoId = ativoSel || undefined;
+    const softwareId = softwareSel || undefined;
+    const softwareNome = softwareId ? licenses.find((l) => l.id === softwareId)?.nome : undefined;
 
     if (enviandoChamado || enviandoAnexo) return;
     setEnviandoChamado(true);
@@ -219,64 +214,69 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Vínculo Dinâmico ao Ativo Físico ou Software/SaaS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Fase 9: equipamento e software afetados (opcionais; dá para informar os dois) */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Objeto do Chamado (Equipamento Físico ou Software / SaaS)
+            <label htmlFor="novo-chamado-ativo" className="block text-xs font-semibold text-slate-700 mb-1">
+              Equipamento afetado
             </label>
             <select
-              value={objetoSelecionado}
+              id="novo-chamado-ativo"
+              value={ativoSel}
               onChange={(e) => {
-                const val = e.target.value;
-                setObjetoSelecionado(val);
-                if (val.startsWith('software:')) {
-                  setCategoria('Software / Acesso a Sistemas');
-                } else if (val.startsWith('asset:')) {
-                  setCategoria('Hardware / Equipamento');
-                }
+                setAtivoSel(e.target.value);
+                if (e.target.value && !softwareSel) setCategoria('Hardware / Equipamento');
               }}
               className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
             >
-              <option value="">Nenhum item específico (Dúvida geral / Solicitação de novo acesso)</option>
-
-              {/* Grupo 1: Equipamentos em posse do solicitante */}
-              {myCustodyAssets.length > 0 && (
-                <optgroup label="Meus Equipamentos sob Custódia (Hardware 1:1)">
-                  {myCustodyAssets.map((asset) => (
-                    <option key={asset.id} value={`asset:${asset.id}`}>
-                      💻 {asset.tag} · {asset.nome} ({asset.marca} - S/N: {asset.serialNumber})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-
-              {/* Grupo 2: Softwares alocados ao solicitante */}
+              <option value="">— nenhum —</option>
+              {myCustodyAssets.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.tag} · {asset.nome} ({asset.marca})
+                </option>
+              ))}
+            </select>
+            {myCustodyAssets.length === 0 && (
+              <p className="text-xs text-slate-500 mt-1">Nenhum equipamento sob sua responsabilidade.</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="novo-chamado-software" className="block text-xs font-semibold text-slate-700 mb-1">
+              Software / licença afetado
+            </label>
+            <select
+              id="novo-chamado-software"
+              value={softwareSel}
+              onChange={(e) => {
+                setSoftwareSel(e.target.value);
+                if (e.target.value && !ativoSel) setCategoria('Softwares & Licenças');
+              }}
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">— nenhum —</option>
               {myLicenses.length > 0 && (
-                <optgroup label="Minhas Licenças & Softwares em Uso (SaaS)">
+                <optgroup label="Minhas licenças">
                   {myLicenses.map((lic) => (
-                    <option key={lic.id} value={`software:${lic.id}`}>
-                      🔑 {lic.nome} ({lic.fornecedor})
+                    <option key={lic.id} value={lic.id}>
+                      {lic.nome} ({lic.fornecedor})
                     </option>
                   ))}
                 </optgroup>
               )}
-
-              {/* Grupo 3: Demais Softwares Corporativos */}
               {otherLicenses.length > 0 && (
-                <optgroup label="Outros Softwares Corporativos da Empresa">
+                <optgroup label="Outros softwares da empresa">
                   {otherLicenses.map((lic) => (
-                    <option key={lic.id} value={`software:${lic.id}`}>
-                      🌐 {lic.nome} ({lic.fornecedor})
+                    <option key={lic.id} value={lic.id}>
+                      {lic.nome} ({lic.fornecedor})
                     </option>
                   ))}
                 </optgroup>
               )}
             </select>
-            <p className="text-xs text-slate-500 mt-1">
-              Vincule o chamado ao equipamento físico ou software afetado para agilizar o suporte técnico da T.I.
-            </p>
           </div>
+          <p className="md:col-span-2 -mt-1 text-xs text-slate-500">
+            Informar o equipamento e o software afetados ajuda a T.I. a saber do que se trata.
+          </p>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
