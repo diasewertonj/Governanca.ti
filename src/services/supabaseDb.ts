@@ -11,8 +11,15 @@ import {
   ColaboradorRecurso,
   CompanySettings,
   CondicaoItem,
+  Contrato,
   DestinoRecurso,
+  Fatura,
+  Fornecedor,
+  ItemContrato,
   Lembrete,
+  PeriodicidadeContrato,
+  StatusFatura,
+  TipoContrato,
   ProcessoEvento,
   ProcessoItem,
   ProcessoItemRascunho,
@@ -40,6 +47,7 @@ import {
   TicketType,
   UserRole,
 } from '../types/index.ts';
+import { diferencaItens } from '../utils/contratos.ts';
 
 // Fase 4: os mapeadores são tipados pelo banco real (database.types.ts, gerado
 // pelo Supabase). Coluna escrita errada vira erro de compilação. Os helpers
@@ -111,11 +119,34 @@ async function excluir(tabela: string, id: string, chave = 'id') {
 // de negócio escritas nas funções do banco (em português) são mostradas como estão.
 const MENSAGEM_TECNICA = /violates|permission denied|row-level security|duplicate key|null value/i;
 
+// Fase 8: regras do banco com nome (constraint) viram frases claras
+const MENSAGEM_DA_REGRA: Record<string, string> = {
+  uq_fornecedores_nome: 'Já existe um fornecedor com esse nome',
+  chk_contrato_periodo: 'O fim do contrato é anterior ao início',
+  chk_contrato_item_alvo: 'Cada item do contrato deve ser um ativo ou uma licença',
+  uq_contrato_item_ativo: 'O ativo já está neste contrato',
+  uq_contrato_item_licenca: 'A licença já está neste contrato',
+  chk_fatura_alvo: 'A fatura deve ser de uma licença ou de um contrato',
+  chk_fatura_paga: 'Fatura paga precisa da data de pagamento',
+  chk_fatura_competencia: 'A competência deve ser o primeiro dia do mês',
+  uq_fatura_licenca_comp: 'Já existe fatura não cancelada para esta competência',
+  uq_fatura_contrato_comp: 'Já existe fatura não cancelada para esta competência',
+};
+
+// Exclusão recusada por vínculo (23503), conforme a tabela de onde se tentou excluir
+const MENSAGEM_DO_VINCULO: Record<string, string> = {
+  fornecedores:
+    'O fornecedor está vinculado a contratos, ativos, licenças ou manutenções e não pode ser excluído; desative-o',
+  contratos: 'O contrato está vinculado a faturas ou manutenções e não pode ser excluído',
+};
+
 /** Mensagem curta para o usuário a partir de um erro do banco */
 export function mensagemDeErro(err: unknown): string {
   const e = err as { code?: string; message?: string };
   const msg = e?.message || '';
   const deNegocio = msg !== '' && !MENSAGEM_TECNICA.test(msg);
+  const regra = Object.keys(MENSAGEM_DA_REGRA).find((nome) => msg.includes(`"${nome}"`));
+  if (regra) return MENSAGEM_DA_REGRA[regra];
   switch (e?.code) {
     case 'validacao':
       return msg || 'arquivo inválido';
@@ -123,8 +154,13 @@ export function mensagemDeErro(err: unknown): string {
       return deNegocio && msg !== SEM_PERMISSAO ? msg : 'sem permissão para esta ação';
     case '23505':
       return deNegocio ? msg : 'já existe um registro com esses dados (e-mail, matrícula, tag, série ou código repetido)';
-    case '23503':
-      return 'o registro está vinculado a outros dados (histórico, chamados ou termos) e não pode ser removido';
+    case '23503': {
+      const tabela = msg.match(/^update or delete on table "(\w+)"/)?.[1];
+      return (
+        (tabela && MENSAGEM_DO_VINCULO[tabela]) ||
+        'o registro está vinculado a outros dados (histórico, chamados ou termos) e não pode ser removido'
+      );
+    }
     case '23514':
       return deNegocio ? msg : 'valor não aceito pelo banco';
     case '23502':
@@ -204,6 +240,7 @@ const linhaLicenca = (l: SoftwareLicense): TablesInsert<'licencas_software'> => 
   data_renovacao: l.dataRenovacao,
   url_painel: l.urlPainel || null,
   observacoes: l.observacoes || null,
+  fornecedor_id: l.fornecedorId || null,
 });
 
 const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
@@ -550,6 +587,7 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     dataRenovacao: l.data_renovacao,
     urlPainel: l.url_painel || undefined,
     observacoes: l.observacoes || undefined,
+    fornecedorId: l.fornecedor_id || undefined,
   })) : [];
 }
 
@@ -599,6 +637,225 @@ export async function revogarLicencaDb(licencaId: string, colaboradorId: string)
   return (await checar(
     supabase.rpc('revogar_licenca', { p_licenca: licencaId, p_colaborador: colaboradorId })
   )) as string[];
+}
+
+// ---------------------------------------------------------------------------
+// 4b. Fase 8 · Fornecedores, contratos e faturas (só a T.I., pela RLS).
+// Quem cadastrou e quando é carimbado pelo banco. Antes da migration as
+// tabelas não existem: a leitura devolve lista vazia e as telas seguem.
+// ---------------------------------------------------------------------------
+const linhaFornecedor = (f: Fornecedor): TablesInsert<'fornecedores'> => ({
+  id: f.id,
+  nome: f.nome.trim(),
+  cnpj: f.cnpj?.trim() || null,
+  contato: f.contato?.trim() || null,
+  telefone: f.telefone?.trim() || null,
+  email: f.email?.trim() || null,
+  site: f.site?.trim() || null,
+  observacoes: f.observacoes?.trim() || null,
+  ativo: f.ativo,
+});
+
+const fornecedorDeLinha = (l: Tables<'fornecedores'>): Fornecedor => ({
+  id: l.id,
+  nome: l.nome,
+  cnpj: l.cnpj || undefined,
+  contato: l.contato || undefined,
+  telefone: l.telefone || undefined,
+  email: l.email || undefined,
+  site: l.site || undefined,
+  observacoes: l.observacoes || undefined,
+  ativo: l.ativo,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+});
+
+export async function fetchFornecedoresFromDb(): Promise<Fornecedor[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('fornecedores').select('*').order('nome');
+  return error ? [] : (data || []).map(fornecedorDeLinha);
+}
+
+export async function insertFornecedorDb(f: Fornecedor) {
+  if (!supabase) return;
+  await checar(supabase.from('fornecedores').insert(linhaFornecedor(f)));
+}
+
+export async function updateFornecedorDb(antes: Fornecedor, depois: Fornecedor) {
+  await atualizar('fornecedores', depois.id, camposAlterados(linhaFornecedor(antes), linhaFornecedor(depois)));
+}
+
+export async function deleteFornecedorDb(id: string) {
+  await excluir('fornecedores', id);
+}
+
+// O arquivo do contrato não entra aqui: vai por gravarArquivoDb, depois do registro
+const linhaContrato = (c: Contrato): TablesInsert<'contratos'> => ({
+  id: c.id,
+  fornecedor_id: c.fornecedorId,
+  tipo: c.tipo,
+  numero: c.numero?.trim() || null,
+  descricao: c.descricao.trim(),
+  inicio: c.inicio,
+  fim: c.fim || null,
+  valor: c.valor,
+  periodicidade: c.periodicidade,
+  sla: c.sla?.trim() || null,
+  contato_suporte: c.contatoSuporte?.trim() || null,
+  observacoes: c.observacoes?.trim() || null,
+});
+
+const linhaItem = (contratoId: string, i: ItemContrato): TablesInsert<'contrato_itens'> => ({
+  contrato_id: contratoId,
+  ativo_id: i.ativoId || null,
+  licenca_id: i.licencaId || null,
+});
+
+export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
+  if (!supabase) return null;
+  const [{ data, error }, { data: itensData }] = await Promise.all([
+    supabase.from('contratos').select('*').order('inicio', { ascending: false }),
+    supabase.from('contrato_itens').select('contrato_id, ativo_id, licenca_id'),
+  ]);
+  if (error) return [];
+  const itensPorContrato: Record<string, ItemContrato[]> = {};
+  (itensData || []).forEach((i) => {
+    const item: ItemContrato | null = i.ativo_id ? { ativoId: i.ativo_id } : i.licenca_id ? { licencaId: i.licenca_id } : null;
+    if (item) (itensPorContrato[i.contrato_id] ||= []).push(item);
+  });
+  return (data || []).map((l) => ({
+    id: l.id,
+    fornecedorId: l.fornecedor_id,
+    tipo: l.tipo as TipoContrato,
+    numero: l.numero || undefined,
+    descricao: l.descricao,
+    inicio: l.inicio,
+    fim: l.fim || undefined,
+    valor: Number(l.valor) || 0,
+    periodicidade: l.periodicidade as PeriodicidadeContrato,
+    sla: l.sla || undefined,
+    contatoSuporte: l.contato_suporte || undefined,
+    arquivoCaminho: l.arquivo_caminho || undefined,
+    observacoes: l.observacoes || undefined,
+    itens: itensPorContrato[l.id] || [],
+    criadoPor: l.criado_por || undefined,
+    criadoEm: l.criado_em,
+  }));
+}
+
+/** Itens cobertos: insere os novos e exclui os que saíram (os demais ficam como estão) */
+async function sincronizarItensContrato(contratoId: string, antes: ItemContrato[], depois: ItemContrato[]) {
+  if (!supabase) return;
+  const { novos, removidos } = diferencaItens(antes, depois);
+  const ativos = removidos.flatMap((i) => (i.ativoId ? [i.ativoId] : []));
+  const licencas = removidos.flatMap((i) => (i.licencaId ? [i.licencaId] : []));
+  if (ativos.length) {
+    await checar(supabase.from('contrato_itens').delete().eq('contrato_id', contratoId).in('ativo_id', ativos));
+  }
+  if (licencas.length) {
+    await checar(supabase.from('contrato_itens').delete().eq('contrato_id', contratoId).in('licenca_id', licencas));
+  }
+  if (novos.length) {
+    await checar(supabase.from('contrato_itens').insert(novos.map((i) => linhaItem(contratoId, i))));
+  }
+}
+
+/** Cria o contrato e os itens cobertos. Se os itens falharem, tenta desfazer o contrato. */
+export async function insertContratoDb(c: Contrato) {
+  if (!supabase) return;
+  await checar(supabase.from('contratos').insert(linhaContrato(c)));
+  try {
+    await sincronizarItensContrato(c.id, [], c.itens);
+  } catch (err) {
+    await excluir('contratos', c.id).catch(() => undefined);
+    throw err;
+  }
+}
+
+export async function updateContratoDb(antes: Contrato, depois: Contrato) {
+  await atualizar('contratos', depois.id, camposAlterados(linhaContrato(antes), linhaContrato(depois)));
+  await sincronizarItensContrato(depois.id, antes.itens, depois.itens);
+}
+
+/** Exclui o contrato (os itens saem junto) e o arquivo dele */
+export async function deleteContratoDb(c: Contrato) {
+  await excluir('contratos', c.id);
+  if (c.arquivoCaminho) await removerArquivosDb([c.arquivoCaminho]).catch(() => undefined);
+}
+
+const linhaFatura = (f: Fatura): TablesInsert<'faturas'> => ({
+  id: f.id,
+  licenca_id: f.licencaId || null,
+  contrato_id: f.contratoId || null,
+  competencia: f.competencia,
+  valor: f.valor,
+  vencimento: f.vencimento,
+  pago_em: f.pagoEm || null,
+  status: f.status,
+  numero_documento: f.numeroDocumento?.trim() || null,
+  observacoes: f.observacoes?.trim() || null,
+});
+
+export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('faturas').select('*').order('competencia', { ascending: false });
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: l.id,
+    licencaId: l.licenca_id || undefined,
+    contratoId: l.contrato_id || undefined,
+    competencia: l.competencia,
+    valor: Number(l.valor) || 0,
+    vencimento: l.vencimento,
+    pagoEm: l.pago_em || undefined,
+    status: l.status as StatusFatura,
+    numeroDocumento: l.numero_documento || undefined,
+    arquivoCaminho: l.arquivo_caminho || undefined,
+    observacoes: l.observacoes || undefined,
+    criadoPor: l.criado_por || undefined,
+    criadoEm: l.criado_em,
+  }));
+}
+
+export async function insertFaturaDb(f: Fatura) {
+  if (!supabase) return;
+  await checar(supabase.from('faturas').insert(linhaFatura(f)));
+}
+
+export async function updateFaturaDb(antes: Fatura, depois: Fatura) {
+  await atualizar('faturas', depois.id, camposAlterados(linhaFatura(antes), linhaFatura(depois)));
+}
+
+export async function deleteFaturaDb(f: Fatura) {
+  await excluir('faturas', f.id);
+  if (f.arquivoCaminho) await removerArquivosDb([f.arquivoCaminho]).catch(() => undefined);
+}
+
+/**
+ * Arquivo do contrato ou da fatura (pastas contratos/<id>/ e faturas/<id>/,
+ * só a T.I. envia). Sobe o arquivo, grava o caminho no registro e só então
+ * apaga o arquivo anterior. Devolve o caminho novo.
+ */
+export async function gravarArquivoDb(
+  tabela: 'contratos' | 'faturas',
+  id: string,
+  arquivo: File,
+  anterior?: string
+): Promise<string> {
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new DbError(erro, 'validacao');
+  // Modo demonstração: arquivo só no navegador
+  if (!supabase) return URL.createObjectURL(arquivo);
+  const caminho = `${tabela}/${id}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
+  await enviar(caminho, arquivo);
+  try {
+    await atualizar(tabela, id, { arquivo_caminho: caminho });
+  } catch (err) {
+    await removerArquivosDb([caminho]).catch(() => undefined);
+    throw err;
+  }
+  if (anterior && anterior !== caminho) await removerArquivosDb([anterior]).catch(() => undefined);
+  return caminho;
 }
 
 // ---------------------------------------------------------------------------
@@ -818,6 +1075,10 @@ export function validarArquivo(arquivo: File): string | null {
 
 const nomeSeguro = (nome: string) =>
   nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+
+/** Nome para mostrar a partir do caminho no Storage (sem a pasta e sem o prefixo aleatório) */
+export const nomeDoArquivo = (caminho: string) =>
+  caminho.startsWith('blob:') ? 'arquivo' : (caminho.split('/').pop() || caminho).replace(/^[0-9a-f-]{36}-/i, '');
 
 export const formatarTamanho = (bytes: number) =>
   bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;

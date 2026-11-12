@@ -4,6 +4,7 @@ import {
   DbError,
   formatarTamanho,
   mensagemDeErro,
+  nomeDoArquivo,
   TAMANHO_MAXIMO_ARQUIVO,
   validarArquivo,
 } from './supabaseDb.ts';
@@ -55,6 +56,67 @@ describe('mensagemDeErro (CRIT-04: erro do banco chega ao usuário)', () => {
 
   it('tem texto padrão para falha sem mensagem', () => {
     expect(mensagemDeErro(undefined)).toBe('falha de comunicação com o banco');
+  });
+});
+
+describe('mensagemDeErro · regras da Fase 8 (fornecedores, contratos e faturas)', () => {
+  it('fornecedor com nome repetido', () => {
+    expect(
+      mensagemDeErro({ code: '23505', message: 'duplicate key value violates unique constraint "uq_fornecedores_nome"' })
+    ).toBe('Já existe um fornecedor com esse nome');
+  });
+
+  it('competência repetida, de licença ou de contrato', () => {
+    for (const regra of ['uq_fatura_licenca_comp', 'uq_fatura_contrato_comp']) {
+      expect(mensagemDeErro({ code: '23505', message: `duplicate key value violates unique constraint "${regra}"` })).toBe(
+        'Já existe fatura não cancelada para esta competência'
+      );
+    }
+  });
+
+  it('fatura paga sem data e contrato com fim antes do início', () => {
+    expect(
+      mensagemDeErro({ code: '23514', message: 'new row for relation "faturas" violates check constraint "chk_fatura_paga"' })
+    ).toBe('Fatura paga precisa da data de pagamento');
+    expect(
+      mensagemDeErro({ code: '23514', message: 'new row for relation "contratos" violates check constraint "chk_contrato_periodo"' })
+    ).toBe('O fim do contrato é anterior ao início');
+    expect(
+      mensagemDeErro({ code: '23514', message: 'new row for relation "faturas" violates check constraint "chk_fatura_competencia"' })
+    ).toBe('A competência deve ser o primeiro dia do mês');
+  });
+
+  it('fornecedor ou contrato com vínculo não é excluído', () => {
+    expect(
+      mensagemDeErro({
+        code: '23503',
+        message:
+          'update or delete on table "fornecedores" violates foreign key constraint "contratos_fornecedor_id_fkey" on table "contratos"',
+      })
+    ).toMatch(/fornecedor está vinculado a contratos, ativos, licenças ou manutenções e não pode ser excluído; desative-o/);
+    expect(
+      mensagemDeErro({
+        code: '23503',
+        message: 'update or delete on table "contratos" violates foreign key constraint "faturas_contrato_id_fkey" on table "faturas"',
+      })
+    ).toMatch(/contrato está vinculado a faturas/);
+  });
+
+  it('vínculo de outras tabelas continua com o texto geral', () => {
+    expect(
+      mensagemDeErro({
+        code: '23503',
+        message: 'insert or update on table "contratos" violates foreign key constraint "contratos_fornecedor_id_fkey"',
+      })
+    ).toMatch(/vinculado a outros dados/);
+  });
+});
+
+describe('nomeDoArquivo', () => {
+  it('tira a pasta e o prefixo aleatório do caminho', () => {
+    expect(nomeDoArquivo('faturas/fat-1/0b7c1f0e-3d2a-4a8e-9f61-2c4d5e6f7a8b-inv-1126.pdf')).toBe('inv-1126.pdf');
+    expect(nomeDoArquivo('contratos/ct-1/contrato.pdf')).toBe('contrato.pdf');
+    expect(nomeDoArquivo('blob:http://localhost/abc')).toBe('arquivo');
   });
 });
 

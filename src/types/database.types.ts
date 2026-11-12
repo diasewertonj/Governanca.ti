@@ -444,6 +444,118 @@ export type Database = {
         }
         Relationships: []
       }
+      contrato_itens: {
+        Row: {
+          ativo_id: string | null
+          contrato_id: string
+          id: string
+          licenca_id: string | null
+        }
+        Insert: {
+          ativo_id?: string | null
+          contrato_id: string
+          id?: string
+          licenca_id?: string | null
+        }
+        Update: {
+          ativo_id?: string | null
+          contrato_id?: string
+          id?: string
+          licenca_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_itens_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_itens_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_itens_licenca_id_fkey"
+            columns: ["licenca_id"]
+            isOneToOne: false
+            referencedRelation: "licencas_software"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratos: {
+        Row: {
+          arquivo_caminho: string | null
+          contato_suporte: string | null
+          criado_em: string
+          criado_por: string | null
+          descricao: string
+          fim: string | null
+          fornecedor_id: string
+          id: string
+          inicio: string
+          numero: string | null
+          observacoes: string | null
+          periodicidade: string
+          sla: string | null
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          arquivo_caminho?: string | null
+          contato_suporte?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao: string
+          fim?: string | null
+          fornecedor_id: string
+          id?: string
+          inicio: string
+          numero?: string | null
+          observacoes?: string | null
+          periodicidade?: string
+          sla?: string | null
+          tipo: string
+          valor?: number
+        }
+        Update: {
+          arquivo_caminho?: string | null
+          contato_suporte?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string
+          fim?: string | null
+          fornecedor_id?: string
+          id?: string
+          inicio?: string
+          numero?: string | null
+          observacoes?: string | null
+          periodicidade?: string
+          sla?: string | null
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departamentos: {
         Row: {
           ativo: boolean
@@ -473,6 +585,126 @@ export type Database = {
           responsavel_id?: string | null
         }
         Relationships: []
+      }
+      faturas: {
+        Row: {
+          arquivo_caminho: string | null
+          competencia: string
+          contrato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          id: string
+          licenca_id: string | null
+          numero_documento: string | null
+          observacoes: string | null
+          pago_em: string | null
+          status: string
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          arquivo_caminho?: string | null
+          competencia: string
+          contrato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          licenca_id?: string | null
+          numero_documento?: string | null
+          observacoes?: string | null
+          pago_em?: string | null
+          status?: string
+          valor: number
+          vencimento: string
+        }
+        Update: {
+          arquivo_caminho?: string | null
+          competencia?: string
+          contrato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          licenca_id?: string | null
+          numero_documento?: string | null
+          observacoes?: string | null
+          pago_em?: string | null
+          status?: string
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faturas_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faturas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faturas_licenca_id_fkey"
+            columns: ["licenca_id"]
+            isOneToOne: false
+            referencedRelation: "licencas_software"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fornecedores: {
+        Row: {
+          ativo: boolean
+          cnpj: string | null
+          contato: string | null
+          criado_em: string
+          criado_por: string | null
+          email: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          site: string | null
+          telefone: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          cnpj?: string | null
+          contato?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          email?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          site?: string | null
+          telefone?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          cnpj?: string | null
+          contato?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          email?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          site?: string | null
+          telefone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fornecedores_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       historico_custodia: {
         Row: {
@@ -561,6 +793,7 @@ export type Database = {
           created_at: string
           data_renovacao: string
           fornecedor: string
+          fornecedor_id: string | null
           id: string
           nome: string
           observacoes: string | null
@@ -574,6 +807,7 @@ export type Database = {
           created_at?: string
           data_renovacao: string
           fornecedor: string
+          fornecedor_id?: string | null
           id: string
           nome: string
           observacoes?: string | null
@@ -587,6 +821,7 @@ export type Database = {
           created_at?: string
           data_renovacao?: string
           fornecedor?: string
+          fornecedor_id?: string | null
           id?: string
           nome?: string
           observacoes?: string | null
@@ -594,7 +829,15 @@ export type Database = {
           url_painel?: string | null
           valor_mensal?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "licencas_software_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       termos_responsabilidade: {
         Row: {

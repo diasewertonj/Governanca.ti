@@ -82,14 +82,31 @@ export const dataLocal = (iso: string): Date => {
   return new Date(ano, (mes || 1) - 1, dia || 1);
 };
 
+/** Data local como 'AAAA-MM-DD' (toISOString() usa UTC e, à noite no Brasil, já é o dia seguinte) */
+export const isoLocal = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Dias de hoje até a data 'AAAA-MM-DD' (negativo se já passou) */
+export const diasAte = (iso: string, agora: Date = new Date()): number => {
+  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  // round: absorve a hora a mais/a menos de um eventual horário de verão
+  return Math.round((dataLocal(iso).getTime() - hoje.getTime()) / 86_400_000);
+};
+
+/** Data do lembrete: `dias` antes do prazo, mas nunca antes de hoje */
+export const dataDoLembrete = (prazo: string, dias: number, agora: Date = new Date()): string => {
+  const p = dataLocal(prazo);
+  const antes = new Date(p.getFullYear(), p.getMonth(), p.getDate() - dias);
+  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  return isoLocal(antes.getTime() < hoje.getTime() ? hoje : antes);
+};
+
 export const getWarrantyStatus = (dataGarantia?: string, agora: Date = new Date()): WarrantyStatus => {
   if (!dataGarantia) {
     return { status: 'sem_data', label: 'Sem data de garantia', diasRestantes: 0 };
   }
 
-  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-  // round: absorve a hora a mais/a menos de um eventual horário de verão
-  const diffDays = Math.round((dataLocal(dataGarantia).getTime() - hoje.getTime()) / 86_400_000);
+  const diffDays = diasAte(dataGarantia, agora);
 
   if (diffDays < 0) {
     return { status: 'expirada', label: 'Garantia expirada', diasRestantes: diffDays };

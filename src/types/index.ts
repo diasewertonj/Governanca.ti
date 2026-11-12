@@ -119,6 +119,69 @@ export interface SoftwareLicense {
   urlPainel?: string;
   tipoCobranca?: 'mensal' | 'anual';
   observacoes?: string;
+  fornecedorId?: string; // Fase 8: vínculo com o cadastro; `fornecedor` guarda o nome (texto)
+}
+
+// -----------------------------------------------------------------------------
+// Fase 8 · Fornecedores, contratos e faturas (só a T.I. lê e grava)
+// -----------------------------------------------------------------------------
+export interface Fornecedor {
+  id: string;
+  nome: string;
+  cnpj?: string;
+  contato?: string;
+  telefone?: string;
+  email?: string;
+  site?: string;
+  observacoes?: string;
+  ativo: boolean;
+  criadoPor?: string;
+  criadoEm: string;
+}
+
+export type TipoContrato = 'suporte' | 'garantia_estendida' | 'manutencao' | 'locacao' | 'licenciamento' | 'outro';
+export type PeriodicidadeContrato = 'mensal' | 'anual' | 'unico';
+
+/** O que o contrato cobre: um ativo OU uma licença (o banco confere) */
+export type ItemContrato = { ativoId: string; licencaId?: never } | { licencaId: string; ativoId?: never };
+
+export interface Contrato {
+  id: string;
+  fornecedorId: string;
+  tipo: TipoContrato;
+  numero?: string;
+  descricao: string;
+  inicio: string;
+  fim?: string;
+  valor: number;
+  periodicidade: PeriodicidadeContrato;
+  sla?: string;
+  contatoSuporte?: string;
+  arquivoCaminho?: string;
+  observacoes?: string;
+  itens: ItemContrato[];
+  criadoPor?: string;
+  criadoEm: string;
+}
+
+/** "Vencida" não é gravada: é calculada (a pagar com vencimento já passado) */
+export type StatusFatura = 'a_pagar' | 'paga' | 'cancelada';
+
+/** Fatura de uma licença OU de um contrato, por competência (1º dia do mês) */
+export interface Fatura {
+  id: string;
+  licencaId?: string;
+  contratoId?: string;
+  competencia: string;
+  valor: number;
+  vencimento: string;
+  pagoEm?: string;
+  status: StatusFatura;
+  numeroDocumento?: string;
+  arquivoCaminho?: string;
+  observacoes?: string;
+  criadoPor?: string;
+  criadoEm: string;
 }
 
 export type TicketType = 'suporte' | 'onboarding' | 'offboarding';
