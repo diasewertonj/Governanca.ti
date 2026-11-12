@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { AssetCategory } from '../../types/index.ts';
-import { X, Plus, ShieldCheck } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 
 interface NewAssetModalProps {
   onClose: () => void;
 }
+
+const CATEGORIA_LABEL: Record<string, string> = {
+  hardware: 'Hardware',
+  software: 'Software',
+  periferico: 'Periférico',
+  telefonia: 'Telefonia',
+};
 
 export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
   const { assets, departments, employees, addAsset, settings, setSelectedAssetIdFor360 } = useApp();
@@ -120,13 +127,27 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
 
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 sm:max-h-[75vh] sm:overflow-y-auto">
-          {/* Seção 1: Identificação Básica */}
+          {/* Seção 1: Identificação */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              1. Identificação Patrimonial
+              1. Identificação
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome / Descrição
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Ex: Notebook Dell Latitude 5430"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Tag de Patrimônio (Asset Tag)
@@ -158,36 +179,6 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Número de Série / Service Tag
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder="Ex: CN084920M12"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nome / Descrição
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  placeholder="Ex: Notebook Dell Latitude 5430"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Marca / Fabricante
                 </label>
                 <input
@@ -212,16 +203,99 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Número de Série / Service Tag
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={serialNumber}
+                  onChange={(e) => setSerialNumber(e.target.value)}
+                  placeholder="Ex: CN084920M12"
+                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Seção 2: Localização e Custodiante Inicial */}
+          {/* Seção 2: Especificações técnicas */}
+          {(availableCustomFields.length > 0 || categoria === 'hardware') && (
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                2. Especificações técnicas ({CATEGORIA_LABEL[categoria] ?? categoria})
+              </h3>
+
+              {availableCustomFields.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {availableCustomFields.map((cf) => (
+                    <div key={cf.id}>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        {cf.label}
+                      </label>
+                      <input
+                        type="text"
+                        value={customFields[cf.key] || ''}
+                        onChange={(e) =>
+                          setCustomFields({ ...customFields, [cf.key]: e.target.value })
+                        }
+                        placeholder={`Informe ${cf.label.toLowerCase()}...`}
+                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {categoria === 'hardware' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Sistema Operacional da Máquina
+                    </label>
+                    <select
+                      value={sistemaOperacional}
+                      onChange={(e) => setSistemaOperacional(e.target.value)}
+                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
+                      <option value="Windows 11 Home">Windows 11 Home</option>
+                      <option value="Windows 10 Pro 64-bit">Windows 10 Pro (64-bit)</option>
+                      <option value="macOS Sequoia 15.x">macOS Sequoia (Apple Silicon / Intel)</option>
+                      <option value="macOS Sonoma 14.x">macOS Sonoma (Apple Silicon)</option>
+                      <option value="Ubuntu Linux 24.04 LTS">Ubuntu Linux 24.04 LTS</option>
+                      <option value="Outro Sistema">Outro Sistema Operacional</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Chave de Recuperação BitLocker / FileVault (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={bitlockerKey}
+                      onChange={(e) => setBitlockerKey(e.target.value)}
+                      placeholder="Ex: 419204-183029-482019-582019-..."
+                      className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    />
+                    <span className="text-xs text-slate-500 mt-0.5 block">
+                      Chave numérica/alfanumérica para desbloqueio emergencial de disco criptografado
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Seção 3: Custódia e alocação */}
           <div className="space-y-3 pt-3 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              2. Custódia e Alocação
+              3. Custódia e alocação
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Alocação Inicial (1:1)
@@ -283,57 +357,10 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Seção 2.5: Sistema Operacional & Segurança BitLocker (Hardware) */}
-          {categoria === 'hardware' && (
-            <div className="space-y-3 pt-3 border-t border-slate-100">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                <span>Sistema Operacional & Segurança (BitLocker)</span>
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Sistema Operacional da Máquina
-                  </label>
-                  <select
-                    value={sistemaOperacional}
-                    onChange={(e) => setSistemaOperacional(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
-                    <option value="Windows 11 Home">Windows 11 Home</option>
-                    <option value="Windows 10 Pro 64-bit">Windows 10 Pro (64-bit)</option>
-                    <option value="macOS Sequoia 15.x">macOS Sequoia (Apple Silicon / Intel)</option>
-                    <option value="macOS Sonoma 14.x">macOS Sonoma (Apple Silicon)</option>
-                    <option value="Ubuntu Linux 24.04 LTS">Ubuntu Linux 24.04 LTS</option>
-                    <option value="Outro Sistema">Outro Sistema Operacional</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Chave de Recuperação BitLocker / FileVault (Opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={bitlockerKey}
-                    onChange={(e) => setBitlockerKey(e.target.value)}
-                    placeholder="Ex: 419204-183029-482019-582019-..."
-                    className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                  <span className="text-xs text-slate-500 mt-0.5 block">
-                    Chave numérica/alfanumérica para desbloqueio emergencial de disco criptografado
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Seção 3: Dados Fiscais e Garantia */}
+          {/* Seção 4: Dados fiscais e garantia */}
           <div className="space-y-3 pt-3 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              3. Dados Fiscais, Financeiros & Garantia
+              4. Dados fiscais e garantia
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -376,10 +403,45 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Data de Aquisição
+                </label>
+                <input
+                  type="date"
+                  value={dataAquisicao}
+                  onChange={(e) => setDataAquisicao(e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Fim da Garantia
+                </label>
+                <input
+                  type="date"
+                  value={dataGarantia}
+                  onChange={(e) => setDataGarantia(e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Contato de Suporte / Contrato Fabricante
+                </label>
+                <input
+                  type="text"
+                  value={suporteContato}
+                  onChange={(e) => setSuporteContato(e.target.value)}
+                  placeholder="Ex: 0800 970 3355 (Dell ProSupport 24x7)"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="md:col-span-3">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Chave de Acesso NF-e (44 dígitos)
                 </label>
@@ -392,75 +454,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
                   className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Data de Aquisição
-                  </label>
-                  <input
-                    type="date"
-                    value={dataAquisicao}
-                    onChange={(e) => setDataAquisicao(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fim da Garantia
-                  </label>
-                  <input
-                    type="date"
-                    value={dataGarantia}
-                    onChange={(e) => setDataGarantia(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Contato de Suporte / Contrato Fabricante
-              </label>
-              <input
-                type="text"
-                value={suporteContato}
-                onChange={(e) => setSuporteContato(e.target.value)}
-                placeholder="Ex: 0800 970 3355 (Dell ProSupport 24x7)"
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              />
             </div>
           </div>
-
-          {/* Seção 4: Campos Dinâmicos por Categoria */}
-          {availableCustomFields.length > 0 && (
-            <div className="space-y-3 pt-3 border-t border-slate-100">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                4. Atributos Específicos ({categoria})
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {availableCustomFields.map((cf) => (
-                  <div key={cf.id}>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {cf.label}
-                    </label>
-                    <input
-                      type="text"
-                      value={customFields[cf.key] || ''}
-                      onChange={(e) =>
-                        setCustomFields({ ...customFields, [cf.key]: e.target.value })
-                      }
-                      placeholder={`Informe ${cf.label.toLowerCase()}...`}
-                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button

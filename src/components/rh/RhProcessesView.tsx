@@ -394,6 +394,7 @@ export const RhProcessesView: React.FC = () => {
                 Regras de Transição e Continuidade Operacional
               </h4>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Regra 1: Redirecionamento de E-mail */}
               <div className="border border-slate-200 rounded-lg p-4 space-y-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -420,7 +421,7 @@ export const RhProcessesView: React.FC = () => {
                       value={destinatarioEmailId}
                       onChange={(e) => setDestinatarioEmailId(e.target.value)}
                       required={redirecionarEmail}
-                      className="w-full max-w-md text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                      className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
                     >
                       <option value="">Selecione o destinatário...</option>
                       {activeEmployees
@@ -461,7 +462,7 @@ export const RhProcessesView: React.FC = () => {
                       value={destinatarioDriveId}
                       onChange={(e) => setDestinatarioDriveId(e.target.value)}
                       required={transferirDrive}
-                      className="w-full max-w-md text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                      className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
                     >
                       <option value="">Selecione o destinatário...</option>
                       {activeEmployees
@@ -474,6 +475,7 @@ export const RhProcessesView: React.FC = () => {
                     </select>
                   </div>
                 )}
+              </div>
               </div>
 
               {/* Regra 3: Logística de Recolhimento */}
@@ -536,8 +538,10 @@ export const RhProcessesView: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+            <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Dados do admitido</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Nome Completo do Novo Colaborador
                 </label>
@@ -564,9 +568,7 @@ export const RhProcessesView: React.FC = () => {
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Cargo / Função
@@ -617,9 +619,7 @@ export const RhProcessesView: React.FC = () => {
                   ))}
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Data de Início Prevista
@@ -632,26 +632,11 @@ export const RhProcessesView: React.FC = () => {
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>
+            </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nível de Acesso Sugerido ao Sistema
-                </label>
-                <select
-                  value={onbPapelAcesso}
-                  onChange={(e) => setOnbPapelAcesso(e.target.value as 'colaborador' | 'rh' | 'ti_suporte' | 'ti_admin')}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
-                >
-                  <option value="colaborador">Colaborador Padrão (Solicitante)</option>
-                  <option value="rh">Recursos Humanos (admissões e desligamentos)</option>
-                  <option value="ti_suporte">Técnico de Suporte T.I.</option>
-                  <option value="ti_admin">Administrador de T.I. (Acesso Total)</option>
-                </select>
-                <span className="text-xs text-slate-500 mt-0.5 block">
-                  Pré-define as permissões do novo usuário pós-login
-                </span>
-              </div>
-
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipamento</h4>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Perfil de Equipamento Sugerido
@@ -675,7 +660,6 @@ export const RhProcessesView: React.FC = () => {
                   A T.I. selecionará o patrimônio físico (#PAT) do estoque
                 </span>
               </div>
-            </div>
 
             {/* Fase 6: kit sugerido (catálogo da T.I.) */}
             <div>
@@ -705,6 +689,29 @@ export const RhProcessesView: React.FC = () => {
                 })}
               </div>
             </div>
+
+            </div>
+
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Acessos</h4>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nível de Acesso Sugerido ao Sistema
+                </label>
+                <select
+                  value={onbPapelAcesso}
+                  onChange={(e) => setOnbPapelAcesso(e.target.value as 'colaborador' | 'rh' | 'ti_suporte' | 'ti_admin')}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                >
+                  <option value="colaborador">Colaborador Padrão (Solicitante)</option>
+                  <option value="rh">Recursos Humanos (admissões e desligamentos)</option>
+                  <option value="ti_suporte">Técnico de Suporte T.I.</option>
+                  <option value="ti_admin">Administrador de T.I. (Acesso Total)</option>
+                </select>
+                <span className="text-xs text-slate-500 mt-0.5 block">
+                  Pré-define as permissões do novo usuário pós-login
+                </span>
+              </div>
 
             {/* Fase 6: contas (catálogo) + outros acessos + grupos de e-mail */}
             <div>
@@ -752,6 +759,7 @@ export const RhProcessesView: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
             </div>
 
             <div>

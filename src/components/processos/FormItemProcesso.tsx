@@ -231,6 +231,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     if (novo) setSelectedTermForPrint(novo);
   };
 
+  const obsObrigatoria =
+    (item.tipo === 'devolver_equipamento' && condicao === 'avaria') || (pedeDestino && destino === 'outro');
+
   const nomeDe = (id?: string) => employees.find((e) => e.id === id)?.nome || '—';
 
   return (
@@ -444,14 +447,18 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       {/* Comuns */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <div className="sm:col-span-2">
-          <label className={rotulo}>Descrição / observação</label>
+          <label className={rotulo}>
+            {obsObrigatoria ? 'Descrição / observação (obrigatória)' : 'Descrição / observação'}
+          </label>
           <textarea
             className={campo}
             rows={2}
             value={obs}
             onChange={(e) => setObs(e.target.value)}
             placeholder={
-              item.tipo === 'dados_drive'
+              obsObrigatoria
+                ? 'Descreva o que foi encontrado ou feito'
+                : item.tipo === 'dados_drive'
                 ? 'Ex.: pasta compartilhada com o gestor; prazo para ele revisar'
                 : item.tipo === 'email'
                   ? 'Ex.: acesso delegado ao gestor por 30 dias, depois importar'

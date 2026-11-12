@@ -27,6 +27,13 @@ const ROTULO_PAPEL: Record<UserRole, string> = {
   colaborador: 'Colaborador',
 };
 
+const ROTULO_CATEGORIA: Record<AssetCategory, string> = {
+  hardware: 'Hardware',
+  periferico: 'Periférico',
+  telefonia: 'Telefonia',
+  software: 'Software',
+};
+
 const ROTULO_CAMPO_EMPRESA = {
   razaoSocial: 'razão social',
   nomeFantasia: 'nome fantasia',
@@ -369,6 +376,9 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h4 className="col-span-full text-xs font-bold uppercase tracking-wider text-slate-500">
+              Identificação jurídica
+            </h4>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Razão Social</label>
               <input
@@ -401,7 +411,8 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <h4 className="col-span-full text-xs font-bold uppercase tracking-wider text-slate-500">Endereço</h4>
             <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">Endereço Completo</label>
               <input
@@ -410,6 +421,16 @@ export const SettingsView: React.FC = () => {
                 value={endereco}
                 onChange={(e) => setEndereco(e.target.value)}
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">CEP</label>
+              <input
+                type="text"
+                required
+                value={cep}
+                onChange={(e) => setCep(e.target.value)}
+                className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
               />
             </div>
             <div>
@@ -424,17 +445,10 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">CEP</label>
-              <input
-                type="text"
-                required
-                value={cep}
-                onChange={(e) => setCep(e.target.value)}
-                className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
-              />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h4 className="col-span-full text-xs font-bold uppercase tracking-wider text-slate-500">
+              Contatos da T.I.
+            </h4>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">E-mail do Suporte de TI</label>
               <input
@@ -467,7 +481,7 @@ export const SettingsView: React.FC = () => {
                 onChange={(e) => setLogoUrl(e.target.value)}
                 placeholder="https://www.suaempresa.com.br/logo.png"
                 aria-invalid={logoInvalido}
-                className="w-full text-sm px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
               />
               {logoInvalido && <span className="block text-xs text-red-700 mt-1">Use um link que começa com https://</span>}
             </label>
@@ -485,52 +499,20 @@ export const SettingsView: React.FC = () => {
 
           {activeTab === 'documentos' && (
           <>
-          {/* Cláusulas dos Termos */}
+          {/* Fase 6: documentos controlados (Qualidade) com o texto legal de cada um */}
           <div className="space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Cláusulas Padrão para Termos de Responsabilidade
-            </h4>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Texto Legal do Termo de Entrega de Equipamentos
-              </label>
-              <textarea
-                rows={3}
-                value={textoTermoEntrega}
-                onChange={(e) => setTextoTermoEntrega(e.target.value)}
-                className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-800 leading-relaxed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Texto Legal do Termo de Devolução e Baixa Patrimonial
-              </label>
-              <textarea
-                rows={3}
-                value={textoTermoDevolucao}
-                onChange={(e) => setTextoTermoDevolucao(e.target.value)}
-                className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-800 leading-relaxed"
-              />
-            </div>
-          </div>
-
-          {/* Fase 6: identificação dos documentos controlados (Qualidade) */}
-          <div className="space-y-3 pt-4 border-t border-slate-100">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Documentos controlados (Qualidade)
-            </h4>
             <p className="text-xs text-slate-500">
-              Aparecem no cabeçalho dos termos. Mantenha igual à versão aprovada pela Qualidade no POP.
+              Código, versão e referência aparecem no cabeçalho dos termos. Mantenha igual à versão aprovada pela
+              Qualidade no POP.
             </p>
             {(
               [
-                ['Termo de entrega', docEntrega, setDocEntrega],
-                ['Recibo de devolução', docDevolucao, setDocDevolucao],
+                ['Termo de entrega', docEntrega, setDocEntrega, 'Texto legal do termo de entrega', textoTermoEntrega, setTextoTermoEntrega],
+                ['Recibo de devolução', docDevolucao, setDocDevolucao, 'Texto legal do termo de devolução e baixa patrimonial', textoTermoDevolucao, setTextoTermoDevolucao],
               ] as const
-            ).map(([nome, doc, setDoc]) => (
-              <div key={nome} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+            ).map(([nome, doc, setDoc, rotuloTexto, texto, setTexto], idx) => (
+              <div key={nome} className={`space-y-3 ${idx > 0 ? 'pt-4 border-t border-slate-100' : ''}`}>
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
                 <span className="col-span-2 md:col-span-6 text-xs font-semibold text-slate-700">{nome}</span>
                 {(
                   [
@@ -549,6 +531,16 @@ export const SettingsView: React.FC = () => {
                     />
                   </label>
                 ))}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{rotuloTexto}</label>
+                <textarea
+                  rows={3}
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-800 leading-relaxed"
+                />
+              </div>
               </div>
             ))}
           </div>
@@ -569,8 +561,8 @@ export const SettingsView: React.FC = () => {
           <form onSubmit={handleAddDepartment} className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Cadastrar Novo Setor / Departamento</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+              <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nome do Setor</label>
                 <input
                   type="text"
@@ -582,7 +574,7 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-1">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Sigla / Código</label>
                 <input
                   type="text"
@@ -595,7 +587,7 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Finalidade / Descrição</label>
                 <input
                   type="text"
@@ -605,12 +597,10 @@ export const SettingsView: React.FC = () => {
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>
-            </div>
 
-            <div className="flex justify-end">
               <button
                 type="submit"
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                className="md:col-span-1 self-end flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Adicionar Setor</span>
@@ -707,7 +697,7 @@ export const SettingsView: React.FC = () => {
           <form onSubmit={handleAddCustomField} className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Adicionar Atributo Dinâmico por Categoria</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Categoria de Ativo</label>
                 <select
@@ -746,12 +736,10 @@ export const SettingsView: React.FC = () => {
                   <option value="date">Data</option>
                 </select>
               </div>
-            </div>
 
-            <div className="flex justify-end">
               <button
                 type="submit"
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                className="self-end flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Salvar Atributo</span>
@@ -762,28 +750,39 @@ export const SettingsView: React.FC = () => {
           {/* Lista de Campos Cadastrados */}
           <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Atributos Ativos no Sistema</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {settings.camposPersonalizados.map((cf) => (
-                <div
-                  key={cf.id}
-                  className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs"
-                >
-                  <div>
-                    <span className="font-semibold text-slate-900 block">{cf.label}</span>
-                    <span className="text-xs text-slate-500 uppercase font-mono">
-                      {cf.categoria} · {cf.tipo}
-                    </span>
+            {(Object.keys(ROTULO_CATEGORIA) as AssetCategory[]).map((cat) => {
+              const doGrupo = settings.camposPersonalizados.filter((cf) => cf.categoria === cat);
+              if (doGrupo.length === 0) return null;
+              return (
+                <div key={cat} className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    {ROTULO_CATEGORIA[cat]}
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {doGrupo.map((cf) => (
+                      <div
+                        key={cf.id}
+                        className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <span className="font-semibold text-slate-900 block">{cf.label}</span>
+                          <span className="text-xs text-slate-500 uppercase font-mono">
+                            {cf.categoria} · {cf.tipo}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomField(cf.id)}
+                          className="text-slate-500 hover:text-rose-600 p-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveCustomField(cf.id)}
-                    className="text-slate-500 hover:text-rose-600 p-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
       )}

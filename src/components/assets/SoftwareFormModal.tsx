@@ -119,126 +119,130 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
 
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nome do Software / Sistema SaaS *
-              </label>
-              <input
-                type="text"
-                required
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex: Microsoft 365 E5, Figma Enterprise, Slack"
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Fornecedor / Desenvolvedor *
-              </label>
-              <input
-                type="text"
-                required
-                value={fornecedor}
-                onChange={(e) => setFornecedor(e.target.value)}
-                placeholder="Ex: Microsoft, Google, Adobe, Atlassian"
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Chave de Contrato / ID da Assinatura *
-              </label>
-              <input
-                type="text"
-                required
-                value={chaveContrato}
-                onChange={(e) => setChaveContrato(e.target.value)}
-                className="w-full text-xs font-mono font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Quantidade Total de Assentos *
-              </label>
-              <input
-                type="number"
-                min={1}
-                required
-                value={assentosTotais}
-                onChange={(e) => setAssentosTotais(Number(e.target.value))}
-                className="w-full text-xs font-mono font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              />
-              <span className="text-xs text-slate-500 mt-0.5 block">
-                Teto máximo de colaboradores
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Data de Renovação / Vigência *
-              </label>
-              <input
-                type="date"
-                required
-                value={dataRenovacao}
-                onChange={(e) => setDataRenovacao(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Valor Financeiro (R$) *
-              </label>
-              <div className="relative">
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Identificação</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome do Software / Sistema SaaS *
+                </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min={0}
+                  type="text"
                   required
-                  value={valorMensal}
-                  onChange={(e) => setValorMensal(Number(e.target.value))}
-                  className="w-full text-xs font-mono font-semibold pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Ex: Microsoft 365 E5, Figma Enterprise, Slack"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 />
-                <span className="absolute left-3 top-2 text-xs font-bold text-slate-500">R$</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Fornecedor / Desenvolvedor *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={fornecedor}
+                  onChange={(e) => setFornecedor(e.target.value)}
+                  placeholder="Ex: Microsoft, Google, Adobe, Atlassian"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Chave de Contrato / ID da Assinatura *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={chaveContrato}
+                  onChange={(e) => setChaveContrato(e.target.value)}
+                  className="w-full text-xs font-mono font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  URL do Painel / Console de Administração Web
+                </label>
+                <input
+                  type="url"
+                  value={urlPainel}
+                  onChange={(e) => setUrlPainel(e.target.value)}
+                  placeholder="https://admin.microsoft.com ou https://admin.google.com"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Periodicidade de Cobrança
-              </label>
-              <select
-                value={tipoCobranca}
-                onChange={(e) => setTipoCobranca(e.target.value as 'mensal' | 'anual')}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="mensal">Mensal (Faturamento Recorrente)</option>
-                <option value="anual">Anual (Contrato Fechado)</option>
-              </select>
-            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              URL do Painel / Console de Administração Web
-            </label>
-            <input
-              type="url"
-              value={urlPainel}
-              onChange={(e) => setUrlPainel(e.target.value)}
-              placeholder="https://admin.microsoft.com ou https://admin.google.com"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-            />
+          <div className="space-y-2 pt-3 border-t border-slate-100">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Contrato e custo</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Quantidade Total de Assentos *
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={assentosTotais}
+                  onChange={(e) => setAssentosTotais(Number(e.target.value))}
+                  className="w-full text-xs font-mono font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+                <span className="text-xs text-slate-500 mt-0.5 block">
+                  Teto máximo de colaboradores
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Data de Renovação / Vigência *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={dataRenovacao}
+                  onChange={(e) => setDataRenovacao(e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Periodicidade de Cobrança
+                </label>
+                <select
+                  value={tipoCobranca}
+                  onChange={(e) => setTipoCobranca(e.target.value as 'mensal' | 'anual')}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="mensal">Mensal (Faturamento Recorrente)</option>
+                  <option value="anual">Anual (Contrato Fechado)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Valor Financeiro (R$) *
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    required
+                    value={valorMensal}
+                    onChange={(e) => setValorMensal(Number(e.target.value))}
+                    className="w-full text-xs font-mono font-semibold pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  />
+                  <span className="absolute left-3 top-2 text-xs font-bold text-slate-500">R$</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>

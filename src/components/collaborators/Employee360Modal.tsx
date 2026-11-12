@@ -315,7 +315,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </div>
 
           {/* 1. Tabela de Ativos Atualmente em Posse (Rastreabilidade 360°) */}
-          <div className="border border-slate-200 rounded-lg p-5 space-y-3">
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Laptop className="w-4 h-4 text-blue-600" />
@@ -327,9 +327,9 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             </div>
 
             {currentAssets.length > 0 ? (
-              <div className="divide-y divide-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {currentAssets.map((asset) => (
-                  <div key={asset.id} className="py-3 flex items-center justify-between hover:bg-slate-50/50 px-2 rounded-md transition-colors">
+                  <div key={asset.id} className="p-3 flex items-center justify-between bg-slate-50/70 border border-slate-200 hover:bg-slate-50 rounded-md transition-colors">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
@@ -348,14 +348,6 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                         {asset.marca} {asset.modelo} · S/N: <span className="font-mono">{asset.serialNumber}</span> · Em posse desde: {formatDate(asset.dataEntregaAtual)}
                       </p>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenAsset(asset.id)}
-                      className="text-xs font-medium text-blue-700 hover:text-blue-800 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded border border-slate-200 transition-colors shrink-0"
-                    >
-                      Ver Ficha do Ativo
-                    </button>
                   </div>
                 ))}
               </div>
@@ -367,7 +359,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </div>
 
           {/* 2. Licenças de Software & Acessos em Uso */}
-          <div className="border border-slate-200 rounded-lg p-5 space-y-3">
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
               <Key className="w-4 h-4 text-slate-600" />
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
@@ -395,7 +387,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </div>
 
           {/* 3. Documentos e Termos de Responsabilidade */}
-          <div className="border border-slate-200 rounded-lg p-5 space-y-3">
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-slate-600" />
@@ -448,7 +440,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
 
           {/* 4. Histórico de Devoluções Passadas */}
           {returnedHistory.length > 0 && (
-            <div className="border border-slate-200 rounded-lg p-5 space-y-3">
+            <div className="border border-slate-200 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <History className="w-4 h-4 text-slate-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
