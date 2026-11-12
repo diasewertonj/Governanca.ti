@@ -54,8 +54,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   // Fase 8: contratos que vencem em 60 dias e faturas a pagar vencidas ou vencendo em 7 dias
   const contratosVencendo = contratos.filter((c) => situacaoContrato(c).situacao === 'vencendo').length;
   const faturasAPagar = resumoFaturasAPagar(faturas);
+  const emManutencao = assets.filter((a) => a.status === 'manutencao').length;
   const mostrarQuadro =
-    garantiasProximas.length > 0 || contratosVencendo > 0 || faturasAPagar.vencidas > 0 || faturasAPagar.vencemEmBreve > 0;
+    garantiasProximas.length > 0 ||
+    contratosVencendo > 0 ||
+    faturasAPagar.vencidas > 0 ||
+    faturasAPagar.vencemEmBreve > 0 ||
+    emManutencao > 0;
 
   // Chamados recentes
   const recentTickets = [...tickets]
@@ -186,6 +191,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                   </div>
                   <div className="text-xs text-amber-800">faturas vencidas · vencem em {DIAS_ALERTA_FATURA} dias</div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('assets')}
+                  className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1"
+                >
+                  <div className="text-xl font-bold text-amber-900">{emManutencao}</div>
+                  <div className="text-xs text-amber-800 underline-offset-2 hover:underline">
+                    {emManutencao === 1 ? 'ativo em manutenção' : 'ativos em manutenção'}
+                  </div>
+                </button>
               </div>
               {garantiasProximas.length > 0 && (
                 <ul className="mt-3 space-y-2">
