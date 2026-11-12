@@ -14,6 +14,7 @@ import {
 } from '../../utils/contratos.ts';
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
+import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
 import { FornecedorFormModal } from './FornecedorFormModal.tsx';
 import { LembreteContrato } from './LembreteContrato.tsx';
 import { SeletorItensContrato } from './SeletorItensContrato.tsx';
@@ -428,6 +429,15 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato, 
                 </span>
                 <LembreteContrato contrato={contrato} />
               </div>
+            )}
+
+            {/* Faturas do contrato gravado (o valor e a periodicidade sugeridos são os já salvos) */}
+            {contrato && (
+              <FaturasSecao
+                alvo={{ contratoId: contrato.id }}
+                periodicidade={contrato.periodicidade}
+                valorPadrao={contrato.valor}
+              />
             )}
           </div>
 

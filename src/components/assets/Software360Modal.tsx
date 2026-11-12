@@ -15,6 +15,7 @@ import {
   Search,
   Globe,
 } from 'lucide-react';
+import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
 
 interface Software360ModalProps {
   softwareId: string;
@@ -33,6 +34,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setSoftwareToEdit,
     setSoftwareModalOpen,
     currentRole,
+    fornecedores,
+    podeDescartarPendencias,
   } = useApp();
 
   const [selectedColabToAssign, setSelectedColabToAssign] = useState('');
@@ -46,6 +49,12 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   if (!license) return null;
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  // Fase 8: nome do cadastro de fornecedores; sem vínculo, o texto antigo
+  const nomeFornecedor = fornecedores.find((f) => f.id === license.fornecedorId)?.nome || license.fornecedor;
+  // Fecha perguntando se houver fatura em digitação
+  const fechar = () => {
+    if (podeDescartarPendencias()) onClose();
+  };
   const freeSeats = Math.max(0, license.assentosTotais - license.assentosAlocados);
   const occupancyPercentage = Math.round((license.assentosAlocados / (license.assentosTotais || 1)) * 100);
 
@@ -132,7 +141,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                {license.fornecedor}
+                {nomeFornecedor}
               </p>
             </div>
           </div>
@@ -167,7 +176,9 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             )}
 
             <button
-              onClick={onClose}
+              type="button"
+              aria-label="Fechar"
+              onClick={fechar}
               className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
             >
               <X className="w-5 h-5" />
@@ -315,6 +326,15 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               </div>
             </div>
           </div>
+
+          {/* Fase 8: faturas da licença (só a T.I.) */}
+          {isTI && (
+            <FaturasSecao
+              alvo={{ licencaId: license.id }}
+              periodicidade={license.tipoCobranca || 'mensal'}
+              valorPadrao={license.valorMensal}
+            />
+          )}
 
           {license.observacoes && (
             <div className="border border-slate-200 rounded-xl p-4 space-y-1">
