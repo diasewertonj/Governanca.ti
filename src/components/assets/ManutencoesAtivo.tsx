@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, Plus, ShieldCheck, Wrench, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Asset, Manutencao, StatusManutencao } from '../../types/index.ts';
@@ -150,7 +151,13 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
         </span>
       </div>
 
-      {form && <FormManutencao asset={asset} modo={form.modo} manutencao={form.manutencao} onClose={() => setForm(null)} />}
+      {/* No body: dentro da ficha (fundo com backdrop-filter e rolagem própria) a janela abriria
+          fora da tela no celular, no alto da rolagem da ficha */}
+      {form &&
+        createPortal(
+          <FormManutencao asset={asset} modo={form.modo} manutencao={form.manutencao} onClose={() => setForm(null)} />,
+          document.body
+        )}
     </div>
   );
 };

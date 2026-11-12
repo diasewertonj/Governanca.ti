@@ -139,6 +139,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   }[asset.status];
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
@@ -364,7 +365,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                     Sistema Operacional & Segurança de Disco (BitLocker)
                   </h3>
                 </div>
-                {isTI && !isEditingSecurity && (
+                {isTI && asset.status !== 'descartado' && !isEditingSecurity && (
                   <button
                     type="button"
                     onClick={() => {
@@ -694,11 +695,14 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
           )}
         </div>
       </div>
-      {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
-      {enviandoManutencao && (
-        <FormManutencao asset={asset} modo="abrir" onClose={() => setEnviandoManutencao(false)} />
-      )}
-      {dandoBaixa && <FormBaixa asset={asset} onClose={() => setDandoBaixa(false)} />}
     </div>
+    {/* Fora da janela da ficha: o fundo desfocado (backdrop-filter) prenderia a janela nova na
+        rolagem da ficha, e no celular ela abriria fora da tela */}
+    {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
+    {enviandoManutencao && (
+      <FormManutencao asset={asset} modo="abrir" onClose={() => setEnviandoManutencao(false)} />
+    )}
+    {dandoBaixa && <FormBaixa asset={asset} onClose={() => setDandoBaixa(false)} />}
+    </>
   );
 };
