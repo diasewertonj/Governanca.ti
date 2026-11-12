@@ -2,7 +2,24 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { TicketPriority, TicketAttachment } from '../../types/index.ts';
 import { X, Paperclip, Send } from 'lucide-react';
-import { enviarAnexoDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
+import {
+  enviarAnexoDb,
+  formatarTamanho,
+  mensagemDeErro,
+  removerArquivosDb,
+  TIPOS_ARQUIVO_ACEITOS,
+  validarArquivo,
+} from '../../services/supabaseDb.ts';
+import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
+import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
+
+// Anexo escolhido, ainda só no navegador (Fase 5: sobe apenas ao enviar o chamado)
+interface AnexoPendente {
+  id: string;
+  nome: string;
+  tamanho: string;
+  arquivo: File;
+}
 
 interface NewTicketModalProps {
   onClose: () => void;
@@ -19,7 +36,19 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
   const [prioridade, setPrioridade] = useState<TicketPriority>('media');
   const [objetoSelecionado, setObjetoSelecionado] = useState<string>('');
   const [descricao, setDescricao] = useState('');
-  const [anexos, setAnexos] = useState<TicketAttachment[]>([]);
+  const [anexos, setAnexos] = useState<AnexoPendente[]>([]);
+
+  // Fase 5: chamado em preenchimento conta como alteração não salva
+  const preenchido = titulo.trim() !== '' || descricao.trim() !== '' || anexos.length > 0;
+  const itensPendentes = preenchido
+    ? [`Chamado novo não enviado${anexos.length ? ` (${anexos.length} anexo(s))` : ''}`]
+    : [];
+  useRegistrarPendencias('novo-chamado', itensPendentes);
+
+  const fechar = () => {
+    if (enviandoChamado) return;
+    if (confirmarDescarte(itensPendentes)) onClose();
+  };
 
   if (!currentUser) return null;
 
@@ -32,25 +61,36 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
   const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(currentUser.id));
   const otherLicenses = licenses.filter((l) => !l.colaboradoresIds.includes(currentUser.id));
 
-  // Fase 3 (MED-04): envio real para o Storage privado, com validação de tipo/tamanho
-  const handleSelecionarArquivos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Fase 5: escolher arquivo só valida tipo/tamanho; o envio ao Storage
+  // acontece ao clicar em "Enviar Chamado" (cancelar não deixa arquivo órfão)
+  const handleSelecionarArquivos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const arquivos = Array.from(e.target.files || []);
     e.target.value = '';
     if (arquivos.length === 0) return;
-    setErroAnexo(null);
-    setEnviandoAnexo(true);
-    const enviados: TicketAttachment[] = [];
+    const validos: AnexoPendente[] = [];
     const erros: string[] = [];
     for (const arquivo of arquivos) {
-      try {
-        enviados.push(await enviarAnexoDb(arquivo, supabaseUser?.id));
-      } catch (err) {
-        erros.push(mensagemDeErro(err));
-      }
+      const erro = validarArquivo(arquivo);
+      if (erro) erros.push(erro);
+      else validos.push({ id: crypto.randomUUID(), nome: arquivo.name, tamanho: formatarTamanho(arquivo.size), arquivo });
     }
     setErroAnexo(erros.length ? erros.join(' ') : null);
-    setAnexos((prev) => [...prev, ...enviados]);
-    setEnviandoAnexo(false);
+    setAnexos((prev) => [...prev, ...validos]);
+  };
+
+  /** Sobe os anexos; se algum falhar, apaga os que já subiram e devolve null */
+  const enviarAnexos = async (): Promise<TicketAttachment[] | null> => {
+    const enviados: TicketAttachment[] = [];
+    for (const a of anexos) {
+      try {
+        enviados.push(await enviarAnexoDb(a.arquivo, supabaseUser?.id));
+      } catch (err) {
+        setErroAnexo(`Não foi possível enviar "${a.nome}": ${mensagemDeErro(err)}. O chamado não foi aberto.`);
+        await removerArquivosDb(enviados.flatMap((x) => (x.caminho ? [x.caminho] : []))).catch(() => undefined);
+        return null;
+      }
+    }
+    return enviados;
   };
 
   const handleRemoveAttachment = (attId: string) => {
@@ -74,6 +114,13 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
 
     if (enviandoChamado || enviandoAnexo) return;
     setEnviandoChamado(true);
+    setEnviandoAnexo(anexos.length > 0);
+    const anexosEnviados = await enviarAnexos();
+    setEnviandoAnexo(false);
+    if (!anexosEnviados) {
+      setEnviandoChamado(false);
+      return;
+    }
     const created = await createTicket({
       tipo: 'suporte',
       solicitanteId: currentUser.id,
@@ -89,10 +136,15 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
       prioridade,
       status: 'aberto',
       descricao: descricao.trim(),
-      anexos,
+      anexos: anexosEnviados,
     });
     setEnviandoChamado(false);
-    if (!created) return; // o modal fica aberto; o erro aparece no aviso global
+    if (!created) {
+      // Chamado recusado: apaga os anexos que subiram (o modal fica aberto para tentar de novo)
+      await removerArquivosDb(anexosEnviados.flatMap((x) => (x.caminho ? [x.caminho] : []))).catch(() => undefined);
+      return;
+    }
+    setAnexos([]);
 
     onClose();
     setSelectedTicketIdForDetail(created.id);
@@ -110,7 +162,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={fechar}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -274,7 +326,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                 }`}
               >
                 <Paperclip className="w-3.5 h-3.5" />
-                {enviandoAnexo ? 'Enviando...' : 'Escolher arquivos'}
+                Escolher arquivos
                 <input
                   type="file"
                   multiple
@@ -296,6 +348,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                   >
                     <Paperclip className="w-3 h-3 text-slate-400" />
                     <span>{att.nome}</span>
+                    <span className="text-[10px] text-slate-400">({att.tamanho})</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveAttachment(att.id)}
@@ -312,7 +365,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
-              onClick={onClose}
+              onClick={fechar}
               className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               Cancelar

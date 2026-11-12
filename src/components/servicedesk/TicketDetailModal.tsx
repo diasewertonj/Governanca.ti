@@ -3,6 +3,9 @@ import { useApp } from '../../context/AppContext.tsx';
 import { TicketStatus } from '../../types/index.ts';
 import { formatDateTime, formatDate, rotuloStatus, rotuloPrioridade } from '../../utils/formatters.ts';
 import { linkTemporarioDb, mensagemDeErro } from '../../services/supabaseDb.ts';
+import { AlteracoesChamado } from '../../context/AppContext.tsx';
+import { BarraAlteracoes, confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
+import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import {
   X,
   Lock,
@@ -32,8 +35,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     addEmployee,
     addTicketMessage,
     updateTicketStatus,
-    assignTicketTechnician,
-    toggleOffboardingChecklist,
+    salvarAlteracoesChamado,
     setSelectedAssetIdFor360,
     setSelectedSoftwareIdFor360,
     setSelectedEmployeeIdFor360,
@@ -47,9 +49,65 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   const [concluindoOffboarding, setConcluindoOffboarding] = useState(false);
   const [resumoOffboarding, setResumoOffboarding] = useState<string | null>(null);
 
+  // Fase 5: status, técnico e checklist ficam em rascunho até "Salvar alterações"
+  const [rascStatus, setRascStatus] = useState<TicketStatus | null>(null);
+  const [rascTecnico, setRascTecnico] = useState<string | null>(null);
+  const [rascChecklist, setRascChecklist] = useState<Record<string, boolean>>({});
+
   const ticket = tickets.find((t) => t.id === ticketId);
 
+  // Técnicos = perfis de TI ativos (antes: quem estava no setor 'dep-1', fixo no código)
+  const tecnicosTI = employees.filter(
+    (e) => (e.role === 'ti_admin' || e.role === 'ti_suporte') && e.status !== 'desligado'
+  );
+  const nomeTecnico = (id?: string) => (id ? employees.find((e) => e.id === id)?.nome || 'Técnico' : 'Não atribuído');
+
+  const itensPendentes: string[] = [];
+  if (ticket) {
+    if (rascStatus !== null && rascStatus !== ticket.status) {
+      itensPendentes.push(`Status: ${rotuloStatus(ticket.status)} → ${rotuloStatus(rascStatus)}`);
+    }
+    if (rascTecnico !== null && rascTecnico !== (ticket.tecnicoResponsavelId || '')) {
+      itensPendentes.push(`Técnico: ${nomeTecnico(ticket.tecnicoResponsavelId)} → ${nomeTecnico(rascTecnico || undefined)}`);
+    }
+    const checklistAlterado = (ticket.offboarding?.checklist || []).filter(
+      (i) => i.id in rascChecklist && rascChecklist[i.id] !== i.concluido
+    );
+    if (checklistAlterado.length > 0) {
+      itensPendentes.push(`Checklist: ${checklistAlterado.length} item(ns) marcado(s) ou desmarcado(s)`);
+    }
+  }
+  useRegistrarPendencias(`chamado:${ticketId}`, itensPendentes);
+
   if (!ticket) return null;
+
+  const statusExibido = rascStatus ?? ticket.status;
+  const tecnicoExibido = rascTecnico ?? (ticket.tecnicoResponsavelId || '');
+  const concluidoExibido = (item: { id: string; concluido: boolean }) => rascChecklist[item.id] ?? item.concluido;
+
+  const descartarRascunho = () => {
+    setRascStatus(null);
+    setRascTecnico(null);
+    setRascChecklist({});
+  };
+
+  const salvarRascunho = () => {
+    const mudancas: AlteracoesChamado = {};
+    if (rascStatus !== null && rascStatus !== ticket.status) mudancas.status = rascStatus;
+    if (rascTecnico !== null && rascTecnico !== (ticket.tecnicoResponsavelId || '')) mudancas.tecnicoId = rascTecnico;
+    const marcados = Object.fromEntries(
+      Object.entries(rascChecklist).filter(
+        ([id, v]) => ticket.offboarding?.checklist.find((i) => i.id === id)?.concluido !== v
+      )
+    );
+    if (Object.keys(marcados).length > 0) mudancas.checklist = marcados;
+    salvarAlteracoesChamado(ticket.id, mudancas);
+    descartarRascunho();
+  };
+
+  const fechar = () => {
+    if (confirmarDescarte(itensPendentes)) onClose();
+  };
 
   // Fase 3: anexos privados abrem por link temporário (5 min).
   // A janela é aberta antes do await para não ser barrada pelo bloqueador de pop-up.
@@ -151,13 +209,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     setNewMessageText('');
   };
 
-  const handleStatusChange = (newStatus: TicketStatus) => {
-    updateTicketStatus(ticket.id, newStatus);
-  };
-
-  const handleTechnicianChange = (techId: string) => {
-    assignTicketTechnician(ticket.id, techId);
-  };
+  const handleStatusChange = (newStatus: TicketStatus) => setRascStatus(newStatus);
+  const handleTechnicianChange = (techId: string) => setRascTecnico(techId);
 
   const statusColors = {
     aberto: 'text-blue-700 bg-blue-50 border-blue-200',
@@ -201,7 +254,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               Prioridade: {rotuloPrioridade(ticket.prioridade).toUpperCase()}
             </span>
             <button
-              onClick={onClose}
+              onClick={fechar}
               className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
             >
               <X className="w-5 h-5" />
@@ -257,7 +310,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       </h4>
                     </div>
                     <span className="text-[11px] font-semibold text-amber-800">
-                      {ticket.offboarding.checklist.filter((c) => c.concluido).length}/
+                      {ticket.offboarding.checklist.filter((c) => concluidoExibido(c)).length}/
                       {ticket.offboarding.checklist.length} concluídos
                     </span>
                   </div>
@@ -267,14 +320,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       <label
                         key={item.id}
                         className={`flex items-start gap-2.5 p-2 rounded cursor-pointer transition-colors text-xs ${
-                          item.concluido ? 'bg-amber-100/60 line-through text-slate-500' : 'bg-white text-slate-800 hover:bg-amber-50'
+                          concluidoExibido(item) ? 'bg-amber-100/60 line-through text-slate-500' : 'bg-white text-slate-800 hover:bg-amber-50'
                         }`}
                       >
                         <input
                           type="checkbox"
-                          checked={item.concluido}
+                          checked={concluidoExibido(item)}
                           disabled={!isTI}
-                          onChange={() => toggleOffboardingChecklist(ticket.id, item.id)}
+                          onChange={() => setRascChecklist((p) => ({ ...p, [item.id]: !concluidoExibido(item) }))}
                           className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
                         <span className="flex-1 leading-tight">{item.texto}</span>
@@ -548,7 +601,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 <div>
                   <label className="text-[11px] font-medium text-slate-700 block mb-1">Status do Chamado</label>
                   <select
-                    value={ticket.status}
+                    value={statusExibido}
                     onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
                     className="w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
                   >
@@ -563,13 +616,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 <div>
                   <label className="text-[11px] font-medium text-slate-700 block mb-1">Técnico Responsável</label>
                   <select
-                    value={ticket.tecnicoResponsavelId || ''}
+                    value={tecnicoExibido}
                     onChange={(e) => handleTechnicianChange(e.target.value)}
                     className="w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
                   >
                     <option value="">Não atribuído...</option>
-                    {employees
-                      .filter((e) => e.setorId === 'dep-1') // Setor TI
+                    {tecnicosTI
                       .map((tech) => (
                         <option key={tech.id} value={tech.id}>
                           {tech.nome} ({tech.cargo})
@@ -689,6 +741,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </div>
           </div>
         </div>
+        <BarraAlteracoes itens={itensPendentes} onCancelar={descartarRascunho} onSalvar={salvarRascunho} />
       </div>
     </div>
   );

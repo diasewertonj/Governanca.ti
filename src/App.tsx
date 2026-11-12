@@ -60,6 +60,7 @@ function MainApp() {
     dbErro,
     limparDbErro,
     precisaDefinirSenha,
+    podeDescartarPendencias,
   } = useApp();
 
   const [viewSolicitada, setCurrentView] = useState<string>('dashboard');
@@ -68,6 +69,11 @@ function MainApp() {
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
   const currentView = vistaPermitida(currentRole, viewSolicitada);
+
+  // Fase 5: trocar de tela com alterações não salvas pede confirmação
+  const navegar = (view: string) => {
+    if (view === currentView || podeDescartarPendencias()) setCurrentView(view);
+  };
 
   if (authLoading) {
     return (
@@ -119,14 +125,14 @@ function MainApp() {
         {/* Menu Lateral Adaptativo por Perfil */}
         <Sidebar
           currentView={currentView}
-          onNavigate={(view) => setCurrentView(view)}
+          onNavigate={navegar}
           onOpenNewTicketModal={() => setShowNewTicketModal(true)}
         />
 
         {/* Viewport Principal com visual leve, respirável e sem densidade pesada */}
         <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
           <Suspense fallback={<Carregando />}>
-          {currentView === 'dashboard' && <DashboardView onNavigate={(view) => setCurrentView(view)} />}
+          {currentView === 'dashboard' && <DashboardView onNavigate={navegar} />}
           {currentView === 'assets' && <AssetsView />}
           {currentView === 'collaborators' && <CollaboratorsView />}
           {currentView === 'servicedesk' && (

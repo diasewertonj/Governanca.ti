@@ -727,6 +727,12 @@ export async function enviarAnexoDb(arquivo: File, authUserId: string | undefine
   return { ...base, url: '', caminho };
 }
 
+/** Remove arquivos do Storage (usado para desfazer anexos de um chamado que não foi aberto) */
+export async function removerArquivosDb(caminhos: string[]) {
+  if (!supabase || caminhos.length === 0) return;
+  await checar(supabase.storage.from(BUCKET).remove(caminhos));
+}
+
 /** Termo assinado: só TI envia (termos/<termo_id>/...); devolve o caminho */
 export async function enviarTermoAssinadoDb(termoId: string, arquivo: File): Promise<string> {
   const erro = validarArquivo(arquivo);

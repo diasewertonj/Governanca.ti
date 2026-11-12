@@ -64,6 +64,16 @@ Depois de mudar o banco, regenere os tipos (`supabase gen types typescript`) em 
 - **Authentication → Sign In / Providers:** cadastro aberto **desligado**. Novos usuários são convidados em *Authentication → Users → Invite*, depois de cadastrados em Colaboradores.
 - **Authentication → Attack Protection:** proteção contra senhas vazadas ligada.
 
+## Regra de interface: nada grava sozinho
+
+Toda edição fica pendente até a pessoa clicar em **Salvar alterações**, e **Cancelar** volta ao valor original. Para telas novas:
+
+- Guarde a edição num estado de rascunho e mostre `<BarraAlteracoes itens={...} onCancelar onSalvar />` (`src/components/comum/BarraAlteracoes.tsx`).
+- Registre as pendências com `useRegistrarPendencias(origem, itens)` (`src/hooks/usePendencias.ts`). Assim, trocar de tela, sair da conta ou fechar a aba pergunta antes de descartar.
+- Ao fechar uma janela com pendências, use `confirmarDescarte(itens)`.
+- Exclusões e ações que tiram acesso pedem confirmação dizendo o que vai acontecer.
+- Arquivos só sobem para o Storage quando o formulário é enviado.
+
 ## Estrutura
 
 ```
