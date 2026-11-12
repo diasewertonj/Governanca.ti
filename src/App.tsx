@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
 import { Header } from './components/layout/Header.tsx';
@@ -18,6 +18,7 @@ const CollaboratorsView = lazy(() => import('./components/collaborators/Collabor
 const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
 const RhProcessesView = lazy(() => import('./components/rh/RhProcessesView.tsx').then((m) => ({ default: m.RhProcessesView })));
 const TermsView = lazy(() => import('./components/terms/TermsView.tsx').then((m) => ({ default: m.TermsView })));
+const RhInicioView = lazy(() => import('./components/rh/RhInicioView.tsx').then((m) => ({ default: m.RhInicioView })));
 const LembretesView = lazy(() => import('./components/lembretes/LembretesView.tsx').then((m) => ({ default: m.LembretesView })));
 const SettingsView = lazy(() => import('./components/settings/SettingsView.tsx').then((m) => ({ default: m.SettingsView })));
 const MyAssetsView = lazy(() => import('./components/collaborators/MyAssetsView.tsx').then((m) => ({ default: m.MyAssetsView })));
@@ -66,6 +67,9 @@ function MainApp() {
 
   const [viewSolicitada, setCurrentView] = useState<string>('dashboard');
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
+  // Fase 7: menu em gaveta no celular/tablet
+  const [menuAberto, setMenuAberto] = useState(false);
+  const fecharMenu = useCallback(() => setMenuAberto(false), []);
 
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
@@ -102,7 +106,7 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Barra Superior Corporativa (Zone Contract) */}
-      <Header currentView={currentView} />
+      <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} />
 
       {/* Fase 2 (CRIT-04): falha de gravação no banco nunca mais passa em silêncio */}
       {dbErro && (
@@ -123,17 +127,19 @@ function MainApp() {
       )}
 
       <div className="flex-1 flex min-h-[calc(100vh-57px)]">
-        {/* Menu Lateral Adaptativo por Perfil */}
+        {/* Menu por perfil (Fase 7: gaveta abaixo de 1024px) */}
         <Sidebar
           currentView={currentView}
           onNavigate={navegar}
           onOpenNewTicketModal={() => setShowNewTicketModal(true)}
+          aberto={menuAberto}
+          onFechar={fecharMenu}
         />
 
-        {/* Viewport Principal com visual leve, respirável e sem densidade pesada */}
-        <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
           <Suspense fallback={<Carregando />}>
-          {currentView === 'dashboard' && <DashboardView onNavigate={navegar} />}
+          {currentView === 'dashboard' &&
+            (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} />)}
           {currentView === 'assets' && <AssetsView />}
           {currentView === 'collaborators' && <CollaboratorsView />}
           {currentView === 'servicedesk' && (

@@ -341,6 +341,7 @@ export type Database = {
       }
       configuracoes_empresa: {
         Row: {
+          logo_url: string | null
           doc_devolucao: Json
           doc_entrega: Json
           campos_personalizados: Json | null
@@ -358,6 +359,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          logo_url?: string | null
           doc_devolucao?: Json
           doc_entrega?: Json
           campos_personalizados?: Json | null
@@ -375,6 +377,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          logo_url?: string | null
           doc_devolucao?: Json
           doc_entrega?: Json
           campos_personalizados?: Json | null

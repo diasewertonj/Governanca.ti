@@ -138,7 +138,7 @@ export const LembretesView: React.FC = () => {
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-900">{l.titulo}</p>
                     {l.descricao && <p className="text-slate-600 mt-0.5">{l.descricao}</p>}
-                    <p className="text-[11px] text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       <span
                         className={
                           sit === 'vencido' ? 'font-semibold text-red-600' : sit === 'hoje' ? 'font-semibold text-amber-700' : ''
@@ -162,7 +162,7 @@ export const LembretesView: React.FC = () => {
                       )}
                     </p>
                     {l.status !== 'aberto' && (
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         {l.status === 'feito' ? 'Concluído' : 'Cancelado'} por {nomeDe(l.concluidoPor) || 'T.I.'}
                         {l.concluidoEm ? ` em ${formatDateTime(l.concluidoEm)}` : ''}
                         {l.observacaoConclusao ? ` — “${l.observacaoConclusao}”` : ''}
@@ -174,14 +174,14 @@ export const LembretesView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setEncerrando({ id: l.id, status: 'feito', obs: '' })}
-                        className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded"
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" /> Concluir
                       </button>
                       <button
                         type="button"
                         onClick={() => setEncerrando({ id: l.id, status: 'cancelado', obs: '' })}
-                        className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-600 bg-white border border-slate-200 rounded"
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-slate-600 bg-white border border-slate-200 rounded"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Cancelar
                       </button>

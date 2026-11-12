@@ -65,7 +65,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Fila Service Desk
+              Chamados em aberto
             </span>
             <LifeBuoy className="w-4 h-4 text-amber-600" />
           </div>
@@ -101,7 +101,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <span className="text-xs text-slate-500">sob gestão</span>
           </div>
           <div className="mt-2 text-xs text-slate-500">
-            Rastreabilidade 360° com RH & T.I.
+            Com custódia e histórico
           </div>
         </div>
 
@@ -162,7 +162,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Fila Unificada de Chamados Recentes</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Chamados recentes</h2>
               <p className="text-xs text-slate-500">Chamados técnicos e requisições de admissão/desligamento</p>
             </div>
             <button
@@ -198,7 +198,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
                 <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className={`text-[11px] px-2 py-0.5 rounded-md font-medium capitalize ${
+                    className={`text-xs px-2 py-0.5 rounded-md font-medium capitalize ${
                       t.status === 'aberto'
                         ? 'text-blue-700 bg-blue-50'
                         : t.status === 'em_andamento'
@@ -237,9 +237,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                         <span className="font-mono font-bold text-blue-700">{asset.tag}</span>
                         <span className="font-medium text-slate-900">{asset.nome}</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{asset.localizacaoFisica}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{asset.localizacaoFisica}</p>
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
                   </div>
                 ))}
             </div>
@@ -269,7 +269,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               onClick={() => onNavigate('rh_processes')}
               className="w-full py-2 text-xs font-semibold text-slate-900 bg-white hover:bg-slate-100 rounded-lg transition-colors"
             >
-              Acessar Módulo On/Offboarding
+              Abrir admissões e desligamentos
             </button>
           </div>
         </div>

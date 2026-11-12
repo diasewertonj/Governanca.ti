@@ -86,7 +86,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                       type="button"
                       onClick={() => setSelectedAssetForQrCode(asset)}
                       title="Ver etiqueta com QR Code"
-                      className="text-slate-400 hover:text-slate-700 p-1 rounded"
+                      className="text-slate-500 hover:text-slate-700 p-1 rounded"
                     >
                       <QrCode className="w-4 h-4" />
                     </button>
@@ -96,11 +96,11 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                   <p className="text-xs text-slate-500 mt-0.5">
                     {asset.marca} {asset.modelo}
                   </p>
-                  <p className="font-mono text-[11px] text-slate-600 mt-1">
+                  <p className="font-mono text-xs text-slate-600 mt-1">
                     S/N: {asset.serialNumber}
                   </p>
 
-                  <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-0.5">
+                  <div className="mt-3 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-0.5">
                     <p>
                       Em posse desde: <span className="font-medium text-slate-700">{formatDate(asset.dataEntregaAtual)}</span>
                     </p>
@@ -131,7 +131,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
             ))}
           </div>
         ) : (
-          <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-400 text-xs">
+          <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500 text-xs">
             Você não possui nenhum equipamento físico atribuído no momento.
           </div>
         )}
@@ -154,9 +154,9 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
             >
               <div>
                 <p className="font-semibold text-slate-900">{lic.nome}</p>
-                <p className="text-[11px] text-slate-500">{lic.fornecedor}</p>
+                <p className="text-xs text-slate-500">{lic.fornecedor}</p>
               </div>
-              <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-medium">
+              <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-medium">
                 Acesso Liberado
               </span>
             </div>
@@ -183,11 +183,11 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                     <span className="font-semibold text-slate-900 capitalize">
                       Termo de {term.tipo === 'entrega' ? 'Entrega' : 'Devolução'}
                     </span>
-                    <span className="text-emerald-700 bg-emerald-50 text-[10px] px-2 py-0.5 rounded border border-emerald-200">
+                    <span className="text-emerald-700 bg-emerald-50 text-xs px-2 py-0.5 rounded border border-emerald-200">
                       Assinado
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     Emitido em {formatDate(term.dataEmissao)} · Responsável TI: {term.responsavelTINome}
                   </p>
                 </div>
@@ -202,7 +202,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
               </div>
             ))
           ) : (
-            <div className="p-4 text-center text-slate-400 text-xs">
+            <div className="p-4 text-center text-slate-500 text-xs">
               Nenhum termo gerado até o momento.
             </div>
           )}

@@ -120,8 +120,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   }[asset.status];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-3">
@@ -164,7 +164,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
 
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
+              className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
             >
               <X className="w-5 h-5" />
             </button>
@@ -181,7 +181,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             <form onSubmit={handleExecuteTransfer} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
                     Novo Destino do Equipamento
                   </label>
                   <select
@@ -205,7 +205,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
                     Motivo da Movimentação
                   </label>
                   <input
@@ -243,25 +243,25 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
           {/* Card de Status & Custódia Atual (Rastreabilidade 360°) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-              <span className="text-[11px] uppercase font-semibold text-slate-500 block">Status do Ativo</span>
+              <span className="text-xs uppercase font-semibold text-slate-500 block">Status do Ativo</span>
               <div className="mt-1 flex items-center gap-2">
                 <span className={`inline-block px-2.5 py-0.5 text-xs font-medium rounded-md border ${statusConfig.textClass}`}>
                   {statusConfig.label}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-2">
+              <p className="text-xs text-slate-500 mt-2">
                 Localização: <span className="font-medium text-slate-700">{asset.localizacaoFisica}</span>
               </p>
             </div>
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg col-span-2">
-              <span className="text-[11px] uppercase font-semibold text-slate-500 block">Custodiante Atual</span>
+              <span className="text-xs uppercase font-semibold text-slate-500 block">Custodiante Atual</span>
               {currentCustodian ? (
                 <div className="mt-1 flex items-center justify-between">
                   <div>
                     {currentRole === 'colaborador' && currentCustodian.id !== currentUser?.id ? (
                       <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-                        <User className="w-4 h-4 text-slate-400" />
+                        <User className="w-4 h-4 text-slate-500" />
                         {currentCustodian.nome}
                       </span>
                     ) : (
@@ -279,7 +279,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                       {currentCustodian.cargo} · {department?.nome || 'Setor'}
                     </p>
                   </div>
-                  <div className="text-right text-[11px] text-slate-500">
+                  <div className="text-right text-xs text-slate-500">
                     <span>Em posse desde</span>
                     <p className="font-medium text-slate-700">{formatDate(asset.dataEntregaAtual)}</p>
                   </div>
@@ -287,7 +287,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               ) : (
                 <div className="mt-1">
                   <p className="text-xs font-medium text-slate-700">Nenhum colaborador alocado no momento</p>
-                  <p className="text-[11px] text-slate-500">O item está no estoque e pronto para empréstimo.</p>
+                  <p className="text-xs text-slate-500">O item está no estoque e pronto para empréstimo.</p>
                 </div>
               )}
             </div>
@@ -323,7 +323,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 <div className="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Sistema Operacional
                       </label>
                       <select
@@ -342,7 +342,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Chave de Recuperação BitLocker (48 dígitos)
                       </label>
                       <input
@@ -376,21 +376,21 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 <div className="space-y-2.5 text-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-slate-50/80 rounded-lg border border-slate-100">
                     <div>
-                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                      <span className="text-xs uppercase font-semibold text-slate-500 block">
                         Sistema Operacional Instalado
                       </span>
                       <span className="font-semibold text-slate-900">
                         {asset.sistemaOperacional || 'Windows 11 Pro 64-bit (Padrão Corporativo)'}
                       </span>
                     </div>
-                    <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 self-start sm:self-auto">
+                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 self-start sm:self-auto">
                       Licenciado OEM/Volume
                     </span>
                   </div>
 
                   <div className="p-3 bg-slate-50/80 rounded-lg border border-slate-100 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-semibold text-slate-400">
+                      <span className="text-xs uppercase font-semibold text-slate-500">
                         Chave de Recuperação BitLocker / Criptografia
                       </span>
                       {isTI && asset.bitlockerKey && (
@@ -420,13 +420,13 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                           {asset.bitlockerKey}
                         </p>
                       ) : (
-                        <p className="text-xs text-slate-400 italic">
+                        <p className="text-xs text-slate-500 italic">
                           Nenhuma chave de recuperação BitLocker registrada para este equipamento.
                         </p>
                       )
                     ) : (
                       <p className="text-xs text-slate-500 italic flex items-center gap-1.5 py-1">
-                        <Lock className="w-3.5 h-3.5 text-slate-400" />
+                        <Lock className="w-3.5 h-3.5 text-slate-500" />
                         Chave confidencial de criptografia de disco (acesso restrito à equipe de TI).
                       </p>
                     )}
@@ -461,7 +461,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 )}
                 {warranty.status === 'expirada' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-md border border-slate-200">
-                    <ShieldAlert className="w-3.5 h-3.5 text-slate-400" />
+                    <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
                     {warranty.label}
                   </span>
                 )}
@@ -470,19 +470,19 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Nota Fiscal (NF-e)</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Nota Fiscal (NF-e)</span>
                 <p className="font-semibold text-slate-900">Nº {asset.fiscal?.numeroNF || 'S/N'}</p>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Valor de Aquisição</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Valor de Aquisição</span>
                 <p className="font-semibold text-slate-900">{formatCurrency(asset.fiscal?.valorCompra || 0)}</p>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Fornecedor</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Fornecedor</span>
                 <p className="text-slate-800">{asset.fiscal?.fornecedor || '-'}</p>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Data de Compra</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Data de Compra</span>
                 <p className="text-slate-800">{formatDate(asset.fiscal?.dataAquisicao)}</p>
               </div>
             </div>
@@ -491,7 +491,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             {asset.fiscal?.chaveAcesso44 && (
               <div className="bg-slate-50 p-2.5 rounded-md border border-slate-200 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                  <span className="text-xs uppercase font-semibold text-slate-500 block">
                     Chave de Acesso NF-e (44 dígitos)
                   </span>
                   <p className="font-mono text-xs text-slate-700 truncate tracking-tight">
@@ -519,7 +519,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             )}
 
             {asset.fiscal?.suporteContato && (
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 <span className="font-semibold text-slate-700">Canais de Suporte Fabricante:</span> {asset.fiscal.suporteContato}
               </p>
             )}
@@ -534,7 +534,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
                 {Object.entries(asset.customFields).map(([key, value]) => (
                   <div key={key} className="bg-slate-50/70 p-2 rounded border border-slate-100">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">{key}</span>
+                    <span className="text-xs text-slate-500 uppercase font-semibold block">{key}</span>
                     <span className="font-medium text-slate-800">{value}</span>
                   </div>
                 ))}
@@ -551,7 +551,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                   Histórico Cronológico de Custódia
                 </h3>
               </div>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500">
                 {asset.historicoCustodia.length} registro(s)
               </span>
             </div>
@@ -575,12 +575,12 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                           <ExternalLink className="w-3 h-3 text-blue-500" />
                         </button>
                       )}
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         Entrega: {formatDate(entry.dataEntrega)}
                         {entry.dataDevolucao ? ` · Devolução: ${formatDate(entry.dataDevolucao)}` : ' · (Custódia Ativa)'}
                       </p>
                       {entry.motivoDevolucao && (
-                        <p className="text-[11px] text-slate-600 italic mt-0.5">
+                        <p className="text-xs text-slate-600 italic mt-0.5">
                           Motivo: {entry.motivoDevolucao}
                         </p>
                       )}
@@ -590,7 +590,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                       <button
                         type="button"
                         onClick={() => handleViewTerm(entry.termoId)}
-                        className="flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-blue-700 bg-slate-50 px-2 py-1 rounded border border-slate-200"
+                        className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-blue-700 bg-slate-50 px-2 py-1 rounded border border-slate-200"
                       >
                         <FileText className="w-3 h-3" />
                         Ver Termo A4
@@ -600,7 +600,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 py-2">Nenhum histórico anterior registrado.</p>
+              <p className="text-xs text-slate-500 py-2">Nenhum histórico anterior registrado.</p>
             )}
           </div>
 
@@ -618,7 +618,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                   <div key={man.id} className="p-3 bg-slate-50 rounded-md border border-slate-200 flex items-start justify-between">
                     <div>
                       <p className="font-semibold text-slate-900">{man.descricao}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         {formatDate(man.data)} · Fornecedor: {man.fornecedor}
                       </p>
                     </div>

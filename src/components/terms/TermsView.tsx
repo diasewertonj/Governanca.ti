@@ -41,7 +41,7 @@ export const TermsView: React.FC = () => {
 
       {/* Filtros e Busca */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start">
+        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start max-w-full overflow-x-auto">
           {[
             { id: 'todos', label: 'Todos os Termos' },
             { id: 'entrega', label: 'Termos de Entrega' },
@@ -51,7 +51,7 @@ export const TermsView: React.FC = () => {
               key={tab.id}
               type="button"
               onClick={() => setTypeFilter(tab.id as 'todos' | 'entrega' | 'devolucao')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+              className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                 typeFilter === tab.id
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -68,9 +68,9 @@ export const TermsView: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por código ou colaborador..."
-            className="w-72 text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            className="w-full sm:w-72 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
           />
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
         </div>
       </div>
 
@@ -79,10 +79,10 @@ export const TermsView: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
                 <th className="py-3 px-4">Código</th>
                 <th className="py-3 px-4">Tipo de Documento</th>
-                <th className="py-3 px-4">Colaborador (360°)</th>
+                <th className="py-3 px-4">Colaborador</th>
                 <th className="py-3 px-4">Qtd. Equipamentos</th>
                 <th className="py-3 px-4">Data de Emissão</th>
                 <th className="py-3 px-4">Responsável T.I.</th>
@@ -115,10 +115,10 @@ export const TermsView: React.FC = () => {
                         }}
                         className="font-medium text-slate-900 hover:text-blue-700 flex items-center gap-1"
                       >
-                        <User className="w-3 h-3 text-slate-400" />
+                        <User className="w-3 h-3 text-slate-500" />
                         <span>{term.colaboradorNome}</span>
                       </button>
-                      <span className="text-[10px] text-slate-400 block font-mono">
+                      <span className="text-xs text-slate-500 block font-mono">
                         {term.colaboradorMatricula} · {term.colaboradorSetorNome}
                       </span>
                     </td>
@@ -139,12 +139,12 @@ export const TermsView: React.FC = () => {
 
                     <td className="py-3 px-4 whitespace-nowrap">
                       {term.statusAssinatura === 'assinado' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" />
                           Assinado & Arquivado
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                           <Clock className="w-3 h-3" />
                           Pendente de Assinatura
                         </span>
@@ -168,7 +168,7 @@ export const TermsView: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
+                  <td colSpan={8} className="py-8 text-center text-slate-500 text-xs">
                     Nenhum termo encontrado.
                   </td>
                 </tr>

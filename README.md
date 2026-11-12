@@ -54,6 +54,7 @@ Um banco novo é montado assim, nesta ordem:
 | `20261113000000_fase2_integridade` | códigos gerados pelo banco, alocação atômica de licença, índices, histórico protegido contra exclusão |
 | `20261114000000_fase3_processos` | Storage privado, desligamento automático, anonimização (LGPD) |
 | `20261115000000_fase6_processos_guiados` | catálogo, checklist de on/offboarding com trilha de auditoria, inventário de contas/grupos/acessórios, lembretes, termo com aceite eletrônico |
+| `20261116000000_fase7_logo_empresa` | coluna `logo_url` (só links https) para o logo da empresa |
 
 Todas podem ser rodadas mais de uma vez.
 
@@ -79,6 +80,12 @@ Depois de mudar o banco, regenere os tipos (`supabase gen types typescript`) em 
 - **Authentication → URL Configuration:** *Site URL* e *Redirect URLs* com o domínio do site (links de convite e recuperação de senha).
 - **Authentication → Sign In / Providers:** cadastro aberto **desligado**. Novos usuários são convidados em *Authentication → Users → Invite*, depois de cadastrados em Colaboradores.
 - **Authentication → Attack Protection:** proteção contra senhas vazadas ligada.
+
+## Navegação e telas (Fase 7)
+
+- **Um nome por tela**, igual no menu e no título: `src/utils/navegacao.ts` é a fonte única dos títulos e do menu de cada perfil, e `vistaPermitida` libera só as telas do menu do perfil. Tela nova = incluir lá.
+- **Celular e tablet** (abaixo de 1024px): o menu vira gaveta (botão ☰), janelas grandes abrem em tela cheia, listas principais viram cartões abaixo de 768px e barras de filtros quebram linha.
+- **Padrão visual**: texto mínimo de 12px nas telas (o termo A4 segue o tamanho de impressão), cinza de texto com contraste AA, foco visível pelo teclado, área de toque de 40px em telas de toque.
 
 ## Regra de interface: nada grava sozinho
 

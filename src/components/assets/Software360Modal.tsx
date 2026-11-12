@@ -116,8 +116,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-3">
@@ -127,7 +127,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-semibold text-slate-900 leading-tight">{license.nome}</h2>
-                <span className="text-[11px] font-mono font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                <span className="text-xs font-mono font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
                   {license.chaveContrato}
                 </span>
               </div>
@@ -147,7 +147,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               >
                 <Globe className="w-3.5 h-3.5 text-blue-600" />
                 <span>Console Admin</span>
-                <ExternalLink className="w-3 h-3 text-slate-400" />
+                <ExternalLink className="w-3 h-3 text-slate-500" />
               </a>
             )}
 
@@ -168,7 +168,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
 
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
+              className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
             >
               <X className="w-5 h-5" />
             </button>
@@ -199,7 +199,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
                   Controle de Capacidade Contratada
                 </span>
                 <div className="flex items-baseline gap-2 mt-0.5">
@@ -212,7 +212,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
 
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
                     Assentos Livres
                   </span>
                   <span
@@ -282,7 +282,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   style={{ width: `${Math.min(100, occupancyPercentage)}%` }}
                 />
               </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+              <div className="flex justify-between text-xs text-slate-500 font-mono">
                 <span>0</span>
                 <span>{Math.round(license.assentosTotais / 2)}</span>
                 <span>{license.assentosTotais} max</span>
@@ -292,23 +292,23 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             {/* Dados Financeiros e Vigência */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-200/80 text-xs">
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Custo Mensal</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Custo Mensal</span>
                 <span className="font-semibold text-slate-900 font-mono">
                   {formatCurrency(license.valorMensal)}
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Custo por Assento</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Custo por Assento</span>
                 <span className="font-semibold text-slate-700 font-mono">
                   {formatCurrency(license.assentosTotais > 0 ? license.valorMensal / license.assentosTotais : 0)}/mês
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Data de Renovação</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Data de Renovação</span>
                 <span className="text-slate-800 font-medium">{formatDate(license.dataRenovacao)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Tipo de Assinatura</span>
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Tipo de Assinatura</span>
                 <span className="text-slate-800 font-medium capitalize">
                   {license.tipoCobranca || 'Mensal Corporativa'}
                 </span>
@@ -377,9 +377,9 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   value={colabFilterSearch}
                   onChange={(e) => setColabFilterSearch(e.target.value)}
                   placeholder="Buscar colaborador na licença..."
-                  className="w-60 text-xs pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400"
+                  className="w-60 text-xs pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500"
                 />
-                <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5" />
+                <Search className="w-3 h-3 text-slate-500 absolute left-2.5 top-2.5" />
               </div>
             </div>
 
@@ -387,8 +387,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
-                      <th className="py-2.5 px-4">Colaborador (360°)</th>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
+                      <th className="py-2.5 px-4">Colaborador</th>
                       <th className="py-2.5 px-4">E-mail Corporativo</th>
                       <th className="py-2.5 px-4">Cargo & Setor</th>
                       <th className="py-2.5 px-4 text-right">Ação</th>
@@ -409,21 +409,21 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                                 }}
                                 className="font-semibold text-slate-900 hover:text-blue-700 flex items-center gap-2 group text-left"
                               >
-                                <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-[10px]">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">
                                   {emp.nome.charAt(0)}
                                 </div>
                                 <span>{emp.nome}</span>
-                                <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                               </button>
                             </td>
 
-                            <td className="py-2.5 px-4 text-slate-600 font-mono text-[11px]">
+                            <td className="py-2.5 px-4 text-slate-600 font-mono text-xs">
                               {emp.email}
                             </td>
 
                             <td className="py-2.5 px-4 text-slate-600">
                               <span className="block font-medium text-slate-800">{emp.cargo}</span>
-                              <span className="text-[10px] text-slate-400">{dep?.nome || '-'}</span>
+                              <span className="text-xs text-slate-500">{dep?.nome || '-'}</span>
                             </td>
 
                             <td className="py-2.5 px-4 text-right">
@@ -437,7 +437,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                                   <span>Liberar Assento</span>
                                 </button>
                               ) : (
-                                <span className="text-slate-400 text-[11px]">Ativo</span>
+                                <span className="text-slate-500 text-xs">Ativo</span>
                               )}
                             </td>
                           </tr>
@@ -445,7 +445,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                       })
                     ) : (
                       <tr>
-                        <td colSpan={4} className="py-6 text-center text-slate-400 text-xs italic">
+                        <td colSpan={4} className="py-6 text-center text-slate-500 text-xs italic">
                           {colabFilterSearch
                             ? 'Nenhum colaborador encontrado com os termos de busca.'
                             : 'Nenhum colaborador alocado neste software no momento.'}

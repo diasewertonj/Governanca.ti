@@ -32,7 +32,7 @@ export const BarraAlteracoes: React.FC<BarraAlteracoesProps> = ({
         <p className="text-xs font-semibold text-amber-900">
           {itens.length === 1 ? '1 alteração não salva' : `${itens.length} alterações não salvas`}
         </p>
-        <ul className="mt-0.5 text-[11px] text-amber-800 space-y-0.5">
+        <ul className="mt-0.5 text-xs text-amber-800 space-y-0.5">
           {itens.map((item) => (
             <li key={item} className="truncate">
               • {item}

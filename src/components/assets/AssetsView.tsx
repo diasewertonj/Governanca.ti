@@ -116,7 +116,7 @@ export const AssetsView: React.FC = () => {
       <div className="space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Tabs por Categoria */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start max-w-full overflow-x-auto">
             {[
               { id: 'todos', label: 'Todos os Ativos' },
               { id: 'hardware', label: 'Hardware' },
@@ -128,7 +128,7 @@ export const AssetsView: React.FC = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setCategoryFilter(tab.id)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                   categoryFilter === tab.id
                     ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -141,16 +141,16 @@ export const AssetsView: React.FC = () => {
 
           {/* Busca e Filtro de Status */}
           {categoryFilter !== 'licencas_tab' && (
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-auto">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Buscar patrimônio, modelo, serial ou NF..."
-                  className="w-64 text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="w-full sm:w-64 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 />
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
               </div>
 
               <select
@@ -193,7 +193,7 @@ export const AssetsView: React.FC = () => {
                         <div>
                           <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors flex items-center gap-1.5">
                             <span>{lic.nome}</span>
-                            <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h3>
                           <p className="text-xs text-slate-500 mt-0.5">
                             {lic.fornecedor} · Contrato: <span className="font-mono">{lic.chaveContrato}</span>
@@ -206,7 +206,7 @@ export const AssetsView: React.FC = () => {
                       <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-50 px-2.5 py-1 rounded border border-slate-200 block">
                         {formatCurrency(lic.valorMensal)}/mês
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-1 block">
+                      <span className="text-xs text-slate-500 mt-1 block">
                         {freeCount > 0 ? (
                           <span className="text-emerald-700 font-semibold">{freeCount} assento(s) livre(s)</span>
                         ) : (
@@ -237,7 +237,7 @@ export const AssetsView: React.FC = () => {
                   {/* Colaboradores Vinculados (Rastreabilidade 360°) */}
                   <div className="pt-2 border-t border-slate-100">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                      <span className="text-xs uppercase font-bold text-slate-500 tracking-wider">
                         Colaboradores Alocados ({lic.colaboradoresIds.length})
                       </span>
                     </div>
@@ -254,7 +254,7 @@ export const AssetsView: React.FC = () => {
                               className="inline-flex items-center gap-1 text-xs text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded transition-colors"
                             >
                               <span>{emp.nome}</span>
-                              <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+                              <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
                             </button>
                           );
                         })}
@@ -265,7 +265,7 @@ export const AssetsView: React.FC = () => {
                         )}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-400 italic">
+                      <p className="text-xs text-slate-500 italic">
                         Nenhum colaborador com assento alocado nesta licença.
                       </p>
                     )}
@@ -279,7 +279,7 @@ export const AssetsView: React.FC = () => {
                       className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
                     >
                       <Users className="w-3.5 h-3.5" />
-                      <span>Gerenciar Assentos & Ficha 360°</span>
+                      <span>Assentos e ficha</span>
                     </button>
 
                     {isTI && (
@@ -306,11 +306,11 @@ export const AssetsView: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
                   <th className="py-3 px-4">Patrimônio</th>
                   <th className="py-3 px-4">Equipamento / Modelo</th>
                   <th className="py-3 px-4">Número de Série</th>
-                  <th className="py-3 px-4">Custodiante Atual (360°)</th>
+                  <th className="py-3 px-4">Custodiante atual</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Garantia</th>
                   <th className="py-3 px-4 text-right">Ações</th>
@@ -338,7 +338,7 @@ export const AssetsView: React.FC = () => {
                           >
                             {asset.nome}
                           </button>
-                          <span className="text-[11px] text-slate-500">
+                          <span className="text-xs text-slate-500">
                             {asset.marca} {asset.modelo}
                           </span>
                         </td>
@@ -359,13 +359,13 @@ export const AssetsView: React.FC = () => {
                               <ExternalLink className="w-3 h-3 text-blue-400" />
                             </button>
                           ) : (
-                            <span className="text-slate-400 italic">Disponível em Estoque</span>
+                            <span className="text-slate-500 italic">Disponível em Estoque</span>
                           )}
                         </td>
 
                         <td className="py-3 px-4 whitespace-nowrap">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium capitalize ${
+                            className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${
                               asset.status === 'em_uso'
                                 ? 'text-blue-700 bg-blue-50'
                                 : asset.status === 'disponivel'
@@ -380,19 +380,19 @@ export const AssetsView: React.FC = () => {
                         {/* Badge sutil de garantia */}
                         <td className="py-3 px-4 whitespace-nowrap">
                           {warranty.status === 'valida' && (
-                            <span className="text-emerald-700 flex items-center gap-1 font-medium text-[11px]">
+                            <span className="text-emerald-700 flex items-center gap-1 font-medium text-xs">
                               <ShieldCheck className="w-3.5 h-3.5" />
                               {formatDate(asset.fiscal?.dataGarantia)}
                             </span>
                           )}
                           {warranty.status === 'expirando' && (
-                            <span className="text-amber-700 flex items-center gap-1 font-semibold text-[11px]">
+                            <span className="text-amber-700 flex items-center gap-1 font-semibold text-xs">
                               <ShieldAlert className="w-3.5 h-3.5" />
                               Expira em breve
                             </span>
                           )}
                           {warranty.status === 'expirada' && (
-                            <span className="text-slate-400 text-[11px]">Expirada</span>
+                            <span className="text-slate-500 text-xs">Expirada</span>
                           )}
                         </td>
 
@@ -412,7 +412,7 @@ export const AssetsView: React.FC = () => {
                               onClick={() => setSelectedAssetIdFor360(asset.id)}
                               className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200 transition-colors"
                             >
-                              Ficha 360°
+                              Ficha
                             </button>
                           </div>
                         </td>
@@ -421,7 +421,7 @@ export const AssetsView: React.FC = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                    <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">
                       Nenhum equipamento encontrado com os filtros aplicados.
                     </td>
                   </tr>

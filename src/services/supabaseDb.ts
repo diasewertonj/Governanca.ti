@@ -691,6 +691,7 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     camposPersonalizados: (data.campos_personalizados || []) as unknown as CustomFieldDefinition[],
     docEntrega: (data.doc_entrega || undefined) as unknown as ModeloDocumento | undefined,
     docDevolucao: (data.doc_devolucao || undefined) as unknown as ModeloDocumento | undefined,
+    logoUrl: data.logo_url || undefined,
   };
 }
 
@@ -714,6 +715,7 @@ export async function saveSettingsDb(st: CompanySettings) {
         campos_personalizados: json(st.camposPersonalizados || []),
         ...(st.docEntrega ? { doc_entrega: json(st.docEntrega) } : {}),
         ...(st.docDevolucao ? { doc_devolucao: json(st.docDevolucao) } : {}),
+        logo_url: st.logoUrl || null,
         updated_at: new Date().toISOString(),
       })
       .select('id')
