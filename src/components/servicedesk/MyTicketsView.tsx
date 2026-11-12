@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatDate } from '../../utils/formatters.ts';
+import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
 import { LifeBuoy, Plus, Laptop, MessageSquare, Clock } from 'lucide-react';
 
 interface MyTicketsViewProps {
@@ -80,12 +80,12 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
                         ? 'text-blue-700 bg-blue-50 border border-blue-200'
                         : tkt.status === 'em_andamento'
                         ? 'text-amber-700 bg-amber-50 border border-amber-200'
-                        : tkt.status === 'aguardando_peca'
+                        : tkt.status === 'aguardando_terceiro'
                         ? 'text-purple-700 bg-purple-50 border border-purple-200'
                         : 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                     }`}
                   >
-                    {tkt.status.replace('_', ' ')}
+                    {rotuloStatus(tkt.status)}
                   </span>
                 </div>
               </div>

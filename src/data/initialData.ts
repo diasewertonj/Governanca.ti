@@ -635,7 +635,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     solicitanteSetorNome: 'Recursos Humanos',
     titulo: 'Offboarding & Desligamento: Felipe Barreto Costa',
     categoria: 'Offboarding de Colaborador',
-    prioridade: 'urgente',
+    prioridade: 'critica',
     status: 'em_andamento',
     tecnicoResponsavelId: 'emp-1',
     tecnicoResponsavelNome: 'Carlos Eduardo Mendes',

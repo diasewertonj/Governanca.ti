@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Asset,
   CompanySettings,
+  CustodyHistoryEntry,
   Department,
   Employee,
   ResponsibilityTerm,
@@ -26,34 +27,42 @@ import {
   isSupabaseConfigured,
   signInWithGoogleSupabase,
   signInWithPasswordSupabase,
-  signUpWithPasswordSupabase,
   signOutSupabase,
   SupabaseAuthUser,
 } from '../services/supabase.ts';
 
 import {
   fetchDepartmentsFromDb,
-  upsertDepartmentDb,
+  insertDepartmentDb,
+  updateDepartmentDb,
   deleteDepartmentDb,
   fetchEmployeesFromDb,
-  upsertEmployeeDb,
+  insertEmployeeDb,
+  updateEmployeeDb,
   deleteEmployeeDb,
   fetchAssetsFromDb,
-  upsertAssetDb,
-  deleteAssetDb,
+  insertAssetDb,
+  updateAssetDb,
   fetchLicensesFromDb,
-  upsertLicenseDb,
+  insertLicenseDb,
+  updateLicenseDb,
   deleteLicenseDb,
+  alocarLicencaDb,
+  revogarLicencaDb,
   fetchTicketsFromDb,
-  upsertTicketDb,
+  insertTicketDb,
+  updateTicketDb,
+  insertTicketMessageDb,
   fetchTermsFromDb,
-  upsertTermDb,
+  insertTermDb,
+  updateTermDb,
   fetchSettingsFromDb,
-  upsertSettingsDb,
+  saveSettingsDb,
   checkSupabaseHealth,
   clearAllDatabaseTables,
-  upsertCustodyEntryDb,
-  addTicketMessageDb,
+  insertCustodyEntryDb,
+  updateCustodyEntryDb,
+  mensagemDeErro,
   SupabaseHealthStatus,
 } from '../services/supabaseDb.ts';
 
@@ -64,13 +73,15 @@ interface AppContextType {
   supabaseHealth: SupabaseHealthStatus | null;
   refreshSupabaseData: () => Promise<void>;
   authLoading: boolean;
+  authError: string | null;
+  // Último erro de gravação no banco (a alteração na tela já foi desfeita)
+  dbErro: string | null;
+  limparDbErro: () => void;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   currentUser: Employee | null;
   currentRole: UserRole;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  registerUser: (email: string, password: string, nome: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  switchUser: (employeeId: string) => void;
 
   // Entidades
   employees: Employee[];
@@ -109,9 +120,10 @@ interface AppContextType {
   revokeLicense: (licenseId: string, employeeId: string) => void;
 
   // Ações de Chamados (Service Desk)
+  // Assíncrono: o código (#CH-AAAA-NNNN) vem do banco. Devolve null se falhar.
   createTicket: (
     ticket: Omit<Ticket, 'id' | 'codigo' | 'dataCriacao' | 'dataAtualizacao' | 'mensagens'>
-  ) => Ticket;
+  ) => Promise<Ticket | null>;
   addTicketMessage: (
     ticketId: string,
     texto: string,
@@ -123,9 +135,10 @@ interface AppContextType {
   toggleOffboardingChecklist: (ticketId: string, checklistItemId: string) => void;
 
   // Ações de Termos
+  // Assíncrono: o código (#TR-AAAA-NNNN) vem do banco. Devolve null se falhar.
   createTerm: (
     term: Omit<ResponsibilityTerm, 'id' | 'codigo' | 'dataEmissao'>
-  ) => ResponsibilityTerm;
+  ) => Promise<ResponsibilityTerm | null>;
   markTermSigned: (termId: string, arquivoUrl?: string) => void;
 
   // Configurações e Reset
@@ -165,8 +178,23 @@ const STORAGE_KEYS = {
   SETTINGS: 'nexus_settings_v1',
 };
 
+// Fase 1: com Supabase (produção), dados de negócio NÃO ficam no navegador.
+// O cache só existe no modo demonstração (sem Supabase).
+function limparCacheLocal() {
+  try {
+    Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // armazenamento indisponível (modo privado etc.): nada a limpar
+  }
+}
+
+if (isSupabaseConfigured) {
+  limparCacheLocal();
+}
+
 // Funções utilitárias para descartar dados mock legados caso Supabase esteja configurado
 function parseStoredOrNull<T>(key: string, isDemoDetector?: (data: T) => boolean): T | null {
+  if (isSupabaseConfigured) return null;
   const saved = localStorage.getItem(key);
   if (!saved) return null;
   try {
@@ -239,64 +267,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Usuário Supabase real e Usuário corporativo
   const [supabaseUser, setSupabaseUser] = useState<SupabaseAuthUser | null>(null);
   const [supabaseHealth, setSupabaseHealth] = useState<SupabaseHealthStatus | null>(null);
-  const [authLoading, setAuthLoading] = useState<boolean>(false);
+  // Em produção, a tela fica em "carregando" até o Supabase dizer se há sessão
+  const [authLoading, setAuthLoading] = useState<boolean>(isSupabaseConfigured);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USER);
-    if (isProduction && (!saved || saved === 'emp-1')) {
-      return null;
-    }
-    return saved || (isProduction ? null : 'emp-1');
+    if (isProduction) return null;
+    return localStorage.getItem(STORAGE_KEYS.USER) || 'emp-1';
   });
 
-  // Função central para vincular usuário do Supabase Auth com colaborador do sistema
-  const vincularUsuarioComColaborador = async (
-    user: SupabaseAuthUser,
-    activeEmployees?: Employee[]
-  ) => {
-    if (!user.email) return;
-    const cleanEmail = user.email.toLowerCase();
-    const currentList = activeEmployees || employees;
-    const existing = currentList.find((e) => e.email.toLowerCase() === cleanEmail);
-
-    if (existing) {
+  // Fase 1 (CRIT-02): o login só ENCONTRA o perfil já cadastrado pela TI/RH.
+  // Nunca cria perfil nem define papel pelo navegador.
+  const vincularUsuarioComColaborador = (user: SupabaseAuthUser, lista: Employee[]) => {
+    const cleanEmail = (user.email || '').toLowerCase();
+    const existing = lista.find((e) => e.email.toLowerCase() === cleanEmail);
+    if (existing && existing.status !== 'desligado') {
+      setAuthError(null);
       setCurrentUserId(existing.id);
       return existing;
-    } else {
-      // Governança RBAC segura: Apenas o 1º usuário registrado do sistema ganha permissão de Administrador bootstrap
-      const isFirst = currentList.length === 0;
-      const isAdmin = isFirst;
-
-      const newId = `emp-${user.id.slice(0, 8)}`;
-      const newColab: Employee = {
-        id: newId,
-        matricula: `NX-${Date.now().toString().slice(-4)}`,
-        nome: user.nome || cleanEmail.split('@')[0].toUpperCase(),
-        email: cleanEmail,
-        cargo: isAdmin ? 'Administrador de T.I. & Governança' : 'Colaborador',
-        setorId: 'dep-1',
-        status: 'ativo',
-        role: isAdmin ? 'ti_admin' : 'colaborador',
-        dataAdmissao: new Date().toISOString().split('T')[0],
-        avatarUrl: user.avatarUrl || undefined,
-      };
-
-      setEmployees((prev) => {
-        const filtered = prev.filter((e) => e.id !== newId && e.email !== cleanEmail);
-        return [newColab, ...filtered];
-      });
-      setCurrentUserId(newColab.id);
-
-      if (isSupabaseConfigured) {
-        await upsertEmployeeDb(newColab);
-      }
-      return newColab;
     }
+    setCurrentUserId(null);
+    setAuthError(
+      existing
+        ? 'Seu acesso foi encerrado. Fale com a equipe de T.I.'
+        : 'Seu login ainda não tem um perfil liberado no sistema. Peça à equipe de T.I. para cadastrar seu e-mail em Colaboradores.'
+    );
+    return null;
   };
 
-  // Carregar dados das tabelas do Supabase (Modo Fullstack)
-  const loadDataFromSupabase = async () => {
-    if (!isSupabaseConfigured) return;
+  // Limpa todo o estado de negócio (logout, sessão expirada)
+  const limparEstado = () => {
+    setEmployees(isProduction ? [] : INITIAL_EMPLOYEES);
+    setAssets([]);
+    setLicenses([]);
+    setTickets([]);
+    setTerms([]);
+    setCurrentUserId(null);
+    setSupabaseUser(null);
+    limparCacheLocal();
+  };
+
+  // Carregar dados das tabelas do Supabase (Modo Fullstack).
+  // Só faz sentido com sessão: sem login a RLS devolve listas vazias.
+  // Retorna a lista de colaboradores lida (ou null se não leu).
+  const loadDataFromSupabase = async (): Promise<Employee[] | null> => {
+    if (!isSupabaseConfigured) return null;
+    let empsLidos: Employee[] | null = null;
 
     try {
       const health = await checkSupabaseHealth();
@@ -318,8 +334,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbDepts && dbDepts.length > 0) {
           setDepartments(dbDepts);
         } else {
-          for (const d of INITIAL_DEPARTMENTS) {
-            await upsertDepartmentDb(d);
+          // Banco sem setores: semeia os padrões (só ti_admin tem permissão; os demais ignoram)
+          try {
+            for (const d of INITIAL_DEPARTMENTS) {
+              await insertDepartmentDb(d);
+            }
+          } catch (err) {
+            console.warn('Setores padrão não semeados:', mensagemDeErro(err));
           }
           setDepartments(INITIAL_DEPARTMENTS);
         }
@@ -327,9 +348,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Sincronizar colaboradores
         if (dbEmps) {
           setEmployees(dbEmps);
-          if (supabaseUser) {
-            vincularUsuarioComColaborador(supabaseUser, dbEmps);
-          }
+          empsLidos = dbEmps;
         }
 
         // Ativos (se a tabela estiver vazia, define [] limpo para produção)
@@ -356,55 +375,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbSettings) {
           setSettings(dbSettings);
         } else {
-          await upsertSettingsDb(INITIAL_COMPANY_SETTINGS);
+          try {
+            await saveSettingsDb(INITIAL_COMPANY_SETTINGS);
+          } catch (err) {
+            console.warn('Configuração padrão não gravada:', mensagemDeErro(err));
+          }
         }
       }
     } catch (err) {
       console.error('Erro ao sincronizar dados com o Supabase:', err);
     }
+    return empsLidos;
   };
 
-  useEffect(() => {
-    loadDataFromSupabase();
-  }, [isSupabaseConfigured]);
-
-  // Listener de sessão do Supabase Auth para manter login persistente
+  // Sessão do Supabase Auth é a única fonte de verdade do login (ALTO-02).
+  // INITIAL_SESSION / SIGNED_IN -> carrega dados e encontra o perfil;
+  // SIGNED_OUT (logout ou sessão expirada) -> limpa tudo.
   useEffect(() => {
     if (!supabase) return;
+    let ativo = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const u = session.user;
-        const authUser: SupabaseAuthUser = {
-          id: u.id,
-          email: u.email || '',
-          nome: u.user_metadata?.full_name || u.email?.split('@')[0],
-          avatarUrl: u.user_metadata?.avatar_url,
-        };
-        setSupabaseUser(authUser);
-        vincularUsuarioComColaborador(authUser);
-      }
+    // Sem sessão, só a configuração (razão social) é pública: usada na tela de login
+    fetchSettingsFromDb().then((st) => {
+      if (ativo && st) setSettings(st);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const u = session.user;
-        const authUser: SupabaseAuthUser = {
-          id: u.id,
-          email: u.email || '',
-          nome: u.user_metadata?.full_name || u.email?.split('@')[0],
-          avatarUrl: u.user_metadata?.avatar_url,
-        };
-        setSupabaseUser(authUser);
-        vincularUsuarioComColaborador(authUser);
-      } else {
-        setSupabaseUser(null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+
+      if (!session?.user) {
+        limparEstado();
+        setAuthLoading(false);
+        return;
       }
+
+      const u = session.user;
+      const authUser: SupabaseAuthUser = {
+        id: u.id,
+        email: u.email || '',
+        nome: u.user_metadata?.full_name || u.email?.split('@')[0],
+        avatarUrl: u.user_metadata?.avatar_url,
+      };
+      setSupabaseUser(authUser);
+
+      // Chamadas ao Supabase fora do callback (recomendação da supabase-js
+      // para evitar travamento dentro do onAuthStateChange)
+      setTimeout(async () => {
+        const lista = await loadDataFromSupabase();
+        if (!ativo) return;
+        const perfil = vincularUsuarioComColaborador(authUser, lista || []);
+        if (!perfil) {
+          // Login válido, mas sem perfil liberado: encerra a sessão e mostra o motivo
+          await signOutSupabase();
+        }
+        setAuthLoading(false);
+      }, 0);
     });
 
     return () => {
+      ativo = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -420,44 +451,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedTermForPrint, setSelectedTermForPrint] = useState<ResponsibilityTerm | null>(null);
   const [selectedAssetForQrCode, setSelectedAssetForQrCode] = useState<Asset | null>(null);
 
-  // Sincronizar com localStorage
+  // Cache em localStorage SÓ no modo demonstração (sem Supabase). Em produção,
+  // nada de negócio fica no navegador (ALTO-01: chaves, notas internas etc.).
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
-  }, [employees]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(departments));
-  }, [departments]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets));
-  }, [assets]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify(licenses));
-  }, [licenses]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
-  }, [tickets]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify(terms));
-  }, [terms]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-  }, [settings]);
-
-  useEffect(() => {
-    if (currentUserId) {
-      localStorage.setItem(STORAGE_KEYS.USER, currentUserId);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.USER);
+    if (isProduction) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(departments));
+      localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets));
+      localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify(licenses));
+      localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+      localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify(terms));
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+      if (currentUserId) {
+        localStorage.setItem(STORAGE_KEYS.USER, currentUserId);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.USER);
+      }
+    } catch {
+      // armazenamento indisponível: o modo demo segue só em memória
     }
-  }, [currentUserId]);
+  }, [isProduction, employees, departments, assets, licenses, tickets, terms, settings, currentUserId]);
 
-  const currentUser = employees.find((e) => e.id === currentUserId) || null;
+  // Em produção, sem sessão do Supabase não há usuário (ALTO-02)
+  const currentUser =
+    isProduction && !supabaseUser ? null : employees.find((e) => e.id === currentUserId) || null;
 
   // Derivação do papel atual
   const currentRole: UserRole = (() => {
@@ -512,6 +530,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
 
+      setAuthError(null);
       const res = await signInWithPasswordSupabase(cleanEmail, password);
       if (res.error) {
         return {
@@ -519,18 +538,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           error: `Falha na autenticação: ${res.error}`,
         };
       }
-
-      if (res.data?.user) {
-        const u = res.data.user;
-        const authUser: SupabaseAuthUser = {
-          id: u.id,
-          email: u.email || cleanEmail,
-          nome: u.user_metadata?.full_name || cleanEmail.split('@')[0],
-        };
-        setSupabaseUser(authUser);
-        vincularUsuarioComColaborador(authUser);
-        return { success: true };
-      }
+      // O listener onAuthStateChange (SIGNED_IN) carrega os dados e encontra o perfil
+      return { success: true };
     }
 
     // 2. Modo Offline / Demonstração: Exige senha padrão segura (nexus@2026)
@@ -553,82 +562,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const registerUser = async (
-    email: string,
-    password: string,
-    nome: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (supabase) {
-      const res = await signUpWithPasswordSupabase(cleanEmail, password, nome);
-      if (res.error) {
-        return { success: false, error: res.error };
-      }
-    }
-
-    // Criar colaborador associado
-    const newEmp: Employee = {
-      id: `emp-${Date.now().toString().slice(-6)}`,
-      matricula: `NX-${Date.now().toString().slice(-4)}`,
-      nome,
-      email: cleanEmail,
-      cargo: 'Colaborador',
-      setorId: 'dep-1',
-      status: 'ativo',
-      role: 'colaborador',
-      dataAdmissao: new Date().toISOString().split('T')[0],
-    };
-    setEmployees((prev) => [newEmp, ...prev]);
-    setCurrentUserId(newEmp.id);
-    return { success: true };
-  };
-
   const logout = async () => {
     await signOutSupabase();
-    setCurrentUserId(null);
-    setSupabaseUser(null);
+    setAuthError(null);
+    limparEstado();
   };
 
-  const switchUser = (employeeId: string) => {
-    const found = employees.find((e) => e.id === employeeId);
-    if (found) {
-      setCurrentUserId(found.id);
-    }
+  // ---------------------------------------------------------------------------
+  // Gravação com verificação de erro (Fase 2 · CRIT-04)
+  // A tela muda na hora (otimista); se o banco recusar, a mudança é desfeita
+  // e o motivo aparece no aviso de erro.
+  // ---------------------------------------------------------------------------
+  const [dbErro, setDbErro] = useState<string | null>(null);
+
+  const persistir = (op: Promise<unknown>, desfazer: () => void, contexto: string) => {
+    op.catch((err) => {
+      console.error(contexto, err);
+      desfazer();
+      setDbErro(`${contexto}: ${mensagemDeErro(err)}. A alteração foi desfeita.`);
+    });
   };
+
+  // IDs aleatórios (ALTO-05: Date.now().slice(-6) repetia a cada ~17 minutos)
+  const novoId = (prefixo: string) => `${prefixo}-${crypto.randomUUID()}`;
+
+  function trocar<T extends { id: string }>(lista: T[], item: T): T[] {
+    return lista.map((x) => (x.id === item.id ? item : x));
+  }
 
   // CRUD de Colaboradores
   const addEmployee = (data: Omit<Employee, 'id'>): Employee => {
-    const id = `emp-${Date.now().toString().slice(-6)}`;
-    const newEmployee: Employee = { ...data, id };
-    setEmployees((prev) => [newEmployee, ...prev]);
-    upsertEmployeeDb(newEmployee);
-    return newEmployee;
+    const novo: Employee = { ...data, email: data.email.trim().toLowerCase(), id: novoId('emp') };
+    setEmployees((prev) => [novo, ...prev]);
+    persistir(
+      insertEmployeeDb(novo),
+      () => setEmployees((prev) => prev.filter((e) => e.id !== novo.id)),
+      `Não foi possível cadastrar ${novo.nome}`
+    );
+    return novo;
   };
 
-  const updateEmployee = (id: string, updates: Partial<Employee>) => {
-    setEmployees((prev) =>
-      prev.map((emp) => {
-        if (emp.id === id) {
-          const updated = { ...emp, ...updates };
-          upsertEmployeeDb(updated);
-          return updated;
-        }
-        return emp;
-      })
-    );
+  const updateEmployee = (id: string, updates: Partial<Employee>, contexto = 'Não foi possível salvar o colaborador') => {
+    const antes = employees.find((e) => e.id === id);
+    if (!antes) return;
+    const depois: Employee = { ...antes, ...updates };
+    setEmployees((prev) => trocar(prev, depois));
+    persistir(updateEmployeeDb(antes, depois), () => setEmployees((prev) => trocar(prev, antes)), contexto);
   };
 
   const updateEmployeeRole = (id: string, role: UserRole) => {
-    setEmployees((prev) =>
-      prev.map((emp) => {
-        if (emp.id === id) {
-          const updated = { ...emp, role };
-          upsertEmployeeDb(updated);
-          return updated;
-        }
-        return emp;
-      })
-    );
+    updateEmployee(id, { role }, 'Não foi possível alterar o papel de acesso');
   };
 
   const deleteEmployee = (id: string): { success: boolean; message?: string } => {
@@ -639,31 +622,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: `Não é possível excluir. O colaborador possui ${assetsWithUser.length} equipamento(s) sob sua custódia. Faça a devolução primeiro.`,
       };
     }
-
+    const antes = employees.find((e) => e.id === id);
+    if (!antes) return { success: false, message: 'Colaborador não encontrado.' };
     setEmployees((prev) => prev.filter((emp) => emp.id !== id));
-    deleteEmployeeDb(id);
+    persistir(
+      deleteEmployeeDb(id),
+      () => setEmployees((prev) => [antes, ...prev]),
+      `Não foi possível excluir ${antes.nome}`
+    );
     return { success: true };
   };
 
   // CRUD de Setores com Proteção Referencial
   const addDepartment = (data: Omit<Department, 'id'>): Department => {
-    const id = `dep-${Date.now().toString().slice(-4)}`;
-    const newDepartment: Department = { ...data, id };
-    setDepartments((prev) => [...prev, newDepartment]);
-    upsertDepartmentDb(newDepartment);
-    return newDepartment;
+    const novo: Department = { ...data, id: novoId('dep') };
+    setDepartments((prev) => [...prev, novo]);
+    persistir(
+      insertDepartmentDb(novo),
+      () => setDepartments((prev) => prev.filter((d) => d.id !== novo.id)),
+      `Não foi possível cadastrar o setor ${novo.nome}`
+    );
+    return novo;
   };
 
   const updateDepartment = (id: string, updates: Partial<Department>) => {
-    setDepartments((prev) =>
-      prev.map((dep) => {
-        if (dep.id === id) {
-          const updated = { ...dep, ...updates };
-          upsertDepartmentDb(updated);
-          return updated;
-        }
-        return dep;
-      })
+    const antes = departments.find((d) => d.id === id);
+    if (!antes) return;
+    const depois: Department = { ...antes, ...updates };
+    setDepartments((prev) => trocar(prev, depois));
+    persistir(
+      updateDepartmentDb(antes, depois),
+      () => setDepartments((prev) => trocar(prev, antes)),
+      'Não foi possível salvar o setor'
     );
   };
 
@@ -675,31 +665,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: `Ação bloqueada: O setor possui ${linkedEmployees.length} colaborador(es) vinculado(s). Você pode inativá-lo, mas não excluí-lo.`,
       };
     }
+    const antes = departments.find((d) => d.id === id);
+    if (!antes) return { success: false, message: 'Setor não encontrado.' };
     setDepartments((prev) => prev.filter((dep) => dep.id !== id));
-    deleteDepartmentDb(id);
+    persistir(
+      deleteDepartmentDb(id),
+      () => setDepartments((prev) => [...prev, antes]),
+      `Não foi possível excluir o setor ${antes.nome}`
+    );
     return { success: true };
   };
 
   // CRUD de Ativos & Gestão de Custódia 1:1
   const addAsset = (data: Omit<Asset, 'id'>): Asset => {
-    const id = `ast-${Date.now().toString().slice(-6)}`;
-    const newAsset: Asset = { ...data, id };
-    setAssets((prev) => [newAsset, ...prev]);
-    upsertAssetDb(newAsset);
-    return newAsset;
+    const novo: Asset = {
+      ...data,
+      id: novoId('ast'),
+      historicoCustodia: (data.historicoCustodia || []).map((c) => ({ ...c, id: novoId('cust') })),
+    };
+    setAssets((prev) => [novo, ...prev]);
+    persistir(
+      insertAssetDb(novo),
+      () => setAssets((prev) => prev.filter((a) => a.id !== novo.id)),
+      `Não foi possível cadastrar o ativo ${novo.tag}`
+    );
+    return novo;
   };
 
   const updateAsset = (id: string, updates: Partial<Asset>) => {
-    setAssets((prev) =>
-      prev.map((ast) => {
-        if (ast.id === id) {
-          const updated = { ...ast, ...updates };
-          upsertAssetDb(updated);
-          return updated;
-        }
-        return ast;
-      })
-    );
+    const antes = assets.find((a) => a.id === id);
+    if (!antes) return;
+    const depois: Asset = { ...antes, ...updates };
+    setAssets((prev) => trocar(prev, depois));
+    persistir(updateAssetDb(antes, depois), () => setAssets((prev) => trocar(prev, antes)), 'Não foi possível salvar o ativo');
   };
 
   const transferAssetCustody = (
@@ -707,80 +705,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     newColaboradorId: string | null,
     motivoDevolucao?: string
   ) => {
+    const antes = assets.find((a) => a.id === assetId);
+    if (!antes) return;
     const today = new Date().toISOString().split('T')[0];
+    const historico = [...antes.historicoCustodia];
 
-    setAssets((prev) =>
-      prev.map((ast) => {
-        if (ast.id !== assetId) return ast;
-
-        const currentCustody = ast.historicoCustodia;
-        let updatedCustody = [...currentCustody];
-
-        if (ast.custodianteId && ast.custodianteId !== newColaboradorId) {
-          const lastEntry = updatedCustody[updatedCustody.length - 1];
-          if (lastEntry && !lastEntry.dataDevolucao) {
-            const closedEntry = {
-              ...lastEntry,
-              dataDevolucao: today,
-              motivoDevolucao: motivoDevolucao || 'Devolução/Transferência para o estoque de TI',
-            };
-            updatedCustody[updatedCustody.length - 1] = closedEntry;
-            upsertCustodyEntryDb(assetId, closedEntry);
-          }
-        }
-
-        if (newColaboradorId) {
-          const newEmp = employees.find((e) => e.id === newColaboradorId);
-          const newEntry = {
-            id: `cust-${Date.now().toString().slice(-6)}`,
-            colaboradorId: newColaboradorId,
-            colaboradorNome: newEmp?.nome || 'Colaborador',
-            dataEntrega: today,
-            observacoes: 'Transferência de custódia realizada pelo setor de TI',
-          };
-          updatedCustody.push(newEntry);
-          upsertCustodyEntryDb(assetId, newEntry);
-        }
-
-        const updated: Asset = {
-          ...ast,
-          custodianteId: newColaboradorId || undefined,
-          status: newColaboradorId ? 'em_uso' : 'disponivel',
-          dataEntregaAtual: newColaboradorId ? today : undefined,
-          historicoCustodia: updatedCustody,
+    let entradaAberta: CustodyHistoryEntry | undefined;
+    let entradaFechada: CustodyHistoryEntry | undefined;
+    if (antes.custodianteId && antes.custodianteId !== newColaboradorId) {
+      const ultima = historico[historico.length - 1];
+      if (ultima && !ultima.dataDevolucao) {
+        entradaAberta = ultima;
+        entradaFechada = {
+          ...ultima,
+          dataDevolucao: today,
+          motivoDevolucao: motivoDevolucao || 'Devolução/Transferência para o estoque de TI',
         };
-        upsertAssetDb(updated);
-        return updated;
-      })
-    );
+        historico[historico.length - 1] = entradaFechada;
+      }
+    }
+
+    let entradaNova: CustodyHistoryEntry | undefined;
+    if (newColaboradorId) {
+      const newEmp = employees.find((e) => e.id === newColaboradorId);
+      entradaNova = {
+        id: novoId('cust'),
+        colaboradorId: newColaboradorId,
+        colaboradorNome: newEmp?.nome || 'Colaborador',
+        dataEntrega: today,
+        observacoes: 'Transferência de custódia realizada pelo setor de TI',
+      };
+      historico.push(entradaNova);
+    }
+
+    const depois: Asset = {
+      ...antes,
+      custodianteId: newColaboradorId || undefined,
+      status: newColaboradorId ? 'em_uso' : 'disponivel',
+      dataEntregaAtual: newColaboradorId ? today : undefined,
+      historicoCustodia: historico,
+    };
+    setAssets((prev) => trocar(prev, depois));
+
+    const gravar = async () => {
+      if (entradaAberta && entradaFechada) await updateCustodyEntryDb(assetId, entradaAberta, entradaFechada);
+      if (entradaNova) await insertCustodyEntryDb(assetId, entradaNova);
+      await updateAssetDb(antes, depois);
+    };
+    persistir(gravar(), () => setAssets((prev) => trocar(prev, antes)), `Não foi possível transferir a custódia de ${antes.tag}`);
   };
 
   // Licenças de Softwares & SaaS
   const addLicense = (data: Omit<SoftwareLicense, 'id' | 'assentosAlocados'>): SoftwareLicense => {
-    const id = `lic-${Date.now().toString().slice(-6)}`;
-    const newLicense: SoftwareLicense = {
+    const nova: SoftwareLicense = {
       ...data,
-      id,
+      id: novoId('lic'),
       assentosAlocados: data.colaboradoresIds ? data.colaboradoresIds.length : 0,
       colaboradoresIds: data.colaboradoresIds || [],
     };
-    setLicenses((prev) => [newLicense, ...prev]);
-    upsertLicenseDb(newLicense);
-    return newLicense;
+    setLicenses((prev) => [nova, ...prev]);
+    persistir(
+      insertLicenseDb(nova),
+      () => setLicenses((prev) => prev.filter((l) => l.id !== nova.id)),
+      `Não foi possível cadastrar a licença ${nova.nome}`
+    );
+    return nova;
   };
 
   const updateLicense = (id: string, updates: Partial<SoftwareLicense>) => {
-    setLicenses((prev) =>
-      prev.map((lic) => {
-        if (lic.id !== id) return lic;
-        const updated = { ...lic, ...updates };
-        if (updates.colaboradoresIds) {
-          updated.assentosAlocados = updates.colaboradoresIds.length;
-        }
-        upsertLicenseDb(updated);
-        return updated;
-      })
-    );
+    const antes = licenses.find((l) => l.id === id);
+    if (!antes) return;
+    const depois: SoftwareLicense = { ...antes, ...updates };
+    if (updates.colaboradoresIds) depois.assentosAlocados = updates.colaboradoresIds.length;
+    setLicenses((prev) => trocar(prev, depois));
+    persistir(updateLicenseDb(antes, depois), () => setLicenses((prev) => trocar(prev, antes)), 'Não foi possível salvar a licença');
   };
 
   const deleteLicense = (id: string): { success: boolean; message?: string } => {
@@ -793,65 +791,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     setLicenses((prev) => prev.filter((l) => l.id !== id));
-    deleteLicenseDb(id);
+    persistir(deleteLicenseDb(id), () => setLicenses((prev) => [found, ...prev]), `Não foi possível excluir a licença ${found.nome}`);
     return { success: true };
   };
 
-  const allocateLicense = (licenseId: string, employeeId: string) => {
+  // Alocação e revogação vão por RPC atômica no banco (ALTO-04); a lista
+  // devolvida pelo banco substitui a da tela.
+  const aplicarAssentos = (licenseId: string, ids: string[] | null) => {
+    if (!ids) return;
     setLicenses((prev) =>
-      prev.map((lic) => {
-        if (lic.id !== licenseId) return lic;
-        if (lic.colaboradoresIds.includes(employeeId)) return lic;
-        if (lic.colaboradoresIds.length >= lic.assentosTotais) {
-          return lic;
-        }
-        const updatedColabs = [...lic.colaboradoresIds, employeeId];
-        const updated: SoftwareLicense = {
-          ...lic,
-          assentosAlocados: updatedColabs.length,
-          colaboradoresIds: updatedColabs,
-        };
-        upsertLicenseDb(updated);
-        return updated;
-      })
+      prev.map((l) => (l.id === licenseId ? { ...l, colaboradoresIds: ids, assentosAlocados: ids.length } : l))
+    );
+  };
+
+  const allocateLicense = (licenseId: string, employeeId: string) => {
+    const antes = licenses.find((l) => l.id === licenseId);
+    if (!antes || antes.colaboradoresIds.includes(employeeId)) return;
+    if (antes.colaboradoresIds.length >= antes.assentosTotais) return;
+    const ids = [...antes.colaboradoresIds, employeeId];
+    setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
+    persistir(
+      alocarLicencaDb(licenseId, employeeId).then((doBanco) => aplicarAssentos(licenseId, doBanco)),
+      () => setLicenses((prev) => trocar(prev, antes)),
+      `Não foi possível alocar assento em ${antes.nome}`
     );
   };
 
   const revokeLicense = (licenseId: string, employeeId: string) => {
-    setLicenses((prev) =>
-      prev.map((lic) => {
-        if (lic.id !== licenseId) return lic;
-        if (!lic.colaboradoresIds.includes(employeeId)) return lic;
-        const updatedColabs = lic.colaboradoresIds.filter((id) => id !== employeeId);
-        const updated: SoftwareLicense = {
-          ...lic,
-          assentosAlocados: updatedColabs.length,
-          colaboradoresIds: updatedColabs,
-        };
-        upsertLicenseDb(updated);
-        return updated;
-      })
+    const antes = licenses.find((l) => l.id === licenseId);
+    if (!antes || !antes.colaboradoresIds.includes(employeeId)) return;
+    const ids = antes.colaboradoresIds.filter((x) => x !== employeeId);
+    setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
+    persistir(
+      revogarLicencaDb(licenseId, employeeId).then((doBanco) => aplicarAssentos(licenseId, doBanco)),
+      () => setLicenses((prev) => trocar(prev, antes)),
+      `Não foi possível liberar o assento em ${antes.nome}`
     );
   };
 
   // Service Desk / Chamados
-  const createTicket = (
+  const createTicket = async (
     ticketData: Omit<Ticket, 'id' | 'codigo' | 'dataCriacao' | 'dataAtualizacao' | 'mensagens'>
-  ): Ticket => {
-    const year = new Date().getFullYear();
-    const count = tickets.length + 1;
-    const codigo = `#CH-${year}-${count.toString().padStart(3, '0')}`;
+  ): Promise<Ticket | null> => {
     const now = new Date().toISOString();
+    const id = novoId('tkt');
+    // Código definitivo vem do banco; o local só vale no modo demonstração
+    const codigoLocal = `#CH-${new Date().getFullYear()}-${(tickets.length + 1).toString().padStart(4, '0')}`;
 
     const newTicket: Ticket = {
       ...ticketData,
-      id: `tkt-${Date.now().toString().slice(-6)}`,
-      codigo,
+      id,
+      codigo: codigoLocal,
       dataCriacao: now,
       dataAtualizacao: now,
       mensagens: [
         {
-          id: `msg-${Date.now().toString().slice(-6)}`,
+          id: novoId('msg'),
           autorId: ticketData.solicitanteId,
           autorNome: ticketData.solicitanteNome,
           autorRole: currentRole,
@@ -863,10 +858,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ],
     };
 
-    setTickets((prev) => [newTicket, ...prev]);
-    upsertTicketDb(newTicket);
-    addTicketMessageDb(newTicket.id, newTicket.mensagens[0]);
-    return newTicket;
+    try {
+      const doBanco = await insertTicketDb(newTicket);
+      const salvo: Ticket = { ...newTicket, codigo: doBanco?.codigo || newTicket.codigo };
+      setTickets((prev) => [salvo, ...prev]);
+      // A mensagem depende do chamado (FK): grava depois dele (MED-02)
+      try {
+        await insertTicketMessageDb(id, newTicket.mensagens[0]);
+      } catch (err) {
+        setDbErro(
+          `O chamado ${salvo.codigo} foi aberto, mas a descrição inicial não foi salva como mensagem: ${mensagemDeErro(err)}`
+        );
+      }
+      return salvo;
+    } catch (err) {
+      console.error('Erro ao abrir chamado', err);
+      setDbErro(`Não foi possível abrir o chamado: ${mensagemDeErro(err)}.`);
+      return null;
+    }
   };
 
   const addTicketMessage = (
@@ -877,9 +886,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     if (!currentUser) return;
     const now = new Date().toISOString();
-
     const newMessage = {
-      id: `msg-${Date.now().toString().slice(-6)}`,
+      id: novoId('msg'),
       autorId: currentUser.id,
       autorNome: currentUser.nome,
       autorRole: currentRole,
@@ -889,122 +897,107 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       anexos,
     };
 
-    addTicketMessageDb(ticketId, newMessage);
-
+    // Não regrava o chamado: o banco atualiza data_atualizacao ao receber a mensagem
     setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId) return tkt;
-        const updated: Ticket = {
-          ...tkt,
-          dataAtualizacao: now,
-          mensagens: [...tkt.mensagens, newMessage],
-        };
-        upsertTicketDb(updated);
-        return updated;
-      })
+      prev.map((tkt) =>
+        tkt.id === ticketId ? { ...tkt, dataAtualizacao: now, mensagens: [...tkt.mensagens, newMessage] } : tkt
+      )
+    );
+    persistir(
+      insertTicketMessageDb(ticketId, newMessage),
+      () =>
+        setTickets((prev) =>
+          prev.map((tkt) =>
+            tkt.id === ticketId ? { ...tkt, mensagens: tkt.mensagens.filter((m) => m.id !== newMessage.id) } : tkt
+          )
+        ),
+      'Não foi possível enviar a mensagem'
     );
   };
 
+  const alterarChamado = (ticketId: string, mudar: (t: Ticket) => Ticket, contexto: string) => {
+    const antes = tickets.find((t) => t.id === ticketId);
+    if (!antes) return;
+    const depois = { ...mudar(antes), dataAtualizacao: new Date().toISOString() };
+    setTickets((prev) => trocar(prev, depois));
+    persistir(updateTicketDb(antes, depois), () => setTickets((prev) => trocar(prev, antes)), contexto);
+  };
+
   const updateTicketStatus = (ticketId: string, status: TicketStatus) => {
-    const now = new Date().toISOString();
-    setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId) return tkt;
-        const updated: Ticket = {
-          ...tkt,
-          status,
-          dataAtualizacao: now,
-          dataResolucao: status === 'resolvido' ? now : tkt.dataResolucao,
-        };
-        upsertTicketDb(updated);
-        return updated;
-      })
+    alterarChamado(
+      ticketId,
+      (t) => ({ ...t, status, dataResolucao: status === 'resolvido' ? new Date().toISOString() : t.dataResolucao }),
+      'Não foi possível alterar o status do chamado'
     );
   };
 
   const assignTicketTechnician = (ticketId: string, technicianId: string) => {
     const tech = employees.find((e) => e.id === technicianId);
-    const now = new Date().toISOString();
-    setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId) return tkt;
-        const updated: Ticket = {
-          ...tkt,
-          tecnicoResponsavelId: technicianId,
-          tecnicoResponsavelNome: tech?.nome || 'Técnico de TI',
-          dataAtualizacao: now,
-        };
-        upsertTicketDb(updated);
-        return updated;
-      })
+    alterarChamado(
+      ticketId,
+      (t) => ({ ...t, tecnicoResponsavelId: technicianId, tecnicoResponsavelNome: tech?.nome || 'Técnico de TI' }),
+      'Não foi possível atribuir o técnico'
     );
   };
 
   const toggleOffboardingChecklist = (ticketId: string, checklistItemId: string) => {
-    const now = new Date().toISOString();
-    setTickets((prev) =>
-      prev.map((tkt) => {
-        if (tkt.id !== ticketId || !tkt.offboarding) return tkt;
-        const updatedChecklist = tkt.offboarding.checklist.map((item) =>
-          item.id === checklistItemId ? { ...item, concluido: !item.concluido } : item
-        );
-        const updated: Ticket = {
-          ...tkt,
-          offboarding: {
-            ...tkt.offboarding,
-            checklist: updatedChecklist,
-          },
-          dataAtualizacao: now,
-        };
-        upsertTicketDb(updated);
-        return updated;
-      })
+    alterarChamado(
+      ticketId,
+      (t) =>
+        t.offboarding
+          ? {
+              ...t,
+              offboarding: {
+                ...t.offboarding,
+                checklist: t.offboarding.checklist.map((item) =>
+                  item.id === checklistItemId ? { ...item, concluido: !item.concluido } : item
+                ),
+              },
+            }
+          : t,
+      'Não foi possível atualizar o checklist'
     );
   };
 
   // Termos de Responsabilidade
-  const createTerm = (
+  const createTerm = async (
     data: Omit<ResponsibilityTerm, 'id' | 'codigo' | 'dataEmissao'>
-  ): ResponsibilityTerm => {
-    const year = new Date().getFullYear();
-    const count = terms.length + 1;
-    const codigo = `#TR-${year}-${count.toString().padStart(4, '0')}`;
-    const now = new Date().toISOString().split('T')[0];
-
-    const newTerm: ResponsibilityTerm = {
+  ): Promise<ResponsibilityTerm | null> => {
+    const novo: ResponsibilityTerm = {
       ...data,
-      id: `tr-${Date.now().toString().slice(-6)}`,
-      codigo,
-      dataEmissao: now,
+      id: novoId('tr'),
+      codigo: `#TR-${new Date().getFullYear()}-${(terms.length + 1).toString().padStart(4, '0')}`,
+      dataEmissao: new Date().toISOString().split('T')[0],
     };
-
-    setTerms((prev) => [newTerm, ...prev]);
-    upsertTermDb(newTerm);
-    return newTerm;
+    try {
+      const doBanco = await insertTermDb(novo);
+      const salvo: ResponsibilityTerm = { ...novo, codigo: doBanco?.codigo || novo.codigo };
+      setTerms((prev) => [salvo, ...prev]);
+      return salvo;
+    } catch (err) {
+      console.error('Erro ao gerar termo', err);
+      setDbErro(`Não foi possível gerar o termo: ${mensagemDeErro(err)}.`);
+      return null;
+    }
   };
 
   const markTermSigned = (termId: string, arquivoUrl?: string) => {
-    setTerms((prev) =>
-      prev.map((t) => {
-        if (t.id !== termId) return t;
-        const updated: ResponsibilityTerm = {
-          ...t,
-          statusAssinatura: 'assinado',
-          arquivoAssinadoUrl:
-            arquivoUrl || 'https://cdn.nexuscorp.com.br/termos/assinado-scan.pdf',
-        };
-        upsertTermDb(updated);
-        return updated;
-      })
-    );
+    const antes = terms.find((t) => t.id === termId);
+    if (!antes) return;
+    const depois: ResponsibilityTerm = {
+      ...antes,
+      statusAssinatura: 'assinado',
+      arquivoAssinadoUrl: arquivoUrl || 'https://cdn.nexuscorp.com.br/termos/assinado-scan.pdf',
+    };
+    setTerms((prev) => trocar(prev, depois));
+    persistir(updateTermDb(antes, depois), () => setTerms((prev) => trocar(prev, antes)), `Não foi possível registrar a assinatura de ${antes.codigo}`);
   };
 
   const updateSettings = (updates: Partial<CompanySettings>) => {
-    setSettings((prev) => {
-      const updated = { ...prev, ...updates };
-      upsertSettingsDb(updated);
-      return updated;
-    });
+    const antes = settings;
+    const depois = { ...settings, ...updates };
+    setSettings(depois);
+    persistir(saveSettingsDb(depois), () => setSettings(antes), 'Não foi possível salvar as configurações');
   };
 
   const resetToInitialData = () => {
@@ -1072,9 +1065,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify([]));
 
-    if (activeAdmin && isSupabaseConfigured) {
-      await upsertEmployeeDb(activeAdmin);
-    }
   };
 
   return (
@@ -1083,15 +1073,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabaseUser,
         isSupabaseConnected: isSupabaseConfigured,
         supabaseHealth,
-        refreshSupabaseData: loadDataFromSupabase,
+        refreshSupabaseData: async () => {
+          await loadDataFromSupabase();
+        },
         authLoading,
+        authError,
+        dbErro,
+        limparDbErro: () => setDbErro(null),
         loginWithGoogle,
         currentUser,
         currentRole,
         login,
-        registerUser,
         logout,
-        switchUser,
         employees,
         departments,
         assets,

@@ -947,7 +947,12 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
               </div>
             </div>
 
-            {/* Zona de Perigo: Zerar Dados de Exemplo */}
+            {/* Fase 0: com Supabase conectado (produção), "Zerar" e "Restaurar demo" ficam ocultos */}
+            {isSupabaseConnected ? (
+              <div className="border border-slate-200 bg-slate-50 rounded-xl p-5 text-xs text-slate-600">
+                Ações de reset ("Zerar dados" e "Restaurar base de demonstração") estão desativadas com o banco de produção conectado.
+              </div>
+            ) : (
             <div className="border border-rose-200 bg-rose-50/40 rounded-xl p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
@@ -986,12 +991,13 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
                 </button>
               </div>
             </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Modal Seguro para Zerar Dados */}
-      {showResetModal && (
+      {showResetModal && !isSupabaseConnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">

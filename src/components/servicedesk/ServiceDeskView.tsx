@@ -70,7 +70,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
   const statusBadges: Record<TicketStatus, { label: string; cls: string }> = {
     aberto: { label: 'Aberto', cls: 'text-blue-700 bg-blue-50 border-blue-200' },
     em_andamento: { label: 'Em Andamento', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
-    aguardando_peca: { label: 'Aguardando Peça', cls: 'text-purple-700 bg-purple-50 border-purple-200' },
+    aguardando_terceiro: { label: 'Aguardando Peça', cls: 'text-purple-700 bg-purple-50 border-purple-200' },
     resolvido: { label: 'Resolvido', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
     cancelado: { label: 'Cancelado', cls: 'text-slate-500 bg-slate-100 border-slate-200' },
   };
@@ -79,7 +79,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     baixa: { label: 'Baixa', cls: 'text-slate-500' },
     media: { label: 'Média', cls: 'text-blue-700' },
     alta: { label: 'Alta', cls: 'text-amber-700 font-semibold' },
-    urgente: { label: 'Urgente', cls: 'text-rose-700 font-bold' },
+    critica: { label: 'Urgente', cls: 'text-rose-700 font-bold' },
   };
 
   const tabsToDisplay = isRH
@@ -162,7 +162,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
               <option value="todos">Todos os Status</option>
               <option value="aberto">Aberto</option>
               <option value="em_andamento">Em Andamento</option>
-              <option value="aguardando_peca">Aguardando Peça</option>
+              <option value="aguardando_terceiro">Aguardando Peça</option>
               <option value="resolvido">Resolvido</option>
             </select>
 
@@ -175,7 +175,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
               <option value="baixa">Baixa</option>
               <option value="media">Média</option>
               <option value="alta">Alta</option>
-              <option value="urgente">Urgente</option>
+              <option value="critica">Urgente</option>
             </select>
           </div>
         </div>

@@ -3,9 +3,10 @@ import { useApp } from '../../context/AppContext.tsx';
 import { Shield, Lock, Mail, ArrowRight, UserCheck, Laptop, LifeBuoy, Loader2 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
-  const { login, loginWithGoogle, settings } = useApp();
-  const [email, setEmail] = useState('admin.ti@nexuscorp.com.br');
-  const [password, setPassword] = useState('nexus@2026');
+  const { login, loginWithGoogle, settings, authError, isSupabaseConnected } = useApp();
+  // Credenciais de exemplo só no modo demonstração (sem Supabase)
+  const [email, setEmail] = useState(isSupabaseConnected ? '' : 'admin.ti@nexuscorp.com.br');
+  const [password, setPassword] = useState(isSupabaseConnected ? '' : 'nexus@2026');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -136,9 +137,9 @@ export const LoginView: React.FC = () => {
               </div>
             </div>
 
-            {errorMessage && (
+            {(errorMessage || authError) && (
               <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
-                {errorMessage}
+                {errorMessage || authError}
               </div>
             )}
 

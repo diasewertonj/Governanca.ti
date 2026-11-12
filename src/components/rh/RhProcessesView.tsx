@@ -84,7 +84,7 @@ export const RhProcessesView: React.FC = () => {
   };
 
   // Submissão do Offboarding Inteligente
-  const handleOffboardingSubmit = (e: React.FormEvent) => {
+  const handleOffboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedColaborador) return;
 
@@ -139,7 +139,7 @@ export const RhProcessesView: React.FC = () => {
       },
     ];
 
-    const ticket = createTicket({
+    const ticket = await createTicket({
       tipo: 'offboarding',
       solicitanteId: currentUser?.id || 'emp-2',
       solicitanteNome: `${currentUser?.nome || 'RH'} (Gente & Gestão)`,
@@ -148,7 +148,7 @@ export const RhProcessesView: React.FC = () => {
       solicitanteSetorNome: 'Recursos Humanos',
       titulo: `Offboarding & Desligamento: ${selectedColaborador.nome} (${selectedColaborador.matricula})`,
       categoria: 'Offboarding de Colaborador',
-      prioridade: 'urgente',
+      prioridade: 'critica',
       status: 'aberto',
       descricao: `Solicitação formal de desligamento para ${selectedColaborador.nome}, cargo ${
         selectedColaborador.cargo
@@ -169,6 +169,7 @@ export const RhProcessesView: React.FC = () => {
         checklist: checklistItems,
       },
     });
+    if (!ticket) return; // o erro já aparece no aviso global
 
     setSuccessMessage(`Requisição de Offboarding aberta com sucesso (${ticket.codigo})!`);
     setSelectedColabId('');
@@ -179,14 +180,14 @@ export const RhProcessesView: React.FC = () => {
   };
 
   // Submissão do Onboarding
-  const handleOnboardingSubmit = (e: React.FormEvent) => {
+  const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onbNome.trim() || !onbEmail.trim()) return;
 
     const setor = departments.find((d) => d.id === onbSetorId);
     const gestor = employees.find((e) => e.id === onbGestorId);
 
-    const ticket = createTicket({
+    const ticket = await createTicket({
       tipo: 'onboarding',
       solicitanteId: currentUser?.id || 'emp-2',
       solicitanteNome: `${currentUser?.nome || 'RH'} (Gente & Gestão)`,
@@ -227,6 +228,7 @@ export const RhProcessesView: React.FC = () => {
         observacoes: onbObservacoes,
       },
     });
+    if (!ticket) return; // o erro já aparece no aviso global
 
     setSuccessMessage(`Requisição de Onboarding ${ticket.codigo} enviada para a equipe de T.I.!`);
     setOnbNome('');

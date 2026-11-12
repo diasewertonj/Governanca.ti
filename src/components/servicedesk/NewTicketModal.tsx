@@ -47,7 +47,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
     setAnexos(anexos.filter((a) => a.id !== attId));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!titulo.trim() || !descricao.trim()) return;
 
@@ -62,7 +62,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
       softwareNome = licenses.find((l) => l.id === softwareId)?.nome;
     }
 
-    const created = createTicket({
+    const created = await createTicket({
       tipo: 'suporte',
       solicitanteId: currentUser.id,
       solicitanteNome: currentUser.nome,
@@ -79,6 +79,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
       descricao: descricao.trim(),
       anexos,
     });
+    if (!created) return; // o modal fica aberto; o erro aparece no aviso global
 
     onClose();
     setSelectedTicketIdForDetail(created.id);
@@ -214,7 +215,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                 <option value="baixa">Baixa (Dúvida ou solicitação sem impacto)</option>
                 <option value="media">Média (Impacto parcial no trabalho diário)</option>
                 <option value="alta">Alta (Impossibilita atividades principais)</option>
-                <option value="urgente">Urgente (Bloqueio total / Falha crítica de máquina)</option>
+                <option value="critica">Urgente (Bloqueio total / Falha crítica de máquina)</option>
               </select>
             </div>
           </div>

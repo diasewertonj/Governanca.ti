@@ -22,7 +22,6 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
     supabaseUser,
     isSupabaseConnected,
     logout,
-    switchUser,
     employees,
     resetToInitialData,
   } = useApp();

@@ -103,8 +103,8 @@ export interface SoftwareLicense {
 }
 
 export type TicketType = 'suporte' | 'onboarding' | 'offboarding';
-export type TicketStatus = 'aberto' | 'em_andamento' | 'aguardando_peca' | 'resolvido' | 'cancelado';
-export type TicketPriority = 'baixa' | 'media' | 'alta' | 'urgente';
+export type TicketStatus = 'aberto' | 'em_andamento' | 'aguardando_terceiro' | 'resolvido' | 'cancelado';
+export type TicketPriority = 'baixa' | 'media' | 'alta' | 'critica';
 
 export interface TicketAttachment {
   id: string;

@@ -28,6 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { currentRole, tickets, assets, currentUser } = useApp();
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const isAdmin = currentRole === 'ti_admin';
   const isRH = currentRole === 'rh';
   const isColaborador = currentRole === 'colaborador';
 
@@ -207,18 +208,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Termos de Responsabilidade</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => onNavigate('settings')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                currentView === 'settings'
-                  ? 'bg-blue-50 text-blue-700 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Settings className="w-4 h-4 text-slate-500" />
-              <span>Configurações</span>
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => onNavigate('settings')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  currentView === 'settings'
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <Settings className="w-4 h-4 text-slate-500" />
+                <span>Configurações</span>
+              </button>
+            )}
           </div>
         )}
 

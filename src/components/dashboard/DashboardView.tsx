@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatDate, getWarrantyStatus, formatCurrency } from '../../utils/formatters.ts';
+import { formatDate, getWarrantyStatus, formatCurrency, rotuloStatus } from '../../utils/formatters.ts';
 import {
   Laptop,
   LifeBuoy,
@@ -26,7 +26,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const assetsAvailable = assets.filter((a) => a.status === 'disponivel').length;
   const openTickets = tickets.filter((t) => t.status === 'aberto' || t.status === 'em_andamento').length;
   const urgentTickets = tickets.filter(
-    (t) => (t.status === 'aberto' || t.status === 'em_andamento') && t.prioridade === 'urgente'
+    (t) => (t.status === 'aberto' || t.status === 'em_andamento') && t.prioridade === 'critica'
   ).length;
 
   // Garantias expirando nos próximos 30 dias
@@ -208,7 +208,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                         : 'text-emerald-700 bg-emerald-50'
                     }`}
                   >
-                    {t.status.replace('_', ' ')}
+                    {rotuloStatus(t.status)}
                   </span>
                 </div>
               </div>
