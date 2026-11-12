@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import { confirmarDescarte } from '../components/comum/BarraAlteracoes.tsx';
 import {
   Asset,
   CompanySettings,
@@ -73,6 +74,13 @@ import {
   SupabaseHealthStatus,
 } from '../services/supabaseDb.ts';
 
+/** Rascunho de edição de um chamado (Fase 5: só grava ao clicar em Salvar) */
+export interface AlteracoesChamado {
+  status?: TicketStatus;
+  tecnicoId?: string; // '' = remover o técnico
+  checklist?: Record<string, boolean>; // id do item -> concluído
+}
+
 interface AppContextType {
   // Autenticação e Usuário Atual (Supabase + Perfis)
   supabaseUser: SupabaseAuthUser | null;
@@ -138,8 +146,11 @@ interface AppContextType {
     anexos?: TicketAttachment[]
   ) => void;
   updateTicketStatus: (ticketId: string, status: TicketStatus) => void;
-  assignTicketTechnician: (ticketId: string, technicianId: string) => void;
-  toggleOffboardingChecklist: (ticketId: string, checklistItemId: string) => void;
+  salvarAlteracoesChamado: (ticketId: string, mudancas: AlteracoesChamado) => void;
+
+  // Fase 5: alterações não salvas
+  registrarPendencias: (origem: string, itens: string[]) => void;
+  podeDescartarPendencias: () => boolean;
 
   // Ações de Termos
   // Assíncrono: o código (#TR-AAAA-NNNN) vem do banco. Devolve null se falhar.
@@ -617,6 +628,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ---------------------------------------------------------------------------
   const [dbErro, setDbErro] = useState<string | null>(null);
 
+  // ---------------------------------------------------------------------------
+  // Fase 5: alterações não salvas registradas pelas telas (origem -> itens).
+  // Usado para perguntar antes de trocar de tela, sair ou fechar a aba.
+  // ---------------------------------------------------------------------------
+  const [pendencias, setPendencias] = useState<Record<string, string[]>>({});
+
+  const registrarPendencias = useCallback((origem: string, itens: string[]) => {
+    setPendencias((atual) => {
+      if (itens.length === 0) {
+        if (!(origem in atual)) return atual;
+        const resto = { ...atual };
+        delete resto[origem];
+        return resto;
+      }
+      if (atual[origem]?.join('\u0000') === itens.join('\u0000')) return atual;
+      return { ...atual, [origem]: itens };
+    });
+  }, []);
+
+  const itensPendentes = Object.values(pendencias).flat();
+  const podeDescartarPendencias = () => confirmarDescarte(itensPendentes);
+
+  useEffect(() => {
+    if (itensPendentes.length === 0) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', avisar);
+    return () => window.removeEventListener('beforeunload', avisar);
+  }, [itensPendentes.length]);
+
   const persistir = (op: Promise<unknown>, desfazer: () => void, contexto: string) => {
     op.catch((err) => {
       console.error(contexto, err);
@@ -973,31 +1016,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const assignTicketTechnician = (ticketId: string, technicianId: string) => {
-    const tech = employees.find((e) => e.id === technicianId);
+  // Fase 5: status, técnico e checklist mudam na tela como rascunho e só são
+  // gravados aqui, quando a pessoa clica em "Salvar alterações" (um único UPDATE).
+  const salvarAlteracoesChamado = (ticketId: string, mudancas: AlteracoesChamado) => {
+    const tecnico = mudancas.tecnicoId ? employees.find((e) => e.id === mudancas.tecnicoId) : undefined;
+    const agora = new Date().toISOString();
     alterarChamado(
       ticketId,
-      (t) => ({ ...t, tecnicoResponsavelId: technicianId, tecnicoResponsavelNome: tech?.nome || 'Técnico de TI' }),
-      'Não foi possível atribuir o técnico'
-    );
-  };
-
-  const toggleOffboardingChecklist = (ticketId: string, checklistItemId: string) => {
-    alterarChamado(
-      ticketId,
-      (t) =>
-        t.offboarding
-          ? {
-              ...t,
-              offboarding: {
-                ...t.offboarding,
-                checklist: t.offboarding.checklist.map((item) =>
-                  item.id === checklistItemId ? { ...item, concluido: !item.concluido } : item
-                ),
-              },
-            }
-          : t,
-      'Não foi possível atualizar o checklist'
+      (t) => {
+        let novo: Ticket = { ...t };
+        if (mudancas.status) {
+          novo = { ...novo, status: mudancas.status, dataResolucao: mudancas.status === 'resolvido' ? agora : t.dataResolucao };
+        }
+        if (mudancas.tecnicoId !== undefined) {
+          novo = {
+            ...novo,
+            tecnicoResponsavelId: mudancas.tecnicoId || undefined,
+            tecnicoResponsavelNome: mudancas.tecnicoId ? tecnico?.nome || 'Técnico de TI' : undefined,
+          };
+        }
+        if (mudancas.checklist && t.offboarding) {
+          const marcados = mudancas.checklist;
+          novo = {
+            ...novo,
+            offboarding: {
+              ...t.offboarding,
+              checklist: t.offboarding.checklist.map((item) =>
+                item.id in marcados ? { ...item, concluido: marcados[item.id] } : item
+              ),
+            },
+          };
+        }
+        return novo;
+      },
+      'Não foi possível salvar as alterações do chamado'
     );
   };
 
@@ -1263,8 +1315,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createTicket,
         addTicketMessage,
         updateTicketStatus,
-        assignTicketTechnician,
-        toggleOffboardingChecklist,
+        salvarAlteracoesChamado,
+        registrarPendencias,
+        podeDescartarPendencias,
         createTerm,
         markTermSigned,
         updateSettings,

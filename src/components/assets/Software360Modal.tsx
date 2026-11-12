@@ -87,6 +87,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   };
 
   const handleRevoke = (empId: string, empNome: string) => {
+    // Fase 5: liberar assento tira o acesso da pessoa; pede confirmação
+    if (!window.confirm(`Liberar o assento de ${empNome} em ${license.nome}?\n\nA pessoa perde o acesso a este software.`)) return;
     revokeLicense(license.id, empId);
     setFeedbackMsg({
       text: `Assento de ${empNome} liberado com sucesso. Saldo livre atualizado!`,

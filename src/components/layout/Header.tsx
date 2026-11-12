@@ -17,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
     currentRole,
     supabaseUser,
     logout,
+    podeDescartarPendencias,
   } = useApp();
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showMeusDados, setShowMeusDados] = useState(false);
@@ -130,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
                   type="button"
                   onClick={() => {
                     setShowSwitchMenu(false);
-                    logout();
+                    if (podeDescartarPendencias()) logout();
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-600 hover:bg-rose-50 transition-colors font-medium text-left"
                 >

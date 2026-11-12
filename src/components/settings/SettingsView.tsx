@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { AssetCategory, UserRole } from '../../types/index.ts';
+import { AssetCategory, Employee, UserRole } from '../../types/index.ts';
+import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
+import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -9,13 +11,32 @@ import {
   Database,
   Key,
   RotateCcw,
-  Save,
   Shield,
   Search,
   Copy,
   RefreshCw,
   Check,
 } from 'lucide-react';
+
+const ROTULO_PAPEL: Record<UserRole, string> = {
+  ti_admin: 'Admin T.I.',
+  ti_suporte: 'Suporte T.I.',
+  rh: 'Recursos Humanos',
+  colaborador: 'Colaborador',
+};
+
+const ROTULO_CAMPO_EMPRESA = {
+  razaoSocial: 'razão social',
+  nomeFantasia: 'nome fantasia',
+  cnpj: 'CNPJ',
+  endereco: 'endereço',
+  cidadeUF: 'cidade/UF',
+  cep: 'CEP',
+  emailTI: 'e-mail da TI',
+  telefoneTI: 'telefone da TI',
+  textoTermoEntrega: 'texto do termo de entrega',
+  textoTermoDevolucao: 'texto do termo de devolução',
+} as const;
 
 export const SettingsView: React.FC = () => {
   const {
@@ -69,22 +90,98 @@ export const SettingsView: React.FC = () => {
   const [novoCampoLabel, setNovoCampoLabel] = useState('');
   const [novoCampoTipo, setNovoCampoTipo] = useState<'text' | 'number' | 'date'>('text');
 
+  // ---------------------------------------------------------------------------
+  // Fase 5: papéis, situação dos setores e dados da empresa ficam em rascunho.
+  // Nada é gravado até "Salvar alterações"; "Cancelar" volta tudo ao original.
+  // ---------------------------------------------------------------------------
+  const [papeisPendentes, setPapeisPendentes] = useState<Record<string, UserRole>>({});
+  const [setoresPendentes, setSetoresPendentes] = useState<Record<string, boolean>>({});
+
+  const papelAtual = (emp: Employee): UserRole => emp.role || 'colaborador';
+
+  const empresaRascunho = {
+    razaoSocial,
+    nomeFantasia,
+    cnpj,
+    endereco,
+    cidadeUF,
+    cep,
+    emailTI,
+    telefoneTI,
+    textoTermoEntrega,
+    textoTermoDevolucao,
+  };
+  const camposEmpresaAlterados = (Object.keys(empresaRascunho) as (keyof typeof empresaRascunho)[]).filter(
+    (k) => empresaRascunho[k] !== settings[k]
+  );
+
+  const itensPendentes: string[] = [
+    ...Object.entries(papeisPendentes).flatMap(([id, papel]) => {
+      const emp = employees.find((e) => e.id === id);
+      return emp ? [`Papel de ${emp.nome}: ${ROTULO_PAPEL[papelAtual(emp)]} → ${ROTULO_PAPEL[papel]}`] : [];
+    }),
+    ...Object.entries(setoresPendentes).flatMap(([id, ativo]) => {
+      const dep = departments.find((d) => d.id === id);
+      return dep ? [`Setor ${dep.nome}: ${ativo ? 'reativar' : 'inativar'}`] : [];
+    }),
+    ...(camposEmpresaAlterados.length > 0
+      ? [`Dados da empresa: ${camposEmpresaAlterados.map((k) => ROTULO_CAMPO_EMPRESA[k]).join(', ')}`]
+      : []),
+  ];
+  useRegistrarPendencias('configuracoes', itensPendentes);
+
+  const descartarTudo = () => {
+    setPapeisPendentes({});
+    setSetoresPendentes({});
+    setRazaoSocial(settings.razaoSocial);
+    setNomeFantasia(settings.nomeFantasia);
+    setCnpj(settings.cnpj);
+    setEndereco(settings.endereco);
+    setCidadeUF(settings.cidadeUF);
+    setCep(settings.cep);
+    setEmailTI(settings.emailTI);
+    setTelefoneTI(settings.telefoneTI);
+    setTextoTermoEntrega(settings.textoTermoEntrega);
+    setTextoTermoDevolucao(settings.textoTermoDevolucao);
+  };
+
+  const salvarTudo = () => {
+    const viramAdmin = Object.entries(papeisPendentes)
+      .filter(([id, papel]) => {
+        const emp = employees.find((e) => e.id === id);
+        return papel === 'ti_admin' && emp && papelAtual(emp) !== 'ti_admin';
+      })
+      .map(([id]) => employees.find((e) => e.id === id)?.nome);
+    if (
+      viramAdmin.length > 0 &&
+      !window.confirm(
+        `Dar acesso TOTAL (Administrador de T.I.) a: ${viramAdmin.join(', ')}?\n\n` +
+          'Administradores trocam papéis, alteram setores e configurações e anonimizam dados pessoais.'
+      )
+    ) {
+      return;
+    }
+    Object.entries(papeisPendentes).forEach(([id, papel]) => updateEmployeeRole(id, papel));
+    Object.entries(setoresPendentes).forEach(([id, ativo]) => updateDepartment(id, { ativo }));
+    if (camposEmpresaAlterados.length > 0) updateSettings(empresaRascunho);
+    setPapeisPendentes({});
+    setSetoresPendentes({});
+    setSuccessMsg('Alterações salvas.');
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
   const handleSaveCompanySettings = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({
-      razaoSocial,
-      nomeFantasia,
-      cnpj,
-      endereco,
-      cidadeUF,
-      cep,
-      emailTI,
-      telefoneTI,
-      textoTermoEntrega,
-      textoTermoDevolucao,
+    salvarTudo();
+  };
+
+  const alterarPapel = (emp: Employee, novo: UserRole) => {
+    setPapeisPendentes((p) => {
+      const resto = { ...p };
+      if (novo === papelAtual(emp)) delete resto[emp.id];
+      else resto[emp.id] = novo;
+      return resto;
     });
-    setSuccessMsg('Dados institucionais e cláusulas atualizados com sucesso!');
-    setTimeout(() => setSuccessMsg(null), 3000);
   };
 
   const handleAddDepartment = (e: React.FormEvent) => {
@@ -107,6 +204,15 @@ export const SettingsView: React.FC = () => {
 
   const handleDeleteDepartment = (depId: string) => {
     setErrorMsg(null);
+    const dep = departments.find((d) => d.id === depId);
+    const vinculados = employees.filter((e) => e.setorId === depId).length;
+    // Fase 5: exclusão sempre pede confirmação (antes: um clique apagava)
+    if (vinculados === 0 && !window.confirm(`Excluir o setor "${dep?.nome}"?\n\nEssa ação não pode ser desfeita.`)) return;
+    setSetoresPendentes((p) => {
+      const resto = { ...p };
+      delete resto[depId];
+      return resto;
+    });
     const result = deleteDepartment(depId);
     if (!result.success) {
       setErrorMsg(result.message || 'Erro ao excluir setor.');
@@ -116,8 +222,15 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleToggleDepartmentStatus = (depId: string, currentStatus: boolean) => {
-    updateDepartment(depId, { ativo: !currentStatus });
+  // Fase 5: ativar/inativar vira rascunho (salvo pela barra de alterações)
+  const handleToggleDepartmentStatus = (depId: string, ativoExibido: boolean) => {
+    const original = departments.find((d) => d.id === depId)?.ativo;
+    setSetoresPendentes((p) => {
+      const resto = { ...p };
+      if (!ativoExibido === original) delete resto[depId];
+      else resto[depId] = !ativoExibido;
+      return resto;
+    });
   };
 
   const handleAddCustomField = (e: React.FormEvent) => {
@@ -148,6 +261,14 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleRemoveCustomField = (cfId: string) => {
+    const campo = settings.camposPersonalizados.find((cf) => cf.id === cfId);
+    if (
+      !window.confirm(
+        `Remover o campo personalizado "${campo?.label}"?\n\nOs valores já preenchidos nos ativos deixam de aparecer na ficha.`
+      )
+    ) {
+      return;
+    }
     updateSettings({
       camposPersonalizados: settings.camposPersonalizados.filter((cf) => cf.id !== cfId),
     });
@@ -369,15 +490,10 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>Salvar Configurações Institucionais</span>
-            </button>
-          </div>
+          <p className="pt-4 border-t border-slate-100 text-[11px] text-slate-500">
+            Ao editar qualquer campo, aparece no fim da página a barra para <strong>salvar</strong> ou{' '}
+            <strong>cancelar</strong> as alterações.
+          </p>
         </form>
       )}
 
@@ -481,14 +597,15 @@ export const SettingsView: React.FC = () => {
                         <td className="py-3 px-4">
                           <button
                             type="button"
-                            onClick={() => handleToggleDepartmentStatus(dep.id, dep.ativo)}
+                            onClick={() => handleToggleDepartmentStatus(dep.id, setoresPendentes[dep.id] ?? dep.ativo)}
                             className={`text-[10px] font-semibold px-2 py-0.5 rounded cursor-pointer ${
-                              dep.ativo
+                              (setoresPendentes[dep.id] ?? dep.ativo)
                                 ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                                 : 'text-slate-500 bg-slate-100 border border-slate-200'
-                            }`}
+                            } ${dep.id in setoresPendentes ? 'ring-2 ring-amber-400' : ''}`}
                           >
-                            {dep.ativo ? 'Ativo' : 'Inativo'}
+                            {(setoresPendentes[dep.id] ?? dep.ativo) ? 'Ativo' : 'Inativo'}
+                            {dep.id in setoresPendentes && ' (não salvo)'}
                           </button>
                         </td>
                         <td className="py-3 px-4 text-right">
@@ -711,15 +828,8 @@ export const SettingsView: React.FC = () => {
                       return matchesSearch && matchesOperator;
                     })
                     .map((emp) => {
-                      const currentEmpRole: UserRole = emp.role || (
-                        emp.email === 'admin.ti@nexuscorp.com.br'
-                          ? 'ti_admin'
-                          : emp.email === 'rh@nexuscorp.com.br' || emp.setorId === 'dep-2'
-                          ? 'rh'
-                          : emp.email.includes('.ti@')
-                          ? 'ti_suporte'
-                          : 'colaborador'
-                      );
+                      const currentEmpRole: UserRole = papelAtual(emp);
+                      const papelPendente = papeisPendentes[emp.id];
 
                       const roleBadgeStyles: Record<UserRole, string> = {
                         ti_admin: 'text-blue-700 bg-blue-50 border-blue-200',
@@ -736,7 +846,7 @@ export const SettingsView: React.FC = () => {
                       };
 
                       return (
-                        <tr key={emp.id} className="hover:bg-slate-50/70 transition-colors">
+                        <tr key={emp.id} className={`transition-colors ${papelPendente ? 'bg-amber-50' : 'hover:bg-slate-50/70'}`}>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2.5">
                               <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-800 font-bold flex items-center justify-center text-xs">
@@ -768,13 +878,9 @@ export const SettingsView: React.FC = () => {
 
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <select
-                              value={currentEmpRole}
-                              onChange={(e) => {
-                                const newRole = e.target.value as UserRole;
-                                updateEmployeeRole(emp.id, newRole);
-                                setSuccessMsg(`Permissão de "${emp.nome}" alterada para "${roleLabelsText[newRole]}".`);
-                                setTimeout(() => setSuccessMsg(null), 3000);
-                              }}
+                              value={papelPendente ?? currentEmpRole}
+                              onChange={(e) => alterarPapel(emp, e.target.value as UserRole)}
+                              aria-label={`Papel de ${emp.nome}`}
                               className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
                             >
                               <option value="ti_admin">Administrador de T.I. (Acesso Total)</option>
@@ -1064,6 +1170,9 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
           </div>
         </div>
       )}
+
+      {/* Fase 5: papéis, setores e dados da empresa só são gravados aqui */}
+      <BarraAlteracoes itens={itensPendentes} onCancelar={descartarTudo} onSalvar={salvarTudo} />
     </div>
   );
 };
