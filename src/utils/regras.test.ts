@@ -55,6 +55,13 @@ describe('vistaPermitida (RBAC de interface)', () => {
     expect(vistaPermitida('rh', 'collaborators')).toBe('collaborators');
   });
 
+  it('fornecedores e contratos só para a T.I. (Fase 8)', () => {
+    expect(vistaPermitida('ti_admin', 'fornecedores')).toBe('fornecedores');
+    expect(vistaPermitida('ti_suporte', 'fornecedores')).toBe('fornecedores');
+    expect(vistaPermitida('rh', 'fornecedores')).toBe('dashboard');
+    expect(vistaPermitida('colaborador', 'fornecedores')).toBe('my_assets');
+  });
+
   it('configurações só para ti_admin', () => {
     expect(vistaPermitida('ti_suporte', 'settings')).toBe('dashboard');
     expect(vistaPermitida('ti_admin', 'settings')).toBe('settings');

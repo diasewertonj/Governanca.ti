@@ -1,16 +1,34 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase.ts';
-import type { Json, TablesInsert } from '../types/database.types.ts';
+import type { Json, Tables, TablesInsert } from '../types/database.types.ts';
 import {
+  AnexoAtivo,
   Asset,
+  BaixaAtivo,
+  CategoriaAnexoAtivo,
+  DadosBaixa,
+  DadosEncerramentoManutencao,
+  DadosManutencao,
+  DestinoBaixa,
+  Manutencao,
+  MotivoBaixa,
+  StatusManutencao,
+  TipoManutencao,
   AssetCategory,
   AssetStatus,
   CatalogoItem,
   ColaboradorRecurso,
   CompanySettings,
   CondicaoItem,
+  Contrato,
   DestinoRecurso,
+  Fatura,
+  Fornecedor,
+  ItemContrato,
   Lembrete,
+  PeriodicidadeContrato,
+  StatusFatura,
+  TipoContrato,
   ProcessoEvento,
   ProcessoItem,
   ProcessoItemRascunho,
@@ -109,11 +127,41 @@ async function excluir(tabela: string, id: string, chave = 'id') {
 // de negócio escritas nas funções do banco (em português) são mostradas como estão.
 const MENSAGEM_TECNICA = /violates|permission denied|row-level security|duplicate key|null value/i;
 
+// Fase 8: regras do banco com nome (constraint) viram frases claras
+const MENSAGEM_DA_REGRA: Record<string, string> = {
+  uq_fornecedores_nome: 'Já existe um fornecedor com esse nome',
+  chk_contrato_periodo: 'O fim do contrato é anterior ao início',
+  chk_contrato_item_alvo: 'Cada item do contrato deve ser um ativo ou uma licença',
+  uq_contrato_item_ativo: 'O ativo já está neste contrato',
+  uq_contrato_item_licenca: 'A licença já está neste contrato',
+  chk_fatura_alvo: 'A fatura deve ser de uma licença ou de um contrato',
+  chk_fatura_paga: 'Fatura paga precisa da data de pagamento',
+  chk_fatura_competencia: 'A competência deve ser o primeiro dia do mês',
+  uq_fatura_licenca_comp: 'Já existe fatura não cancelada para esta competência',
+  uq_fatura_contrato_comp: 'Já existe fatura não cancelada para esta competência',
+  uq_manutencao_aberta: 'O ativo já tem uma manutenção em andamento',
+  manutencoes_custo_check: 'O custo da manutenção não pode ser negativo',
+  manutencoes_descricao_check: 'Descreva o problema ou o serviço',
+  chk_manutencao_conclusao: 'Manutenção concluída precisa da data de conclusão',
+  uq_baixa_vigente: 'O ativo já está baixado',
+  chk_baixa_venda: 'O valor de venda só vale quando o destino é venda',
+  ativo_baixas_valor_venda_check: 'O valor de venda não pode ser negativo',
+};
+
+// Exclusão recusada por vínculo (23503), conforme a tabela de onde se tentou excluir
+const MENSAGEM_DO_VINCULO: Record<string, string> = {
+  fornecedores:
+    'O fornecedor está vinculado a contratos, ativos, licenças ou manutenções e não pode ser excluído; desative-o',
+  contratos: 'O contrato está vinculado a faturas ou manutenções e não pode ser excluído',
+};
+
 /** Mensagem curta para o usuário a partir de um erro do banco */
 export function mensagemDeErro(err: unknown): string {
   const e = err as { code?: string; message?: string };
   const msg = e?.message || '';
   const deNegocio = msg !== '' && !MENSAGEM_TECNICA.test(msg);
+  const regra = Object.keys(MENSAGEM_DA_REGRA).find((nome) => msg.includes(`"${nome}"`));
+  if (regra) return MENSAGEM_DA_REGRA[regra];
   switch (e?.code) {
     case 'validacao':
       return msg || 'arquivo inválido';
@@ -121,8 +169,13 @@ export function mensagemDeErro(err: unknown): string {
       return deNegocio && msg !== SEM_PERMISSAO ? msg : 'sem permissão para esta ação';
     case '23505':
       return deNegocio ? msg : 'já existe um registro com esses dados (e-mail, matrícula, tag, série ou código repetido)';
-    case '23503':
-      return 'o registro está vinculado a outros dados (histórico, chamados ou termos) e não pode ser removido';
+    case '23503': {
+      const tabela = msg.match(/^update or delete on table "(\w+)"/)?.[1];
+      return (
+        (tabela && MENSAGEM_DO_VINCULO[tabela]) ||
+        'o registro está vinculado a outros dados (histórico, chamados ou termos) e não pode ser removido'
+      );
+    }
     case '23514':
       return deNegocio ? msg : 'valor não aceito pelo banco';
     case '23502':
@@ -175,6 +228,8 @@ const linhaAtivo = (a: Asset): TablesInsert<'ativos'> => ({
   sistema_operacional: a.sistemaOperacional || null,
   fiscal: json(a.fiscal || {}),
   custom_fields: json(a.customFields || {}),
+  observacoes: a.observacoes?.trim() || null,
+  fornecedor_id: a.fornecedorId || null,
 });
 
 const linhaCustodia = (ativoId: string, c: CustodyHistoryEntry): TablesInsert<'historico_custodia'> => ({
@@ -200,6 +255,7 @@ const linhaLicenca = (l: SoftwareLicense): TablesInsert<'licencas_software'> => 
   data_renovacao: l.dataRenovacao,
   url_painel: l.urlPainel || null,
   observacoes: l.observacoes || null,
+  fornecedor_id: l.fornecedorId || null,
 });
 
 const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
@@ -362,6 +418,26 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     if (s.bitlocker_key) bitlockerByAssetId[s.ativo_id] = s.bitlocker_key;
   });
 
+  // Fase 8: anexos, manutenções e baixas (só TI; para os demais a RLS devolve vazio, e
+  // antes da migration as tabelas não existem: o erro é ignorado e as listas ficam vazias)
+  const [{ data: anexosData }, { data: manutencoesData }, { data: baixasData }] = await Promise.all([
+    supabase.from('ativo_anexos').select('*').order('criado_em'),
+    supabase.from('manutencoes').select('*').order('aberta_em'),
+    supabase.from('ativo_baixas').select('*').order('criado_em'),
+  ]);
+  const anexosPorAtivo: Record<string, AnexoAtivo[]> = {};
+  (anexosData || []).forEach((l) => {
+    (anexosPorAtivo[l.ativo_id] ||= []).push(anexoAtivoDeLinha(l));
+  });
+  const manutencoesPorAtivo: Record<string, Manutencao[]> = {};
+  (manutencoesData || []).forEach((l) => {
+    (manutencoesPorAtivo[l.ativo_id] ||= []).push(manutencaoDeLinha(l));
+  });
+  const baixasPorAtivo: Record<string, BaixaAtivo[]> = {};
+  (baixasData || []).forEach((l) => {
+    (baixasPorAtivo[l.ativo_id] ||= []).push(baixaDeLinha(l));
+  });
+
   const custodyByAssetId: Record<string, CustodyHistoryEntry[]> = {};
   (custodyData || []).forEach((c) => {
     if (!custodyByAssetId[c.ativo_id]) custodyByAssetId[c.ativo_id] = [];
@@ -394,9 +470,201 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     bitlockerKey: bitlockerByAssetId[a.id] || undefined,
     fiscal: (a.fiscal || {}) as unknown as FiscalData,
     customFields: (a.custom_fields || {}) as Record<string, string>,
+    observacoes: a.observacoes || undefined,
+    fornecedorId: a.fornecedor_id || undefined,
+    anexos: anexosPorAtivo[a.id] || [],
     historicoCustodia: custodyByAssetId[a.id] || [],
-    historicoManutencao: [],
+    historicoManutencao: manutencoesPorAtivo[a.id] || [],
+    baixas: baixasPorAtivo[a.id] || [],
   })) : [];
+}
+
+// ---------------------------------------------------------------------------
+// 3a. Fase 8 · Manutenções e baixa patrimonial (só a T.I., pela RLS).
+// Enviar para manutenção, concluir/cancelar, dar baixa e estornar passam pelas
+// funções do banco, que mudam o status e a custódia do ativo na mesma
+// transação. "Manutenção já feita" é um INSERT direto (não muda o status).
+// ---------------------------------------------------------------------------
+const manutencaoDeLinha = (l: Tables<'manutencoes'>): Manutencao => ({
+  id: l.id,
+  ativoId: l.ativo_id,
+  tipo: l.tipo as TipoManutencao,
+  descricao: l.descricao,
+  numeroOs: l.numero_os || undefined,
+  fornecedorId: l.fornecedor_id || undefined,
+  contratoId: l.contrato_id || undefined,
+  chamadoId: l.chamado_id || undefined,
+  abertaEm: l.aberta_em,
+  previsao: l.previsao || undefined,
+  concluidaEm: l.concluida_em || undefined,
+  custo: Number(l.custo) || 0,
+  cobertoGarantia: l.coberto_garantia,
+  status: l.status as StatusManutencao,
+  observacoes: l.observacoes || undefined,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+  encerradoPor: l.encerrado_por || undefined,
+  encerradoEm: l.encerrado_em || undefined,
+});
+
+const baixaDeLinha = (l: Tables<'ativo_baixas'>): BaixaAtivo => ({
+  id: l.id,
+  ativoId: l.ativo_id,
+  dataBaixa: l.data_baixa,
+  motivo: l.motivo as MotivoBaixa,
+  destino: l.destino as DestinoBaixa,
+  destinatario: l.destinatario || undefined,
+  valorVenda: l.valor_venda ?? undefined,
+  documento: l.documento || undefined,
+  observacoes: l.observacoes || undefined,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+  estornadaEm: l.estornada_em || undefined,
+  estornadaPor: l.estornada_por || undefined,
+  motivoEstorno: l.motivo_estorno || undefined,
+});
+
+// Campos da manutenção nos nomes das colunas (texto vazio vira nulo, como nas funções do banco)
+const colunasManutencao = (d: DadosManutencao) => ({
+  tipo: d.tipo,
+  descricao: d.descricao.trim(),
+  numero_os: d.numeroOs?.trim() || null,
+  fornecedor_id: d.fornecedorId || null,
+  contrato_id: d.contratoId || null,
+  chamado_id: d.chamadoId || null,
+  aberta_em: d.abertaEm,
+  previsao: d.previsao || null,
+  custo: d.custo,
+  coberto_garantia: d.cobertoGarantia,
+  observacoes: d.observacoes?.trim() || null,
+});
+
+/** Envia o ativo para manutenção (grava e muda o status); devolve o id da manutenção */
+export async function abrirManutencaoDb(ativoId: string, dados: DadosManutencao): Promise<string> {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const id = await checar(supabase.rpc('abrir_manutencao', { p_ativo: ativoId, p_dados: json(colunasManutencao(dados)) }));
+  return id as string;
+}
+
+/** Lança no histórico uma manutenção já concluída, sem mexer no status do ativo */
+export async function registrarManutencaoFeitaDb(
+  ativoId: string,
+  dados: DadosManutencao & { concluidaEm: string }
+): Promise<string> {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const linha: TablesInsert<'manutencoes'> = {
+    ...colunasManutencao(dados),
+    ativo_id: ativoId,
+    concluida_em: dados.concluidaEm,
+    status: 'concluida',
+  };
+  const data = await checar(supabase.from('manutencoes').insert(linha).select('id').single());
+  return (data as { id: string }).id;
+}
+
+/** Conclui ou cancela: o banco devolve o ativo para "em uso" ou "disponível" */
+export async function encerrarManutencaoDb(
+  manutencaoId: string,
+  status: 'concluida' | 'cancelada',
+  dados: DadosEncerramentoManutencao
+) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('encerrar_manutencao', {
+      p_manutencao: manutencaoId,
+      p_status: status,
+      p_dados: json({ concluida_em: dados.concluidaEm, custo: dados.custo, observacoes: dados.observacoes }),
+    })
+  );
+}
+
+/** Baixa patrimonial (só ti_admin); devolve o id da baixa */
+export async function baixarAtivoDb(ativoId: string, dados: DadosBaixa): Promise<string> {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const id = await checar(
+    supabase.rpc('baixar_ativo', {
+      p_ativo: ativoId,
+      p_dados: json({
+        data_baixa: dados.dataBaixa,
+        motivo: dados.motivo,
+        destino: dados.destino,
+        destinatario: dados.destinatario,
+        valor_venda: dados.destino === 'venda' ? dados.valorVenda : undefined,
+        documento: dados.documento,
+        observacoes: dados.observacoes,
+      }),
+    })
+  );
+  return id as string;
+}
+
+/** Estorno da baixa (só ti_admin): o registro fica e o ativo volta ao estoque */
+export async function estornarBaixaDb(baixaId: string, motivo: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('estornar_baixa', { p_baixa: baixaId, p_motivo: motivo }));
+}
+
+type LinhaAnexoAtivo = Tables<'ativo_anexos'>;
+const anexoAtivoDeLinha = (l: LinhaAnexoAtivo): AnexoAtivo => ({
+  id: l.id,
+  ativoId: l.ativo_id,
+  categoria: l.categoria as CategoriaAnexoAtivo,
+  nome: l.nome,
+  caminho: l.caminho,
+  tipo: l.tipo || undefined,
+  tamanho: l.tamanho ?? undefined,
+  manutencaoId: l.manutencao_id || undefined,
+  baixaId: l.baixa_id || undefined,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+});
+
+/** Fase 8: anexa um arquivo ao ativo (pasta ativos/<id>/ do bucket privado; só TI) */
+export async function enviarAnexoAtivoDb(
+  ativoId: string,
+  arquivo: File,
+  categoria: CategoriaAnexoAtivo,
+  vinculo: { manutencaoId?: string; baixaId?: string } = {}
+): Promise<AnexoAtivo> {
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new DbError(erro, 'validacao');
+  const caminho = `ativos/${ativoId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
+  const linha: TablesInsert<'ativo_anexos'> = {
+    ativo_id: ativoId,
+    categoria,
+    nome: arquivo.name,
+    caminho,
+    tipo: arquivo.type,
+    tamanho: arquivo.size,
+    manutencao_id: vinculo.manutencaoId || null,
+    baixa_id: vinculo.baixaId || null,
+  };
+  if (!supabase) {
+    // Modo demonstração: arquivo só no navegador
+    return anexoAtivoDeLinha({
+      ...linha,
+      id: crypto.randomUUID(),
+      caminho: URL.createObjectURL(arquivo),
+      criado_em: new Date().toISOString(),
+    } as LinhaAnexoAtivo);
+  }
+  await enviar(caminho, arquivo);
+  try {
+    const data = await checar(supabase.from('ativo_anexos').insert(linha).select().single());
+    return anexoAtivoDeLinha(data as LinhaAnexoAtivo);
+  } catch (err) {
+    await removerArquivosDb([caminho]).catch(() => undefined);
+    throw err;
+  }
+}
+
+/** Fase 8: remove o registro e o arquivo do anexo */
+export async function removerAnexoAtivoDb(anexo: AnexoAtivo) {
+  if (!supabase) return;
+  await excluir('ativo_anexos', anexo.id);
+  // O registro já saiu: se apagar o arquivo falhar, o anexo some da tela do mesmo jeito
+  // (o arquivo fica só no Storage privado, sem link para ninguém abrir)
+  await removerArquivosDb([anexo.caminho]).catch((err) => console.error('Arquivo do anexo não apagado', err));
 }
 
 async function gravarSegredoAtivo(ativoId: string, chave?: string) {
@@ -475,6 +743,7 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     dataRenovacao: l.data_renovacao,
     urlPainel: l.url_painel || undefined,
     observacoes: l.observacoes || undefined,
+    fornecedorId: l.fornecedor_id || undefined,
   })) : [];
 }
 
@@ -524,6 +793,204 @@ export async function revogarLicencaDb(licencaId: string, colaboradorId: string)
   return (await checar(
     supabase.rpc('revogar_licenca', { p_licenca: licencaId, p_colaborador: colaboradorId })
   )) as string[];
+}
+
+// ---------------------------------------------------------------------------
+// 4b. Fase 8 · Fornecedores, contratos e faturas (só a T.I., pela RLS).
+// Quem cadastrou e quando é carimbado pelo banco. Antes da migration as
+// tabelas não existem: a leitura devolve lista vazia e as telas seguem.
+// ---------------------------------------------------------------------------
+const linhaFornecedor = (f: Fornecedor): TablesInsert<'fornecedores'> => ({
+  id: f.id,
+  nome: f.nome.trim(),
+  cnpj: f.cnpj?.trim() || null,
+  contato: f.contato?.trim() || null,
+  telefone: f.telefone?.trim() || null,
+  email: f.email?.trim() || null,
+  site: f.site?.trim() || null,
+  observacoes: f.observacoes?.trim() || null,
+  ativo: f.ativo,
+});
+
+const fornecedorDeLinha = (l: Tables<'fornecedores'>): Fornecedor => ({
+  id: l.id,
+  nome: l.nome,
+  cnpj: l.cnpj || undefined,
+  contato: l.contato || undefined,
+  telefone: l.telefone || undefined,
+  email: l.email || undefined,
+  site: l.site || undefined,
+  observacoes: l.observacoes || undefined,
+  ativo: l.ativo,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+});
+
+export async function fetchFornecedoresFromDb(): Promise<Fornecedor[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('fornecedores').select('*').order('nome');
+  return error ? [] : (data || []).map(fornecedorDeLinha);
+}
+
+export async function insertFornecedorDb(f: Fornecedor) {
+  if (!supabase) return;
+  await checar(supabase.from('fornecedores').insert(linhaFornecedor(f)));
+}
+
+export async function updateFornecedorDb(antes: Fornecedor, depois: Fornecedor) {
+  await atualizar('fornecedores', depois.id, camposAlterados(linhaFornecedor(antes), linhaFornecedor(depois)));
+}
+
+export async function deleteFornecedorDb(id: string) {
+  await excluir('fornecedores', id);
+}
+
+// O arquivo do contrato não entra aqui: vai por gravarArquivoDb, depois do registro
+const linhaContrato = (c: Contrato): TablesInsert<'contratos'> => ({
+  id: c.id,
+  fornecedor_id: c.fornecedorId,
+  tipo: c.tipo,
+  numero: c.numero?.trim() || null,
+  descricao: c.descricao.trim(),
+  inicio: c.inicio,
+  fim: c.fim || null,
+  valor: c.valor,
+  periodicidade: c.periodicidade,
+  sla: c.sla?.trim() || null,
+  contato_suporte: c.contatoSuporte?.trim() || null,
+  observacoes: c.observacoes?.trim() || null,
+});
+
+export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
+  if (!supabase) return null;
+  const [{ data, error }, { data: itensData }] = await Promise.all([
+    supabase.from('contratos').select('*').order('inicio', { ascending: false }),
+    supabase.from('contrato_itens').select('contrato_id, ativo_id, licenca_id'),
+  ]);
+  if (error) return [];
+  const itensPorContrato: Record<string, ItemContrato[]> = {};
+  (itensData || []).forEach((i) => {
+    const item: ItemContrato | null = i.ativo_id ? { ativoId: i.ativo_id } : i.licenca_id ? { licencaId: i.licenca_id } : null;
+    if (item) (itensPorContrato[i.contrato_id] ||= []).push(item);
+  });
+  return (data || []).map((l) => ({
+    id: l.id,
+    fornecedorId: l.fornecedor_id,
+    tipo: l.tipo as TipoContrato,
+    numero: l.numero || undefined,
+    descricao: l.descricao,
+    inicio: l.inicio,
+    fim: l.fim || undefined,
+    valor: Number(l.valor) || 0,
+    periodicidade: l.periodicidade as PeriodicidadeContrato,
+    sla: l.sla || undefined,
+    contatoSuporte: l.contato_suporte || undefined,
+    arquivoCaminho: l.arquivo_caminho || undefined,
+    observacoes: l.observacoes || undefined,
+    itens: itensPorContrato[l.id] || [],
+    criadoPor: l.criado_por || undefined,
+    criadoEm: l.criado_em,
+  }));
+}
+
+/**
+ * Contrato e itens cobertos numa transação só (função salvar_contrato do banco):
+ * cria ou atualiza o contrato, inclui os itens novos e exclui os que saíram.
+ * Se algo falhar, nada fica gravado e a tela desfaz a alteração.
+ */
+async function salvarContratoDb(c: Contrato) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('salvar_contrato', {
+      p_contrato: json(linhaContrato(c)),
+      p_itens: json(c.itens.map((i) => ({ ativo_id: i.ativoId || null, licenca_id: i.licencaId || null }))),
+    })
+  );
+}
+
+export const insertContratoDb = (c: Contrato) => salvarContratoDb(c);
+
+export const updateContratoDb = (_antes: Contrato, depois: Contrato) => salvarContratoDb(depois);
+
+/** Exclui o contrato (os itens saem junto) e o arquivo dele */
+export async function deleteContratoDb(c: Contrato) {
+  await excluir('contratos', c.id);
+  if (c.arquivoCaminho) await removerArquivosDb([c.arquivoCaminho]).catch(() => undefined);
+}
+
+const linhaFatura = (f: Fatura): TablesInsert<'faturas'> => ({
+  id: f.id,
+  licenca_id: f.licencaId || null,
+  contrato_id: f.contratoId || null,
+  competencia: f.competencia,
+  valor: f.valor,
+  vencimento: f.vencimento,
+  pago_em: f.pagoEm || null,
+  status: f.status,
+  numero_documento: f.numeroDocumento?.trim() || null,
+  observacoes: f.observacoes?.trim() || null,
+});
+
+export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('faturas').select('*').order('competencia', { ascending: false });
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: l.id,
+    licencaId: l.licenca_id || undefined,
+    contratoId: l.contrato_id || undefined,
+    competencia: l.competencia,
+    valor: Number(l.valor) || 0,
+    vencimento: l.vencimento,
+    pagoEm: l.pago_em || undefined,
+    status: l.status as StatusFatura,
+    numeroDocumento: l.numero_documento || undefined,
+    arquivoCaminho: l.arquivo_caminho || undefined,
+    observacoes: l.observacoes || undefined,
+    criadoPor: l.criado_por || undefined,
+    criadoEm: l.criado_em,
+  }));
+}
+
+export async function insertFaturaDb(f: Fatura) {
+  if (!supabase) return;
+  await checar(supabase.from('faturas').insert(linhaFatura(f)));
+}
+
+export async function updateFaturaDb(antes: Fatura, depois: Fatura) {
+  await atualizar('faturas', depois.id, camposAlterados(linhaFatura(antes), linhaFatura(depois)));
+}
+
+export async function deleteFaturaDb(f: Fatura) {
+  await excluir('faturas', f.id);
+  if (f.arquivoCaminho) await removerArquivosDb([f.arquivoCaminho]).catch(() => undefined);
+}
+
+/**
+ * Arquivo do contrato ou da fatura (pastas contratos/<id>/ e faturas/<id>/,
+ * só a T.I. envia). Sobe o arquivo, grava o caminho no registro e só então
+ * apaga o arquivo anterior. Devolve o caminho novo.
+ */
+export async function gravarArquivoDb(
+  tabela: 'contratos' | 'faturas',
+  id: string,
+  arquivo: File,
+  anterior?: string
+): Promise<string> {
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new DbError(erro, 'validacao');
+  // Modo demonstração: arquivo só no navegador
+  if (!supabase) return URL.createObjectURL(arquivo);
+  const caminho = `${tabela}/${id}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
+  await enviar(caminho, arquivo);
+  try {
+    await atualizar(tabela, id, { arquivo_caminho: caminho });
+  } catch (err) {
+    await removerArquivosDb([caminho]).catch(() => undefined);
+    throw err;
+  }
+  if (anterior && anterior !== caminho) await removerArquivosDb([anterior]).catch(() => undefined);
+  return caminho;
 }
 
 // ---------------------------------------------------------------------------
@@ -743,6 +1210,10 @@ export function validarArquivo(arquivo: File): string | null {
 
 const nomeSeguro = (nome: string) =>
   nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+
+/** Nome para mostrar a partir do caminho no Storage (sem a pasta e sem o prefixo aleatório) */
+export const nomeDoArquivo = (caminho: string) =>
+  caminho.startsWith('blob:') ? 'arquivo' : (caminho.split('/').pop() || caminho).replace(/^[0-9a-f-]{36}-/i, '');
 
 export const formatarTamanho = (bytes: number) =>
   bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -997,6 +1468,8 @@ export async function fetchLembretesFromDb(): Promise<Lembrete[] | null> {
     status: l.status as Lembrete['status'],
     chamadoId: l.chamado_id || undefined,
     colaboradorId: l.colaborador_id || undefined,
+    ativoId: l.ativo_id || undefined,
+    contratoId: l.contrato_id || undefined,
     itemId: l.item_id || undefined,
     criadoPor: l.criado_por || undefined,
     criadoEm: l.criado_em,
@@ -1006,7 +1479,9 @@ export async function fetchLembretesFromDb(): Promise<Lembrete[] | null> {
   }));
 }
 
-export async function criarLembreteDb(l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId'>) {
+export async function criarLembreteDb(
+  l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId'>
+) {
   if (!supabase) return null;
   const data = await checar(
     supabase
@@ -1017,6 +1492,8 @@ export async function criarLembreteDb(l: Pick<Lembrete, 'titulo' | 'descricao' |
         vence_em: l.venceEm,
         chamado_id: l.chamadoId || null,
         colaborador_id: l.colaboradorId || null,
+        ativo_id: l.ativoId || null,
+        contrato_id: l.contratoId || null,
       })
       .select('id')
       .single()
@@ -1127,20 +1604,45 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthStatus> {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Limpeza completa (zerar base) — só ti_admin pela RLS; oculta em produção
+// 9. Limpeza completa (zerar base) — só ti_admin pela RLS. A única chamada é o
+// "Zerar dados" de Configurações, que fica oculto quando o Supabase está
+// configurado (Fase 0): na prática não roda em produção.
 // ---------------------------------------------------------------------------
+
+/** Tabela que ainda não existe (migration não aplicada): não há o que apagar nela */
+const tabelaAusente = (error: { code?: string; message?: string }) =>
+  error.code === '42P01' || error.code === 'PGRST205' || /does not exist|could not find the table/i.test(error.message || '');
+
 export async function clearAllDatabaseTables(keepEmployeeEmail?: string) {
   if (!supabase) return;
+  // Baixa patrimonial não se apaga (o banco recusa, por design). Confere antes de
+  // apagar qualquer coisa, para não deixar a base zerada pela metade.
+  const { count, error } = await supabase.from('ativo_baixas').select('id', { count: 'exact', head: true });
+  if (error && !tabelaAusente(error)) lancar(error);
+  if (count) {
+    throw new DbError(
+      `A base tem ${count} baixa(s) patrimonial(is) registrada(s). Elas fazem parte do histórico e não podem ser apagadas; nada foi apagado`,
+      '23514'
+    );
+  }
+  // Ordem segura das chaves estrangeiras: primeiro quem aponta, depois o apontado
   const tabelas = [
+    'ativo_anexos', // -> ativos, manutencoes, ativo_baixas
+    'manutencoes', // -> ativos, fornecedores, contratos, chamados
+    'faturas', // -> licencas_software, contratos
+    'contrato_itens', // -> contratos, ativos, licencas_software
+    'contratos', // -> fornecedores
     'chamado_mensagens',
     'chamados',
     'termos_responsabilidade',
     'historico_custodia',
     'ativos',
     'licencas_software',
+    'fornecedores', // <- ativos e licenças (fornecedor_id)
   ];
   for (const t of tabelas) {
-    await checar(bd().from(t).delete().neq('id', 'dummy_zero'));
+    const { error: erroTabela } = await bd().from(t).delete().neq('id', 'dummy_zero');
+    if (erroTabela && !tabelaAusente(erroTabela)) lancar(erroTabela);
   }
   if (keepEmployeeEmail) {
     await checar(bd().from('colaboradores').delete().neq('email', keepEmployeeEmail.toLowerCase()));

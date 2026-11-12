@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import {  } from '../../types/index.ts';
-import { formatDate, formatCurrency, getWarrantyStatus } from '../../utils/formatters.ts';
+import { formatDate, formatCurrency } from '../../utils/formatters.ts';
+import { garantiaEfetiva } from '../../utils/contratos.ts';
 import {
   Search,
   Plus,
@@ -27,19 +27,26 @@ export const AssetsView: React.FC = () => {
     setSelectedEmployeeIdFor360,
     setSelectedAssetForQrCode,
     currentRole,
+    contratos,
+    fornecedores,
   } = useApp();
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
   const [categoryFilter, setCategoryFilter] = useState<string>('todos');
-  const [statusFilter, setStatusFilter] = useState<string>('todos');
+  const [statusFilter, setStatusFilter] = useState<string>('ativos');
+  const [garantiaFilter, setGarantiaFilter] = useState<string>('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewAssetModal, setShowNewAssetModal] = useState(false);
 
   // Filtro de ativos
   const filteredAssets = assets.filter((asset) => {
     const matchesCategory = categoryFilter === 'todos' || asset.categoria === categoryFilter;
-    const matchesStatus = statusFilter === 'todos' || asset.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'ativos' ? asset.status !== 'descartado' : asset.status === statusFilter;
+    // Fase 8: garantia efetiva (fábrica ou contrato de suporte/garantia estendida, a maior)
+    const matchesGarantia =
+      garantiaFilter === 'todas' || garantiaEfetiva(asset, contratos).status === garantiaFilter;
     const matchesSearch =
       asset.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       asset.tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -47,7 +54,7 @@ export const AssetsView: React.FC = () => {
       asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (asset.fiscal?.numeroNF && asset.fiscal.numeroNF.includes(searchTerm));
 
-    return matchesCategory && matchesStatus && matchesSearch;
+    return matchesCategory && matchesStatus && matchesGarantia && matchesSearch;
   });
 
   const getCustodian = (colabId?: string) => {
@@ -156,12 +163,26 @@ export const AssetsView: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700"
+                aria-label="Filtrar por status"
+                className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
               >
-                <option value="todos">Todos os Status</option>
+                <option value="ativos">Todos (exceto baixados)</option>
                 <option value="em_uso">Em Uso (Alocado)</option>
                 <option value="disponivel">Disponível em Estoque</option>
                 <option value="manutencao">Em Manutenção</option>
+                <option value="descartado">Baixados</option>
+              </select>
+
+              <select
+                value={garantiaFilter}
+                onChange={(e) => setGarantiaFilter(e.target.value)}
+                aria-label="Filtrar por garantia"
+                className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+              >
+                <option value="todas">Garantia: todas</option>
+                <option value="expirando">Vencendo</option>
+                <option value="expirada">Vencida</option>
+                <option value="sem_data">Sem data</option>
               </select>
             </div>
           )}
@@ -196,7 +217,8 @@ export const AssetsView: React.FC = () => {
                             <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h3>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {lic.fornecedor} · Contrato: <span className="font-mono">{lic.chaveContrato}</span>
+                            {fornecedores.find((f) => f.id === lic.fornecedorId)?.nome || lic.fornecedor} · Contrato:{' '}
+                            <span className="font-mono">{lic.chaveContrato}</span>
                           </p>
                         </div>
                       </button>
@@ -320,7 +342,7 @@ export const AssetsView: React.FC = () => {
                 {filteredAssets.length > 0 ? (
                   filteredAssets.map((asset) => {
                     const custodian = getCustodian(asset.custodianteId);
-                    const warranty = getWarrantyStatus(asset.fiscal?.dataGarantia);
+                    const warranty = garantiaEfetiva(asset, contratos);
 
                     return (
                       <tr
@@ -359,7 +381,9 @@ export const AssetsView: React.FC = () => {
                               <ExternalLink className="w-3 h-3 text-blue-400" />
                             </button>
                           ) : (
-                            <span className="text-slate-500 italic">Disponível em Estoque</span>
+                            <span className="text-slate-500 italic">
+                              {asset.status === 'descartado' ? 'Baixado (fora do estoque)' : 'Disponível em Estoque'}
+                            </span>
                           )}
                         </td>
 
@@ -370,10 +394,13 @@ export const AssetsView: React.FC = () => {
                                 ? 'text-blue-700 bg-blue-50'
                                 : asset.status === 'disponivel'
                                 ? 'text-emerald-700 bg-emerald-50'
+                                : asset.status === 'descartado'
+                                ? 'text-slate-600 bg-slate-100'
                                 : 'text-amber-700 bg-amber-50'
                             }`}
                           >
-                            {asset.status.replace('_', ' ')}
+                            {/* Fase 8: o status "descartado" é a baixa patrimonial (como na ficha e no filtro) */}
+                            {asset.status === 'descartado' ? 'Baixado' : asset.status.replace('_', ' ')}
                           </span>
                         </td>
 
@@ -382,7 +409,7 @@ export const AssetsView: React.FC = () => {
                           {warranty.status === 'valida' && (
                             <span className="text-emerald-700 flex items-center gap-1 font-medium text-xs">
                               <ShieldCheck className="w-3.5 h-3.5" />
-                              {formatDate(asset.fiscal?.dataGarantia)}
+                              {formatDate(warranty.fim)}
                             </span>
                           )}
                           {warranty.status === 'expirando' && (
@@ -394,6 +421,7 @@ export const AssetsView: React.FC = () => {
                           {warranty.status === 'expirada' && (
                             <span className="text-slate-500 text-xs">Expirada</span>
                           )}
+                          {warranty.status === 'sem_data' && <span className="text-slate-500 text-xs">Sem data</span>}
                         </td>
 
                         {/* Ações */}

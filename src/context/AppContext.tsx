@@ -1,13 +1,21 @@
-import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useState, useEffect } from 'react';
 import { confirmarDescarte } from '../components/comum/BarraAlteracoes.tsx';
 import {
+  AnexoAtivo,
+  CategoriaAnexoAtivo,
   Asset,
   CatalogoItem,
   ColaboradorRecurso,
   CompanySettings,
+  Contrato,
   CustodyHistoryEntry,
+  DadosBaixa,
+  DadosEncerramentoManutencao,
+  DadosManutencao,
   Department,
   Employee,
+  Fatura,
+  Fornecedor,
   Lembrete,
   ProcessoItem,
   ProcessoItemRascunho,
@@ -22,8 +30,11 @@ import {
 import {
   INITIAL_ASSETS,
   INITIAL_COMPANY_SETTINGS,
+  INITIAL_CONTRATOS,
   INITIAL_DEPARTMENTS,
   INITIAL_EMPLOYEES,
+  INITIAL_FATURAS,
+  INITIAL_FORNECEDORES,
   INITIAL_LICENSES,
   INITIAL_TERMS,
   INITIAL_TICKETS,
@@ -53,6 +64,8 @@ import {
   deleteEmployeeDb,
   fetchAssetsFromDb,
   insertAssetDb,
+  enviarAnexoAtivoDb,
+  removerAnexoAtivoDb,
   updateAssetDb,
   fetchLicensesFromDb,
   insertLicenseDb,
@@ -93,11 +106,48 @@ import {
   aceitarTermoDb,
   dispensarAssinaturaTermoDb,
   acessoNexusDb,
+  fetchFornecedoresFromDb,
+  insertFornecedorDb,
+  updateFornecedorDb,
+  deleteFornecedorDb,
+  fetchContratosFromDb,
+  insertContratoDb,
+  updateContratoDb,
+  deleteContratoDb,
+  fetchFaturasFromDb,
+  insertFaturaDb,
+  updateFaturaDb,
+  deleteFaturaDb,
+  gravarArquivoDb,
+  abrirManutencaoDb,
+  registrarManutencaoFeitaDb,
+  encerrarManutencaoDb,
+  baixarAtivoDb,
+  estornarBaixaDb,
 } from '../services/supabaseDb.ts';
 import { CATALOGO_PADRAO } from '../utils/processos.ts';
+import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
+import {
+  aplicarAbertura,
+  aplicarBaixa,
+  aplicarEncerramento,
+  aplicarEstorno,
+  aplicarManutencaoFeita,
+  bloqueiosDaBaixa,
+  erroAoAbrirManutencao,
+  juntarObservacoes,
+  novaManutencao,
+  statusAoMudarCustodia,
+  validarBaixa,
+  validarEncerramento,
+  validarManutencao,
+} from '../utils/cicloVida.ts';
 
 /** Tipo do pedido de senha: link de e-mail ou primeiro login com senha provisória (Fase 6) */
 export type TipoLinkSenha = 'recovery' | 'invite' | 'primeiro_acesso';
+
+/** Fase 8: o id do registro criado (manutenção, baixa) ou o motivo da recusa */
+export type ResultadoRegistro = { id: string; erro?: undefined } | { erro: string; id?: undefined };
 
 /** Rascunho de edição de um chamado (Fase 5: só grava ao clicar em Salvar) */
 export interface AlteracoesChamado {
@@ -146,11 +196,31 @@ interface AppContextType {
   // Ações de Ativos
   addAsset: (asset: Omit<Asset, 'id'>) => Asset;
   updateAsset: (id: string, updates: Partial<Asset>) => void;
+  /** Fase 8: envia o arquivo e só então mostra o anexo (devolve false se falhar) */
+  anexarArquivoAtivo: (
+    ativoId: string,
+    arquivo: File,
+    categoria: CategoriaAnexoAtivo,
+    vinculo?: { manutencaoId?: string; baixaId?: string }
+  ) => Promise<boolean>;
+  removerAnexoAtivo: (anexo: AnexoAtivo) => Promise<boolean>;
   transferAssetCustody: (
     assetId: string,
     newColaboradorId: string | null,
     motivoDevolucao?: string
   ) => void;
+
+  // Fase 8 · Manutenção e baixa. As funções do banco mudam o status e a custódia:
+  // a tela espera a resposta, e o erro volta em texto para mostrar no formulário.
+  abrirManutencao: (ativoId: string, dados: DadosManutencao) => Promise<ResultadoRegistro>;
+  registrarManutencaoFeita: (ativoId: string, dados: DadosManutencao & { concluidaEm: string }) => Promise<ResultadoRegistro>;
+  encerrarManutencao: (
+    manutencaoId: string,
+    status: 'concluida' | 'cancelada',
+    dados?: DadosEncerramentoManutencao
+  ) => Promise<string | null>;
+  baixarAtivo: (ativoId: string, dados: DadosBaixa) => Promise<ResultadoRegistro>;
+  estornarBaixa: (baixaId: string, motivo: string) => Promise<string | null>;
 
   // Ações de Licenças
   addLicense: (license: Omit<SoftwareLicense, 'id' | 'assentosAlocados'>) => SoftwareLicense;
@@ -211,10 +281,30 @@ interface AppContextType {
     chamadoId?: string
   ) => Promise<{ email: string; senha: string } | { erro: string }>;
   salvarCatalogo: (itens: CatalogoItem[], novosIds: string[]) => Promise<boolean>;
-  criarLembrete: (l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId'>) => Promise<string | null>;
+  criarLembrete: (
+    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId'>
+  ) => Promise<string | null>;
   encerrarLembrete: (id: string, status: 'feito' | 'cancelado', observacao?: string) => Promise<string | null>;
   aceitarTermo: (termoId: string) => Promise<string | null>;
   dispensarAssinaturaTermo: (termoId: string, motivo: string) => Promise<string | null>;
+
+  // Fase 8 · Fornecedores, contratos e faturas (só a T.I.; gravação otimista)
+  fornecedores: Fornecedor[];
+  contratos: Contrato[];
+  faturas: Fatura[];
+  criarFornecedor: (dados: Omit<Fornecedor, 'id' | 'criadoEm' | 'criadoPor'>) => Fornecedor;
+  alterarFornecedor: (id: string, mudancas: Partial<Fornecedor>) => void;
+  excluirFornecedor: (id: string) => { success: boolean; message?: string };
+  criarContrato: (dados: Omit<Contrato, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>) => Contrato;
+  alterarContrato: (id: string, mudancas: Partial<Contrato>) => void;
+  excluirContrato: (id: string) => { success: boolean; message?: string };
+  lancarFatura: (dados: Omit<Fatura, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>) => Fatura;
+  alterarFatura: (id: string, mudancas: Partial<Fatura>) => void;
+  excluirFatura: (id: string) => void;
+  /** Sobe o arquivo do contrato/fatura (espera o registro novo ser gravado); false se falhar */
+  anexarArquivoContrato: (contratoId: string, arquivo: File) => Promise<boolean>;
+  anexarArquivoFatura: (faturaId: string, arquivo: File) => Promise<boolean>;
+
   erroLinkAuth: string | null;
   solicitarRecuperacaoSenha: (email: string) => Promise<{ success: boolean; error?: string }>;
   definirNovaSenha: (senha: string) => Promise<{ success: boolean; error?: string }>;
@@ -309,7 +399,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = parseStoredOrNull<Asset[]>(STORAGE_KEYS.ASSETS, (ast) =>
       ast.some((a) => a.id === 'ast-1' || a.id === 'ast-001')
     );
-    if (saved) return saved;
+    // Fase 8: o cache do modo demonstração pode ter manutenções no formato antigo (sem abertaEm)
+    if (saved) {
+      return saved.map((a) => ({ ...a, historicoManutencao: (a.historicoManutencao || []).filter((m) => Boolean(m.abertaEm)) }));
+    }
     return isProduction ? [] : INITIAL_ASSETS;
   });
 
@@ -358,6 +451,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [recursos, setRecursos] = useState<ColaboradorRecurso[]>([]);
   const [lembretes, setLembretes] = useState<Lembrete[]>([]);
 
+  // Fase 8: fornecedores, contratos e faturas (no modo demonstração, só em memória)
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(isProduction ? [] : INITIAL_FORNECEDORES);
+  const [contratos, setContratos] = useState<Contrato[]>(isProduction ? [] : INITIAL_CONTRATOS);
+  const [faturas, setFaturas] = useState<Fatura[]>(isProduction ? [] : INITIAL_FATURAS);
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     if (isProduction) return null;
     return localStorage.getItem(STORAGE_KEYS.USER) || 'emp-1';
@@ -392,6 +490,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProcessoItens([]);
     setRecursos([]);
     setLembretes([]);
+    setFornecedores([]);
+    setContratos([]);
+    setFaturas([]);
     setCurrentUserId(null);
     setSupabaseUser(null);
     limparCacheLocal();
@@ -472,6 +573,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbItens) setProcessoItens(dbItens);
         if (dbRecursos) setRecursos(dbRecursos);
         if (dbLembretes) setLembretes(dbLembretes);
+
+        // Fase 8: só a T.I. lê (para os demais a RLS devolve vazio; sem a migration, também)
+        const [dbFornecedores, dbContratos, dbFaturas] = await Promise.all([
+          fetchFornecedoresFromDb(),
+          fetchContratosFromDb(),
+          fetchFaturasFromDb(),
+        ]);
+        if (dbFornecedores) setFornecedores(dbFornecedores);
+        if (dbContratos) setContratos(dbContratos);
+        if (dbFaturas) setFaturas(dbFaturas);
 
         // Configurações
         if (dbSettings) {
@@ -847,12 +958,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       historicoCustodia: (data.historicoCustodia || []).map((c) => ({ ...c, id: novoId('cust') })),
     };
     setAssets((prev) => [novo, ...prev]);
+    const insercao = insertAssetDb(novo);
+    insercoes.current.set(novo.id, insercao);
     persistir(
-      insertAssetDb(novo),
+      insercao,
       () => setAssets((prev) => prev.filter((a) => a.id !== novo.id)),
       `Não foi possível cadastrar o ativo ${novo.tag}`
     );
     return novo;
+  };
+
+  // Fase 8: o arquivo de um registro recém-cadastrado (ativo, contrato, fatura)
+  // espera a gravação do registro terminar
+  const insercoes = useRef(new Map<string, Promise<unknown>>());
+
+  const anexarArquivoAtivo: AppContextType['anexarArquivoAtivo'] = async (ativoId, arquivo, categoria, vinculo) => {
+    try {
+      await insercoes.current.get(ativoId);
+      const anexo = await enviarAnexoAtivoDb(ativoId, arquivo, categoria, vinculo);
+      setAssets((prev) => prev.map((a) => (a.id === ativoId ? { ...a, anexos: [...(a.anexos || []), anexo] } : a)));
+      return true;
+    } catch (err) {
+      console.error('Anexo do ativo', err);
+      setDbErro(`Não foi possível anexar "${arquivo.name}": ${mensagemDeErro(err)}.`);
+      return false;
+    }
+  };
+
+  const removerAnexoAtivo = async (anexo: AnexoAtivo) => {
+    try {
+      await removerAnexoAtivoDb(anexo);
+      setAssets((prev) =>
+        prev.map((a) => (a.id === anexo.ativoId ? { ...a, anexos: (a.anexos || []).filter((x) => x.id !== anexo.id) } : a))
+      );
+      return true;
+    } catch (err) {
+      console.error('Remover anexo do ativo', err);
+      setDbErro(`Não foi possível remover "${anexo.nome}": ${mensagemDeErro(err)}.`);
+      return false;
+    }
   };
 
   const updateAsset = (id: string, updates: Partial<Asset>) => {
@@ -904,7 +1048,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const depois: Asset = {
       ...antes,
       custodianteId: newColaboradorId || undefined,
-      status: newColaboradorId ? 'em_uso' : 'disponivel',
+      // Fase 8: com manutenção em andamento continua "em manutenção" (o banco garante o mesmo)
+      status: statusAoMudarCustodia(antes, newColaboradorId),
       dataEntregaAtual: newColaboradorId ? today : undefined,
       historicoCustodia: historico,
     };
@@ -916,6 +1061,148 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await updateAssetDb(antes, depois);
     };
     persistir(gravar(), () => setAssets((prev) => trocar(prev, antes)), `Não foi possível transferir a custódia de ${antes.tag}`);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Fase 8 · Manutenção e baixa patrimonial. As funções do banco mudam o status
+  // e a custódia numa transação: a tela espera a resposta e então relê os ativos
+  // como o banco ficou. Sem Supabase, as mesmas regras valem só na memória.
+  // ---------------------------------------------------------------------------
+  const ehTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+
+  const aplicarNoAtivo = (ativoId: string, mudar: (a: Asset) => Asset) =>
+    setAssets((prev) => prev.map((a) => (a.id === ativoId ? mudar(a) : a)));
+
+  /** Depois de uma função do banco: relê os ativos; se a leitura falhar, aplica a mesma regra localmente */
+  const refletirDoBanco = async (ativoId: string, mudar: (a: Asset) => Asset) => {
+    const lista = await fetchAssetsFromDb();
+    if (lista) setAssets(lista);
+    else aplicarNoAtivo(ativoId, mudar);
+  };
+
+  const ativoDaManutencao = (manutencaoId: string) => {
+    for (const a of assets) {
+      const m = a.historicoManutencao.find((x) => x.id === manutencaoId);
+      if (m) return { ativo: a, manutencao: m };
+    }
+    return null;
+  };
+
+  const abrirManutencao = async (ativoId: string, dados: DadosManutencao): Promise<ResultadoRegistro> => {
+    const ativo = assets.find((a) => a.id === ativoId);
+    if (!ativo) return { erro: 'Ativo não encontrado.' };
+    const problema = validarManutencao(dados) || erroAoAbrirManutencao(ativo);
+    if (problema) return { erro: problema };
+    if (!isProduction && !ehTI) return { erro: 'Apenas a T.I. registra manutenções' };
+    try {
+      const id = isProduction ? await abrirManutencaoDb(ativoId, dados) : novoId('man');
+      const mudar = (a: Asset) => aplicarAbertura(a, novaManutencao(id, ativoId, dados, currentUser?.id, new Date()));
+      if (isProduction) await refletirDoBanco(ativoId, mudar);
+      else aplicarNoAtivo(ativoId, mudar);
+      return { id };
+    } catch (err) {
+      console.error('Enviar para manutenção', err);
+      return { erro: mensagemDeErro(err) };
+    }
+  };
+
+  const registrarManutencaoFeita = async (
+    ativoId: string,
+    dados: DadosManutencao & { concluidaEm: string }
+  ): Promise<ResultadoRegistro> => {
+    const problema = validarManutencao(dados, true);
+    if (problema) return { erro: problema };
+    if (!isProduction && !ehTI) return { erro: 'Apenas a T.I. registra manutenções' };
+    try {
+      const id = isProduction ? await registrarManutencaoFeitaDb(ativoId, dados) : novoId('man');
+      // Não muda o status: basta acrescentar ao histórico do ativo
+      aplicarNoAtivo(ativoId, (a) =>
+        aplicarManutencaoFeita(a, novaManutencao(id, ativoId, dados, currentUser?.id, new Date(), dados.concluidaEm))
+      );
+      return { id };
+    } catch (err) {
+      console.error('Registrar manutenção já feita', err);
+      return { erro: mensagemDeErro(err) };
+    }
+  };
+
+  const encerrarManutencao = async (
+    manutencaoId: string,
+    status: 'concluida' | 'cancelada',
+    dados: DadosEncerramentoManutencao = {}
+  ): Promise<string | null> => {
+    const achado = ativoDaManutencao(manutencaoId);
+    if (!achado) return 'Manutenção não encontrada.';
+    const { ativo, manutencao } = achado;
+    const problema = validarEncerramento(manutencao, status, dados);
+    if (problema) return problema;
+    if (!isProduction && !ehTI) return 'Apenas a T.I. registra manutenções';
+    // O banco troca a observação pela nova: a da abertura é mantida numa linha acima
+    const final = { ...dados, observacoes: juntarObservacoes(manutencao.observacoes, dados.observacoes, status) };
+    const mudar = (a: Asset) => aplicarEncerramento(a, manutencaoId, status, final, currentUser?.id, new Date());
+    try {
+      if (isProduction) {
+        await encerrarManutencaoDb(manutencaoId, status, final);
+        await refletirDoBanco(ativo.id, mudar);
+      } else {
+        aplicarNoAtivo(ativo.id, mudar);
+      }
+      return null;
+    } catch (err) {
+      console.error('Encerrar manutenção', err);
+      return mensagemDeErro(err);
+    }
+  };
+
+  const baixarAtivo = async (ativoId: string, dados: DadosBaixa): Promise<ResultadoRegistro> => {
+    const ativo = assets.find((a) => a.id === ativoId);
+    if (!ativo) return { erro: 'Ativo não encontrado.' };
+    const problema = validarBaixa(dados) || bloqueiosDaBaixa(ativo, dados.motivo)[0];
+    if (problema) return { erro: problema };
+    if (!isProduction && currentRole !== 'ti_admin') return { erro: 'Apenas o administrador de T.I. dá baixa em ativos' };
+    try {
+      const id = isProduction ? await baixarAtivoDb(ativoId, dados) : novoId('bxa');
+      const mudar = (a: Asset) =>
+        aplicarBaixa(a, {
+          ...dados,
+          id,
+          ativoId,
+          destinatario: dados.destinatario?.trim() || undefined,
+          documento: dados.documento?.trim() || undefined,
+          observacoes: dados.observacoes?.trim() || undefined,
+          valorVenda: dados.destino === 'venda' ? dados.valorVenda : undefined,
+          criadoPor: currentUser?.id,
+          criadoEm: new Date().toISOString(),
+        });
+      if (isProduction) await refletirDoBanco(ativoId, mudar);
+      else aplicarNoAtivo(ativoId, mudar);
+      return { id };
+    } catch (err) {
+      console.error('Dar baixa', err);
+      return { erro: mensagemDeErro(err) };
+    }
+  };
+
+  const estornarBaixa = async (baixaId: string, motivo: string): Promise<string | null> => {
+    const ativo = assets.find((a) => a.baixas?.some((b) => b.id === baixaId));
+    const baixa = ativo?.baixas?.find((b) => b.id === baixaId);
+    if (!ativo || !baixa) return 'Baixa não encontrada.';
+    if (!motivo.trim()) return 'Informe o motivo do estorno.';
+    if (baixa.estornadaEm) return 'Esta baixa já foi estornada.';
+    if (!isProduction && currentRole !== 'ti_admin') return 'Apenas o administrador de T.I. estorna baixas';
+    const mudar = (a: Asset) => aplicarEstorno(a, baixaId, motivo, currentUser?.id, new Date());
+    try {
+      if (isProduction) {
+        await estornarBaixaDb(baixaId, motivo.trim());
+        await refletirDoBanco(ativo.id, mudar);
+      } else {
+        aplicarNoAtivo(ativo.id, mudar);
+      }
+      return null;
+    } catch (err) {
+      console.error('Estornar baixa', err);
+      return mensagemDeErro(err);
+    }
   };
 
   // Licenças de Softwares & SaaS
@@ -951,6 +1238,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {
         success: false,
         message: `Não é possível excluir. Existem ${found.colaboradoresIds.length} colaborador(es) com assento ativo nesta licença. Libere os assentos primeiro.`,
+      };
+    }
+    // Fase 8: faturas e contratos guardam o histórico de custo da licença
+    if (faturas.some((f) => f.licencaId === id) || contratos.some((c) => c.itens.some((i) => i.licencaId === id))) {
+      return {
+        success: false,
+        message: 'Não é possível excluir. A licença tem faturas lançadas ou está coberta por um contrato.',
       };
     }
     setLicenses((prev) => prev.filter((l) => l.id !== id));
@@ -991,6 +1285,153 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Não foi possível liberar o assento em ${antes.nome}`
     );
   };
+
+  // ---------------------------------------------------------------------------
+  // Fase 8 · Fornecedores, contratos e faturas (só a T.I.). A tela muda na hora
+  // e volta atrás se o banco recusar (persistir). Arquivos sobem depois do registro.
+  // ---------------------------------------------------------------------------
+  const criarFornecedor = (dados: Omit<Fornecedor, 'id' | 'criadoEm' | 'criadoPor'>): Fornecedor => {
+    const novo: Fornecedor = { ...dados, id: novoId('forn'), criadoEm: new Date().toISOString() };
+    setFornecedores((prev) => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+    persistir(
+      insertFornecedorDb(novo),
+      () => setFornecedores((prev) => prev.filter((f) => f.id !== novo.id)),
+      `Não foi possível cadastrar o fornecedor ${novo.nome}`
+    );
+    return novo;
+  };
+
+  const alterarFornecedor = (id: string, mudancas: Partial<Fornecedor>) => {
+    const antes = fornecedores.find((f) => f.id === id);
+    if (!antes) return;
+    const depois: Fornecedor = { ...antes, ...mudancas };
+    setFornecedores((prev) => trocar(prev, depois));
+    persistir(
+      updateFornecedorDb(antes, depois),
+      () => setFornecedores((prev) => trocar(prev, antes)),
+      `Não foi possível salvar o fornecedor ${antes.nome}`
+    );
+  };
+
+  const excluirFornecedor = (id: string): { success: boolean; message?: string } => {
+    const antes = fornecedores.find((f) => f.id === id);
+    if (!antes) return { success: false, message: 'Fornecedor não encontrado.' };
+    const vinculos = vinculosDoFornecedor(id, { contratos, ativos: assets, licencas: licenses });
+    if (temVinculos(vinculos)) {
+      return {
+        success: false,
+        message: `${antes.nome} está vinculado a ${resumoVinculos(vinculos)} e não pode ser excluído. Desative o fornecedor para tirá-lo das listas de escolha.`,
+      };
+    }
+    setFornecedores((prev) => prev.filter((f) => f.id !== id));
+    persistir(
+      deleteFornecedorDb(id),
+      () => setFornecedores((prev) => [...prev, antes].sort((a, b) => a.nome.localeCompare(b.nome))),
+      `Não foi possível excluir o fornecedor ${antes.nome}`
+    );
+    return { success: true };
+  };
+
+  const criarContrato = (dados: Omit<Contrato, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>): Contrato => {
+    const novo: Contrato = { ...dados, id: novoId('ctr'), criadoEm: new Date().toISOString() };
+    setContratos((prev) => [novo, ...prev]);
+    // Contrato e itens são gravados juntos (salvar_contrato): falhou, nada fica e a tela desfaz
+    const insercao = insertContratoDb(novo);
+    insercoes.current.set(novo.id, insercao);
+    persistir(
+      insercao,
+      () => setContratos((prev) => prev.filter((c) => c.id !== novo.id)),
+      `Não foi possível cadastrar o contrato ${novo.numero || novo.descricao}`
+    );
+    return novo;
+  };
+
+  const alterarContrato = (id: string, mudancas: Partial<Contrato>) => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return;
+    const depois: Contrato = { ...antes, ...mudancas };
+    setContratos((prev) => trocar(prev, depois));
+    persistir(
+      updateContratoDb(antes, depois),
+      () => setContratos((prev) => trocar(prev, antes)),
+      `Não foi possível salvar o contrato ${antes.numero || antes.descricao}`
+    );
+  };
+
+  const excluirContrato = (id: string): { success: boolean; message?: string } => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return { success: false, message: 'Contrato não encontrado.' };
+    const qtdFaturas = faturas.filter((f) => f.contratoId === id).length;
+    if (qtdFaturas > 0) {
+      return {
+        success: false,
+        message: `O contrato tem ${qtdFaturas} fatura(s) lançada(s) e não pode ser excluído. As faturas guardam o histórico de custo.`,
+      };
+    }
+    setContratos((prev) => prev.filter((c) => c.id !== id));
+    persistir(
+      deleteContratoDb(antes),
+      () => setContratos((prev) => [antes, ...prev]),
+      `Não foi possível excluir o contrato ${antes.numero || antes.descricao}`
+    );
+    return { success: true };
+  };
+
+  const lancarFatura = (dados: Omit<Fatura, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>): Fatura => {
+    const nova: Fatura = { ...dados, id: novoId('fat'), criadoEm: new Date().toISOString() };
+    setFaturas((prev) => [nova, ...prev]);
+    const insercao = insertFaturaDb(nova);
+    insercoes.current.set(nova.id, insercao);
+    persistir(
+      insercao,
+      () => setFaturas((prev) => prev.filter((f) => f.id !== nova.id)),
+      'Não foi possível lançar a fatura'
+    );
+    return nova;
+  };
+
+  const alterarFatura = (id: string, mudancas: Partial<Fatura>) => {
+    const antes = faturas.find((f) => f.id === id);
+    if (!antes) return;
+    const depois: Fatura = { ...antes, ...mudancas };
+    setFaturas((prev) => trocar(prev, depois));
+    persistir(updateFaturaDb(antes, depois), () => setFaturas((prev) => trocar(prev, antes)), 'Não foi possível salvar a fatura');
+  };
+
+  const excluirFatura = (id: string) => {
+    const antes = faturas.find((f) => f.id === id);
+    if (!antes) return;
+    setFaturas((prev) => prev.filter((f) => f.id !== id));
+    persistir(deleteFaturaDb(antes), () => setFaturas((prev) => [antes, ...prev]), 'Não foi possível excluir a fatura');
+  };
+
+  const anexarArquivoRegistro = async (
+    tabela: 'contratos' | 'faturas',
+    id: string,
+    arquivo: File,
+    anterior: string | undefined,
+    aplicar: (caminho: string) => void
+  ) => {
+    try {
+      await insercoes.current.get(id);
+      aplicar(await gravarArquivoDb(tabela, id, arquivo, anterior));
+      return true;
+    } catch (err) {
+      console.error(`Arquivo (${tabela})`, err);
+      setDbErro(`Não foi possível anexar "${arquivo.name}": ${mensagemDeErro(err)}.`);
+      return false;
+    }
+  };
+
+  const anexarArquivoContrato = (contratoId: string, arquivo: File) =>
+    anexarArquivoRegistro('contratos', contratoId, arquivo, contratos.find((c) => c.id === contratoId)?.arquivoCaminho, (caminho) =>
+      setContratos((prev) => prev.map((c) => (c.id === contratoId ? { ...c, arquivoCaminho: caminho } : c)))
+    );
+
+  const anexarArquivoFatura = (faturaId: string, arquivo: File) =>
+    anexarArquivoRegistro('faturas', faturaId, arquivo, faturas.find((f) => f.id === faturaId)?.arquivoCaminho, (caminho) =>
+      setFaturas((prev) => prev.map((f) => (f.id === faturaId ? { ...f, arquivoCaminho: caminho } : f)))
+    );
 
   // Service Desk / Chamados
   const createTicket = async (
@@ -1199,7 +1640,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : {
               ...a,
               custodianteId: undefined,
-              status: 'disponivel',
+              status: statusAoMudarCustodia(a, null),
               dataEntregaAtual: undefined,
               historicoCustodia: a.historicoCustodia.map((h) =>
                 h.colaboradorId === colabId && !h.dataDevolucao
@@ -1441,7 +1882,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const criarLembrete = async (
-    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId'>
+    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId'>
   ): Promise<string | null> => {
     if (isProduction) {
       try {
@@ -1539,6 +1980,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTickets(INITIAL_TICKETS);
     setTerms(INITIAL_TERMS);
     setSettings(INITIAL_COMPANY_SETTINGS);
+    setFornecedores(INITIAL_FORNECEDORES);
+    setContratos(INITIAL_CONTRATOS);
+    setFaturas(INITIAL_FATURAS);
     setCurrentUserId('emp-1');
   };
 
@@ -1583,6 +2027,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLicenses([]);
     setTickets([]);
     setTerms([]);
+    setFornecedores([]);
+    setContratos([]);
+    setFaturas([]);
     if (activeAdmin) {
       setCurrentUserId(activeAdmin.id);
       localStorage.setItem(STORAGE_KEYS.USER, activeAdmin.id);
@@ -1630,6 +2077,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         encerrarLembrete,
         aceitarTermo,
         dispensarAssinaturaTermo,
+        fornecedores,
+        contratos,
+        faturas,
+        criarFornecedor,
+        alterarFornecedor,
+        excluirFornecedor,
+        criarContrato,
+        alterarContrato,
+        excluirContrato,
+        lancarFatura,
+        alterarFatura,
+        excluirFatura,
+        anexarArquivoContrato,
+        anexarArquivoFatura,
         solicitarRecuperacaoSenha,
         definirNovaSenha,
         loginWithGoogle,
@@ -1653,7 +2114,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteDepartment,
         addAsset,
         updateAsset,
+        anexarArquivoAtivo,
+        removerAnexoAtivo,
         transferAssetCustody,
+        abrirManutencao,
+        registrarManutencaoFeita,
+        encerrarManutencao,
+        baixarAtivo,
+        estornarBaixa,
         addLicense,
         updateLicense,
         deleteLicense,

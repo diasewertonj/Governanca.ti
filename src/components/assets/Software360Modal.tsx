@@ -15,6 +15,7 @@ import {
   Search,
   Globe,
 } from 'lucide-react';
+import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
 
 interface Software360ModalProps {
   softwareId: string;
@@ -33,6 +34,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setSoftwareToEdit,
     setSoftwareModalOpen,
     currentRole,
+    fornecedores,
+    podeDescartarPendencias,
   } = useApp();
 
   const [selectedColabToAssign, setSelectedColabToAssign] = useState('');
@@ -46,6 +49,12 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   if (!license) return null;
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  // Fase 8: nome do cadastro de fornecedores; sem vínculo, o texto antigo
+  const nomeFornecedor = fornecedores.find((f) => f.id === license.fornecedorId)?.nome || license.fornecedor;
+  // Fecha perguntando se houver fatura em digitação
+  const fechar = () => {
+    if (podeDescartarPendencias()) onClose();
+  };
   const freeSeats = Math.max(0, license.assentosTotais - license.assentosAlocados);
   const occupancyPercentage = Math.round((license.assentosAlocados / (license.assentosTotais || 1)) * 100);
 
@@ -119,25 +128,25 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 shrink-0 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
               <Key className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-slate-900 leading-tight">{license.nome}</h2>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold text-slate-900 leading-tight break-words">{license.nome}</h2>
                 <span className="text-xs font-mono font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
                   {license.chaveContrato}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                {license.fornecedor}
+                {nomeFornecedor}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {license.urlPainel && (
               <a
                 href={license.urlPainel}
@@ -155,6 +164,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               <button
                 type="button"
                 onClick={() => {
+                  // Fase 8: a ficha fecha; pergunta antes se há fatura em digitação
+                  if (!podeDescartarPendencias()) return;
                   setSoftwareToEdit(license);
                   setSoftwareModalOpen(true);
                   onClose();
@@ -167,7 +178,9 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             )}
 
             <button
-              onClick={onClose}
+              type="button"
+              aria-label="Fechar"
+              onClick={fechar}
               className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
             >
               <X className="w-5 h-5" />
@@ -315,6 +328,15 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               </div>
             </div>
           </div>
+
+          {/* Fase 8: faturas da licença (só a T.I.) */}
+          {isTI && (
+            <FaturasSecao
+              alvo={{ licencaId: license.id }}
+              periodicidade={license.tipoCobranca || 'mensal'}
+              valorPadrao={license.valorMensal}
+            />
+          )}
 
           {license.observacoes && (
             <div className="border border-slate-200 rounded-xl p-4 space-y-1">

@@ -9,12 +9,16 @@ interface SoftwareFormModalProps {
 }
 
 export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, softwareToEdit }) => {
-  const { addLicense, updateLicense, setSelectedSoftwareIdFor360 } = useApp();
+  const { addLicense, updateLicense, setSelectedSoftwareIdFor360, fornecedores } = useApp();
 
   const isEditing = Boolean(softwareToEdit);
 
   const [nome, setNome] = useState(softwareToEdit?.nome || '');
+  // Fase 8: fornecedor do cadastro; o texto antigo fica como reserva enquanto não houver vínculo
+  const [fornecedorId, setFornecedorId] = useState(softwareToEdit?.fornecedorId || '');
   const [fornecedor, setFornecedor] = useState(softwareToEdit?.fornecedor || '');
+  const fornecedorCadastro = fornecedores.find((f) => f.id === fornecedorId);
+  const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
   const [chaveContrato, setChaveContrato] = useState(() =>
     softwareToEdit?.chaveContrato || `CTR-SaaS-${Date.now().toString().slice(-4)}`
   );
@@ -33,7 +37,9 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !fornecedor.trim() || !chaveContrato.trim()) {
+    // Com vínculo, o texto passa a ser o nome do cadastro (é o que as outras telas mostram)
+    const nomeFornecedor = fornecedorCadastro ? fornecedorCadastro.nome : fornecedor.trim();
+    if (!nome.trim() || !nomeFornecedor || !chaveContrato.trim()) {
       setErrorMsg('Preencha os campos obrigatórios.');
       return;
     }
@@ -53,7 +59,8 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
 
       updateLicense(softwareToEdit.id, {
         nome: nome.trim(),
-        fornecedor: fornecedor.trim(),
+        fornecedor: nomeFornecedor,
+        fornecedorId: fornecedorId || undefined,
         chaveContrato: chaveContrato.trim(),
         assentosTotais: Number(assentosTotais),
         valorMensal: Number(valorMensal),
@@ -68,7 +75,8 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
     } else {
       const created = addLicense({
         nome: nome.trim(),
-        fornecedor: fornecedor.trim(),
+        fornecedor: nomeFornecedor,
+        fornecedorId: fornecedorId || undefined,
         chaveContrato: chaveContrato.trim(),
         assentosTotais: Number(assentosTotais),
         colaboradoresIds: [],
@@ -103,6 +111,8 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Fechar"
             onClick={onClose}
             className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
@@ -137,18 +147,44 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Fornecedor / Desenvolvedor *
+                <label htmlFor="licenca-fornecedor" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Fornecedor *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={fornecedor}
-                  onChange={(e) => setFornecedor(e.target.value)}
-                  placeholder="Ex: Microsoft, Google, Adobe, Atlassian"
+                <select
+                  id="licenca-fornecedor"
+                  value={fornecedorId}
+                  onChange={(e) => setFornecedorId(e.target.value)}
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
+                >
+                  <option value="">Sem vínculo (informar o nome)</option>
+                  {opcoesFornecedor.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
+                      {f.ativo ? '' : ' (inativo)'}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {!fornecedorId && (
+                <div>
+                  <label htmlFor="licenca-fornecedor-texto" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Fornecedor (texto) *
+                  </label>
+                  <input
+                    id="licenca-fornecedor-texto"
+                    type="text"
+                    required
+                    value={fornecedor}
+                    onChange={(e) => setFornecedor(e.target.value)}
+                    placeholder="Ex: Microsoft, Google, Adobe, Atlassian"
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  />
+                  <span className="text-xs text-slate-500 mt-0.5 block">
+                    Cadastre o fornecedor em "Fornecedores e contratos" para vinculá-lo.
+                  </span>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">

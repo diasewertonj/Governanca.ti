@@ -14,6 +14,7 @@ import { DefinirSenhaView } from './components/auth/DefinirSenhaView.tsx';
 // Fase 4: telas e modais carregam sob demanda (bundle inicial menor)
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.tsx').then((m) => ({ default: m.DashboardView })));
 const AssetsView = lazy(() => import('./components/assets/AssetsView.tsx').then((m) => ({ default: m.AssetsView })));
+const FornecedoresView = lazy(() => import('./components/fornecedores/FornecedoresView.tsx').then((m) => ({ default: m.FornecedoresView })));
 const CollaboratorsView = lazy(() => import('./components/collaborators/CollaboratorsView.tsx').then((m) => ({ default: m.CollaboratorsView })));
 const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
 const RhProcessesView = lazy(() => import('./components/rh/RhProcessesView.tsx').then((m) => ({ default: m.RhProcessesView })));
@@ -141,6 +142,7 @@ function MainApp() {
           {currentView === 'dashboard' &&
             (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} />)}
           {currentView === 'assets' && <AssetsView />}
+          {currentView === 'fornecedores' && <FornecedoresView />}
           {currentView === 'collaborators' && <CollaboratorsView />}
           {currentView === 'servicedesk' && (
             <ServiceDeskView onOpenNewTicketModal={() => setShowNewTicketModal(true)} />

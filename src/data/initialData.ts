@@ -1,8 +1,11 @@
 import {
   CompanySettings,
+  Contrato,
   Department,
   Employee,
   Asset,
+  Fatura,
+  Fornecedor,
   SoftwareLicense,
   Ticket,
   ResponsibilityTerm,
@@ -190,7 +193,6 @@ export const INITIAL_ASSETS: Asset[] = [
       dataAquisicao: '2024-01-03',
       dataGarantia: '2027-01-03', // Em garantia
       suporteContato: '0800 970 3355 (ProSupport 24x7)',
-      notaFiscalArquivoUrl: 'https://cdn.nexuscorp.com.br/docs/nf-004821.pdf',
     },
     sistemaOperacional: 'Windows 11 Pro 64-bit',
     bitlockerKey: '419204-183029-482019-582019-391029-482019-281920-492019',
@@ -213,11 +215,28 @@ export const INITIAL_ASSETS: Asset[] = [
     historicoManutencao: [
       {
         id: 'man-1',
-        data: '2025-06-12',
+        ativoId: 'ast-1',
+        tipo: 'preventiva',
         descricao: 'Limpeza preventiva interna, repaste térmico e atualização da BIOS Dell 1.14',
-        fornecedor: 'Dell ProSupport On-Site',
-        custo: 0.0,
-        status: 'concluido',
+        fornecedorId: 'forn-1',
+        abertaEm: '2025-06-12',
+        concluidaEm: '2025-06-12',
+        custo: 0,
+        cobertoGarantia: true,
+        status: 'concluida',
+        criadoEm: '2025-06-12T10:00:00Z',
+      },
+      {
+        id: 'man-2',
+        ativoId: 'ast-1',
+        tipo: 'corretiva',
+        descricao: 'Troca da bateria (desgaste acima de 30%)',
+        abertaEm: '2026-03-02',
+        concluidaEm: '2026-03-02',
+        custo: 400,
+        cobertoGarantia: false,
+        status: 'concluida',
+        criadoEm: '2026-03-02T10:00:00Z',
       },
     ],
   },
@@ -476,6 +495,7 @@ export const INITIAL_LICENSES: SoftwareLicense[] = [
     dataRenovacao: '2027-03-31',
     valorMensal: 3500.0,
     urlPainel: 'https://admin.microsoft.com',
+    fornecedorId: 'forn-2',
   },
   {
     id: 'lic-2',
@@ -512,6 +532,69 @@ export const INITIAL_LICENSES: SoftwareLicense[] = [
     dataRenovacao: '2027-02-01',
     valorMensal: 950.0,
     urlPainel: 'https://account.jetbrains.com',
+  },
+];
+
+// Fase 8: fornecedores, contratos e faturas de demonstração (só no modo sem Supabase)
+export const INITIAL_FORNECEDORES: Fornecedor[] = [
+  {
+    id: 'forn-1',
+    nome: 'Dell Computadores do Brasil Ltda',
+    contato: 'Equipe ProSupport',
+    telefone: '0800 970 3355',
+    site: 'https://www.dell.com.br',
+    ativo: true,
+    criadoEm: '2026-01-05T10:00:00Z',
+  },
+  {
+    id: 'forn-2',
+    nome: 'Microsoft Corporation',
+    contato: 'Revenda CSP',
+    site: 'https://admin.microsoft.com',
+    ativo: true,
+    criadoEm: '2026-01-05T10:00:00Z',
+  },
+];
+
+export const INITIAL_CONTRATOS: Contrato[] = [
+  {
+    id: 'ctr-1',
+    fornecedorId: 'forn-1',
+    tipo: 'suporte',
+    numero: '#CT-88',
+    descricao: 'Dell ProSupport On-Site 24x7',
+    inicio: '2026-01-01',
+    fim: '2027-06-30',
+    valor: 9000,
+    periodicidade: 'anual',
+    sla: 'Atendimento no local em até 1 dia útil',
+    contatoSuporte: '0800 970 3355',
+    itens: [{ ativoId: 'ast-1' }, { ativoId: 'ast-2' }],
+    criadoEm: '2026-01-05T10:00:00Z',
+  },
+];
+
+export const INITIAL_FATURAS: Fatura[] = [
+  {
+    id: 'fat-1',
+    licencaId: 'lic-1',
+    competencia: '2026-10-01',
+    valor: 3500,
+    vencimento: '2026-10-10',
+    pagoEm: '2026-10-08',
+    status: 'paga',
+    numeroDocumento: 'INV-1026',
+    criadoEm: '2026-10-01T10:00:00Z',
+  },
+  {
+    id: 'fat-2',
+    licencaId: 'lic-1',
+    competencia: '2026-11-01',
+    valor: 3500,
+    vencimento: '2026-11-10',
+    status: 'a_pagar',
+    numeroDocumento: 'INV-1126',
+    criadoEm: '2026-11-01T10:00:00Z',
   },
 ];
 

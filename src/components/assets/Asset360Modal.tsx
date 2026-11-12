@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatCurrency, formatDate, formatChaveNFe, getWarrantyStatus } from '../../utils/formatters.ts';
+import { formatCurrency, formatDate, formatChaveNFe } from '../../utils/formatters.ts';
+import { contratosQueCobrem, garantiaEfetiva, nomeContrato } from '../../utils/contratos.ts';
 import {
   X,
   QrCode,
@@ -9,6 +10,7 @@ import {
   Clock,
   Receipt,
   Wrench,
+  Pencil,
   ShieldAlert,
   ShieldCheck,
   Copy,
@@ -17,7 +19,16 @@ import {
   ExternalLink,
   Edit2,
   Lock,
+  Archive,
 } from 'lucide-react';
+import { NewAssetModal } from './NewAssetModal.tsx';
+import { AnexosAtivo } from './AnexosAtivo.tsx';
+import { LembreteGarantia } from './LembreteGarantia.tsx';
+import { ManutencoesAtivo } from './ManutencoesAtivo.tsx';
+import { FormManutencao } from './FormManutencao.tsx';
+import { FormBaixa } from './FormBaixa.tsx';
+import { BaixaPatrimonial } from './BaixaPatrimonial.tsx';
+import { podeEnviarParaManutencao } from '../../utils/cicloVida.ts';
 
 interface Asset360ModalProps {
   assetId: string;
@@ -37,6 +48,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
     updateAsset,
     currentUser,
     currentRole,
+    contratos,
+    fornecedores,
   } = useApp();
 
   const [copiedKey, setCopiedKey] = useState(false);
@@ -45,6 +58,9 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   const [selectedNewUser, setSelectedNewUser] = useState<string>('');
   const [motivoDevolucao, setMotivoDevolucao] = useState('');
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [enviandoManutencao, setEnviandoManutencao] = useState(false);
+  const [dandoBaixa, setDandoBaixa] = useState(false);
   const [tempSO, setTempSO] = useState('');
   const [tempBitlocker, setTempBitlocker] = useState('');
 
@@ -54,7 +70,10 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
 
   const currentCustodian = employees.find((e) => e.id === asset.custodianteId);
   const department = departments.find((d) => d.id === asset.setorId);
-  const warranty = getWarrantyStatus(asset.fiscal?.dataGarantia);
+  // Fase 8: a garantia considera os contratos de suporte/garantia estendida que cobrem o ativo
+  const warranty = garantiaEfetiva(asset, contratos);
+  const contratoCobertura = contratosQueCobrem(asset.id, contratos)[0];
+  const nomeFornecedor = fornecedores.find((f) => f.id === asset.fornecedorId)?.nome || asset.fiscal?.fornecedor;
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
   const handleCopyKey = () => {
@@ -116,31 +135,52 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
     disponivel: { label: 'Disponível em Estoque', textClass: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
     em_uso: { label: 'Em Uso / Alocado', textClass: 'text-blue-700 bg-blue-50 border-blue-200' },
     manutencao: { label: 'Em Manutenção', textClass: 'text-amber-700 bg-amber-50 border-amber-200' },
-    descartado: { label: 'Baixado / Descartado', textClass: 'text-slate-500 bg-slate-100 border-slate-200' },
+    descartado: { label: 'Baixado', textClass: 'text-slate-500 bg-slate-100 border-slate-200' },
   }[asset.status];
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
+          <div className="flex items-center gap-3 min-w-0">
             <span className="font-mono text-sm font-bold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-md border border-blue-200">
               {asset.tag}
             </span>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900 leading-tight">{asset.nome}</h2>
-              <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-slate-900 leading-tight break-words">{asset.nome}</h2>
+              <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500 mt-0.5">
                 <span>{asset.marca} {asset.modelo}</span>
-                <span>·</span>
+                <span aria-hidden="true">·</span>
                 <span className="capitalize">{asset.categoria}</span>
-                <span>·</span>
-                <span className="font-mono">S/N: {asset.serialNumber}</span>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono break-all">S/N: {asset.serialNumber}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isTI && asset.status !== 'descartado' && (
+              <button
+                type="button"
+                onClick={() => setEditando(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
+              >
+                <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                Editar
+              </button>
+            )}
+            {isTI && podeEnviarParaManutencao(asset) && (
+              <button
+                type="button"
+                onClick={() => setEnviandoManutencao(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors shadow-2xs"
+              >
+                <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
+                {asset.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleOpenQrCode}
@@ -151,7 +191,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               Etiqueta QR Code
             </button>
 
-            {(currentRole === 'ti_admin' || currentRole === 'ti_suporte') && (
+            {isTI && asset.status !== 'descartado' && (
               <button
                 type="button"
                 onClick={() => setShowTransferModal(true)}
@@ -162,7 +202,20 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               </button>
             )}
 
+            {currentRole === 'ti_admin' && asset.status !== 'descartado' && (
+              <button
+                type="button"
+                onClick={() => setDandoBaixa(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors shadow-2xs"
+              >
+                <Archive className="w-3.5 h-3.5" aria-hidden="true" />
+                Dar baixa
+              </button>
+            )}
+
             <button
+              type="button"
+              aria-label="Fechar"
               onClick={onClose}
               className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
             >
@@ -293,6 +346,9 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             </div>
           </div>
 
+          {/* Fase 8: baixa patrimonial vigente e estornadas (só TI) */}
+          {isTI && <BaixaPatrimonial asset={asset} />}
+
           {/* Especificações técnicas: SO/BitLocker (hardware) + atributos personalizados */}
           {(asset.categoria === 'hardware' ||
             (asset.customFields && Object.keys(asset.customFields).length > 0)) && (
@@ -309,7 +365,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                     Sistema Operacional & Segurança de Disco (BitLocker)
                   </h3>
                 </div>
-                {isTI && !isEditingSecurity && (
+                {isTI && asset.status !== 'descartado' && !isEditingSecurity && (
                   <button
                     type="button"
                     onClick={() => {
@@ -457,7 +513,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
 
           {/* Dados Fiscais e Garantia com Alerta Visual */}
           <div className="border border-slate-200 rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-slate-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
@@ -465,9 +521,9 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 </h3>
               </div>
               {/* Badge de Garantia */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs text-slate-500">
-                  <span className="uppercase font-semibold">Fim da garantia:</span>{' '}
+                  <span className="uppercase font-semibold">Garantia de fábrica:</span>{' '}
                   <span className="font-medium text-slate-800">{formatDate(asset.fiscal?.dataGarantia)}</span>
                 </span>
                 {warranty.status === 'valida' && (
@@ -482,14 +538,27 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                     {warranty.label}
                   </span>
                 )}
-                {warranty.status === 'expirada' && (
+                {(warranty.status === 'expirada' || warranty.status === 'sem_data') && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-md border border-slate-200">
                     <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
                     {warranty.label}
                   </span>
                 )}
+                {(warranty.status === 'expirando' || warranty.status === 'expirada') && asset.status !== 'descartado' && (
+                  <LembreteGarantia asset={asset} />
+                )}
               </div>
             </div>
+
+            {contratoCobertura?.fim && (
+              <p className="flex items-start gap-1.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words">
+                  Coberto pelo contrato <span className="font-semibold">{nomeContrato(contratoCobertura)}</span> até{' '}
+                  {formatDate(contratoCobertura.fim)}
+                </span>
+              </p>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
               <div>
@@ -502,7 +571,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               </div>
               <div>
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Fornecedor</span>
-                <p className="text-slate-800">{asset.fiscal?.fornecedor || '-'}</p>
+                <p className="text-slate-800 break-words">{nomeFornecedor || '-'}</p>
               </div>
               <div>
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Data de Compra</span>
@@ -610,34 +679,30 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             )}
           </div>
 
-          {/* Histórico de Manutenções e Upgrades */}
-          {asset.historicoManutencao.length > 0 && (
-            <div className="border border-slate-200 rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
-                <Wrench className="w-4 h-4 text-slate-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Manutenções & Upgrades Técnicos
-                </h3>
-              </div>
-              <div className="space-y-2 text-xs">
-                {asset.historicoManutencao.map((man) => (
-                  <div key={man.id} className="p-3 bg-slate-50 rounded-md border border-slate-200 flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900">{man.descricao}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {formatDate(man.data)} · Fornecedor: {man.fornecedor}
-                      </p>
-                    </div>
-                    <span className="font-semibold text-slate-800 font-mono">
-                      {formatCurrency(man.custo)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          {/* Fase 8: manutenções com custos (só TI; o colaborador vê só o status) */}
+          {isTI && <ManutencoesAtivo asset={asset} podeEditar={asset.status !== 'descartado'} />}
+
+          {/* Fase 8: arquivos (só TI) e observações (todos que veem o ativo) */}
+          {isTI && <AnexosAtivo asset={asset} podeEditar={asset.status !== 'descartado'} />}
+
+          {asset.observacoes && (
+            <div className="border border-slate-200 rounded-lg p-4 space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-100">
+                Observações
+              </h3>
+              <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">{asset.observacoes}</p>
             </div>
           )}
         </div>
       </div>
     </div>
+    {/* Fora da janela da ficha: o fundo desfocado (backdrop-filter) prenderia a janela nova na
+        rolagem da ficha, e no celular ela abriria fora da tela */}
+    {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
+    {enviandoManutencao && (
+      <FormManutencao asset={asset} modo="abrir" onClose={() => setEnviandoManutencao(false)} />
+    )}
+    {dandoBaixa && <FormBaixa asset={asset} onClose={() => setDandoBaixa(false)} />}
+    </>
   );
 };

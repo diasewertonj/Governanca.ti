@@ -5,6 +5,7 @@ import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
+import { mensagemDeErro } from '../../services/supabaseDb.ts';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -1216,7 +1217,7 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
                     setTimeout(() => setSuccessMsg(null), 4000);
                   } catch (err) {
                     console.error('Erro ao zerar base:', err);
-                    setErrorMsg('Ocorreu um erro ao limpar o banco. Verifique o console.');
+                    setErrorMsg(`Não foi possível limpar o banco: ${mensagemDeErro(err)}.`);
                   } finally {
                     setIsResetting(false);
                   }

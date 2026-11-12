@@ -42,7 +42,23 @@ export interface FiscalData {
   dataAquisicao: string;
   dataGarantia: string;
   suporteContato?: string;
-  notaFiscalArquivoUrl?: string;
+}
+
+/** Fase 8: arquivo ligado ao ativo (NF, orçamento, OS, laudo, foto, evidência de baixa) */
+export type CategoriaAnexoAtivo = 'nota_fiscal' | 'orcamento' | 'os' | 'laudo' | 'foto' | 'evidencia_baixa' | 'outro';
+
+export interface AnexoAtivo {
+  id: string;
+  ativoId: string;
+  categoria: CategoriaAnexoAtivo;
+  nome: string;
+  caminho: string;
+  tipo?: string;
+  tamanho?: number;
+  manutencaoId?: string;
+  baixaId?: string;
+  criadoPor?: string;
+  criadoEm: string;
 }
 
 export interface CustodyHistoryEntry {
@@ -56,14 +72,77 @@ export interface CustodyHistoryEntry {
   observacoes?: string;
 }
 
-export interface MaintenanceEntry {
+// -----------------------------------------------------------------------------
+// Fase 8 · Manutenção e baixa patrimonial (só a T.I. lê; o colaborador vê só o status)
+// -----------------------------------------------------------------------------
+export type TipoManutencao = 'corretiva' | 'preventiva' | 'upgrade' | 'garantia';
+export type StatusManutencao = 'em_andamento' | 'concluida' | 'cancelada';
+
+export interface Manutencao {
   id: string;
-  data: string;
+  ativoId: string;
+  tipo: TipoManutencao;
   descricao: string;
-  fornecedor: string;
+  numeroOs?: string;
+  fornecedorId?: string; // vazio = feita pela própria T.I.
+  contratoId?: string; // contrato que cobre o serviço
+  chamadoId?: string; // chamado de origem
+  abertaEm: string;
+  previsao?: string;
+  concluidaEm?: string;
   custo: number;
-  status: 'concluido' | 'em_andamento';
+  cobertoGarantia: boolean;
+  status: StatusManutencao;
+  observacoes?: string;
+  criadoPor?: string; // quem abriu (carimbado pelo banco)
+  criadoEm: string;
+  encerradoPor?: string; // quem concluiu ou cancelou
+  encerradoEm?: string;
 }
+
+/** O que o formulário informa ao abrir ou registrar uma manutenção */
+export type DadosManutencao = Pick<
+  Manutencao,
+  | 'tipo'
+  | 'descricao'
+  | 'numeroOs'
+  | 'fornecedorId'
+  | 'contratoId'
+  | 'chamadoId'
+  | 'abertaEm'
+  | 'previsao'
+  | 'custo'
+  | 'cobertoGarantia'
+  | 'observacoes'
+>;
+
+/** Conclusão ou cancelamento: data, custo final e observação (todos opcionais) */
+export type DadosEncerramentoManutencao = Partial<Pick<Manutencao, 'concluidaEm' | 'custo' | 'observacoes'>>;
+
+export type MotivoBaixa = 'obsoleto' | 'defeito' | 'perda' | 'roubo_furto' | 'sinistro' | 'devolucao_locadora' | 'outro';
+export type DestinoBaixa = 'doacao' | 'venda' | 'descarte' | 'reciclagem' | 'devolucao_locadora' | 'nao_se_aplica';
+
+export interface BaixaAtivo {
+  id: string;
+  ativoId: string;
+  dataBaixa: string;
+  motivo: MotivoBaixa;
+  destino: DestinoBaixa;
+  destinatario?: string;
+  valorVenda?: number; // só quando o destino é venda
+  documento?: string; // laudo, certificado de descarte, BO...
+  observacoes?: string;
+  criadoPor?: string; // quem registrou (carimbado pelo banco)
+  criadoEm: string;
+  estornadaEm?: string;
+  estornadaPor?: string;
+  motivoEstorno?: string;
+}
+
+export type DadosBaixa = Pick<
+  BaixaAtivo,
+  'dataBaixa' | 'motivo' | 'destino' | 'destinatario' | 'valorVenda' | 'documento' | 'observacoes'
+>;
 
 export interface Asset {
   id: string;
@@ -83,8 +162,12 @@ export interface Asset {
   bitlockerKey?: string; // Chave de recuperação BitLocker (até 48 dígitos)
   customFields?: Record<string, string>;
   fotos?: string[];
+  observacoes?: string; // Fase 8
+  fornecedorId?: string; // Fase 8: vínculo com o cadastro de fornecedores
+  anexos?: AnexoAtivo[]; // Fase 8: só a TI recebe
   historicoCustodia: CustodyHistoryEntry[];
-  historicoManutencao: MaintenanceEntry[];
+  historicoManutencao: Manutencao[]; // Fase 8: só a T.I. recebe
+  baixas?: BaixaAtivo[]; // Fase 8: vigente e estornadas (só a T.I. recebe)
 }
 
 export interface SoftwareLicense {
@@ -100,6 +183,69 @@ export interface SoftwareLicense {
   urlPainel?: string;
   tipoCobranca?: 'mensal' | 'anual';
   observacoes?: string;
+  fornecedorId?: string; // Fase 8: vínculo com o cadastro; `fornecedor` guarda o nome (texto)
+}
+
+// -----------------------------------------------------------------------------
+// Fase 8 · Fornecedores, contratos e faturas (só a T.I. lê e grava)
+// -----------------------------------------------------------------------------
+export interface Fornecedor {
+  id: string;
+  nome: string;
+  cnpj?: string;
+  contato?: string;
+  telefone?: string;
+  email?: string;
+  site?: string;
+  observacoes?: string;
+  ativo: boolean;
+  criadoPor?: string;
+  criadoEm: string;
+}
+
+export type TipoContrato = 'suporte' | 'garantia_estendida' | 'manutencao' | 'locacao' | 'licenciamento' | 'outro';
+export type PeriodicidadeContrato = 'mensal' | 'anual' | 'unico';
+
+/** O que o contrato cobre: um ativo OU uma licença (o banco confere) */
+export type ItemContrato = { ativoId: string; licencaId?: never } | { licencaId: string; ativoId?: never };
+
+export interface Contrato {
+  id: string;
+  fornecedorId: string;
+  tipo: TipoContrato;
+  numero?: string;
+  descricao: string;
+  inicio: string;
+  fim?: string;
+  valor: number;
+  periodicidade: PeriodicidadeContrato;
+  sla?: string;
+  contatoSuporte?: string;
+  arquivoCaminho?: string;
+  observacoes?: string;
+  itens: ItemContrato[];
+  criadoPor?: string;
+  criadoEm: string;
+}
+
+/** "Vencida" não é gravada: é calculada (a pagar com vencimento já passado) */
+export type StatusFatura = 'a_pagar' | 'paga' | 'cancelada';
+
+/** Fatura de uma licença OU de um contrato, por competência (1º dia do mês) */
+export interface Fatura {
+  id: string;
+  licencaId?: string;
+  contratoId?: string;
+  competencia: string;
+  valor: number;
+  vencimento: string;
+  pagoEm?: string;
+  status: StatusFatura;
+  numeroDocumento?: string;
+  arquivoCaminho?: string;
+  observacoes?: string;
+  criadoPor?: string;
+  criadoEm: string;
 }
 
 export type TicketType = 'suporte' | 'onboarding' | 'offboarding';
@@ -285,6 +431,8 @@ export interface Lembrete {
   status: 'aberto' | 'feito' | 'cancelado';
   chamadoId?: string;
   colaboradorId?: string;
+  ativoId?: string;
+  contratoId?: string;
   itemId?: string;
   criadoPor?: string;
   criadoEm: string;
