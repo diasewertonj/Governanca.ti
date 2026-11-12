@@ -56,7 +56,6 @@ import {
   TicketType,
   UserRole,
 } from '../types/index.ts';
-import { diferencaItens } from '../utils/contratos.ts';
 
 // Fase 4: os mapeadores são tipados pelo banco real (database.types.ts, gerado
 // pelo Supabase). Coluna escrita errada vira erro de compilação. Os helpers
@@ -862,12 +861,6 @@ const linhaContrato = (c: Contrato): TablesInsert<'contratos'> => ({
   observacoes: c.observacoes?.trim() || null,
 });
 
-const linhaItem = (contratoId: string, i: ItemContrato): TablesInsert<'contrato_itens'> => ({
-  contrato_id: contratoId,
-  ativo_id: i.ativoId || null,
-  licenca_id: i.licencaId || null,
-});
-
 export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
   if (!supabase) return null;
   const [{ data, error }, { data: itensData }] = await Promise.all([
@@ -900,48 +893,24 @@ export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
   }));
 }
 
-/** Itens cobertos: insere os novos e exclui os que saíram (os demais ficam como estão) */
-async function sincronizarItensContrato(contratoId: string, antes: ItemContrato[], depois: ItemContrato[]) {
-  if (!supabase) return;
-  const { novos, removidos } = diferencaItens(antes, depois);
-  const ativos = removidos.flatMap((i) => (i.ativoId ? [i.ativoId] : []));
-  const licencas = removidos.flatMap((i) => (i.licencaId ? [i.licencaId] : []));
-  if (ativos.length) {
-    await checar(supabase.from('contrato_itens').delete().eq('contrato_id', contratoId).in('ativo_id', ativos));
-  }
-  if (licencas.length) {
-    await checar(supabase.from('contrato_itens').delete().eq('contrato_id', contratoId).in('licenca_id', licencas));
-  }
-  if (novos.length) {
-    await checar(supabase.from('contrato_itens').insert(novos.map((i) => linhaItem(contratoId, i))));
-  }
-}
-
-/** Código do erro em que o contrato foi gravado, mas os itens cobertos não */
-export const ERRO_ITENS_CONTRATO = 'itens_contrato';
-
 /**
- * Cria o contrato e os itens cobertos. Se os itens falharem, o contrato fica
- * (sem itens): a ti_suporte não pode excluí-lo para desfazer, e apagar às
- * cegas perderia o cadastro. O erro avisa que é preciso editar o contrato.
+ * Contrato e itens cobertos numa transação só (função salvar_contrato do banco):
+ * cria ou atualiza o contrato, inclui os itens novos e exclui os que saíram.
+ * Se algo falhar, nada fica gravado e a tela desfaz a alteração.
  */
-export async function insertContratoDb(c: Contrato) {
+async function salvarContratoDb(c: Contrato) {
   if (!supabase) return;
-  await checar(supabase.from('contratos').insert(linhaContrato(c)));
-  try {
-    await sincronizarItensContrato(c.id, [], c.itens);
-  } catch (err) {
-    throw new DbError(
-      `O contrato foi gravado, mas os itens cobertos não (${mensagemDeErro(err)}). Edite o contrato para incluí-los`,
-      ERRO_ITENS_CONTRATO
-    );
-  }
+  await checar(
+    supabase.rpc('salvar_contrato', {
+      p_contrato: json(linhaContrato(c)),
+      p_itens: json(c.itens.map((i) => ({ ativo_id: i.ativoId || null, licenca_id: i.licencaId || null }))),
+    })
+  );
 }
 
-export async function updateContratoDb(antes: Contrato, depois: Contrato) {
-  await atualizar('contratos', depois.id, camposAlterados(linhaContrato(antes), linhaContrato(depois)));
-  await sincronizarItensContrato(depois.id, antes.itens, depois.itens);
-}
+export const insertContratoDb = (c: Contrato) => salvarContratoDb(c);
+
+export const updateContratoDb = (_antes: Contrato, depois: Contrato) => salvarContratoDb(depois);
 
 /** Exclui o contrato (os itens saem junto) e o arquivo dele */
 export async function deleteContratoDb(c: Contrato) {

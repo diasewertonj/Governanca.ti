@@ -551,3 +551,51 @@ grant execute on function public.abrir_manutencao(text, jsonb) to authenticated;
 grant execute on function public.encerrar_manutencao(text, text, jsonb) to authenticated;
 grant execute on function public.baixar_ativo(text, jsonb) to authenticated;
 grant execute on function public.estornar_baixa(text, text) to authenticated;
+
+-- Contrato + itens cobertos numa transação só (cria ou atualiza; itens que saíram são excluídos).
+-- Se um item for inválido, nada é gravado: nem o contrato, nem os outros itens.
+create or replace function public.salvar_contrato(p_contrato jsonb, p_itens jsonb default '[]'::jsonb)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_id    text := nullif(p_contrato ->> 'id', '');
+  v_itens jsonb := coalesce(p_itens, '[]'::jsonb);
+begin
+  if auth.uid() is not null and coalesce(public.meu_papel(), '') not in ('ti_admin', 'ti_suporte') then
+    raise exception 'Apenas a T.I. cadastra contratos' using errcode = '42501';
+  end if;
+  if v_id is null then
+    raise exception 'Contrato sem identificador' using errcode = '23514';
+  end if;
+
+  insert into public.contratos (id, fornecedor_id, tipo, numero, descricao, inicio, fim, valor, periodicidade,
+                                sla, contato_suporte, observacoes)
+  values (v_id, p_contrato ->> 'fornecedor_id', p_contrato ->> 'tipo', nullif(p_contrato ->> 'numero', ''),
+          p_contrato ->> 'descricao', (p_contrato ->> 'inicio')::date, nullif(p_contrato ->> 'fim', '')::date,
+          coalesce(nullif(p_contrato ->> 'valor', '')::numeric, 0),
+          coalesce(nullif(p_contrato ->> 'periodicidade', ''), 'mensal'),
+          nullif(p_contrato ->> 'sla', ''), nullif(p_contrato ->> 'contato_suporte', ''),
+          nullif(p_contrato ->> 'observacoes', ''))
+  on conflict (id) do update
+  set fornecedor_id = excluded.fornecedor_id, tipo = excluded.tipo, numero = excluded.numero,
+      descricao = excluded.descricao, inicio = excluded.inicio, fim = excluded.fim, valor = excluded.valor,
+      periodicidade = excluded.periodicidade, sla = excluded.sla, contato_suporte = excluded.contato_suporte,
+      observacoes = excluded.observacoes;
+
+  delete from public.contrato_itens ci
+  where ci.contrato_id = v_id
+    and not exists (select 1 from jsonb_array_elements(v_itens) e
+                    where nullif(e ->> 'ativo_id', '') is not distinct from ci.ativo_id
+                      and nullif(e ->> 'licenca_id', '') is not distinct from ci.licenca_id);
+
+  insert into public.contrato_itens (contrato_id, ativo_id, licenca_id)
+  select v_id, nullif(e ->> 'ativo_id', ''), nullif(e ->> 'licenca_id', '')
+  from jsonb_array_elements(v_itens) e
+  on conflict do nothing;
+end;
+$$;
+
+revoke all on function public.salvar_contrato(jsonb, jsonb) from public, anon;
+grant execute on function public.salvar_contrato(jsonb, jsonb) to authenticated;

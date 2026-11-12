@@ -124,8 +124,6 @@ import {
   encerrarManutencaoDb,
   baixarAtivoDb,
   estornarBaixaDb,
-  DbError,
-  ERRO_ITENS_CONTRATO,
 } from '../services/supabaseDb.ts';
 import { CATALOGO_PADRAO } from '../utils/processos.ts';
 import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
@@ -1337,26 +1335,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const criarContrato = (dados: Omit<Contrato, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>): Contrato => {
     const novo: Contrato = { ...dados, id: novoId('ctr'), criadoEm: new Date().toISOString() };
     setContratos((prev) => [novo, ...prev]);
+    // Contrato e itens são gravados juntos (salvar_contrato): falhou, nada fica e a tela desfaz
     const insercao = insertContratoDb(novo);
-    const itensFalharam = (err: unknown) => err instanceof DbError && err.code === ERRO_ITENS_CONTRATO;
-    // O arquivo do contrato espera só o contrato existir (itens que falharam não o impedem)
-    const contratoGravado = insercao.catch((err) => {
-      if (!itensFalharam(err)) throw err;
-    });
-    contratoGravado.catch(() => undefined); // quem anexa o arquivo trata a recusa
-    insercoes.current.set(novo.id, contratoGravado);
-    insercao.catch((err) => {
-      if (itensFalharam(err)) {
-        // O contrato ficou no banco sem itens: a tela mostra o mesmo, e o aviso pede para editar
-        console.error('Itens do contrato', err);
-        setContratos((prev) => prev.map((c) => (c.id === novo.id ? { ...c, itens: [] } : c)));
-        setDbErro(`${(err as DbError).message}.`);
-        return;
-      }
-      console.error('Cadastrar contrato', err);
-      setContratos((prev) => prev.filter((c) => c.id !== novo.id));
-      setDbErro(`Não foi possível cadastrar o contrato ${novo.numero || novo.descricao}: ${mensagemDeErro(err)}. A alteração foi desfeita.`);
-    });
+    insercoes.current.set(novo.id, insercao);
+    persistir(
+      insercao,
+      () => setContratos((prev) => prev.filter((c) => c.id !== novo.id)),
+      `Não foi possível cadastrar o contrato ${novo.numero || novo.descricao}`
+    );
     return novo;
   };
 

@@ -1417,6 +1417,10 @@ export type Database = {
         Args: { p_baixa: string; p_motivo: string }
         Returns: undefined
       }
+      salvar_contrato: {
+        Args: { p_contrato: Json; p_itens?: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

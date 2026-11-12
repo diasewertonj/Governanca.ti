@@ -267,3 +267,33 @@ select harness.rodar('fase8', 'S2 colaborador não envia arquivo para a pasta de
   $q$insert into storage.objects (bucket_id, name) values ('documentos', 'ativos/ast-1/x.pdf')$q$);
 select harness.rodar('fase8', 'S3 RH não envia arquivo para a pasta de faturas', 'bloqueado', :'rh', 'authenticated',
   $q$insert into storage.objects (bucket_id, name) values ('documentos', 'faturas/fat-1/x.pdf')$q$);
+
+-- Contrato + itens de uma vez
+select harness.rodar('fase8', 'SC1 salvar_contrato cria o contrato com os itens', 'ok', :'sup', 'authenticated',
+  $q$do $x$ begin
+    perform public.salvar_contrato('{"id":"ct-n","fornecedor_id":"forn-1","tipo":"suporte","descricao":"Novo","inicio":"2026-01-01","fim":"2027-01-01","valor":"10"}',
+      '[{"ativo_id":"ast-1"},{"licenca_id":"lic-1"}]');
+    perform harness.espera($s$select 1 from public.contrato_itens where contrato_id = 'ct-n'$s$, 2);
+    perform harness.espera($s$select 1 from public.contratos where id = 'ct-n' and criado_por = 'emp-sup'$s$, 1);
+  end $x$$q$);
+select harness.rodar('fase8', 'SC2 item inválido desfaz tudo: o contrato também não é gravado', 'ok', :'sup', 'authenticated',
+  $q$do $x$ begin
+    begin
+      perform public.salvar_contrato('{"id":"ct-m","fornecedor_id":"forn-1","tipo":"suporte","descricao":"X","inicio":"2026-01-01"}',
+        '[{"ativo_id":"ast-1","licenca_id":"lic-1"}]');
+    exception when check_violation then null;
+    end;
+    perform harness.espera($s$select 1 from public.contratos where id = 'ct-m'$s$, 0);
+  end $x$$q$);
+select harness.rodar('fase8', 'SC3 edição troca itens (sai um, entra outro) e mantém o arquivo do contrato', 'ok', :'sup', 'authenticated',
+  $q$do $x$ begin
+    update public.contratos set arquivo_caminho = 'contratos/ct-1/a.pdf' where id = 'ct-1';
+    insert into public.contrato_itens (contrato_id, ativo_id) values ('ct-1', 'ast-1');
+    perform public.salvar_contrato('{"id":"ct-1","fornecedor_id":"forn-1","tipo":"suporte","descricao":"Suporte notebooks v2","inicio":"2026-01-01","fim":"2027-06-30","valor":"950"}',
+      '[{"ativo_id":"ast-2"}]');
+    perform harness.espera($s$select 1 from public.contrato_itens where contrato_id = 'ct-1'$s$, 1);
+    perform harness.espera($s$select 1 from public.contrato_itens where contrato_id = 'ct-1' and ativo_id = 'ast-2'$s$, 1);
+    perform harness.espera($s$select 1 from public.contratos where id = 'ct-1' and valor = 950 and arquivo_caminho = 'contratos/ct-1/a.pdf'$s$, 1);
+  end $x$$q$);
+select harness.rodar('fase8', 'SC4 colaborador não salva contrato', 'bloqueado', :'colab', 'authenticated',
+  $q$select public.salvar_contrato('{"id":"ct-z","fornecedor_id":"forn-1","tipo":"suporte","descricao":"X","inicio":"2026-01-01"}', '[]')$q$);
