@@ -53,8 +53,24 @@ Um banco novo é montado assim, nesta ordem:
 | `20261112000100_fase1_rls_por_papel` | RLS por papel; BitLocker e chave de contrato em tabelas só da TI |
 | `20261113000000_fase2_integridade` | códigos gerados pelo banco, alocação atômica de licença, índices, histórico protegido contra exclusão |
 | `20261114000000_fase3_processos` | Storage privado, desligamento automático, anonimização (LGPD) |
+| `20261115000000_fase6_processos_guiados` | catálogo, checklist de on/offboarding com trilha de auditoria, inventário de contas/grupos/acessórios, lembretes, termo com aceite eletrônico |
 
-Todas podem ser rodadas mais de uma vez. Para aplicar em produção, use o **SQL Editor** do Supabase: o conector MCP recusa comandos com `DROP` sem mostrar a confirmação.
+Todas podem ser rodadas mais de uma vez.
+
+### Edge Function `criar-acesso-nexus` (Fase 6)
+
+Cria o login do colaborador com **senha provisória** (ou gera uma nova) sem depender de e-mail; no primeiro login a pessoa troca a senha. Só `ti_admin`/`ti_suporte` chamam; o e-mail vem do cadastro. A chave `service_role` fica só no servidor do Supabase (variável já fornecida pela plataforma). Opcional: `ORIGENS_PERMITIDAS` (lista separada por vírgula) para o CORS.
+
+```bash
+supabase functions deploy criar-acesso-nexus
+```
+
+## Processos guiados de admissão e desligamento (Fase 6)
+
+- **RH** abre o chamado marcando o kit e as contas a partir do **catálogo** (Configurações › Catálogo de admissão); pode sugerir grupos de e-mail. Acompanha o andamento e conversa pelas mensagens.
+- **T.I.** monta o checklist sugerido (rascunho, nada é obrigatório), registra cada passo — login criado, ativo entregue, licença, destino da conta, condição da devolução — e conclui. O banco valida e aplica os efeitos no inventário numa transação (`registrar_item_processo`, `concluir_processo`).
+- **Desligamento**: o checklist nasce do inventário real da pessoa; dados do Drive e caixa de e-mail têm destino, descrição e lembrete.
+- **Termo** no layout do documento controlado (RG.TI.001/002, código e versão em Configurações › Empresa). Assinatura híbrida: aceite eletrônico das duas partes (com código de verificação SHA-256), documento físico anexado ou dispensa com motivo. Termo pendente na conclusão vira lembrete. Para aplicar em produção, use o **SQL Editor** do Supabase: o conector MCP recusa comandos com `DROP` sem mostrar a confirmação.
 
 Depois de mudar o banco, regenere os tipos (`supabase gen types typescript`) em `src/types/database.types.ts`.
 

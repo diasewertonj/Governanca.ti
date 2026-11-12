@@ -41,9 +41,10 @@ select harness.rodar('fase2', 'P11 setor do ativo gravado', 'ok', :'sup', 'authe
   $q$select harness.afeta($s$update public.ativos set setor_id = 'dep-1' where id = 'ast-1'$s$, 1)$q$);
 select harness.rodar('fase2', 'P12 índices e FKs RESTRICT presentes', 'ok', null, null,
   $q$do $x$ begin
-    perform harness.espera($s$select 1 from pg_indexes where schemaname = 'public' and indexname like 'idx\_%'$s$, 14);
+    perform harness.espera($s$select 1 from pg_indexes where schemaname = 'public' and indexname in ('idx_colaboradores_setor','idx_colaboradores_gestor','idx_ativos_custodiante','idx_ativos_setor','idx_custodia_ativo','idx_custodia_colaborador','idx_chamados_solicitante','idx_chamados_tecnico','idx_chamados_ativo','idx_chamados_software','idx_chamados_status_data','idx_mensagens_chamado','idx_mensagens_autor','idx_termos_colaborador')$s$, 14);
     perform harness.espera($s$select 1 from pg_constraint where contype = 'f' and confdeltype = 'r' and conrelid in
-      ('public.historico_custodia'::regclass, 'public.chamados'::regclass, 'public.chamado_mensagens'::regclass, 'public.termos_responsabilidade'::regclass)$s$, 5); end $x$$q$);
+      ('public.historico_custodia'::regclass, 'public.chamados'::regclass, 'public.chamado_mensagens'::regclass, 'public.termos_responsabilidade'::regclass)
+      and conname not like 'chamados_colaborador_id%'$s$, 5); end $x$$q$);
 select harness.rodar('fase2', 'P13 valor negativo de licença recusado', 'erro: restrito', :'sup', 'authenticated',
   $q$do $x$ begin update public.licencas_software set valor_mensal = -1 where id = 'lic-1';
     exception when check_violation then raise exception 'restrito'; end $x$$q$);

@@ -2,11 +2,17 @@ import React, { createContext, useCallback, useContext, useState, useEffect } fr
 import { confirmarDescarte } from '../components/comum/BarraAlteracoes.tsx';
 import {
   Asset,
+  CatalogoItem,
+  ColaboradorRecurso,
   CompanySettings,
   CustodyHistoryEntry,
   Department,
   Employee,
+  Lembrete,
+  ProcessoItem,
+  ProcessoItemRascunho,
   ResponsibilityTerm,
+  StatusItemProcesso,
   SoftwareLicense,
   Ticket,
   TicketAttachment,
@@ -72,7 +78,26 @@ import {
   anonimizarColaboradorDb,
   ResumoOffboarding,
   SupabaseHealthStatus,
+  fetchCatalogoFromDb,
+  salvarCatalogoItemDb,
+  fetchProcessoItensFromDb,
+  inserirProcessoItensDb,
+  excluirProcessoItemDb,
+  registrarItemProcessoDb,
+  DadosRegistroItem,
+  concluirProcessoDb,
+  fetchRecursosFromDb,
+  fetchLembretesFromDb,
+  criarLembreteDb,
+  encerrarLembreteDb,
+  aceitarTermoDb,
+  dispensarAssinaturaTermoDb,
+  acessoNexusDb,
 } from '../services/supabaseDb.ts';
+import { CATALOGO_PADRAO } from '../utils/processos.ts';
+
+/** Tipo do pedido de senha: link de e-mail ou primeiro login com senha provisória (Fase 6) */
+export type TipoLinkSenha = 'recovery' | 'invite' | 'primeiro_acesso';
 
 /** Rascunho de edição de um chamado (Fase 5: só grava ao clicar em Salvar) */
 export interface AlteracoesChamado {
@@ -163,7 +188,33 @@ interface AppContextType {
   concluirOffboarding: (ticketId: string) => Promise<ResumoOffboarding | null>;
   anonimizarColaborador: (employeeId: string) => Promise<boolean>;
   precisaDefinirSenha: boolean;
-  tipoLinkSenha: 'recovery' | 'invite' | null;
+  tipoLinkSenha: TipoLinkSenha | null;
+
+  // Fase 6 · Processos guiados
+  catalogo: CatalogoItem[];
+  processoItens: ProcessoItem[];
+  recursos: ColaboradorRecurso[];
+  lembretes: Lembrete[];
+  salvarChecklist: (chamadoId: string, itens: ProcessoItemRascunho[]) => Promise<boolean>;
+  removerItemProcesso: (itemId: string) => Promise<boolean>;
+  /** Devolve a mensagem de erro (ou null se gravou) para mostrar junto do formulário */
+  registrarItemProcesso: (
+    itemId: string,
+    status: StatusItemProcesso,
+    observacao: string | undefined,
+    dados: DadosRegistroItem
+  ) => Promise<string | null>;
+  concluirProcesso: (chamadoId: string) => Promise<string | null>;
+  acessoNexus: (
+    colaboradorId: string,
+    acao: 'criar' | 'redefinir',
+    chamadoId?: string
+  ) => Promise<{ email: string; senha: string } | { erro: string }>;
+  salvarCatalogo: (itens: CatalogoItem[], novosIds: string[]) => Promise<boolean>;
+  criarLembrete: (l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId'>) => Promise<string | null>;
+  encerrarLembrete: (id: string, status: 'feito' | 'cancelado', observacao?: string) => Promise<string | null>;
+  aceitarTermo: (termoId: string) => Promise<string | null>;
+  dispensarAssinaturaTermo: (termoId: string, motivo: string) => Promise<string | null>;
   erroLinkAuth: string | null;
   solicitarRecuperacaoSenha: (email: string) => Promise<{ success: boolean; error?: string }>;
   definirNovaSenha: (senha: string) => Promise<{ success: boolean; error?: string }>;
@@ -299,9 +350,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authError, setAuthError] = useState<string | null>(null);
   // Fase 3: aberto por link de convite/recuperação -> pedir nova senha antes de tudo
   const [precisaDefinirSenha, setPrecisaDefinirSenha] = useState<boolean>(Boolean(tipoLinkAuth));
-  const [tipoLinkSenha, setTipoLinkSenha] = useState<'recovery' | 'invite' | null>(
-    tipoLinkAuth as 'recovery' | 'invite' | null
-  );
+  const [tipoLinkSenha, setTipoLinkSenha] = useState<TipoLinkSenha | null>(tipoLinkAuth as TipoLinkSenha | null);
+
+  // Fase 6: catálogo, checklists, inventário de acessos e lembretes
+  const [catalogo, setCatalogo] = useState<CatalogoItem[]>(isProduction ? [] : CATALOGO_PADRAO);
+  const [processoItens, setProcessoItens] = useState<ProcessoItem[]>([]);
+  const [recursos, setRecursos] = useState<ColaboradorRecurso[]>([]);
+  const [lembretes, setLembretes] = useState<Lembrete[]>([]);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     if (isProduction) return null;
@@ -334,6 +389,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLicenses([]);
     setTickets([]);
     setTerms([]);
+    setProcessoItens([]);
+    setRecursos([]);
+    setLembretes([]);
     setCurrentUserId(null);
     setSupabaseUser(null);
     limparCacheLocal();
@@ -403,6 +461,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setTerms(dbTerms);
         }
 
+        // Fase 6 (tabelas novas: se ainda não existirem, as telas seguem sem elas)
+        const [dbCatalogo, dbItens, dbRecursos, dbLembretes] = await Promise.all([
+          fetchCatalogoFromDb(),
+          fetchProcessoItensFromDb(),
+          fetchRecursosFromDb(),
+          fetchLembretesFromDb(),
+        ]);
+        if (dbCatalogo) setCatalogo(dbCatalogo);
+        if (dbItens) setProcessoItens(dbItens);
+        if (dbRecursos) setRecursos(dbRecursos);
+        if (dbLembretes) setLembretes(dbLembretes);
+
         // Configurações
         if (dbSettings) {
           setSettings(dbSettings);
@@ -446,13 +516,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Link de recuperação/convite: a pessoa define a senha primeiro; os dados
       // carregam depois (a página recarrega ao salvar a senha).
       if (event === 'PASSWORD_RECOVERY' || tipoLinkAuth) {
-        setTipoLinkSenha(event === 'PASSWORD_RECOVERY' ? 'recovery' : (tipoLinkAuth as 'recovery' | 'invite'));
+        setTipoLinkSenha(event === 'PASSWORD_RECOVERY' ? 'recovery' : (tipoLinkAuth as TipoLinkSenha));
         setPrecisaDefinirSenha(true);
         setAuthLoading(false);
         return;
       }
 
       const u = session.user;
+
+      // Fase 6: login criado pela T.I. com senha provisória -> trocar antes de entrar
+      if (u.user_metadata?.precisa_trocar_senha === true) {
+        setTipoLinkSenha('primeiro_acesso');
+        setPrecisaDefinirSenha(true);
+        setAuthLoading(false);
+        return;
+      }
       const authUser: SupabaseAuthUser = {
         id: u.id,
         email: u.email || '',
@@ -1082,6 +1160,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...antes,
       statusAssinatura: 'assinado',
       arquivoAssinadoUrl: arquivoUrl || 'https://cdn.nexuscorp.com.br/termos/assinado-scan.pdf',
+      // Fase 6: termos do processo guiado registram a forma (documento físico anexado)
+      ...(antes.formaAssinatura ? { formaAssinatura: 'documento' as const } : {}),
     };
     setTerms((prev) => trocar(prev, depois));
     persistir(updateTermDb(antes, depois), () => setTerms((prev) => trocar(prev, antes)), `Não foi possível registrar a assinatura de ${antes.codigo}`);
@@ -1191,6 +1271,259 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
+  // ---------------------------------------------------------------------------
+  // Fase 6 · Processos guiados (onboarding/offboarding com checklist)
+  // Cada passo é uma ação explícita da T.I. ("Registrar"); o banco valida e
+  // faz os efeitos no inventário numa transação. Depois, recarrega o que mudou.
+  // ---------------------------------------------------------------------------
+  const recarregarProcesso = async () => {
+    const [itens, recs, ativos, lics, chamados, lems, termos] = await Promise.all([
+      fetchProcessoItensFromDb(),
+      fetchRecursosFromDb(),
+      fetchAssetsFromDb(),
+      fetchLicensesFromDb(),
+      fetchTicketsFromDb(),
+      fetchLembretesFromDb(),
+      fetchTermsFromDb(),
+    ]);
+    if (itens) setProcessoItens(itens);
+    if (recs) setRecursos(recs);
+    if (ativos) setAssets(ativos);
+    if (lics) setLicenses(lics);
+    if (chamados) setTickets(chamados);
+    if (lems) setLembretes(lems);
+    if (termos) setTerms(termos);
+  };
+
+  const salvarChecklist = async (chamadoId: string, rascunhos: ProcessoItemRascunho[]) => {
+    if (rascunhos.length === 0) return true;
+    const ordemInicial = Math.max(0, ...processoItens.filter((i) => i.chamadoId === chamadoId).map((i) => i.ordem));
+    if (isProduction) {
+      try {
+        const novos = await inserirProcessoItensDb(chamadoId, rascunhos, ordemInicial);
+        if (novos) setProcessoItens((prev) => [...prev, ...novos]);
+        return true;
+      } catch (err) {
+        setDbErro(`Não foi possível salvar o checklist: ${mensagemDeErro(err)}.`);
+        return false;
+      }
+    }
+    const agora = new Date().toISOString();
+    setProcessoItens((prev) => [
+      ...prev,
+      ...rascunhos.map(({ chave: _chave, ...r }, i): ProcessoItem => ({
+        ...r,
+        id: novoId('pit'),
+        chamadoId,
+        status: 'pendente',
+        ordem: ordemInicial + i + 1,
+        criadoEm: agora,
+        criadoPor: currentUserId || undefined,
+      })),
+    ]);
+    return true;
+  };
+
+  const removerItemProcesso = async (itemId: string) => {
+    if (isProduction) {
+      try {
+        await excluirProcessoItemDb(itemId);
+      } catch (err) {
+        setDbErro(`Não foi possível remover o passo: ${mensagemDeErro(err)}.`);
+        return false;
+      }
+    }
+    setProcessoItens((prev) => prev.filter((i) => i.id !== itemId));
+    return true;
+  };
+
+  const registrarItemProcesso = async (
+    itemId: string,
+    status: StatusItemProcesso,
+    observacao: string | undefined,
+    dados: DadosRegistroItem
+  ): Promise<string | null> => {
+    if (isProduction) {
+      try {
+        await registrarItemProcessoDb(itemId, status, observacao, dados);
+        await recarregarProcesso();
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    // Modo demonstração: só registra o passo (sem efeitos no inventário)
+    const item = processoItens.find((i) => i.id === itemId);
+    if (!item) return 'Passo não encontrado';
+    if (status === 'nao_se_aplica' && !observacao?.trim()) return 'Informe o motivo para marcar como "não se aplica"';
+    const chamado = tickets.find((t) => t.id === item.chamadoId);
+    if (status === 'feito' && item.tipo === 'cadastro') {
+      if (!dados.colaborador_id) return 'Informe o colaborador cadastrado';
+      setTickets((prev) => prev.map((t) => (t.id === item.chamadoId ? { ...t, colaboradorId: dados.colaborador_id } : t)));
+    } else if (status === 'feito' && !chamado?.colaboradorId) {
+      return 'Faça primeiro o passo "Cadastrar colaborador"';
+    }
+    const agora = new Date().toISOString();
+    setProcessoItens((prev) =>
+      prev.map((i) =>
+        i.id !== itemId
+          ? i
+          : {
+              ...i,
+              status,
+              observacao: observacao ?? i.observacao,
+              identificador: dados.identificador ?? i.identificador,
+              ativoId: dados.ativo_id ?? i.ativoId,
+              licencaId: dados.licenca_id ?? i.licencaId,
+              destino: dados.destino ?? i.destino,
+              destinoColaboradorId: dados.destino_colaborador_id ?? i.destinoColaboradorId,
+              condicao: dados.condicao ?? i.condicao,
+              lembreteEm: dados.lembrete_em ?? i.lembreteEm,
+              concluidoEm: status === 'pendente' ? undefined : agora,
+              concluidoPor: status === 'pendente' ? undefined : currentUserId || undefined,
+            }
+      )
+    );
+    return null;
+  };
+
+  const concluirProcesso = async (chamadoId: string): Promise<string | null> => {
+    if (isProduction) {
+      try {
+        await concluirProcessoDb(chamadoId);
+        await loadDataFromSupabase();
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    const itens = processoItens.filter((i) => i.chamadoId === chamadoId);
+    if (itens.length === 0) return 'Monte o checklist antes de concluir';
+    const pendentes = itens.filter((i) => i.status === 'pendente' && i.tipo !== 'termo').length;
+    if (pendentes > 0) return `Ainda há ${pendentes} passo(s) pendente(s).`;
+    const tkt = tickets.find((t) => t.id === chamadoId);
+    setTickets((prev) => prev.map((t) => (t.id === chamadoId ? { ...t, status: 'resolvido' } : t)));
+    if (tkt?.tipo === 'offboarding' && tkt.colaboradorId) {
+      setEmployees((prev) => prev.map((e) => (e.id === tkt.colaboradorId ? { ...e, status: 'desligado' } : e)));
+    }
+    return null;
+  };
+
+  const acessoNexus = async (colaboradorId: string, acao: 'criar' | 'redefinir', chamadoId?: string) => {
+    try {
+      const r = await acessoNexusDb(colaboradorId, acao, chamadoId);
+      return { email: r.email, senha: r.senha };
+    } catch (err) {
+      return { erro: mensagemDeErro(err) };
+    }
+  };
+
+  const salvarCatalogo = async (itens: CatalogoItem[], novosIds: string[]) => {
+    if (isProduction) {
+      try {
+        for (const c of itens) await salvarCatalogoItemDb(c, novosIds.includes(c.id));
+        const atual = await fetchCatalogoFromDb();
+        if (atual) setCatalogo(atual);
+        return true;
+      } catch (err) {
+        setDbErro(`Não foi possível salvar o catálogo: ${mensagemDeErro(err)}.`);
+        const atual = await fetchCatalogoFromDb();
+        if (atual) setCatalogo(atual);
+        return false;
+      }
+    }
+    setCatalogo((prev) => {
+      const mapa = new Map(prev.map((c) => [c.id, c]));
+      for (const c of itens) mapa.set(c.id, c);
+      return [...mapa.values()];
+    });
+    return true;
+  };
+
+  const criarLembrete = async (
+    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId'>
+  ): Promise<string | null> => {
+    if (isProduction) {
+      try {
+        await criarLembreteDb(l);
+        const lems = await fetchLembretesFromDb();
+        if (lems) setLembretes(lems);
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    setLembretes((prev) => [
+      ...prev,
+      { ...l, id: novoId('lem'), status: 'aberto', criadoEm: new Date().toISOString(), criadoPor: currentUserId || undefined },
+    ]);
+    return null;
+  };
+
+  const encerrarLembrete = async (id: string, status: 'feito' | 'cancelado', observacao?: string) => {
+    if (isProduction) {
+      try {
+        await encerrarLembreteDb(id, status, observacao);
+        const lems = await fetchLembretesFromDb();
+        if (lems) setLembretes(lems);
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    setLembretes((prev) =>
+      prev.map((l) =>
+        l.id === id
+          ? { ...l, status, observacaoConclusao: observacao, concluidoEm: new Date().toISOString(), concluidoPor: currentUserId || undefined }
+          : l
+      )
+    );
+    return null;
+  };
+
+  const aceitarTermo = async (termoId: string): Promise<string | null> => {
+    if (isProduction) {
+      try {
+        await aceitarTermoDb(termoId);
+        const termos = await fetchTermsFromDb();
+        if (termos) setTerms(termos);
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    const t = terms.find((x) => x.id === termoId);
+    if (!t) return 'Termo não encontrado';
+    const agora = new Date().toISOString();
+    const souColab = currentUserId === t.colaboradorId;
+    const depois: ResponsibilityTerm = souColab
+      ? { ...t, aceiteColaboradorEm: agora }
+      : { ...t, aceiteTiEm: agora, aceiteTiPor: currentUserId || undefined };
+    if (depois.aceiteColaboradorEm && depois.aceiteTiEm) {
+      depois.statusAssinatura = 'assinado';
+      depois.formaAssinatura = 'eletronica';
+      depois.dataAssinatura = agora;
+    }
+    setTerms((prev) => trocar(prev, depois));
+    return null;
+  };
+
+  const dispensarAssinaturaTermo = async (termoId: string, motivo: string): Promise<string | null> => {
+    if (!motivo.trim()) return 'Informe o motivo da dispensa';
+    if (isProduction) {
+      try {
+        await dispensarAssinaturaTermoDb(termoId, motivo);
+        const termos = await fetchTermsFromDb();
+        if (termos) setTerms(termos);
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    setTerms((prev) => prev.map((t) => (t.id === termoId ? { ...t, formaAssinatura: 'dispensada', motivoDispensa: motivo } : t)));
+    return null;
+  };
+
   const updateSettings = (updates: Partial<CompanySettings>) => {
     const antes = settings;
     const depois = { ...settings, ...updates };
@@ -1283,6 +1616,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         precisaDefinirSenha,
         tipoLinkSenha,
         erroLinkAuth,
+        catalogo,
+        processoItens,
+        recursos,
+        lembretes,
+        salvarChecklist,
+        removerItemProcesso,
+        registrarItemProcesso,
+        concluirProcesso,
+        acessoNexus,
+        salvarCatalogo,
+        criarLembrete,
+        encerrarLembrete,
+        aceitarTermo,
+        dispensarAssinaturaTermo,
         solicitarRecuperacaoSenha,
         definirNovaSenha,
         loginWithGoogle,

@@ -10,6 +10,7 @@ import {
   Settings,
   FolderSync,
   PlusCircle,
+  Bell,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,7 +24,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   onOpenNewTicketModal,
 }) => {
-  const { currentRole, tickets, assets, currentUser } = useApp();
+  const { currentRole, tickets, assets, currentUser, lembretes } = useApp();
+  // Fase 6: lembretes em aberto que já venceram ou vencem hoje
+  const hoje = new Date().toISOString().split('T')[0];
+  const lembretesDevidos = lembretes.filter((l) => l.status === 'aberto' && l.venceEm <= hoje).length;
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   const isAdmin = currentRole === 'ti_admin';
@@ -191,6 +195,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <FolderSync className="w-4 h-4 text-slate-500" />
               <span>On/Offboarding RH</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigate('lembretes')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                currentView === 'lembretes'
+                  ? 'bg-blue-50 text-blue-700 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Bell className="w-4 h-4 text-slate-500" />
+              <span className="flex-1 text-left">Lembretes</span>
+              {lembretesDevidos > 0 && (
+                <span className="text-[10px] font-bold text-white bg-red-500 rounded-full px-1.5 py-0.5">{lembretesDevidos}</span>
+              )}
             </button>
 
             <button

@@ -1,305 +1,419 @@
 import React, { useState } from 'react';
-import { ResponsibilityTerm } from '../../types/index.ts';
+import { ItemTermo, ResponsibilityTerm } from '../../types/index.ts';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatDate } from '../../utils/formatters.ts';
-import { Printer, X, CheckCircle2, Upload, FileText } from 'lucide-react';
+import { formatDate, formatDateTime } from '../../utils/formatters.ts';
+import { Printer, X, CheckCircle2, Upload, FileText, PenLine, Ban } from 'lucide-react';
 import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
+import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO, SEM_TOMBO } from '../../utils/processos.ts';
 
 interface PrintableTermModalProps {
   term: ResponsibilityTerm;
   onClose: () => void;
 }
 
+const ROTULO_FORMA: Record<string, string> = {
+  pendente: 'Aguardando assinaturas',
+  eletronica: 'Assinado eletronicamente',
+  documento: 'Assinado (documento anexado)',
+  dispensada: 'Assinatura dispensada',
+};
+
+/** Caixa de marcação no estilo do formulário em papel */
+const Caixa: React.FC<{ marcada: boolean; rotulo: string }> = ({ marcada, rotulo }) => (
+  <span className="inline-flex items-center gap-1 mr-2 whitespace-nowrap">
+    <span className="font-mono">{marcada ? '☒' : '☐'}</span>
+    {rotulo}
+  </span>
+);
+
+/**
+ * Termo no layout do documento controlado da Qualidade (RG.TI.001 entrega /
+ * RG.TI.002 devolução, ref. POP.TI.013). Código, versão e título vêm das
+ * Configurações; as linhas vêm do checklist do processo (Fase 6) ou, nos
+ * termos antigos, dos ativos vinculados.
+ * Assinatura híbrida: aceite eletrônico (colaborador + T.I.), documento físico
+ * anexado ou dispensa com motivo (ex.: desligamento não amigável).
+ */
 export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, onClose }) => {
-  const { settings, assets, markTermSigned, currentRole, terms } = useApp();
+  const { settings, assets, markTermSigned, currentRole, currentUser, terms, aceitarTermo, dispensarAssinaturaTermo } =
+    useApp();
   const [uploadingSigned, setUploadingSigned] = useState(false);
-  const [uploadedSuccess, setUploadedSuccess] = useState(false);
-  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [dispensando, setDispensando] = useState<string | null>(null);
+  const [gravando, setGravando] = useState(false);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   // Usa a versão mais recente do termo (o modal recebe uma cópia do momento da abertura)
-  const termoAtual = terms.find((t) => t.id === term.id) || term;
+  const t = terms.find((x) => x.id === term.id) || term;
+  const isEntrega = t.tipo === 'entrega';
+  const forma = t.formaAssinatura || (t.statusAssinatura === 'assinado' ? 'documento' : 'pendente');
+  const encerrado = forma !== 'pendente';
+  const souColaborador = currentUser?.id === t.colaboradorId;
 
-  // Buscar detalhes dos ativos incluídos no termo
-  const termAssets = assets.filter((a) => term.ativoIds.includes(a.id));
-
-  const handlePrint = () => {
-    window.print();
+  const padrao = isEntrega ? settings.docEntrega || DOC_ENTREGA_PADRAO : settings.docDevolucao || DOC_DEVOLUCAO_PADRAO;
+  const doc = {
+    codigo: t.docCodigo || padrao.codigo,
+    versao: t.docVersao || padrao.versao,
+    referencia: t.docReferencia || padrao.referencia,
+    titulo: t.docTitulo || padrao.titulo,
   };
+  const textoClausula = t.textoClausula || (isEntrega ? settings.textoTermoEntrega : settings.textoTermoDevolucao);
 
-  // Fase 3 (MED-04): o scan assinado vai para o Storage privado; só a TI envia
+  // Linhas: do checklist (Fase 6) ou dos ativos vinculados (termos antigos)
+  const linhas: ItemTermo[] =
+    t.itens && t.itens.length > 0
+      ? t.itens
+      : assets
+          .filter((a) => t.ativoIds.includes(a.id))
+          .map((a) => ({
+            descricao: a.nome,
+            patrimonio: [a.tag, a.serialNumber].filter(Boolean).join(' / '),
+            marcaModelo: [a.marca, a.modelo].filter(Boolean).join(' '),
+            condicao: 'bom',
+            situacao: isEntrega ? 'entregue' : 'devolvido',
+            ativoId: a.id,
+          }));
+  const observacoesLinhas = linhas.filter((l) => l.observacao).map((l) => `${l.descricao}: ${l.observacao}`);
+  const pendentes = linhas.filter((l) => l.situacao === 'pendente').map((l) => l.descricao);
+
+  // Documento físico assinado (Storage privado; só a T.I. envia)
   const handleEnviarAssinado = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const arquivo = e.target.files?.[0];
     e.target.value = '';
     if (!arquivo) return;
-    setErroArquivo(null);
+    setErro(null);
     setUploadingSigned(true);
     try {
-      const caminho = await enviarTermoAssinadoDb(term.id, arquivo);
-      markTermSigned(term.id, caminho);
-      setUploadedSuccess(true);
-      setTimeout(() => setUploadedSuccess(false), 3000);
+      const caminho = await enviarTermoAssinadoDb(t.id, arquivo);
+      markTermSigned(t.id, caminho);
+      setAviso('Documento assinado anexado.');
     } catch (err) {
-      setErroArquivo(`Não foi possível anexar: ${mensagemDeErro(err)}`);
+      setErro(`Não foi possível anexar: ${mensagemDeErro(err)}`);
     } finally {
       setUploadingSigned(false);
     }
   };
 
   const handleVerAssinado = async () => {
-    if (!termoAtual.arquivoAssinadoUrl) return;
-    setErroArquivo(null);
+    if (!t.arquivoAssinadoUrl) return;
+    setErro(null);
     const janela = window.open('', '_blank');
     try {
-      const url = await linkTemporarioDb(termoAtual.arquivoAssinadoUrl);
+      const url = await linkTemporarioDb(t.arquivoAssinadoUrl);
       if (janela) {
         janela.opener = null;
         janela.location.href = url;
       }
     } catch (err) {
       janela?.close();
-      setErroArquivo(`Não foi possível abrir o termo assinado: ${mensagemDeErro(err)}`);
+      setErro(`Não foi possível abrir o termo assinado: ${mensagemDeErro(err)}`);
     }
   };
 
-  const isEntrega = term.tipo === 'entrega';
-  const tituloTermo = isEntrega
-    ? 'TERMO DE RESPONSABILIDADE E ENTREGA DE EQUIPAMENTOS'
-    : 'TERMO DE DEVOLUÇÃO E BAIXA PATRIMONIAL DE EQUIPAMENTOS';
+  const assinar = async () => {
+    const quem = souColaborador ? 'Declaro que li e concordo com este termo.' : 'Assinar este termo como responsável da T.I.?';
+    if (!window.confirm(`${quem}\n\nO aceite fica registrado com data, hora, usuário e um código de verificação do conteúdo.`))
+      return;
+    setGravando(true);
+    const falha = await aceitarTermo(t.id);
+    setGravando(false);
+    if (falha) setErro(falha);
+    else setAviso('Aceite registrado.');
+  };
 
-  const textoClausula = isEntrega ? settings.textoTermoEntrega : settings.textoTermoDevolucao;
+  const confirmarDispensa = async () => {
+    if (!dispensando?.trim()) return setErro('Informe o motivo da dispensa.');
+    setGravando(true);
+    const falha = await dispensarAssinaturaTermo(t.id, dispensando.trim());
+    setGravando(false);
+    if (falha) return setErro(falha);
+    setDispensando(null);
+    setAviso('Dispensa registrada.');
+  };
+
+  const podeAceitarColab = !encerrado && souColaborador && !t.aceiteColaboradorEm && Boolean(t.formaAssinatura);
+  const podeAceitarTI = !encerrado && isTI && !souColaborador && !t.aceiteTiEm && Boolean(t.formaAssinatura);
+
+  const celula = 'border border-slate-400 px-2 py-1';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
       <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
-        {/* Barra Superior de Ações (Oculta na impressão) */}
-        <div className="no-print flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/80">
+        {/* Barra de ações (fora da impressão) */}
+        <div className="no-print flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/80">
           <div>
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-600" />
               <h2 className="text-sm font-semibold text-slate-900">
-                {term.codigo} · {tituloTermo}
+                {doc.codigo} · {t.codigo}
               </h2>
             </div>
-            <p className="text-xs text-slate-500">
-              Formato formal A4 pronto para impressão física ou arquivamento digital
+            <p className={`text-xs ${encerrado ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {ROTULO_FORMA[forma]}
+              {forma === 'pendente' && (
+                <>
+                  {' · '}colaborador {t.aceiteColaboradorEm ? '✓' : 'pendente'} · T.I. {t.aceiteTiEm ? '✓' : 'pendente'}
+                </>
+              )}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            {erroArquivo && <span className="text-[11px] text-rose-700 max-w-xs">{erroArquivo}</span>}
-            {uploadedSuccess && <span className="text-[11px] text-emerald-700">Termo assinado anexado.</span>}
-            {termoAtual.statusAssinatura === 'assinado' ? (
-              termoAtual.arquivoAssinadoUrl ? (
-                <button
-                  type="button"
-                  onClick={handleVerAssinado}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md border border-emerald-200 hover:bg-emerald-100"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Ver termo assinado
-                </button>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Termo Assinado & Arquivado
-                </span>
-              )
-            ) : isTI ? (
-              <label
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer ${
-                  uploadingSigned ? 'opacity-50 pointer-events-none' : ''
-                }`}
+          <div className="flex flex-wrap items-center gap-2">
+            {(podeAceitarColab || podeAceitarTI) && (
+              <button
+                type="button"
+                disabled={gravando}
+                onClick={assinar}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
               >
-                <Upload className="w-3.5 h-3.5" />
-                {uploadingSigned ? 'Enviando...' : 'Anexar termo assinado (PDF ou foto)'}
-                <input
-                  type="file"
-                  accept={TIPOS_ARQUIVO_ACEITOS.filter((t) => t !== 'text/plain').join(',')}
-                  onChange={handleEnviarAssinado}
-                  className="sr-only"
-                />
-              </label>
-            ) : (
-              <span className="text-[11px] text-slate-500">Aguardando assinatura</span>
+                <PenLine className="w-3.5 h-3.5" />
+                {souColaborador ? 'Li e concordo' : 'Assinar como T.I.'}
+              </button>
             )}
-
+            {t.arquivoAssinadoUrl && (
+              <button
+                type="button"
+                onClick={handleVerAssinado}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 hover:bg-emerald-100"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Ver documento assinado
+              </button>
+            )}
+            {isTI && !encerrado && (
+              <>
+                <label
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 cursor-pointer ${
+                    uploadingSigned ? 'opacity-50 pointer-events-none' : ''
+                  }`}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {uploadingSigned ? 'Enviando...' : 'Anexar assinado (PDF/foto)'}
+                  <input
+                    type="file"
+                    accept={TIPOS_ARQUIVO_ACEITOS.filter((x) => x !== 'text/plain').join(',')}
+                    onChange={handleEnviarAssinado}
+                    className="sr-only"
+                  />
+                </label>
+                {t.formaAssinatura && (
+                  <button
+                    type="button"
+                    onClick={() => setDispensando(dispensando === null ? '' : null)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100"
+                  >
+                    <Ban className="w-3.5 h-3.5" /> Dispensar assinatura
+                  </button>
+                )}
+              </>
+            )}
             <button
               type="button"
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-xs"
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
             >
-              <Printer className="w-3.5 h-3.5" />
-              Imprimir A4
+              <Printer className="w-3.5 h-3.5" /> Imprimir A4
             </button>
-
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-colors ml-2"
+              aria-label="Fechar"
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {uploadedSuccess && (
-          <div className="no-print bg-emerald-50 border-b border-emerald-200 px-6 py-2 text-xs text-emerald-700 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            Cópia digitalizada anexada com sucesso à ficha do colaborador e histórico do ativo!
+        {(aviso || erro || dispensando !== null) && (
+          <div className="no-print px-6 py-2 border-b border-slate-200 space-y-2 text-xs">
+            {aviso && <p className="text-emerald-700">{aviso}</p>}
+            {erro && <p className="text-rose-700">{erro}</p>}
+            {dispensando !== null && (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={dispensando}
+                  onChange={(e) => setDispensando(e.target.value)}
+                  placeholder="Motivo (ex.: colaborador não compareceu; desligamento não amigável)"
+                  className="flex-1 min-w-[16rem] px-2.5 py-1.5 border border-slate-300 rounded-md"
+                />
+                <button
+                  type="button"
+                  disabled={gravando}
+                  onClick={confirmarDispensa}
+                  className="px-3 py-1.5 font-semibold text-white bg-slate-700 rounded-md disabled:opacity-50"
+                >
+                  Confirmar dispensa
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Folha A4 Formatada */}
-        <div className="p-8 md:p-12 bg-white max-h-[75vh] overflow-y-auto print:max-h-none print:p-0">
-          <div className="print-a4-page mx-auto text-slate-800 text-xs leading-relaxed space-y-6">
-            {/* Cabeçalho Institucional da Empresa */}
-            <div className="border-b border-slate-300 pb-5 flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                    N
-                  </div>
-                  <div>
-                    <h1 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                      {settings.razaoSocial}
-                    </h1>
-                    <p className="text-[11px] text-slate-500 font-medium">{settings.nomeFantasia}</p>
-                  </div>
-                </div>
-                <div className="pt-2 text-[11px] text-slate-600 space-y-0.5">
-                  <p>CNPJ: {settings.cnpj} · Departamento de Tecnologia da Informação (T.I.)</p>
-                  <p>{settings.endereco} · {settings.cidadeUF} · CEP {settings.cep}</p>
-                  <p>Contato T.I.: {settings.emailTI} · {settings.telefoneTI}</p>
-                </div>
-              </div>
+        {/* Folha A4 */}
+        <div className="p-8 md:p-10 bg-white max-h-[75vh] overflow-y-auto print:max-h-none print:p-0">
+          <div className="print-a4-page mx-auto text-slate-900 text-xs leading-relaxed space-y-5">
+            {/* Cabeçalho do documento controlado */}
+            <table className="w-full border-collapse text-[11px]">
+              <tbody>
+                <tr>
+                  <td className={`${celula} w-1/2 font-bold uppercase`} rowSpan={2}>
+                    {settings.razaoSocial}
+                    <span className="block font-normal normal-case text-slate-600">CNPJ {settings.cnpj}</span>
+                  </td>
+                  <td className={celula}>
+                    <span className="font-semibold">Código:</span> {doc.codigo}
+                  </td>
+                  <td className={celula}>
+                    <span className="font-semibold">Registro:</span> {t.codigo}
+                  </td>
+                </tr>
+                <tr>
+                  <td className={celula}>
+                    <span className="font-semibold">Área:</span> T.I. · <span className="font-semibold">Versão:</span> {doc.versao}
+                  </td>
+                  <td className={celula}>
+                    <span className="font-semibold">Ref.:</span> {doc.referencia}
+                  </td>
+                </tr>
+                <tr>
+                  <td className={`${celula} text-center font-bold uppercase`} colSpan={2}>
+                    {doc.titulo}
+                  </td>
+                  <td className={`${celula} text-center`}>Página 1 de 1</td>
+                </tr>
+              </tbody>
+            </table>
 
-              <div className="text-right">
-                <span className="font-mono text-xs font-semibold text-blue-700 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-                  {term.codigo}
-                </span>
-                <p className="text-[11px] text-slate-400 mt-2">Data de Emissão</p>
-                <p className="text-xs font-medium text-slate-700">{formatDate(term.dataEmissao)}</p>
-              </div>
-            </div>
+            {/* 1. Identificação */}
+            <section className="space-y-1.5">
+              <h3 className="text-[11px] font-bold uppercase">1. Identificação</h3>
+              <table className="w-full border-collapse text-[11px]">
+                <tbody>
+                  <tr>
+                    <td className={`${celula} w-1/4 font-semibold`}>Data {isEntrega ? 'da entrega' : 'da devolução'}</td>
+                    <td className={celula}>{formatDate(t.dataEmissao)}</td>
+                    <td className={`${celula} w-1/4 font-semibold`}>Local / Unidade</td>
+                    <td className={celula}>{t.localUnidade || settings.cidadeUF}</td>
+                  </tr>
+                  <tr>
+                    <td className={`${celula} font-semibold`}>Colaborador(a)</td>
+                    <td className={celula}>
+                      {t.colaboradorNome}
+                      <span className="text-slate-500"> · Mat. {t.colaboradorMatricula}</span>
+                    </td>
+                    <td className={`${celula} font-semibold`}>Departamento</td>
+                    <td className={celula}>{t.colaboradorSetorNome}</td>
+                  </tr>
+                  <tr>
+                    <td className={`${celula} font-semibold`}>Responsável {isEntrega ? 'pela entrega' : 'pelo recebimento'}</td>
+                    <td className={celula}>{t.responsavelTINome}</td>
+                    <td className={`${celula} font-semibold`}>Departamento responsável</td>
+                    <td className={celula}>T.I.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
 
-            {/* Título Central */}
-            <div className="text-center py-2">
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                {tituloTermo}
-              </h2>
-            </div>
-
-            {/* Qualificação do Colaborador (Beneficiário) */}
-            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-2">
-              <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider border-b border-slate-200 pb-1">
-                1. Qualificação do Colaborador (Custodiante)
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs pt-1">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Nome Completo</span>
-                  <span className="font-semibold text-slate-900">{term.colaboradorNome}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Matrícula</span>
-                  <span className="font-mono text-slate-800">{term.colaboradorMatricula}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Cargo</span>
-                  <span className="text-slate-800">{term.colaboradorCargo}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Setor / Departamento</span>
-                  <span className="text-slate-800">{term.colaboradorSetorNome}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tabela de Equipamentos Envolvidos */}
-            <div className="space-y-2">
-              <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">
-                2. Relação de Equipamentos e Ativos
-              </h3>
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100 border-b border-slate-200 text-[11px] text-slate-600 uppercase font-semibold">
-                      <th className="py-2 px-3">Patrimônio</th>
-                      <th className="py-2 px-3">Descrição / Modelo</th>
-                      <th className="py-2 px-3">Marca</th>
-                      <th className="py-2 px-3">Número de Série</th>
-                      <th className="py-2 px-3">Estado Físico</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-slate-700">
-                    {termAssets.length > 0 ? (
-                      termAssets.map((asset) => (
-                        <tr key={asset.id} className="hover:bg-slate-50/50">
-                          <td className="py-2.5 px-3 font-mono font-bold text-blue-700">{asset.tag}</td>
-                          <td className="py-2.5 px-3 font-medium text-slate-900">{asset.nome}</td>
-                          <td className="py-2.5 px-3">{asset.marca}</td>
-                          <td className="py-2.5 px-3 font-mono text-slate-600">{asset.serialNumber}</td>
-                          <td className="py-2.5 px-3 text-slate-600">Perfeito funcionamento, sem avarias</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="py-4 text-center text-slate-400">
-                          Nenhum equipamento listado neste termo.
+            {/* 2. Equipamentos */}
+            <section className="space-y-1.5">
+              <h3 className="text-[11px] font-bold uppercase">2. Equipamentos {isEntrega ? 'entregues' : 'devolvidos'}</h3>
+              <table className="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className={`${celula} text-left`}>Equipamento</th>
+                    <th className={`${celula} text-left`}>Patrimônio / Nº de série</th>
+                    <th className={`${celula} text-left`}>Condição</th>
+                    <th className={`${celula} text-left`}>Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhas.length > 0 ? (
+                    linhas.map((l, i) => (
+                      <tr key={`${l.descricao}-${i}`}>
+                        <td className={celula}>
+                          {l.descricao}
+                          {l.marcaModelo && <span className="block text-[10px] text-slate-500">{l.marcaModelo}</span>}
+                        </td>
+                        <td className={`${celula} font-mono`}>{l.patrimonio || SEM_TOMBO}</td>
+                        <td className={celula}>
+                          <Caixa marcada={l.condicao === 'bom'} rotulo="Bom" />
+                          <Caixa marcada={l.condicao === 'avaria'} rotulo="Avaria" />
+                        </td>
+                        <td className={celula}>
+                          <Caixa
+                            marcada={l.situacao === 'entregue' || l.situacao === 'devolvido'}
+                            rotulo={isEntrega ? 'Entregue' : 'Devolvido'}
+                          />
+                          <Caixa marcada={l.situacao === 'pendente'} rotulo="Pendente" />
+                          <Caixa marcada={l.situacao === 'na'} rotulo="N/A" />
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className={`${celula} text-center text-slate-400`}>
+                        Nenhum equipamento listado neste termo.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </section>
 
-            {/* Cláusula Legal de Responsabilidade */}
-            <div className="space-y-2">
-              <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">
-                3. Cláusulas de Compromisso e Responsabilidade
-              </h3>
-              <div className="p-3.5 bg-slate-50/50 border border-slate-200 rounded-lg text-[11px] text-slate-600 text-justify leading-relaxed">
-                {textoClausula}
+            {/* 3. Observações */}
+            <section className="space-y-1.5">
+              <h3 className="text-[11px] font-bold uppercase">3. Observações, avarias e itens pendentes</h3>
+              <div className="border border-slate-400 min-h-[3.5rem] p-2 text-[11px] space-y-0.5">
+                {observacoesLinhas.map((o) => (
+                  <p key={o}>• {o}</p>
+                ))}
+                {pendentes.length > 0 && <p>• Pendente de devolução: {pendentes.join(', ')}</p>}
+                {t.observacoes && <p>{t.observacoes}</p>}
               </div>
-            </div>
+            </section>
 
-            {term.observacoes && (
-              <div className="p-2.5 bg-slate-50 rounded border border-slate-200 text-[11px] text-slate-600">
-                <span className="font-semibold text-slate-800">Observações adicionais:</span> {term.observacoes}
-              </div>
-            )}
+            {/* Declaração */}
+            <section className="space-y-1.5">
+              <h3 className="text-[11px] font-bold uppercase">Declaração</h3>
+              <p className="text-[11px] text-justify">{textoClausula}</p>
+            </section>
 
-            {/* Local, Data e Assinaturas Formais */}
-            <div className="pt-6 space-y-8">
-              <p className="text-right text-[11px] text-slate-500">
-                {settings.cidadeUF}, {formatDate(term.dataEmissao)}.
+            {/* Assinaturas */}
+            <section className="pt-4 space-y-6">
+              <p className="text-right text-[11px]">
+                {t.localUnidade || settings.cidadeUF}, {formatDate(t.dataEmissao)}.
               </p>
-
-              <div className="grid grid-cols-2 gap-12 pt-8">
+              <div className="grid grid-cols-2 gap-10 pt-6">
                 <div className="text-center space-y-1">
-                  <div className="border-b border-slate-400 w-3/4 mx-auto pb-1 mb-1">
-                    {term.statusAssinatura === 'assinado' && (
-                      <span className="text-[10px] text-emerald-600 font-mono italic">
-                        [Assinado Digitalmente / Documento Original Arquivado]
-                      </span>
-                    )}
+                  <div className="border-b border-slate-500 w-4/5 mx-auto min-h-[1.5rem] text-[10px] italic text-emerald-700">
+                    {t.aceiteColaboradorEm && `Aceite eletrônico em ${formatDateTime(t.aceiteColaboradorEm)}`}
+                    {forma === 'dispensada' && <span className="text-slate-600">Assinatura dispensada</span>}
                   </div>
-                  <p className="font-bold text-slate-900 text-xs">{term.colaboradorNome}</p>
-                  <p className="text-[10px] text-slate-500">Colaborador(a) / Solicitante</p>
-                  <p className="text-[10px] text-slate-400 font-mono">CPF / Matrícula: {term.colaboradorMatricula}</p>
+                  <p className="font-semibold">{t.colaboradorNome}</p>
+                  <p className="text-[10px] text-slate-500">Colaborador(a)</p>
                 </div>
-
                 <div className="text-center space-y-1">
-                  <div className="border-b border-slate-400 w-3/4 mx-auto pb-1 mb-1">
-                    <span className="text-[10px] text-blue-600 font-mono italic">
-                      [Visto Técnico de TI]
-                    </span>
+                  <div className="border-b border-slate-500 w-4/5 mx-auto min-h-[1.5rem] text-[10px] italic text-emerald-700">
+                    {t.aceiteTiEm && `Aceite eletrônico em ${formatDateTime(t.aceiteTiEm)}`}
                   </div>
-                  <p className="font-bold text-slate-900 text-xs">{term.responsavelTINome}</p>
-                  <p className="text-[10px] text-slate-500">Responsável T.I. / Patrimônio</p>
-                  <p className="text-[10px] text-slate-400">{settings.nomeFantasia}</p>
+                  <p className="font-semibold">{t.responsavelTINome}</p>
+                  <p className="text-[10px] text-slate-500">Responsável T.I.</p>
                 </div>
               </div>
-            </div>
+            </section>
+
+            {/* Registro eletrônico (proposta para a versão 03 do documento) */}
+            {(t.hashConteudo || forma === 'dispensada') && (
+              <section className="border-t border-dashed border-slate-300 pt-2 text-[10px] text-slate-500 space-y-0.5">
+                {forma === 'eletronica' && t.dataAssinatura && (
+                  <p>Assinado eletronicamente no Nexus em {formatDateTime(t.dataAssinatura)} por ambas as partes.</p>
+                )}
+                {forma === 'dispensada' && <p>Assinatura do colaborador dispensada pela T.I. Motivo: {t.motivoDispensa}</p>}
+                {t.hashConteudo && (
+                  <p className="font-mono break-all">Código de verificação do conteúdo (SHA-256): {t.hashConteudo}</p>
+                )}
+              </section>
+            )}
           </div>
         </div>
       </div>

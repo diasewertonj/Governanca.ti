@@ -29,7 +29,12 @@ export const DefinirSenhaView: React.FC = () => {
     if (!res.success) setErro(res.error || 'Não foi possível salvar a senha.');
   };
 
-  const titulo = tipoLinkSenha === 'invite' ? 'Bem-vindo(a)! Crie sua senha de acesso' : 'Defina sua nova senha';
+  const titulo =
+    tipoLinkSenha === 'invite'
+      ? 'Bem-vindo(a)! Crie sua senha de acesso'
+      : tipoLinkSenha === 'primeiro_acesso'
+        ? 'Primeiro acesso: troque a senha provisória'
+        : 'Defina sua nova senha';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

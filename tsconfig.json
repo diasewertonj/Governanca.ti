@@ -26,5 +26,5 @@
     "strict": true,
     "noFallthroughCasesInSwitch": true
   },
-  "exclude": ["dist"]
+  "exclude": ["dist", "supabase/functions"]
 }

@@ -18,6 +18,7 @@ const CollaboratorsView = lazy(() => import('./components/collaborators/Collabor
 const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
 const RhProcessesView = lazy(() => import('./components/rh/RhProcessesView.tsx').then((m) => ({ default: m.RhProcessesView })));
 const TermsView = lazy(() => import('./components/terms/TermsView.tsx').then((m) => ({ default: m.TermsView })));
+const LembretesView = lazy(() => import('./components/lembretes/LembretesView.tsx').then((m) => ({ default: m.LembretesView })));
 const SettingsView = lazy(() => import('./components/settings/SettingsView.tsx').then((m) => ({ default: m.SettingsView })));
 const MyAssetsView = lazy(() => import('./components/collaborators/MyAssetsView.tsx').then((m) => ({ default: m.MyAssetsView })));
 const MyTicketsView = lazy(() => import('./components/servicedesk/MyTicketsView.tsx').then((m) => ({ default: m.MyTicketsView })));
@@ -140,6 +141,7 @@ function MainApp() {
           )}
           {currentView === 'rh_processes' && <RhProcessesView />}
           {currentView === 'terms' && <TermsView />}
+          {currentView === 'lembretes' && <LembretesView />}
           {currentView === 'settings' && <SettingsView />}
           {currentView === 'my_assets' && (
             <MyAssetsView

@@ -23,6 +23,8 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
   const myAssets = assets.filter((a) => a.custodianteId === currentUser.id);
   const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(currentUser.id));
   const myTerms = terms.filter((t) => t.colaboradorId === currentUser.id);
+  // Fase 6: termos aguardando o "Li e concordo" do colaborador
+  const termosParaAssinar = myTerms.filter((t) => t.formaAssinatura === 'pendente' && !t.aceiteColaboradorEm);
 
   return (
     <div className="space-y-6">
@@ -33,6 +35,31 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
           Lista de patrimônio corporativo de T.I. atualmente vinculada à sua matrícula ({currentUser.matricula})
         </p>
       </div>
+
+      {termosParaAssinar.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-2">
+          <p className="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
+            <FileText className="w-4 h-4" /> Você tem {termosParaAssinar.length} termo(s) para ler e assinar
+          </p>
+          <ul className="space-y-1.5">
+            {termosParaAssinar.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2 text-xs">
+                <span>
+                  {t.docTitulo || (t.tipo === 'entrega' ? 'Termo de entrega' : 'Recibo de devolução')} · {t.codigo} ·{' '}
+                  {formatDate(t.dataEmissao)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTermForPrint(t)}
+                  className="px-3 py-1 text-xs font-semibold text-white bg-amber-600 rounded-md hover:bg-amber-700"
+                >
+                  Ler e assinar
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Grid de Equipamentos Físicos */}
       <div className="space-y-3">

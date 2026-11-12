@@ -5,13 +5,27 @@ import {
   Asset,
   AssetCategory,
   AssetStatus,
+  CatalogoItem,
+  ColaboradorRecurso,
   CompanySettings,
+  CondicaoItem,
+  DestinoRecurso,
+  Lembrete,
+  ProcessoEvento,
+  ProcessoItem,
+  ProcessoItemRascunho,
+  StatusItemProcesso,
+  StatusRecurso,
+  TipoCatalogo,
+  TipoItemProcesso,
   CustodyHistoryEntry,
   CustomFieldDefinition,
   Department,
   Employee,
   EmployeeStatus,
   FiscalData,
+  ItemTermo,
+  ModeloDocumento,
   OffboardingData,
   OnboardingData,
   ResponsibilityTerm,
@@ -210,6 +224,7 @@ const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
   onboarding: t.onboarding ? json(t.onboarding) : null,
   offboarding: t.offboarding ? json(t.offboarding) : null,
   anexos: json(t.anexos || []),
+  colaborador_id: t.colaboradorId || null,
 });
 
 const linhaMensagem = (chamadoId: string, m: TicketMessage): TablesInsert<'chamado_mensagens'> => ({
@@ -239,6 +254,16 @@ const linhaTermo = (tm: ResponsibilityTerm): TablesInsert<'termos_responsabilida
   arquivo_url: tm.arquivoAssinadoUrl || null,
   responsavel_ti_id: tm.responsavelTIId,
   responsavel_ti_nome: tm.responsavelTINome,
+  chamado_id: tm.chamadoId || null,
+  itens: json(tm.itens || []),
+  observacoes: tm.observacoes || null,
+  local_unidade: tm.localUnidade || null,
+  doc_codigo: tm.docCodigo || null,
+  doc_versao: tm.docVersao || null,
+  doc_referencia: tm.docReferencia || null,
+  doc_titulo: tm.docTitulo || null,
+  texto_clausula: tm.textoClausula || null,
+  forma_assinatura: tm.formaAssinatura || 'pendente',
 });
 
 // ---------------------------------------------------------------------------
@@ -564,6 +589,7 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     mensagens: messagesByTicketId[t.id] || [],
     dataCriacao: t.data_criacao,
     dataAtualizacao: t.data_atualizacao,
+    colaboradorId: t.colaborador_id || undefined,
   })) : [];
 }
 
@@ -609,6 +635,22 @@ export async function fetchTermsFromDb(): Promise<ResponsibilityTerm[] | null> {
     arquivoAssinadoUrl: tm.arquivo_url || undefined,
     responsavelTIId: tm.responsavel_ti_id,
     responsavelTINome: tm.responsavel_ti_nome,
+    chamadoId: tm.chamado_id || undefined,
+    itens: (tm.itens || []) as unknown as ItemTermo[],
+    observacoes: tm.observacoes || undefined,
+    localUnidade: tm.local_unidade || undefined,
+    docCodigo: tm.doc_codigo || undefined,
+    docVersao: tm.doc_versao || undefined,
+    docReferencia: tm.doc_referencia || undefined,
+    docTitulo: tm.doc_titulo || undefined,
+    textoClausula: tm.texto_clausula || undefined,
+    hashConteudo: tm.hash_conteudo || undefined,
+    aceiteColaboradorEm: tm.aceite_colaborador_em || undefined,
+    aceiteTiEm: tm.aceite_ti_em || undefined,
+    aceiteTiPor: tm.aceite_ti_por || undefined,
+    formaAssinatura: (tm.forma_assinatura || 'pendente') as ResponsibilityTerm['formaAssinatura'],
+    motivoDispensa: tm.motivo_dispensa || undefined,
+    dataAssinatura: tm.data_assinatura || undefined,
   })) : [];
 }
 
@@ -647,6 +689,8 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     textoTermoEntrega: data.texto_termo_entrega,
     textoTermoDevolucao: data.texto_termo_devolucao,
     camposPersonalizados: (data.campos_personalizados || []) as unknown as CustomFieldDefinition[],
+    docEntrega: (data.doc_entrega || undefined) as unknown as ModeloDocumento | undefined,
+    docDevolucao: (data.doc_devolucao || undefined) as unknown as ModeloDocumento | undefined,
   };
 }
 
@@ -668,6 +712,8 @@ export async function saveSettingsDb(st: CompanySettings) {
         texto_termo_entrega: st.textoTermoEntrega,
         texto_termo_devolucao: st.textoTermoDevolucao,
         campos_personalizados: json(st.camposPersonalizados || []),
+        ...(st.docEntrega ? { doc_entrega: json(st.docEntrega) } : {}),
+        ...(st.docDevolucao ? { doc_devolucao: json(st.docDevolucao) } : {}),
         updated_at: new Date().toISOString(),
       })
       .select('id')
@@ -767,6 +813,268 @@ export async function concluirOffboardingDb(chamadoId: string): Promise<ResumoOf
 export async function anonimizarColaboradorDb(colaboradorId: string) {
   if (!supabase) return;
   await checar(supabase.rpc('anonimizar_colaborador', { p_colaborador: colaboradorId }));
+}
+
+// ---------------------------------------------------------------------------
+// 7d. Fase 6 · Processos guiados (catálogo, checklist, inventário, lembretes)
+// ---------------------------------------------------------------------------
+export async function fetchCatalogoFromDb(): Promise<CatalogoItem[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('catalogo_itens').select('*').order('tipo').order('ordem');
+  if (error) {
+    console.error('Erro ao buscar catálogo:', error);
+    return null;
+  }
+  return (data || []).map((c) => ({
+    id: c.id,
+    tipo: c.tipo as TipoCatalogo,
+    nome: c.nome,
+    descricao: c.descricao || undefined,
+    sugeridoOnboarding: c.sugerido_onboarding,
+    ativo: c.ativo,
+    ordem: c.ordem,
+  }));
+}
+
+export async function salvarCatalogoItemDb(item: CatalogoItem, novo: boolean) {
+  if (!supabase) return;
+  const linha = {
+    id: item.id,
+    tipo: item.tipo,
+    nome: item.nome.trim(),
+    descricao: item.descricao || null,
+    sugerido_onboarding: item.sugeridoOnboarding,
+    ativo: item.ativo,
+    ordem: item.ordem,
+  };
+  if (novo) {
+    await checar(supabase.from('catalogo_itens').insert(linha));
+  } else {
+    await atualizar('catalogo_itens', item.id, linha);
+  }
+}
+
+const mapearItem = (i: {
+  id: string; chamado_id: string; tipo: string; titulo: string; detalhe: string | null; sugerido_por: string;
+  status: string; observacao: string | null; catalogo_id: string | null; recurso_id: string | null;
+  ativo_id: string | null; licenca_id: string | null; identificador: string | null; destino: string | null;
+  destino_colaborador_id: string | null; condicao: string | null; lembrete_em: string | null; ordem: number;
+  criado_por: string | null; criado_em: string; concluido_por: string | null; concluido_em: string | null;
+}): ProcessoItem => ({
+  id: i.id,
+  chamadoId: i.chamado_id,
+  tipo: i.tipo as TipoItemProcesso,
+  titulo: i.titulo,
+  detalhe: i.detalhe || undefined,
+  sugeridoPor: i.sugerido_por as ProcessoItem['sugeridoPor'],
+  status: i.status as StatusItemProcesso,
+  observacao: i.observacao || undefined,
+  catalogoId: i.catalogo_id || undefined,
+  recursoId: i.recurso_id || undefined,
+  ativoId: i.ativo_id || undefined,
+  licencaId: i.licenca_id || undefined,
+  identificador: i.identificador || undefined,
+  destino: (i.destino || undefined) as DestinoRecurso | undefined,
+  destinoColaboradorId: i.destino_colaborador_id || undefined,
+  condicao: (i.condicao || undefined) as CondicaoItem | undefined,
+  lembreteEm: i.lembrete_em || undefined,
+  ordem: i.ordem,
+  criadoPor: i.criado_por || undefined,
+  criadoEm: i.criado_em,
+  concluidoPor: i.concluido_por || undefined,
+  concluidoEm: i.concluido_em || undefined,
+});
+
+export async function fetchProcessoItensFromDb(): Promise<ProcessoItem[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('processo_itens').select('*').order('chamado_id').order('ordem');
+  if (error) {
+    console.error('Erro ao buscar checklists:', error);
+    return null;
+  }
+  return (data || []).map(mapearItem);
+}
+
+/** Salva o checklist montado (rascunho) de um chamado; devolve os itens criados */
+export async function inserirProcessoItensDb(chamadoId: string, itens: ProcessoItemRascunho[], ordemInicial = 0) {
+  if (!supabase) return null;
+  const linhas = itens.map((r, i) => ({
+    chamado_id: chamadoId,
+    tipo: r.tipo,
+    titulo: r.titulo,
+    detalhe: r.detalhe || null,
+    sugerido_por: r.sugeridoPor,
+    catalogo_id: r.catalogoId || null,
+    recurso_id: r.recursoId || null,
+    ativo_id: r.ativoId || null,
+    licenca_id: r.licencaId || null,
+    identificador: r.identificador || null,
+    ordem: ordemInicial + i + 1,
+  }));
+  const data = await checar(supabase.from('processo_itens').insert(linhas).select('*'));
+  return (data || []).map(mapearItem);
+}
+
+export async function excluirProcessoItemDb(id: string) {
+  await excluir('processo_itens', id);
+}
+
+export interface DadosRegistroItem {
+  colaborador_id?: string;
+  identificador?: string;
+  ativo_id?: string;
+  licenca_id?: string;
+  destino?: DestinoRecurso;
+  destino_colaborador_id?: string;
+  condicao?: CondicaoItem;
+  lembrete_em?: string;
+}
+
+export async function registrarItemProcessoDb(
+  itemId: string,
+  status: StatusItemProcesso,
+  observacao: string | undefined,
+  dados: DadosRegistroItem
+) {
+  if (!supabase) return null;
+  return checar(
+    supabase.rpc('registrar_item_processo', {
+      p_item: itemId,
+      p_status: status,
+      p_observacao: observacao || undefined,
+      p_dados: json(dados),
+    })
+  );
+}
+
+export async function concluirProcessoDb(chamadoId: string) {
+  if (!supabase) return null;
+  return (await checar(supabase.rpc('concluir_processo', { p_chamado: chamadoId }))) as unknown as {
+    chamado: string;
+    termoPendente: boolean;
+  };
+}
+
+export async function fetchRecursosFromDb(): Promise<ColaboradorRecurso[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('colaborador_recursos').select('*').order('concedido_em');
+  if (error) {
+    console.error('Erro ao buscar inventário de acessos:', error);
+    return null;
+  }
+  return (data || []).map((r) => ({
+    id: r.id,
+    colaboradorId: r.colaborador_id,
+    tipo: r.tipo as ColaboradorRecurso['tipo'],
+    catalogoId: r.catalogo_id || undefined,
+    nome: r.nome,
+    identificador: r.identificador || undefined,
+    status: r.status as StatusRecurso,
+    concedidoEm: r.concedido_em,
+    concedidoPor: r.concedido_por || undefined,
+    chamadoConcessao: r.chamado_concessao || undefined,
+    encerradoEm: r.encerrado_em || undefined,
+    encerradoPor: r.encerrado_por || undefined,
+    chamadoEncerramento: r.chamado_encerramento || undefined,
+    observacao: r.observacao || undefined,
+  }));
+}
+
+export async function fetchLembretesFromDb(): Promise<Lembrete[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('lembretes').select('*').order('vence_em');
+  if (error) {
+    // RH e colaborador não têm acesso aos lembretes (são tarefas da TI)
+    return [];
+  }
+  return (data || []).map((l) => ({
+    id: l.id,
+    titulo: l.titulo,
+    descricao: l.descricao || undefined,
+    venceEm: l.vence_em,
+    status: l.status as Lembrete['status'],
+    chamadoId: l.chamado_id || undefined,
+    colaboradorId: l.colaborador_id || undefined,
+    itemId: l.item_id || undefined,
+    criadoPor: l.criado_por || undefined,
+    criadoEm: l.criado_em,
+    concluidoPor: l.concluido_por || undefined,
+    concluidoEm: l.concluido_em || undefined,
+    observacaoConclusao: l.observacao_conclusao || undefined,
+  }));
+}
+
+export async function criarLembreteDb(l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId'>) {
+  if (!supabase) return null;
+  const data = await checar(
+    supabase
+      .from('lembretes')
+      .insert({
+        titulo: l.titulo,
+        descricao: l.descricao || null,
+        vence_em: l.venceEm,
+        chamado_id: l.chamadoId || null,
+        colaborador_id: l.colaboradorId || null,
+      })
+      .select('id')
+      .single()
+  );
+  return (data as { id: string }).id;
+}
+
+export async function encerrarLembreteDb(id: string, status: 'feito' | 'cancelado', observacao?: string) {
+  await atualizar('lembretes', id, { status, observacao_conclusao: observacao || null });
+}
+
+export async function fetchEventosProcessoDb(chamadoId: string): Promise<ProcessoEvento[]> {
+  if (!supabase) return [];
+  const data = await checar(
+    supabase.from('processo_eventos').select('*').eq('chamado_id', chamadoId).order('em', { ascending: false })
+  );
+  return (data || []).map((e) => ({
+    id: e.id,
+    chamadoId: e.chamado_id,
+    itemId: e.item_id || undefined,
+    acao: e.acao,
+    detalhe: (e.detalhe || undefined) as Record<string, unknown> | undefined,
+    por: e.por || undefined,
+    em: e.em,
+  }));
+}
+
+export async function aceitarTermoDb(termoId: string) {
+  if (!supabase) return null;
+  return (await checar(supabase.rpc('aceitar_termo', { p_termo: termoId }))) as unknown as {
+    colaborador: boolean;
+    ti: boolean;
+    assinado: boolean;
+    hash: string;
+  };
+}
+
+export async function dispensarAssinaturaTermoDb(termoId: string, motivo: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('dispensar_assinatura_termo', { p_termo: termoId, p_motivo: motivo }));
+}
+
+/** 6c: cria o login no Nexus (ou gera nova senha) pela Edge Function; a senha volta uma única vez */
+export async function acessoNexusDb(colaboradorId: string, acao: 'criar' | 'redefinir', chamadoId?: string) {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const { data, error } = await supabase.functions.invoke('criar-acesso-nexus', {
+    body: { colaborador_id: colaboradorId, acao, chamado_id: chamadoId },
+  });
+  if (error) {
+    // A função devolve { erro } com a explicação; o supabase-js a coloca em error.context
+    let mensagem = error.message;
+    try {
+      const corpo = await (error as { context?: Response }).context?.json();
+      if (corpo?.erro) mensagem = corpo.erro;
+    } catch {
+      // mantém a mensagem padrão
+    }
+    throw new DbError(mensagem, 'validacao');
+  }
+  return data as { email: string; senha: string; acao: string };
 }
 
 // ---------------------------------------------------------------------------
