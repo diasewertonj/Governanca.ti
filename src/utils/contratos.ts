@@ -2,7 +2,14 @@
 // Fase 8 · Contratos: vigência, cobertura dos ativos e itens cobertos.
 // Datas sempre como 'AAAA-MM-DD' locais (comparação de texto já ordena certo).
 // =============================================================================
-import type { Asset, Contrato, ItemContrato, PeriodicidadeContrato, TipoContrato } from '../types/index.ts';
+import type {
+  Asset,
+  Contrato,
+  ItemContrato,
+  PeriodicidadeContrato,
+  SoftwareLicense,
+  TipoContrato,
+} from '../types/index.ts';
 import { diasAte, getWarrantyStatus, isoLocal, type WarrantyStatus } from './formatters.ts';
 
 /** Antecedência do alerta "contrato vence em N dias" */
@@ -98,16 +105,46 @@ export function diferencaItens(antes: ItemContrato[], depois: ItemContrato[]) {
   };
 }
 
+const contar = (n: number, um: string, varios: string) => (n ? `${n} ${n === 1 ? um : varios}` : '');
+const juntar = (partes: string[], vazio: string) => partes.filter(Boolean).join(' · ') || vazio;
+
 /** Ex.: "20 ativos · 1 licença" */
 export function resumoItens(itens: ItemContrato[]): string {
   const ativos = itens.filter((i) => i.ativoId).length;
-  const licencas = itens.length - ativos;
-  const partes = [
-    ativos ? `${ativos} ${ativos === 1 ? 'ativo' : 'ativos'}` : '',
-    licencas ? `${licencas} ${licencas === 1 ? 'licença' : 'licenças'}` : '',
-  ].filter(Boolean);
-  return partes.length ? partes.join(' · ') : 'Nenhum item';
+  return juntar([contar(ativos, 'ativo', 'ativos'), contar(itens.length - ativos, 'licença', 'licenças')], 'Nenhum item');
 }
+
+export interface VinculosFornecedor {
+  contratos: number;
+  ativos: number;
+  licencas: number;
+}
+
+/** Quantos contratos, ativos e licenças usam o fornecedor (com vínculo, só dá para desativar) */
+export function vinculosDoFornecedor(
+  fornecedorId: string,
+  dados: {
+    contratos: Pick<Contrato, 'fornecedorId'>[];
+    ativos: Pick<Asset, 'fornecedorId'>[];
+    licencas: Pick<SoftwareLicense, 'fornecedorId'>[];
+  }
+): VinculosFornecedor {
+  const doFornecedor = (x: { fornecedorId?: string }) => x.fornecedorId === fornecedorId;
+  return {
+    contratos: dados.contratos.filter(doFornecedor).length,
+    ativos: dados.ativos.filter(doFornecedor).length,
+    licencas: dados.licencas.filter(doFornecedor).length,
+  };
+}
+
+/** Ex.: "2 contratos · 5 ativos · 1 licença" */
+export const resumoVinculos = (v: VinculosFornecedor) =>
+  juntar(
+    [contar(v.contratos, 'contrato', 'contratos'), contar(v.ativos, 'ativo', 'ativos'), contar(v.licencas, 'licença', 'licenças')],
+    'Nenhum vínculo'
+  );
+
+export const temVinculos = (v: VinculosFornecedor) => v.contratos + v.ativos + v.licencas > 0;
 
 /** Nome curto do contrato: número e descrição (ex.: "#CT-88 · Dell ProSupport") */
 export const nomeContrato = (c: Pick<Contrato, 'numero' | 'descricao'>) =>

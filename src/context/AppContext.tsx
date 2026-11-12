@@ -118,6 +118,7 @@ import {
   gravarArquivoDb,
 } from '../services/supabaseDb.ts';
 import { CATALOGO_PADRAO } from '../utils/processos.ts';
+import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
 
 /** Tipo do pedido de senha: link de e-mail ou primeiro login com senha provisória (Fase 6) */
 export type TipoLinkSenha = 'recovery' | 'invite' | 'primeiro_acesso';
@@ -1131,14 +1132,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const excluirFornecedor = (id: string): { success: boolean; message?: string } => {
     const antes = fornecedores.find((f) => f.id === id);
     if (!antes) return { success: false, message: 'Fornecedor não encontrado.' };
-    const vinculado =
-      contratos.some((c) => c.fornecedorId === id) ||
-      assets.some((a) => a.fornecedorId === id) ||
-      licenses.some((l) => l.fornecedorId === id);
-    if (vinculado) {
+    const vinculos = vinculosDoFornecedor(id, { contratos, ativos: assets, licencas: licenses });
+    if (temVinculos(vinculos)) {
       return {
         success: false,
-        message: `${antes.nome} está vinculado a contratos, ativos ou licenças e não pode ser excluído. Desative o fornecedor para tirá-lo das listas de escolha.`,
+        message: `${antes.nome} está vinculado a ${resumoVinculos(vinculos)} e não pode ser excluído. Desative o fornecedor para tirá-lo das listas de escolha.`,
       };
     }
     setFornecedores((prev) => prev.filter((f) => f.id !== id));

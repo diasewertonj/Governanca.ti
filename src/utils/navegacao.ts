@@ -8,6 +8,7 @@ import type { UserRole } from '../types/index.ts';
 export type Vista =
   | 'dashboard'
   | 'assets'
+  | 'fornecedores'
   | 'collaborators'
   | 'servicedesk'
   | 'rh_processes'
@@ -21,6 +22,7 @@ export type Vista =
 export const TITULO_VISTA: Record<Vista, string> = {
   dashboard: 'Início',
   assets: 'Ativos e licenças',
+  fornecedores: 'Fornecedores e contratos',
   collaborators: 'Colaboradores',
   servicedesk: 'Chamados',
   rh_processes: 'Admissões e desligamentos',
@@ -41,6 +43,7 @@ export type Icone =
   | 'admissoes'
   | 'termos'
   | 'ativos'
+  | 'fornecedores'
   | 'meus_equipamentos'
   | 'meus_chamados'
   | 'configuracoes';
@@ -95,7 +98,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
       titulo: 'Pessoas',
       itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes'), item('terms', 'termos')],
     },
-    { titulo: 'Patrimônio', itens: [item('assets', 'ativos')] },
+    { titulo: 'Patrimônio', itens: [item('assets', 'ativos'), item('fornecedores', 'fornecedores')] },
     MINHA_AREA,
   ];
   if (papel === 'ti_admin') grupos.push({ titulo: 'Administração', itens: [item('settings', 'configuracoes')] });

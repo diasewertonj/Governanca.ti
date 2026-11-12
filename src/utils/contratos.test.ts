@@ -8,7 +8,10 @@ import {
   garantiaEfetiva,
   nomeContrato,
   resumoItens,
+  resumoVinculos,
   situacaoContrato,
+  temVinculos,
+  vinculosDoFornecedor,
 } from './contratos.ts';
 
 const agora = new Date(2026, 10, 12, 22, 0, 0); // 12/11/2026, 22h local
@@ -111,6 +114,20 @@ describe('itens cobertos', () => {
     expect(resumoItens([{ ativoId: 'a' }])).toBe('1 ativo');
     expect(resumoItens([{ ativoId: 'a' }, { ativoId: 'b' }, { licencaId: 'l' }])).toBe('2 ativos · 1 licença');
     expect(resumoItens([{ licencaId: 'l' }, { licencaId: 'm' }])).toBe('2 licenças');
+  });
+
+  it('conta e resume os vínculos do fornecedor', () => {
+    const v = vinculosDoFornecedor('f-1', {
+      contratos: [{ fornecedorId: 'f-1' }, { fornecedorId: 'f-2' }],
+      ativos: [{ fornecedorId: 'f-1' }, { fornecedorId: 'f-1' }, {}],
+      licencas: [{ fornecedorId: 'f-1' }],
+    });
+    expect(v).toEqual({ contratos: 1, ativos: 2, licencas: 1 });
+    expect(resumoVinculos(v)).toBe('1 contrato · 2 ativos · 1 licença');
+    expect(temVinculos(v)).toBe(true);
+    const nenhum = { contratos: 0, ativos: 0, licencas: 0 };
+    expect(resumoVinculos(nenhum)).toBe('Nenhum vínculo');
+    expect(temVinculos(nenhum)).toBe(false);
   });
 
   it('nome do contrato usa número quando houver', () => {
