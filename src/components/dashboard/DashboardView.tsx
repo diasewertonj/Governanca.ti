@@ -1,6 +1,8 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatDate, getWarrantyStatus, rotuloStatus } from '../../utils/formatters.ts';
+import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
+import { DIAS_ALERTA_CONTRATO, garantiaEfetiva, situacaoContrato } from '../../utils/contratos.ts';
+import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts';
 import { LembreteGarantia } from '../assets/LembreteGarantia.tsx';
 import {
   Laptop,
@@ -18,7 +20,16 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
-  const { assets, tickets, employees, licenses, setSelectedAssetIdFor360, setSelectedTicketIdForDetail } = useApp();
+  const {
+    assets,
+    tickets,
+    employees,
+    licenses,
+    contratos,
+    faturas,
+    setSelectedAssetIdFor360,
+    setSelectedTicketIdForDetail,
+  } = useApp();
 
   const totalAssets = assets.length;
   const assetsInUse = assets.filter((a) => a.status === 'em_uso').length;
@@ -28,16 +39,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     (t) => (t.status === 'aberto' || t.status === 'em_andamento') && t.prioridade === 'critica'
   ).length;
 
-  // Garantias: vencendo em 30 dias, vencidas em uso e os 5 mais próximos do prazo
+  // Garantias (efetivas: fábrica ou contrato de suporte/garantia estendida): vencendo
+  // em 30 dias, vencidas em uso e os 5 mais próximos do prazo
   const garantias = assets
     .filter((a) => a.status !== 'descartado')
-    .map((a) => ({ asset: a, w: getWarrantyStatus(a.fiscal?.dataGarantia) }));
+    .map((a) => ({ asset: a, w: garantiaEfetiva(a, contratos) }));
   const expiringWarranties = garantias.filter((g) => g.w.status === 'expirando');
   const expiredInUse = garantias.filter((g) => g.w.status === 'expirada' && g.asset.status === 'em_uso');
   const garantiasProximas = [
     ...[...expiringWarranties].sort((x, y) => x.w.diasRestantes - y.w.diasRestantes),
     ...[...expiredInUse].sort((x, y) => y.w.diasRestantes - x.w.diasRestantes),
   ].slice(0, 5);
+
+  // Fase 8: contratos que vencem em 60 dias e faturas a pagar vencidas ou vencendo em 7 dias
+  const contratosVencendo = contratos.filter((c) => situacaoContrato(c).situacao === 'vencendo').length;
+  const faturasAPagar = resumoFaturasAPagar(faturas);
+  const mostrarQuadro =
+    garantiasProximas.length > 0 || contratosVencendo > 0 || faturasAPagar.vencidas > 0 || faturasAPagar.vencemEmBreve > 0;
 
   // Chamados recentes
   const recentTickets = [...tickets]
@@ -131,54 +149,74 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Quadro de Garantias (se houver algo a decidir) */}
-      {garantiasProximas.length > 0 && (
+      {/* Quadro de garantias e contratos (se houver algo a decidir) */}
+      {mostrarQuadro && (
         <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <ShieldAlert className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Garantias</h3>
+              <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Garantias e contratos</h3>
               <p className="text-xs text-amber-800 mt-0.5">
                 Revise os contratos de suporte e acione os fornecedores caso haja pendências técnicas.
               </p>
-              <div className="flex flex-wrap gap-6 mt-3">
+              <div className="flex flex-wrap gap-x-6 gap-y-3 mt-3">
                 <div>
                   <div className="text-xl font-bold text-amber-900">{expiringWarranties.length}</div>
-                  <div className="text-xs text-amber-800">vencem em 30 dias</div>
+                  <div className="text-xs text-amber-800">garantias vencem em 30 dias</div>
                 </div>
                 <div>
                   <div className="text-xl font-bold text-amber-900">{expiredInUse.length}</div>
                   <div className="text-xs text-amber-800">vencidas em uso</div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('fornecedores')}
+                  className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1"
+                >
+                  <div className="text-xl font-bold text-amber-900">{contratosVencendo}</div>
+                  <div className="text-xs text-amber-800 underline-offset-2 hover:underline">
+                    {contratosVencendo === 1 ? 'contrato vence' : 'contratos vencem'} em {DIAS_ALERTA_CONTRATO} dias
+                  </div>
+                </button>
+                <div>
+                  <div className="text-xl font-bold text-amber-900">
+                    <span className={faturasAPagar.vencidas > 0 ? 'text-red-700' : ''}>{faturasAPagar.vencidas}</span>
+                    <span className="text-amber-700 font-normal"> · </span>
+                    {faturasAPagar.vencemEmBreve}
+                  </div>
+                  <div className="text-xs text-amber-800">faturas vencidas · vencem em {DIAS_ALERTA_FATURA} dias</div>
+                </div>
               </div>
-              <ul className="mt-3 space-y-2">
-                {garantiasProximas.map(({ asset: a, w }) => (
-                  <li
-                    key={a.id}
-                    className="flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2"
-                  >
-                    <div className="min-w-0 flex flex-wrap items-center gap-x-2 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedAssetIdFor360(a.id)}
-                        className="inline-flex items-center gap-1.5 text-amber-900 font-medium hover:underline text-left"
-                      >
-                        <span>{a.tag}</span>
-                        <span>·</span>
-                        <span>{a.nome}</span>
-                      </button>
-                      <span className="text-slate-600">
-                        {w.status === 'expirada'
-                          ? `venceu em ${formatDate(a.fiscal?.dataGarantia)}`
-                          : w.diasRestantes === 0
-                          ? 'vence hoje'
-                          : `vence em ${w.diasRestantes} dia(s) (${formatDate(a.fiscal?.dataGarantia)})`}
-                      </span>
-                    </div>
-                    <LembreteGarantia asset={a} />
-                  </li>
-                ))}
-              </ul>
+              {garantiasProximas.length > 0 && (
+                <ul className="mt-3 space-y-2">
+                  {garantiasProximas.map(({ asset: a, w }) => (
+                    <li
+                      key={a.id}
+                      className="flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2"
+                    >
+                      <div className="min-w-0 flex flex-wrap items-center gap-x-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAssetIdFor360(a.id)}
+                          className="inline-flex items-center gap-1.5 text-amber-900 font-medium hover:underline text-left"
+                        >
+                          <span>{a.tag}</span>
+                          <span>·</span>
+                          <span>{a.nome}</span>
+                        </button>
+                        <span className="text-slate-600">
+                          {w.status === 'expirada'
+                            ? `venceu em ${formatDate(w.fim)}`
+                            : w.diasRestantes === 0
+                            ? 'vence hoje'
+                            : `vence em ${w.diasRestantes} dia(s) (${formatDate(w.fim)})`}
+                        </span>
+                      </div>
+                      <LembreteGarantia asset={a} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>

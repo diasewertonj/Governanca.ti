@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatCurrency, formatDate, formatChaveNFe, getWarrantyStatus } from '../../utils/formatters.ts';
+import { formatCurrency, formatDate, formatChaveNFe } from '../../utils/formatters.ts';
+import { contratosQueCobrem, garantiaEfetiva, nomeContrato } from '../../utils/contratos.ts';
 import {
   X,
   QrCode,
@@ -41,6 +42,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
     updateAsset,
     currentUser,
     currentRole,
+    contratos,
+    fornecedores,
   } = useApp();
 
   const [copiedKey, setCopiedKey] = useState(false);
@@ -59,7 +62,10 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
 
   const currentCustodian = employees.find((e) => e.id === asset.custodianteId);
   const department = departments.find((d) => d.id === asset.setorId);
-  const warranty = getWarrantyStatus(asset.fiscal?.dataGarantia);
+  // Fase 8: a garantia considera os contratos de suporte/garantia estendida que cobrem o ativo
+  const warranty = garantiaEfetiva(asset, contratos);
+  const contratoCobertura = contratosQueCobrem(asset.id, contratos)[0];
+  const nomeFornecedor = fornecedores.find((f) => f.id === asset.fornecedorId)?.nome || asset.fiscal?.fornecedor;
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
   const handleCopyKey = () => {
@@ -472,7 +478,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
 
           {/* Dados Fiscais e Garantia com Alerta Visual */}
           <div className="border border-slate-200 rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-slate-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
@@ -480,9 +486,9 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 </h3>
               </div>
               {/* Badge de Garantia */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs text-slate-500">
-                  <span className="uppercase font-semibold">Fim da garantia:</span>{' '}
+                  <span className="uppercase font-semibold">Garantia de fábrica:</span>{' '}
                   <span className="font-medium text-slate-800">{formatDate(asset.fiscal?.dataGarantia)}</span>
                 </span>
                 {warranty.status === 'valida' && (
@@ -509,6 +515,16 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               </div>
             </div>
 
+            {contratoCobertura?.fim && (
+              <p className="flex items-start gap-1.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words">
+                  Coberto pelo contrato <span className="font-semibold">{nomeContrato(contratoCobertura)}</span> até{' '}
+                  {formatDate(contratoCobertura.fim)}
+                </span>
+              </p>
+            )}
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
               <div>
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Nota Fiscal (NF-e)</span>
@@ -520,7 +536,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               </div>
               <div>
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Fornecedor</span>
-                <p className="text-slate-800">{asset.fiscal?.fornecedor || '-'}</p>
+                <p className="text-slate-800 break-words">{nomeFornecedor || '-'}</p>
               </div>
               <div>
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Data de Compra</span>

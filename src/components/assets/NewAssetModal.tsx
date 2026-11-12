@@ -20,8 +20,17 @@ const CATEGORIA_LABEL: Record<string, string> = {
 };
 
 export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) => {
-  const { assets, departments, employees, addAsset, updateAsset, anexarArquivoAtivo, settings, setSelectedAssetIdFor360 } =
-    useApp();
+  const {
+    assets,
+    departments,
+    employees,
+    fornecedores,
+    addAsset,
+    updateAsset,
+    anexarArquivoAtivo,
+    settings,
+    setSelectedAssetIdFor360,
+  } = useApp();
 
   const nextTagNumber = 1040 + assets.length + 1;
   const defaultTag = `#PAT-${nextTagNumber}`;
@@ -41,7 +50,10 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   const [numeroNF, setNumeroNF] = useState(fiscalAtual?.numeroNF ?? '');
   const [chaveAcesso44, setChaveAcesso44] = useState(fiscalAtual?.chaveAcesso44 ?? '');
   const [valorCompra, setValorCompra] = useState<number>(fiscalAtual?.valorCompra ?? 0);
+  // Fase 8: fornecedor do cadastro; o texto antigo fica (e aparece) enquanto não houver vínculo
+  const [fornecedorId, setFornecedorId] = useState(ativo?.fornecedorId ?? '');
   const [fornecedor, setFornecedor] = useState(fiscalAtual?.fornecedor ?? '');
+  const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
   const [dataAquisicao, setDataAquisicao] = useState(fiscalAtual?.dataAquisicao ?? new Date().toISOString().split('T')[0]);
   const [dataGarantia, setDataGarantia] = useState(fiscalAtual?.dataGarantia ?? '');
   const [suporteContato, setSuporteContato] = useState(fiscalAtual?.suporteContato ?? '');
@@ -68,8 +80,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
 
   // Aviso ao fechar com alterações não salvas
   const valores = JSON.stringify([tag, nome, categoria, marca, modelo, serialNumber, localizacaoFisica, setorId,
-    custodianteId, numeroNF, chaveAcesso44, valorCompra, fornecedor, dataAquisicao, dataGarantia, suporteContato,
-    sistemaOperacional, bitlockerKey, customFields, observacoes]);
+    custodianteId, numeroNF, chaveAcesso44, valorCompra, fornecedorId, fornecedor, dataAquisicao, dataGarantia,
+    suporteContato, sistemaOperacional, bitlockerKey, customFields, observacoes]);
   const [valoresIniciais] = useState(valores);
   const itensPendentes =
     valores !== valoresIniciais || notaFiscal
@@ -118,6 +130,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
         fiscal,
         customFields,
         observacoes: observacoes.trim() || undefined,
+        fornecedorId: fornecedorId || undefined,
       });
       if (notaFiscal) void anexarArquivoAtivo(ativo.id, notaFiscal, 'nota_fiscal');
       onClose();
@@ -147,6 +160,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
       fiscal,
       customFields,
       observacoes: observacoes.trim() || undefined,
+      fornecedorId: fornecedorId || undefined,
       historicoCustodia: isEmUso && custodian
         ? [
             {
@@ -460,17 +474,40 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="ativo-fornecedor" className="block text-xs font-semibold text-slate-700 mb-1">
                   Fornecedor
                 </label>
-                <input
-                  type="text"
-                  value={fornecedor}
-                  onChange={(e) => setFornecedor(e.target.value)}
-                  placeholder="Ex: Dell Brasil Ltda"
+                <select
+                  id="ativo-fornecedor"
+                  value={fornecedorId}
+                  onChange={(e) => setFornecedorId(e.target.value)}
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
+                >
+                  <option value="">Sem vínculo com o cadastro</option>
+                  {opcoesFornecedor.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
+                      {f.ativo ? '' : ' (inativo)'}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {!fornecedorId && (
+                <div>
+                  <label htmlFor="ativo-fornecedor-texto" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Fornecedor (texto)
+                  </label>
+                  <input
+                    id="ativo-fornecedor-texto"
+                    type="text"
+                    value={fornecedor}
+                    onChange={(e) => setFornecedor(e.target.value)}
+                    placeholder="Ex: Dell Brasil Ltda"
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
