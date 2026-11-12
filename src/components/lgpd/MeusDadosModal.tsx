@@ -107,7 +107,7 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
             <ShieldCheck className="w-5 h-5 text-blue-600" />
             <h2 className="text-sm font-semibold text-slate-900">Meus dados (LGPD)</h2>
           </div>
-          <button onClick={onClose} aria-label="Fechar" className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+          <button onClick={onClose} aria-label="Fechar" className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -152,7 +152,7 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
             {pedido && (
               <div className="space-y-2">
                 {pedido === 'eliminacao' && (
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-xs text-slate-500">
                     Enquanto houver vínculo ou obrigação legal (termos de equipamentos, por exemplo), os dados são mantidos. Quando
                     cabível, a T.I. anonimiza o cadastro e preserva o histórico sem identificar você.
                   </p>

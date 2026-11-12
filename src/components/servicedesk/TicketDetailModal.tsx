@@ -193,44 +193,40 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   }[ticket.prioridade];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 overflow-hidden my-0 sm:my-6">
         {/* Barra Superior */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-xs font-bold text-slate-800 bg-white px-2.5 py-1 rounded border border-slate-200 shadow-2xs">
-              {ticket.codigo}
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-slate-900 leading-tight">{ticket.titulo}</h2>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Aberto em {formatDateTime(ticket.dataCriacao)} por {ticket.solicitanteNome}
-              </p>
-            </div>
+        {/* Fase 7: no celular o cabeçalho quebra em duas linhas (etiquetas em cima, título embaixo) */}
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50">
+          <span className="font-mono text-xs font-bold text-slate-800 bg-white px-2.5 py-1 rounded border border-slate-200">
+            {ticket.codigo}
+          </span>
+          <div className="order-last w-full sm:order-none sm:w-auto sm:flex-1 min-w-0">
+            <h2 className="text-base sm:text-sm font-semibold text-slate-900 leading-tight">{ticket.titulo}</h2>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Aberto em {formatDateTime(ticket.dataCriacao)} por {ticket.solicitanteNome}
+            </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
-              {rotuloStatus(ticket.status).toUpperCase()}
-            </span>
-            <span className={`text-xs px-2 py-0.5 rounded-md ${priorityColors}`}>
-              Prioridade: {rotuloPrioridade(ticket.prioridade).toUpperCase()}
-            </span>
-            <button
-              onClick={fechar}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
+            {rotuloStatus(ticket.status)}
+          </span>
+          <span className={`text-xs px-2 py-0.5 rounded-md ${priorityColors}`}>
+            Prioridade {rotuloPrioridade(ticket.prioridade).toLowerCase()}
+          </span>
+          <button
+            type="button"
+            onClick={fechar}
+            aria-label="Fechar chamado"
+            className="ml-auto sm:ml-0 p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Corpo do Chamado em 2 Colunas */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 max-h-[75vh] overflow-y-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 sm:max-h-[75vh] sm:overflow-y-auto">
           {/* Coluna Principal: Conversas e Linha do Tempo */}
-          <div className="lg:col-span-2 p-6 space-y-6 flex flex-col justify-between">
+          <div className="lg:col-span-2 p-4 sm:p-6 space-y-6 flex flex-col justify-between">
             <div className="space-y-5">
               {/* Descrição Inicial do Chamado */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
@@ -244,8 +240,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
                 {ticket.anexos && ticket.anexos.length > 0 && (
                   <div className="pt-2 border-t border-slate-200 mt-2 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Anexos</span>
-                    {erroArquivo && <p className="text-[11px] text-rose-700">{erroArquivo}</p>}
+                    <span className="text-xs text-slate-500 uppercase font-semibold block">Anexos</span>
+                    {erroArquivo && <p className="text-xs text-rose-700">{erroArquivo}</p>}
                     <div className="flex flex-wrap gap-2">
                       {ticket.anexos.map((att) => (
                         <button
@@ -254,9 +250,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                           onClick={() => abrirAnexo(att.caminho || att.url)}
                           className="flex items-center gap-1.5 text-xs text-blue-700 bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-blue-50 transition-colors"
                         >
-                          <Paperclip className="w-3 h-3 text-slate-400" />
+                          <Paperclip className="w-3 h-3 text-slate-500" />
                           <span>{att.nome}</span>
-                          <span className="text-[10px] text-slate-400">({att.tamanho})</span>
+                          <span className="text-xs text-slate-500">({att.tamanho})</span>
                         </button>
                       ))}
                     </div>
@@ -274,7 +270,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                         Checklist Operacional de Desligamento (Persistido)
                       </h4>
                     </div>
-                    <span className="text-[11px] font-semibold text-amber-800">
+                    <span className="text-xs font-semibold text-amber-800">
                       {ticket.offboarding.checklist.filter((c) => concluidoExibido(c)).length}/
                       {ticket.offboarding.checklist.length} concluídos
                     </span>
@@ -301,7 +297,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   </div>
 
                   {ticket.offboarding.recolhimentoInstrucoes && (
-                    <div className="text-[11px] text-amber-900 bg-white/80 p-2 rounded border border-amber-200">
+                    <div className="text-xs text-amber-900 bg-white/80 p-2 rounded border border-amber-200">
                       <span className="font-semibold">Logística:</span> {ticket.offboarding.recolhimentoInstrucoes}
                     </div>
                   )}
@@ -327,7 +323,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                           : `Concluir desligamento de ${colaboradorDesligado.nome}`}
                       </button>
                     ) : (
-                      <p className="text-[11px] text-amber-800">
+                      <p className="text-xs text-amber-800">
                         Este chamado foi aberto antes da automação e não identifica o colaborador: conclua o checklist manualmente.
                       </p>
                     )
@@ -346,12 +342,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       </h4>
                     </div>
                     {isColaboradorJaCadastrado ? (
-                      <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1">
+                      <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                         Cadastrado no Sistema
                       </span>
                     ) : (
-                      <span className="text-[11px] font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded">
+                      <span className="text-xs font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded">
                         Ainda não cadastrado
                       </span>
                     )}
@@ -359,23 +355,23 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-white p-3 rounded border border-blue-200/80">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Novo Colaborador</span>
+                      <span className="text-xs uppercase font-bold text-slate-500 block">Novo Colaborador</span>
                       <span className="font-semibold text-slate-900 block">{ticket.onboarding.nomeColaborador}</span>
-                      <span className="text-slate-600 text-[11px] block">{ticket.onboarding.cargo}</span>
-                      <span className="text-slate-400 font-mono text-[11px] block">{ticket.onboarding.emailColaborador}</span>
+                      <span className="text-slate-600 text-xs block">{ticket.onboarding.cargo}</span>
+                      <span className="text-slate-500 font-mono text-xs block">{ticket.onboarding.emailColaborador}</span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Setor & Início</span>
+                      <span className="text-xs uppercase font-bold text-slate-500 block">Setor & Início</span>
                       <span className="text-slate-800 font-medium block">
                         Setor: {departments.find((d) => d.id === ticket.onboarding?.setorId)?.nome || 'Não definido'}
                       </span>
-                      <span className="text-slate-600 text-[11px] block">
+                      <span className="text-slate-600 text-xs block">
                         Início: {formatDate(ticket.onboarding.dataAdmissao)}
                       </span>
                       <div className="mt-1 flex items-center gap-1.5">
                         <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                        <span className="text-[11px] font-semibold text-blue-900">
+                        <span className="text-xs font-semibold text-blue-900">
                           Acesso sugerido: {
                             ticket.onboarding.papelAcessoSugerido === 'ti_admin'
                               ? 'Admin de T.I.'
@@ -392,23 +388,23 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
                   <div className="space-y-2 text-xs">
                     <div className="bg-white p-2.5 rounded border border-slate-200">
-                      <span className="font-semibold text-slate-800 block text-[11px]">
+                      <span className="font-semibold text-slate-800 block text-xs">
                         Sugestão de Perfil de Equipamento:
                       </span>
                       <span className="text-blue-700 font-medium">{ticket.onboarding.tipoComputador}</span>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         * O RH não define a máquina física. A T.I. aloca o equipamento (#PAT) do estoque durante o atendimento.
                       </p>
                     </div>
 
                     {ticket.onboarding.perifericos.length > 0 && (
                       <div className="bg-white p-2.5 rounded border border-slate-200">
-                        <span className="font-semibold text-slate-800 block text-[11px] mb-1">
+                        <span className="font-semibold text-slate-800 block text-xs mb-1">
                           Periféricos Solicitados:
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {ticket.onboarding.perifericos.map((p, idx) => (
-                            <span key={idx} className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px]">
+                            <span key={idx} className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs">
                               {p}
                             </span>
                           ))}
@@ -418,12 +414,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
                     {ticket.onboarding.acessosSoftwares.length > 0 && (
                       <div className="bg-white p-2.5 rounded border border-slate-200">
-                        <span className="font-semibold text-slate-800 block text-[11px] mb-1">
+                        <span className="font-semibold text-slate-800 block text-xs mb-1">
                           Acessos e Licenças Requeridos:
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {ticket.onboarding.acessosSoftwares.map((a, idx) => (
-                            <span key={idx} className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                            <span key={idx} className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-xs">
                               {a}
                             </span>
                           ))}
@@ -442,7 +438,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
               {/* Linha do Tempo de Mensagens */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Histórico de Mensagens & Comunicação
                 </h4>
 
@@ -462,7 +458,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                             : 'bg-white border-slate-200 text-slate-900 mr-4'
                         }`}
                       >
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-slate-900">{msg.autorNome}</span>
                             {msg.ehNotaInterna ? (
@@ -471,10 +467,10 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                                 Nota Interna TI (Privada)
                               </span>
                             ) : (
-                              <span className="text-slate-400">· {msg.autorRole}</span>
+                              <span className="text-slate-500">· {msg.autorRole}</span>
                             )}
                           </div>
-                          <span className="text-slate-400 font-mono text-[10px]">
+                          <span className="text-slate-500 font-mono text-xs">
                             {formatDateTime(msg.data)}
                           </span>
                         </div>
@@ -490,7 +486,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             {/* Caixa de Resposta */}
             <form onSubmit={handleSendMessage} className="pt-4 border-t border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-slate-600">Adicionar Resposta ao Chamado</span>
+                <span className="text-xs font-medium text-slate-600">Adicionar Resposta ao Chamado</span>
                 {isTI && (
                   <label className="flex items-center gap-1.5 text-xs text-amber-800 cursor-pointer select-none">
                     <input
@@ -545,12 +541,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             {/* Controles de Status (para TI) */}
             {isTI && (
               <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">
+                <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
                   Gerenciamento de Atendimento
                 </span>
 
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Status do Chamado</label>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Status do Chamado</label>
                   <select
                     value={statusExibido}
                     onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
@@ -565,7 +561,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Técnico Responsável</label>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Técnico Responsável</label>
                   <select
                     value={tecnicoExibido}
                     onChange={(e) => handleTechnicianChange(e.target.value)}
@@ -585,7 +581,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
             {/* Vínculo ao Equipamento com Defeito (360°) */}
             <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">
+              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
                 Equipamento Vinculado ao Chamado
               </span>
               {linkedAsset ? (
@@ -598,26 +594,26 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                         onClose();
                         setSelectedAssetIdFor360(linkedAsset.id);
                       }}
-                      className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
+                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
                     >
-                      Ver Ficha 360°
+                      Ver ficha
                       <ExternalLink className="w-3 h-3" />
                     </button>
                   </div>
                   <p className="font-medium text-slate-900 mt-0.5">{linkedAsset.nome}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     {linkedAsset.marca} {linkedAsset.modelo} · S/N: <span className="font-mono">{linkedAsset.serialNumber}</span>
                   </p>
                 </div>
               ) : (
-                <p className="text-slate-400 text-xs">Nenhum equipamento físico vinculado.</p>
+                <p className="text-slate-500 text-xs">Nenhum equipamento físico vinculado.</p>
               )}
             </div>
 
             {/* Vínculo a Software / SaaS (360°) */}
             {ticket.softwareId && (
               <div className="bg-white p-4 rounded-lg border border-purple-200 bg-purple-50/20 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-purple-700 block tracking-wide flex items-center gap-1.5">
+                <span className="text-xs uppercase font-bold text-purple-700 block tracking-wide flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5" />
                   Software / SaaS Vinculado
                 </span>
@@ -630,13 +626,13 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                         onClose();
                         setSelectedSoftwareIdFor360(ticket.softwareId!);
                       }}
-                      className="text-[11px] text-purple-700 hover:underline flex items-center gap-1 font-medium"
+                      className="text-xs text-purple-700 hover:underline flex items-center gap-1 font-medium"
                     >
-                      Ficha 360°
+                      Ficha
                       <ExternalLink className="w-3 h-3" />
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Assinatura Corporativa monitorada pela T.I.
                   </p>
                 </div>
@@ -645,7 +641,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
             {/* Solicitante do Chamado */}
             <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">
+              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
                 Solicitante
               </span>
               <div>
@@ -663,18 +659,18 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     className="font-bold text-slate-900 hover:text-blue-700 flex items-center gap-1"
                   >
                     {ticket.solicitanteNome}
-                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                    <ExternalLink className="w-3 h-3 text-slate-500" />
                   </button>
                 )}
-                <p className="text-[11px] text-slate-600 mt-0.5">{ticket.solicitanteCargo}</p>
-                <p className="text-[11px] text-slate-500">{ticket.solicitanteSetorNome}</p>
-                <p className="text-[11px] text-slate-400 mt-1">{ticket.solicitanteEmail}</p>
+                <p className="text-xs text-slate-600 mt-0.5">{ticket.solicitanteCargo}</p>
+                <p className="text-xs text-slate-500">{ticket.solicitanteSetorNome}</p>
+                <p className="text-xs text-slate-500 mt-1">{ticket.solicitanteEmail}</p>
               </div>
             </div>
 
             {/* Informações de Categoria */}
             <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-1.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">
+              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
                 Metadados do Chamado
               </span>
               <div className="flex justify-between py-1 border-b border-slate-100">

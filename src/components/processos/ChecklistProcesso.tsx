@@ -132,7 +132,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
           </h4>
         </div>
         {itens.length > 0 && (
-          <span className="text-[11px] font-semibold text-indigo-800 whitespace-nowrap">
+          <span className="text-xs font-semibold text-indigo-800 whitespace-nowrap">
             {prog.feitos + prog.naoSeAplica}/{prog.total} · {prog.percentual}%
           </span>
         )}
@@ -189,7 +189,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
 
       {grupos.map((g) => (
         <div key={g.etapa} className="space-y-1.5">
-          <h5 className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{g.etapa}</h5>
+          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.etapa}</h5>
           {g.itens.map((item) => (
             <LinhaItem
               key={item.id}
@@ -226,7 +226,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
             <button
               type="button"
               onClick={() => setRascunho([])}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50"
             >
               <Plus className="w-3.5 h-3.5" /> Adicionar passos
             </button>
@@ -240,7 +240,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
             </button>
           </div>
           {!prog.podeConcluir && (
-            <p className="text-[11px] text-slate-500">
+            <p className="text-xs text-slate-500">
               Para concluir, cada passo precisa estar feito ou marcado como "não se aplica" (o termo pode ficar para depois).
             </p>
           )}
@@ -268,7 +268,7 @@ const LinhaItem: React.FC<{
     item.status === 'feito' ? (
       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
     ) : item.status === 'nao_se_aplica' ? (
-      <MinusCircle className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+      <MinusCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
     ) : (
       <Circle className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
     );
@@ -300,9 +300,9 @@ const LinhaItem: React.FC<{
           aria-expanded={aberto}
         >
           <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] uppercase font-semibold text-slate-400">{ACAO_DO_TIPO[item.tipo]}</span>
+            <span className="text-xs uppercase font-semibold text-slate-500">{ACAO_DO_TIPO[item.tipo]}</span>
             {item.sugeridoPor === 'rh' && (
-              <span className="text-[10px] px-1.5 rounded bg-blue-50 text-blue-700 border border-blue-200">pedido do RH</span>
+              <span className="text-xs px-1.5 rounded bg-blue-50 text-blue-700 border border-blue-200">pedido do RH</span>
             )}
           </span>
           <span
@@ -310,24 +310,24 @@ const LinhaItem: React.FC<{
           >
             {item.titulo}
           </span>
-          {item.detalhe && <span className="block text-[11px] text-slate-500">{item.detalhe}</span>}
+          {item.detalhe && <span className="block text-xs text-slate-500">{item.detalhe}</span>}
           {item.status !== 'pendente' && (
-            <span className="block text-[11px] text-slate-500 mt-0.5">
+            <span className="block text-xs text-slate-500 mt-0.5">
               {registro.length > 0 && <>{registro.join(' · ')} · </>}
               {item.observacao && <>“{item.observacao}” · </>}
               {nomeDe(item.concluidoPor) || 'T.I.'}
               {item.concluidoEm ? ` em ${formatDateTime(item.concluidoEm)}` : ''}
             </span>
           )}
-          {clicavel && <span className="block text-[11px] text-indigo-600 mt-0.5">Registrar este passo</span>}
+          {clicavel && <span className="block text-xs text-indigo-600 mt-0.5">Registrar este passo</span>}
         </button>
         {podeEditar && item.status === 'pendente' && !aberto && (
-          <button type="button" onClick={onRemover} title="Remover passo" className="p-1 text-slate-400 hover:text-red-600">
+          <button type="button" onClick={onRemover} title="Remover passo" className="p-1 text-slate-500 hover:text-red-600">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
         {podeEditar && podeReabrir(item) && (
-          <button type="button" onClick={onReabrir} title="Voltar para pendente" className="p-1 text-slate-400 hover:text-indigo-600">
+          <button type="button" onClick={onReabrir} title="Voltar para pendente" className="p-1 text-slate-500 hover:text-indigo-600">
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
         )}
@@ -379,27 +379,27 @@ const Montagem: React.FC<{
 
   return (
     <div className="rounded-md border-2 border-dashed border-indigo-300 bg-white p-3 space-y-2">
-      <p className="text-[11px] font-semibold text-indigo-900">
+      <p className="text-xs font-semibold text-indigo-900">
         {existentes > 0 ? 'Novos passos (rascunho)' : 'Checklist sugerido (rascunho)'} — tire o que não se aplica e acrescente o
         que faltar.
       </p>
-      {rascunho.length === 0 && <p className="text-[11px] text-slate-500">Nenhum passo ainda.</p>}
+      {rascunho.length === 0 && <p className="text-xs text-slate-500">Nenhum passo ainda.</p>}
       <ul className="space-y-1">
         {rascunho.map((r) => (
           <li key={r.chave} className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 w-28 shrink-0 truncate">
+            <span className="text-xs uppercase font-semibold text-slate-500 w-28 shrink-0 truncate">
               {ACAO_DO_TIPO[r.tipo]}
             </span>
             <span className="flex-1 min-w-0 truncate">
               {r.titulo}
-              {r.detalhe && <span className="text-slate-400"> · {r.detalhe}</span>}
+              {r.detalhe && <span className="text-slate-500"> · {r.detalhe}</span>}
             </span>
-            {r.sugeridoPor === 'rh' && <span className="text-[10px] text-blue-700">RH</span>}
+            {r.sugeridoPor === 'rh' && <span className="text-xs text-blue-700">RH</span>}
             <button
               type="button"
               onClick={() => setRascunho(rascunho.filter((x) => x.chave !== r.chave))}
               title="Tirar do checklist"
-              className="p-0.5 text-slate-400 hover:text-red-600"
+              className="p-0.5 text-slate-500 hover:text-red-600"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -483,7 +483,7 @@ const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string) => st
       <button
         type="button"
         onClick={carregar}
-        className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-indigo-700"
+        className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-700"
       >
         <History className="w-3.5 h-3.5" /> Ver trilha de auditoria
         {erro && <span className="text-red-600"> · {erro}</span>}
@@ -492,13 +492,13 @@ const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string) => st
   }
   return (
     <div className="space-y-1">
-      <p className="flex items-center gap-1 text-[11px] font-semibold text-slate-600">
+      <p className="flex items-center gap-1 text-xs font-semibold text-slate-600">
         <History className="w-3.5 h-3.5" /> Trilha de auditoria
       </p>
       {eventos.length === 0 ? (
-        <p className="text-[11px] text-slate-500">Sem eventos registrados (no modo demonstração a trilha fica no banco).</p>
+        <p className="text-xs text-slate-500">Sem eventos registrados (no modo demonstração a trilha fica no banco).</p>
       ) : (
-        <ul className="max-h-40 overflow-y-auto text-[11px] text-slate-600 space-y-0.5">
+        <ul className="max-h-40 overflow-y-auto text-xs text-slate-600 space-y-0.5">
           {eventos.map((e) => (
             <li key={e.id}>
               {formatDateTime(e.em)} · {nomeDe(e.por) || 'Sistema'} {ROTULO_EVENTO[e.acao] || e.acao}

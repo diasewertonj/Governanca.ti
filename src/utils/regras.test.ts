@@ -46,8 +46,12 @@ describe('vistaPermitida (RBAC de interface)', () => {
     expect(vistaPermitida('colaborador', 'dashboard')).toBe('my_assets');
   });
 
-  it('rh não acessa painel nem configurações', () => {
-    expect(vistaPermitida('rh', 'settings')).toBe('rh_processes');
+  it('rh tem Início próprio e não acessa configurações, lembretes nem ativos (Fase 7)', () => {
+    expect(vistaPermitida('rh', 'settings')).toBe('dashboard');
+    expect(vistaPermitida('rh', 'lembretes')).toBe('dashboard');
+    expect(vistaPermitida('rh', 'assets')).toBe('dashboard');
+    expect(vistaPermitida('rh', 'dashboard')).toBe('dashboard');
+    expect(vistaPermitida('rh', 'my_assets')).toBe('my_assets');
     expect(vistaPermitida('rh', 'collaborators')).toBe('collaborators');
   });
 

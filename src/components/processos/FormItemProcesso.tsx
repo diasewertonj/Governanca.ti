@@ -26,7 +26,7 @@ const ROTULO_FORMA: Record<string, string> = {
 };
 
 const campo = 'w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
-const rotulo = 'block text-[11px] font-semibold text-slate-600 mb-0.5';
+const rotulo = 'block text-xs font-semibold text-slate-600 mb-0.5';
 
 interface Props {
   item: ProcessoItem;
@@ -288,7 +288,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
             ))}
           </select>
           {ativosLivres.length === 0 && (
-            <p className="text-[11px] text-amber-700 mt-1">Nenhum ativo disponível no estoque. Cadastre ou libere um em Ativos.</p>
+            <p className="text-xs text-amber-700 mt-1">Nenhum ativo disponível no estoque. Cadastre ou libere um em Ativos.</p>
           )}
         </div>
       )}
@@ -367,18 +367,18 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard?.writeText(senha.senha)}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100"
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100"
                 >
                   <Copy className="w-3 h-3" /> Copiar
                 </button>
               </div>
-              <p className="text-[11px] text-emerald-800">
+              <p className="text-xs text-emerald-800">
                 Entregue por um canal seguro (pessoalmente ou mensagem direta). No primeiro login o sistema pede uma senha nova.
               </p>
             </div>
           ) : (
             <>
-              <p className="text-[11px] text-slate-600">
+              <p className="text-xs text-slate-600">
                 Cria o login de {colab?.nome || 'colaborador'} ({colab?.email || 'e-mail do cadastro'}) com senha provisória.
                 Não depende de e-mail.
               </p>
@@ -418,7 +418,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               <button
                 type="button"
                 onClick={() => setSelectedTermForPrint(termo)}
-                className="px-2 py-1 text-[11px] font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
+                className="px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
               >
                 Abrir termo
               </button>
@@ -434,7 +434,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
             </button>
           )}
           {!termoOk && (
-            <p className="text-[11px] text-slate-500">
+            <p className="text-xs text-slate-500">
               O processo pode ser concluído com o termo pendente: o sistema cria um lembrete para coletar a assinatura.
             </p>
           )}
@@ -465,8 +465,8 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
         </div>
       </div>
 
-      {aviso && <p className="text-[11px] text-emerald-700">{aviso}</p>}
-      {erro && <p className="text-[11px] font-medium text-red-700">{erro}</p>}
+      {aviso && <p className="text-xs text-emerald-700">{aviso}</p>}
+      {erro && <p className="text-xs font-medium text-red-700">{erro}</p>}
 
       <div className="flex flex-wrap justify-end gap-2">
         <button

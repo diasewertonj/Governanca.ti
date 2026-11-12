@@ -40,6 +40,18 @@ const ROTULO_CAMPO_EMPRESA = {
   textoTermoDevolucao: 'texto do termo de devolução',
 } as const;
 
+// Fase 7: abas com nomes do glossário (a chave interna não muda)
+type Aba = 'empresa' | 'documentos' | 'setores' | 'equipe' | 'catalogo' | 'campos' | 'banco';
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: 'empresa', rotulo: 'Empresa' },
+  { id: 'documentos', rotulo: 'Documentos e termos' },
+  { id: 'setores', rotulo: 'Setores' },
+  { id: 'equipe', rotulo: 'Usuários e permissões' },
+  { id: 'catalogo', rotulo: 'Catálogo de admissão' },
+  { id: 'campos', rotulo: 'Campos dos ativos' },
+  { id: 'banco', rotulo: 'Sistema' },
+];
+
 export const SettingsView: React.FC = () => {
   const {
     settings,
@@ -57,9 +69,7 @@ export const SettingsView: React.FC = () => {
     refreshSupabaseData,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'empresa' | 'setores' | 'campos' | 'catalogo' | 'equipe' | 'banco'>(
-    'empresa'
-  );
+  const [activeTab, setActiveTab] = useState<Aba>('empresa');
   const [resetConfirmText, setResetConfirmText] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -91,6 +101,10 @@ export const SettingsView: React.FC = () => {
   const docsAlterados =
     JSON.stringify(docEntrega) !== JSON.stringify(docEntregaSalvo) ||
     JSON.stringify(docDevolucao) !== JSON.stringify(docDevolucaoSalvo);
+  // Fase 7: logo da empresa (link https)
+  const [logoUrl, setLogoUrl] = useState(settings.logoUrl || '');
+  const logoAlterado = logoUrl.trim() !== (settings.logoUrl || '');
+  const logoInvalido = logoUrl.trim() !== '' && !/^https:\/\//i.test(logoUrl.trim());
 
   // Estados para Novo Setor
   const [novoSetorNome, setNovoSetorNome] = useState('');
@@ -140,6 +154,7 @@ export const SettingsView: React.FC = () => {
       ? [`Dados da empresa: ${camposEmpresaAlterados.map((k) => ROTULO_CAMPO_EMPRESA[k]).join(', ')}`]
       : []),
     ...(docsAlterados ? ['Documentos da Qualidade (código/versão dos termos)'] : []),
+    ...(logoAlterado ? ['Logo da empresa'] : []),
   ];
   useRegistrarPendencias('configuracoes', itensPendentes);
 
@@ -158,9 +173,16 @@ export const SettingsView: React.FC = () => {
     setTextoTermoDevolucao(settings.textoTermoDevolucao);
     setDocEntrega(docEntregaSalvo);
     setDocDevolucao(docDevolucaoSalvo);
+    setLogoUrl(settings.logoUrl || '');
   };
 
   const salvarTudo = () => {
+    // Valida antes de gravar qualquer coisa (nada fica salvo pela metade)
+    if (logoInvalido) {
+      setActiveTab('empresa');
+      setErrorMsg('O logo precisa ser um link que começa com https://');
+      return;
+    }
     const viramAdmin = Object.entries(papeisPendentes)
       .filter(([id, papel]) => {
         const emp = employees.find((e) => e.id === id);
@@ -178,8 +200,8 @@ export const SettingsView: React.FC = () => {
     }
     Object.entries(papeisPendentes).forEach(([id, papel]) => updateEmployeeRole(id, papel));
     Object.entries(setoresPendentes).forEach(([id, ativo]) => updateDepartment(id, { ativo }));
-    if (camposEmpresaAlterados.length > 0 || docsAlterados) {
-      updateSettings({ ...empresaRascunho, docEntrega, docDevolucao });
+    if (camposEmpresaAlterados.length > 0 || docsAlterados || logoAlterado) {
+      updateSettings({ ...empresaRascunho, docEntrega, docDevolucao, logoUrl: logoUrl.trim() || undefined });
     }
     setPapeisPendentes({});
     setSetoresPendentes({});
@@ -294,81 +316,29 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Configurações Gerais da Empresa</h2>
-          <p className="text-xs text-slate-500">
-            Parâmetros institucionais, integridade referencial de setores e atributos personalizados
-          </p>
+          <h2 className="text-base font-semibold text-slate-900">Configurações</h2>
+          <p className="text-sm text-slate-600">Dados da empresa, documentos, estrutura, permissões e catálogo</p>
         </div>
 
-        {/* Tabs de Configuração */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
-          <button
-            type="button"
-            onClick={() => setActiveTab('empresa')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'empresa'
-                ? 'bg-white text-slate-900 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Dados Institucionais
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('setores')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'setores'
-                ? 'bg-white text-slate-900 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Gestão de Setores
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('campos')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'campos'
-                ? 'bg-white text-slate-900 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Campos Customizados
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('equipe')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'equipe'
-                ? 'bg-white text-slate-900 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Equipe TI & RH
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('catalogo')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'catalogo' ? 'bg-white text-slate-900 font-semibold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Catálogo de admissão
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('banco')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-              activeTab === 'banco'
-                ? 'bg-white text-emerald-900 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Banco & Supabase</span>
-          </button>
+        {/* Fase 7: abas com rolagem lateral no celular */}
+        <div role="tablist" aria-label="Seções das configurações" className="flex gap-1 p-1 bg-slate-100 rounded-lg overflow-x-auto">
+          {ABAS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === a.id}
+              onClick={() => setActiveTab(a.id)}
+              className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm rounded-md transition-colors ${
+                activeTab === a.id ? 'bg-white text-slate-900 font-semibold shadow-xs' : 'text-slate-700 hover:text-slate-900'
+              }`}
+            >
+              {a.id === 'banco' && <Database className="inline w-4 h-4 mr-1 -mt-0.5 text-slate-500" aria-hidden="true" />}
+              {a.rotulo}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -387,12 +357,14 @@ export const SettingsView: React.FC = () => {
       )}
 
       {/* ABA 1: DADOS INSTITUCIONAIS & TERMOS */}
-      {activeTab === 'empresa' && (
-        <form onSubmit={handleSaveCompanySettings} className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-6">
+      {(activeTab === 'empresa' || activeTab === 'documentos') && (
+        <form onSubmit={handleSaveCompanySettings} className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 space-y-6">
+          {activeTab === 'empresa' && (
+          <>
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-semibold text-slate-900">Identificação Jurídica e Contatos de TI</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Estes dados são carregados dinamicamente nos cabeçalhos dos Termos de Responsabilidade A4 e etiquetas
+              Estes dados são carregados dinamicamente nos cabeçalhos dos termos e das etiquetas
             </p>
           </div>
 
@@ -485,9 +457,37 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
+          {/* Fase 7: logo (link https) — aparece no cabeçalho do sistema */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <label className="block md:col-span-2">
+              <span className="block text-xs font-semibold text-slate-700 mb-1">Logo da empresa (link https)</span>
+              <input
+                type="url"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://www.suaempresa.com.br/logo.png"
+                aria-invalid={logoInvalido}
+                className="w-full text-sm px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+              />
+              {logoInvalido && <span className="block text-xs text-red-700 mt-1">Use um link que começa com https://</span>}
+            </label>
+            {logoUrl.trim() && !logoInvalido && (
+              <img
+                src={logoUrl.trim()}
+                alt="Prévia do logo"
+                className="h-12 w-auto max-w-[12rem] object-contain border border-slate-200 rounded-lg p-1 bg-white"
+                referrerPolicy="no-referrer"
+              />
+            )}
+          </div>
+          </>
+          )}
+
+          {activeTab === 'documentos' && (
+          <>
           {/* Cláusulas dos Termos */}
-          <div className="space-y-4 pt-4 border-t border-slate-100">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Cláusulas Padrão para Termos de Responsabilidade
             </h4>
 
@@ -518,10 +518,10 @@ export const SettingsView: React.FC = () => {
 
           {/* Fase 6: identificação dos documentos controlados (Qualidade) */}
           <div className="space-y-3 pt-4 border-t border-slate-100">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Documentos controlados (Qualidade)
             </h4>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-xs text-slate-500">
               Aparecem no cabeçalho dos termos. Mantenha igual à versão aprovada pela Qualidade no POP.
             </p>
             {(
@@ -541,7 +541,7 @@ export const SettingsView: React.FC = () => {
                   ] as const
                 ).map(([chave, rotulo, cols]) => (
                   <label key={chave} className={`block ${cols}`}>
-                    <span className="block text-[11px] text-slate-500 mb-0.5">{rotulo}</span>
+                    <span className="block text-xs text-slate-500 mb-0.5">{rotulo}</span>
                     <input
                       value={doc[chave]}
                       onChange={(e) => setDoc({ ...doc, [chave]: e.target.value })}
@@ -552,8 +552,10 @@ export const SettingsView: React.FC = () => {
               </div>
             ))}
           </div>
+          </>
+          )}
 
-          <p className="pt-4 border-t border-slate-100 text-[11px] text-slate-500">
+          <p className="pt-4 border-t border-slate-100 text-xs text-slate-500">
             Ao editar qualquer campo, aparece no fim da página a barra para <strong>salvar</strong> ou{' '}
             <strong>cancelar</strong> as alterações.
           </p>
@@ -630,7 +632,7 @@ export const SettingsView: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
                     <th className="py-3 px-4">Código</th>
                     <th className="py-3 px-4">Nome do Setor</th>
                     <th className="py-3 px-4">Descrição</th>
@@ -651,7 +653,7 @@ export const SettingsView: React.FC = () => {
                         <td className="py-3 px-4">
                           <span
                             className={`font-semibold ${
-                              linkedCount > 0 ? 'text-blue-700' : 'text-slate-400'
+                              linkedCount > 0 ? 'text-blue-700' : 'text-slate-500'
                             }`}
                           >
                             {linkedCount} colaborador(es)
@@ -661,7 +663,7 @@ export const SettingsView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleToggleDepartmentStatus(dep.id, setoresPendentes[dep.id] ?? dep.ativo)}
-                            className={`text-[10px] font-semibold px-2 py-0.5 rounded cursor-pointer ${
+                            className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer ${
                               (setoresPendentes[dep.id] ?? dep.ativo)
                                 ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                                 : 'text-slate-500 bg-slate-100 border border-slate-200'
@@ -768,14 +770,14 @@ export const SettingsView: React.FC = () => {
                 >
                   <div>
                     <span className="font-semibold text-slate-900 block">{cf.label}</span>
-                    <span className="text-[10px] text-slate-500 uppercase font-mono">
+                    <span className="text-xs text-slate-500 uppercase font-mono">
                       {cf.categoria} · {cf.tipo}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleRemoveCustomField(cf.id)}
-                    className="text-slate-400 hover:text-rose-600 p-1"
+                    className="text-slate-500 hover:text-rose-600 p-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -811,7 +813,7 @@ export const SettingsView: React.FC = () => {
                   placeholder="Buscar colaborador..."
                   className="w-48 text-xs pl-7 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
                 />
-                <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5" />
+                <Search className="w-3 h-3 text-slate-500 absolute left-2.5 top-2.5" />
               </div>
 
               <select
@@ -832,7 +834,7 @@ export const SettingsView: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                 Admin de T.I.
               </span>
-              <p className="text-[11px] text-blue-800 leading-tight">
+              <p className="text-xs text-blue-800 leading-tight">
                 Acesso integral: inventário 1:1, fila de chamados, configurações, termos, setores e gestão de operadores.
               </p>
             </div>
@@ -842,7 +844,7 @@ export const SettingsView: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-cyan-600"></span>
                 Suporte de T.I.
               </span>
-              <p className="text-[11px] text-cyan-800 leading-tight">
+              <p className="text-xs text-cyan-800 leading-tight">
                 Atendimento da fila de chamados, movimentação de equipamentos, checklists técnicos e termos A4.
               </p>
             </div>
@@ -852,8 +854,8 @@ export const SettingsView: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-purple-600"></span>
                 Recursos Humanos (RH)
               </span>
-              <p className="text-[11px] text-purple-800 leading-tight">
-                Condução de On/Offboarding, inventário em tempo real, regras condicionais e chamados próprios.
+              <p className="text-xs text-purple-800 leading-tight">
+                Condução de admissões e desligamentos, inventário em tempo real, regras condicionais e chamados próprios.
               </p>
             </div>
 
@@ -862,7 +864,7 @@ export const SettingsView: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-slate-400"></span>
                 Colaborador (Solicitante)
               </span>
-              <p className="text-[11px] text-slate-600 leading-tight">
+              <p className="text-xs text-slate-600 leading-tight">
                 Acesso restrito: visualiza apenas seus equipamentos sob custódia e abre chamados com filtro do seu ativo.
               </p>
             </div>
@@ -873,7 +875,7 @@ export const SettingsView: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
                     <th className="py-3 px-4">Colaborador</th>
                     <th className="py-3 px-4">E-mail Corporativo</th>
                     <th className="py-3 px-4">Setor / Cargo</th>
@@ -919,7 +921,7 @@ export const SettingsView: React.FC = () => {
                               </div>
                               <div>
                                 <span className="font-semibold text-slate-900 block">{emp.nome}</span>
-                                <span className="font-mono text-[10px] text-slate-400">{emp.matricula}</span>
+                                <span className="font-mono text-xs text-slate-500">{emp.matricula}</span>
                               </div>
                             </div>
                           </td>
@@ -930,13 +932,13 @@ export const SettingsView: React.FC = () => {
 
                           <td className="py-3 px-4 whitespace-nowrap">
                             <span className="text-slate-800 block">{emp.cargo}</span>
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-xs text-slate-500">
                               {departments.find((d) => d.id === emp.setorId)?.nome || '-'}
                             </span>
                           </td>
 
                           <td className="py-3 px-4 whitespace-nowrap">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium border ${roleBadgeStyles[currentEmpRole]}`}>
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${roleBadgeStyles[currentEmpRole]}`}>
                               {roleLabelsText[currentEmpRole]}
                             </span>
                           </td>
@@ -1071,19 +1073,19 @@ export const SettingsView: React.FC = () => {
 
               <div className="space-y-3 text-xs text-slate-700">
                 <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
                     1
                   </span>
                   <div>
                     <p className="font-semibold text-slate-900">Execute o Schema no Supabase SQL Editor:</p>
                     <p className="text-slate-500 mt-0.5">
-                      Copie o conteúdo do arquivo <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-[11px]">supabase-schema.sql</code> já criado na raiz do projeto e cole na aba <strong>SQL Editor</strong> do painel do Supabase. Em seguida, clique em <strong>Run</strong>.
+                      Copie o conteúdo do arquivo <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-xs">supabase-schema.sql</code> já criado na raiz do projeto e cole na aba <strong>SQL Editor</strong> do painel do Supabase. Em seguida, clique em <strong>Run</strong>.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
                     2
                   </span>
                   <div>
@@ -1095,7 +1097,7 @@ export const SettingsView: React.FC = () => {
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
                     3
                   </span>
                   <div>
@@ -1103,7 +1105,7 @@ export const SettingsView: React.FC = () => {
                     <p className="text-slate-500 mt-0.5">
                       Na Vercel, vá em <strong>Settings &gt; Environment Variables</strong> e adicione:
                     </p>
-                    <pre className="mt-2 bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">
+                    <pre className="mt-2 bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-xs overflow-x-auto">
 {`VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
                     </pre>
@@ -1177,7 +1179,7 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
             </div>
 
             <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs space-y-2">
-              <label className="block text-[11px] font-semibold text-slate-700">
+              <label className="block text-xs font-semibold text-slate-700">
                 Digite <span className="font-mono font-bold text-rose-600">ZERAR</span> para liberar a limpeza:
               </label>
               <input

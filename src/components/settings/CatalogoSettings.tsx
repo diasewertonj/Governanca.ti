@@ -83,9 +83,9 @@ export const CatalogoSettings: React.FC = () => {
           const doTipo = lista.filter((c) => c.tipo === tipo).sort((a, b) => a.ordem - b.ordem);
           return (
             <div key={tipo} className="space-y-1.5">
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{ROTULO_TIPO[tipo]}</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">{ROTULO_TIPO[tipo]}</h4>
               {doTipo.length === 0 ? (
-                <p className="text-[11px] text-slate-400">Nenhum item.</p>
+                <p className="text-xs text-slate-500">Nenhum item.</p>
               ) : (
                 <div className="space-y-1">
                   {doTipo.map((c) => (
@@ -108,7 +108,7 @@ export const CatalogoSettings: React.FC = () => {
                         onChange={(e) => editar(c, { descricao: e.target.value || undefined })}
                         aria-label="Descrição"
                       />
-                      <label className="col-span-6 sm:col-span-2 flex items-center gap-1.5 text-[11px] text-slate-600">
+                      <label className="col-span-6 sm:col-span-2 flex items-center gap-1.5 text-xs text-slate-600">
                         <input
                           type="checkbox"
                           checked={c.sugeridoOnboarding}
@@ -116,7 +116,7 @@ export const CatalogoSettings: React.FC = () => {
                         />
                         Sugerido
                       </label>
-                      <label className="col-span-6 sm:col-span-1 flex items-center gap-1.5 text-[11px] text-slate-600">
+                      <label className="col-span-6 sm:col-span-1 flex items-center gap-1.5 text-xs text-slate-600">
                         <input type="checkbox" checked={c.ativo} onChange={(e) => editar(c, { ativo: e.target.checked })} />
                         Ativo
                       </label>

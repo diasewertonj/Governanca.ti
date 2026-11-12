@@ -105,14 +105,14 @@ export const LoginView: React.FC = () => {
               )}
               <span>{googleLoading ? 'Autenticando...' : 'Entrar com Conta Google (Supabase)'}</span>
             </button>
-            <p className="text-[10px] text-slate-400 text-center mt-1.5">
+            <p className="text-xs text-slate-500 text-center mt-1.5">
               Autenticação corporativa integrada com Supabase PostgreSQL
             </p>
           </div>
 
           <div className="relative flex items-center justify-center">
             <div className="border-t border-slate-200 w-full" />
-            <span className="bg-white px-3 text-[10px] uppercase font-bold text-slate-400 tracking-wider absolute">
+            <span className="bg-white px-3 text-xs uppercase font-bold text-slate-500 tracking-wider absolute">
               ou credenciais corporativas
             </span>
           </div>
@@ -131,7 +131,7 @@ export const LoginView: React.FC = () => {
                   placeholder="usuario@nexuscorp.com.br"
                   className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:bg-white transition-colors"
                 />
-                <Mail className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                <Mail className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
@@ -148,7 +148,7 @@ export const LoginView: React.FC = () => {
                   placeholder="••••••••"
                   className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:bg-white transition-colors"
                 />
-                <Lock className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
@@ -216,7 +216,7 @@ export const LoginView: React.FC = () => {
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-slate-400">
+        <p className="mt-4 text-center text-xs text-slate-500">
           Autenticação corporativa segura via Supabase PostgreSQL · Governança 360° ·{' '}
           <button type="button" onClick={() => setMostrarPolitica(true)} className="underline hover:text-slate-600">
             Aviso de privacidade

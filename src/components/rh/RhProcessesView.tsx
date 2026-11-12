@@ -322,7 +322,7 @@ export const RhProcessesView: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Equipamentos Físicos */}
                   <div className="space-y-2">
-                    <span className="text-[11px] font-semibold text-slate-700 block">
+                    <span className="text-xs font-semibold text-slate-700 block">
                       Equipamentos Físicos para Devolução (Relação 1:1)
                     </span>
                     {colabAssets.length > 0 ? (
@@ -337,14 +337,14 @@ export const RhProcessesView: React.FC = () => {
                                 <span className="font-mono font-bold text-blue-700">{asset.tag}</span>
                                 <span className="font-medium text-slate-900">{asset.nome}</span>
                               </div>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
+                              <p className="text-xs text-slate-500 mt-0.5">
                                 {asset.marca} {asset.modelo} · S/N: <span className="font-mono">{asset.serialNumber}</span>
                               </p>
                             </div>
                             <button
                               type="button"
                               onClick={() => setSelectedAssetIdFor360(asset.id)}
-                              className="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5"
+                              className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
                             >
                               Ver ficha
                               <ExternalLink className="w-2.5 h-2.5" />
@@ -353,7 +353,7 @@ export const RhProcessesView: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-400 italic py-2">
+                      <p className="text-xs text-slate-500 italic py-2">
                         Nenhum equipamento físico registrado sob a posse deste colaborador.
                       </p>
                     )}
@@ -361,7 +361,7 @@ export const RhProcessesView: React.FC = () => {
 
                   {/* Licenças & Acessos */}
                   <div className="space-y-2">
-                    <span className="text-[11px] font-semibold text-slate-700 block">
+                    <span className="text-xs font-semibold text-slate-700 block">
                       Softwares e Contas Corporativas Ativas
                     </span>
                     {colabLicenses.length > 0 ? (
@@ -372,14 +372,14 @@ export const RhProcessesView: React.FC = () => {
                             className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs"
                           >
                             <span className="font-medium text-slate-800">{lic.nome}</span>
-                            <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                               Revogação automática
                             </span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-400 italic py-2">
+                      <p className="text-xs text-slate-500 italic py-2">
                         Nenhuma licença corporativa individual atribuída.
                       </p>
                     )}
@@ -390,7 +390,7 @@ export const RhProcessesView: React.FC = () => {
 
             {/* REGRAS CONDICIONAIS COM DROPDOWNS DINÂMICOS */}
             <div className="space-y-4 pt-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Regras de Transição e Continuidade Operacional
               </h4>
 
@@ -413,7 +413,7 @@ export const RhProcessesView: React.FC = () => {
 
                 {redirecionarEmail && (
                   <div className="pl-6 pt-1">
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
                       Destinatário que receberá os e-mails (Colaborador Ativo)
                     </label>
                     <select
@@ -454,7 +454,7 @@ export const RhProcessesView: React.FC = () => {
 
                 {transferirDrive && (
                   <div className="pl-6 pt-1">
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
                       Destinatário que receberá a propriedade dos arquivos
                     </label>
                     <select
@@ -643,11 +643,11 @@ export const RhProcessesView: React.FC = () => {
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                 >
                   <option value="colaborador">Colaborador Padrão (Solicitante)</option>
-                  <option value="rh">Recursos Humanos (Onboarding & Offboarding)</option>
+                  <option value="rh">Recursos Humanos (admissões e desligamentos)</option>
                   <option value="ti_suporte">Técnico de Suporte T.I.</option>
                   <option value="ti_admin">Administrador de T.I. (Acesso Total)</option>
                 </select>
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                <span className="text-xs text-slate-500 mt-0.5 block">
                   Pré-define as permissões do novo usuário pós-login
                 </span>
               </div>
@@ -671,7 +671,7 @@ export const RhProcessesView: React.FC = () => {
                     MacBook Pro Apple Silicon (Design / Engenharia)
                   </option>
                 </select>
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                <span className="text-xs text-slate-500 mt-0.5 block">
                   A T.I. selecionará o patrimônio físico (#PAT) do estoque
                 </span>
               </div>
@@ -680,7 +680,7 @@ export const RhProcessesView: React.FC = () => {
             {/* Fase 6: kit sugerido (catálogo da T.I.) */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Equipamentos e acessórios</label>
-              <p className="text-[10px] text-slate-400 mb-2">
+              <p className="text-xs text-slate-500 mb-2">
                 Sugestão padrão da T.I. — desmarque o que não precisa. A T.I. confirma o kit final.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -732,7 +732,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Outros sistemas (opcional)</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Outros sistemas (opcional)</label>
                   <input
                     value={onbOutrosAcessos}
                     onChange={(e) => setOnbOutrosAcessos(e.target.value)}
@@ -741,7 +741,7 @@ export const RhProcessesView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Grupos de e-mail sugeridos (opcional)
                   </label>
                   <input

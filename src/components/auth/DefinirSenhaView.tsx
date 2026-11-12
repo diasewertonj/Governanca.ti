@@ -73,7 +73,7 @@ export const DefinirSenhaView: React.FC = () => {
 
           <ul className="space-y-1">
             {regras.map((r) => (
-              <li key={r.texto} className={`text-[11px] ${r.ok ? 'text-emerald-700' : 'text-slate-500'}`}>
+              <li key={r.texto} className={`text-xs ${r.ok ? 'text-emerald-700' : 'text-slate-500'}`}>
                 {r.ok ? '✓' : '○'} {r.texto}
               </li>
             ))}
@@ -90,7 +90,7 @@ export const DefinirSenhaView: React.FC = () => {
           >
             {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar senha e entrar'}
           </button>
-          <button type="button" onClick={logout} className="w-full text-[11px] text-slate-500 hover:text-slate-700">
+          <button type="button" onClick={logout} className="w-full text-xs text-slate-500 hover:text-slate-700">
             Cancelar e voltar ao login
           </button>
         </form>

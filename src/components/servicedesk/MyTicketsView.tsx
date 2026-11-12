@@ -57,7 +57,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
                     <span className="font-semibold text-slate-900 text-sm">{tkt.titulo}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                  <div className="flex items-center gap-2 text-slate-500 text-xs">
                     <span className="capitalize">{tkt.categoria}</span>
                     <span>·</span>
                     <span>Aberto em {formatDate(tkt.dataCriacao)}</span>
@@ -92,7 +92,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
             );
           })
         ) : (
-          <div className="p-8 text-center text-slate-400 text-xs">
+          <div className="p-8 text-center text-slate-500 text-xs">
             Você não possui nenhum chamado aberto no momento.
           </div>
         )}

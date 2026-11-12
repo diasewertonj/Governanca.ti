@@ -151,19 +151,19 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Abertura de Chamado Técnico (Service Desk)</h2>
+            <h2 className="text-base font-semibold text-slate-900">Abrir chamado</h2>
             <p className="text-xs text-slate-500">
               Solicitação interna de suporte vinculada ao perfil corporativo
             </p>
           </div>
           <button
             onClick={fechar}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -181,12 +181,12 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                 <p className="font-semibold text-slate-900">
                   {currentUser.nome} <span className="font-mono text-slate-500 font-normal">({currentUser.matricula})</span>
                 </p>
-                <p className="text-[11px] text-slate-600">
+                <p className="text-xs text-slate-600">
                   {currentUser.cargo} · {userDepartment?.nome || 'Setor'}
                 </p>
               </div>
             </div>
-            <span className="text-[11px] font-medium text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200 shadow-2xs">
+            <span className="text-xs font-medium text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200 shadow-2xs">
               Solicitante Identificado
             </span>
           </div>
@@ -244,7 +244,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                 </optgroup>
               )}
             </select>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Vincule o chamado ao equipamento físico ou software afetado para agilizar o suporte técnico da T.I.
             </p>
           </div>
@@ -335,9 +335,9 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                   className="sr-only"
                 />
               </label>
-              <span className="text-[11px] text-slate-500">PDF, PNG, JPG, WEBP ou TXT · até 10 MB cada</span>
+              <span className="text-xs text-slate-500">PDF, PNG, JPG, WEBP ou TXT · até 10 MB cada</span>
             </div>
-            {erroAnexo && <p className="text-[11px] text-rose-700">{erroAnexo}</p>}
+            {erroAnexo && <p className="text-xs text-rose-700">{erroAnexo}</p>}
 
             {anexos.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -346,13 +346,13 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                     key={att.id}
                     className="inline-flex items-center gap-1.5 text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200"
                   >
-                    <Paperclip className="w-3 h-3 text-slate-400" />
+                    <Paperclip className="w-3 h-3 text-slate-500" />
                     <span>{att.nome}</span>
-                    <span className="text-[10px] text-slate-400">({att.tamanho})</span>
+                    <span className="text-xs text-slate-500">({att.tamanho})</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveAttachment(att.id)}
-                      className="text-slate-400 hover:text-rose-600 ml-1"
+                      className="text-slate-500 hover:text-rose-600 ml-1"
                     >
                       <X className="w-3 h-3" />
                     </button>
