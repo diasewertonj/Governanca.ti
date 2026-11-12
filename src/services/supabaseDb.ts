@@ -915,15 +915,24 @@ async function sincronizarItensContrato(contratoId: string, antes: ItemContrato[
   }
 }
 
-/** Cria o contrato e os itens cobertos. Se os itens falharem, tenta desfazer o contrato. */
+/** Código do erro em que o contrato foi gravado, mas os itens cobertos não */
+export const ERRO_ITENS_CONTRATO = 'itens_contrato';
+
+/**
+ * Cria o contrato e os itens cobertos. Se os itens falharem, o contrato fica
+ * (sem itens): a ti_suporte não pode excluí-lo para desfazer, e apagar às
+ * cegas perderia o cadastro. O erro avisa que é preciso editar o contrato.
+ */
 export async function insertContratoDb(c: Contrato) {
   if (!supabase) return;
   await checar(supabase.from('contratos').insert(linhaContrato(c)));
   try {
     await sincronizarItensContrato(c.id, [], c.itens);
   } catch (err) {
-    await excluir('contratos', c.id).catch(() => undefined);
-    throw err;
+    throw new DbError(
+      `O contrato foi gravado, mas os itens cobertos não (${mensagemDeErro(err)}). Edite o contrato para incluí-los`,
+      ERRO_ITENS_CONTRATO
+    );
   }
 }
 
@@ -1624,20 +1633,45 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthStatus> {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Limpeza completa (zerar base) — só ti_admin pela RLS; oculta em produção
+// 9. Limpeza completa (zerar base) — só ti_admin pela RLS. A única chamada é o
+// "Zerar dados" de Configurações, que fica oculto quando o Supabase está
+// configurado (Fase 0): na prática não roda em produção.
 // ---------------------------------------------------------------------------
+
+/** Tabela que ainda não existe (migration não aplicada): não há o que apagar nela */
+const tabelaAusente = (error: { code?: string; message?: string }) =>
+  error.code === '42P01' || error.code === 'PGRST205' || /does not exist|could not find the table/i.test(error.message || '');
+
 export async function clearAllDatabaseTables(keepEmployeeEmail?: string) {
   if (!supabase) return;
+  // Baixa patrimonial não se apaga (o banco recusa, por design). Confere antes de
+  // apagar qualquer coisa, para não deixar a base zerada pela metade.
+  const { count, error } = await supabase.from('ativo_baixas').select('id', { count: 'exact', head: true });
+  if (error && !tabelaAusente(error)) lancar(error);
+  if (count) {
+    throw new DbError(
+      `A base tem ${count} baixa(s) patrimonial(is) registrada(s). Elas fazem parte do histórico e não podem ser apagadas; nada foi apagado`,
+      '23514'
+    );
+  }
+  // Ordem segura das chaves estrangeiras: primeiro quem aponta, depois o apontado
   const tabelas = [
+    'ativo_anexos', // -> ativos, manutencoes, ativo_baixas
+    'manutencoes', // -> ativos, fornecedores, contratos, chamados
+    'faturas', // -> licencas_software, contratos
+    'contrato_itens', // -> contratos, ativos, licencas_software
+    'contratos', // -> fornecedores
     'chamado_mensagens',
     'chamados',
     'termos_responsabilidade',
     'historico_custodia',
     'ativos',
     'licencas_software',
+    'fornecedores', // <- ativos e licenças (fornecedor_id)
   ];
   for (const t of tabelas) {
-    await checar(bd().from(t).delete().neq('id', 'dummy_zero'));
+    const { error: erroTabela } = await bd().from(t).delete().neq('id', 'dummy_zero');
+    if (erroTabela && !tabelaAusente(erroTabela)) lancar(erroTabela);
   }
   if (keepEmployeeEmail) {
     await checar(bd().from('colaboradores').delete().neq('email', keepEmployeeEmail.toLowerCase()));

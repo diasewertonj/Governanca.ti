@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Plus, Receipt, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Paperclip, Plus, Receipt, Trash2, Upload, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
@@ -46,10 +46,13 @@ const BOTAO_LINHA = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-mediu
  * fatura". Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
 export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade, valorPadrao }) => {
-  const { faturas, currentRole, alterarFatura, excluirFatura } = useApp();
+  const { faturas, currentRole, alterarFatura, excluirFatura, anexarArquivoFatura } = useApp();
   const [lancando, setLancando] = useState(false);
   const [pagando, setPagando] = useState<{ id: string; data: string } | null>(null);
+  // Arquivo de uma fatura já lançada sem arquivo: escolhe e só sobe ao clicar em "Enviar"
+  const [anexando, setAnexando] = useState<{ id: string; arquivo: File | null; enviando: boolean } | null>(null);
   const [erro, setErro] = useState('');
+  useRegistrarPendencias(`fatura-arquivo:${alvo.licencaId || alvo.contratoId}`, anexando?.arquivo ? ['Arquivo da fatura não enviado'] : []);
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   if (!isTI) return null;
@@ -69,6 +72,21 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
   const cancelar = (f: Fatura) => {
     const aviso = `Cancelar a fatura de ${rotuloCompetencia(f.competencia)}?\n\nEla continua no histórico, mas deixa de contar como paga ou a pagar.`;
     if (window.confirm(aviso)) alterarFatura(f.id, { status: 'cancelada' });
+  };
+
+  const escolherArquivo = (arquivo: File | undefined) => {
+    if (!anexando || !arquivo) return;
+    const msg = validarArquivo(arquivo);
+    setErro(msg || '');
+    setAnexando({ ...anexando, arquivo: msg ? null : arquivo });
+  };
+
+  const enviarArquivo = async () => {
+    if (!anexando?.arquivo || anexando.enviando) return;
+    setAnexando({ ...anexando, enviando: true });
+    // Sobe para faturas/<id>/ e grava o caminho; se falhar, o aviso de erro explica
+    const ok = await anexarArquivoFatura(anexando.id, anexando.arquivo);
+    setAnexando(ok ? null : { ...anexando, enviando: false });
   };
 
   const excluir = (f: Fatura) => {
@@ -133,7 +151,56 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
                     {f.numeroDocumento || '-'}
                   </td>
                   <td data-label="Arquivo" className="py-2 px-3 min-w-0">
-                    {f.arquivoCaminho ? <AbrirArquivo caminho={f.arquivoCaminho} /> : <span className="text-slate-500">-</span>}
+                    {f.arquivoCaminho ? (
+                      <AbrirArquivo caminho={f.arquivoCaminho} />
+                    ) : anexando?.id === f.id ? (
+                      <span className="flex flex-col gap-1.5 min-w-0">
+                        <label htmlFor={`fatura-arq-${f.id}`} className="sr-only">
+                          Arquivo da fatura de {rotuloCompetencia(f.competencia)}
+                        </label>
+                        <input
+                          id={`fatura-arq-${f.id}`}
+                          type="file"
+                          accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
+                          onChange={(e) => escolherArquivo(e.target.files?.[0])}
+                          className={CLASSE_ARQUIVO}
+                        />
+                        <span className="inline-flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={enviarArquivo}
+                            disabled={!anexando.arquivo || anexando.enviando}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+                          >
+                            <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+                            {anexando.enviando ? 'Enviando...' : 'Enviar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAnexando(null);
+                              setErro('');
+                            }}
+                            disabled={anexando.enviando}
+                            className="px-2 py-1 text-xs text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-50"
+                          >
+                            Voltar
+                          </button>
+                        </span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAnexando({ id: f.id, arquivo: null, enviando: false });
+                          setErro('');
+                        }}
+                        aria-label={`Anexar arquivo à fatura de ${rotuloCompetencia(f.competencia)}`}
+                        className={`${BOTAO_LINHA} text-blue-700 bg-white border-blue-200 hover:bg-blue-50`}
+                      >
+                        <Paperclip className="w-3.5 h-3.5" aria-hidden="true" /> Anexar arquivo
+                      </button>
+                    )}
                   </td>
                   <td data-label="Ações" className="py-2 px-3 text-right">
                     {pagando?.id === f.id ? (
