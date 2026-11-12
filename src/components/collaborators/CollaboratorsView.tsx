@@ -116,14 +116,14 @@ export const CollaboratorsView: React.FC = () => {
       {/* Tabela de Colaboradores */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="tabela-cartoes w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
                 <th className="py-3 px-4">Colaborador</th>
-                <th className="py-3 px-4">Matrícula</th>
+                <th className="hidden xl:table-cell py-3 px-4">Matrícula</th>
                 <th className="py-3 px-4">Setor / Departamento</th>
-                <th className="py-3 px-4">Líder Imediato</th>
-                <th className="py-3 px-4">Equipamentos em Uso</th>
+                <th className="hidden 2xl:table-cell py-3 px-4">Líder Imediato</th>
+                <th className="hidden xl:table-cell py-3 px-4">Equipamentos em Uso</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Ficha</th>
               </tr>
@@ -142,7 +142,7 @@ export const CollaboratorsView: React.FC = () => {
                       onClick={() => setSelectedEmployeeIdFor360(emp.id)}
                       className="hover:bg-slate-50/70 transition-colors cursor-pointer"
                     >
-                      <td className="py-3 px-4">
+                      <td data-label="Colaborador" className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-full bg-blue-600/10 text-blue-700 font-bold flex items-center justify-center text-xs">
                             {emp.nome.charAt(0)}
@@ -156,15 +156,15 @@ export const CollaboratorsView: React.FC = () => {
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 font-mono font-medium text-slate-600 whitespace-nowrap">
+                      <td data-label="Matrícula" className="hidden xl:table-cell py-3 px-4 font-mono font-medium text-slate-600">
                         {emp.matricula}
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-800">
+                      <td data-label="Setor / Departamento" className="py-3 px-4 text-slate-800">
                         {dept?.nome || '-'}
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td data-label="Líder Imediato" className="hidden 2xl:table-cell py-3 px-4">
                         {manager ? (
                           <span className="text-slate-800 flex items-center gap-1">
                             <User className="w-3 h-3 text-slate-500" />
@@ -175,7 +175,7 @@ export const CollaboratorsView: React.FC = () => {
                         )}
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td data-label="Equipamentos em Uso" className="hidden xl:table-cell py-3 px-4">
                         <div className="flex items-center gap-1.5">
                           <Laptop className="w-3.5 h-3.5 text-blue-600" />
                           <span className="font-semibold text-slate-900">
@@ -189,7 +189,7 @@ export const CollaboratorsView: React.FC = () => {
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td data-label="Status" className="py-3 px-4">
                         <span
                           className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${
                             emp.status === 'ativo'
@@ -203,7 +203,7 @@ export const CollaboratorsView: React.FC = () => {
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td data-label="Ficha" className="py-3 px-4 text-right">
                         <button
                           type="button"
                           onClick={(e) => {

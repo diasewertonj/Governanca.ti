@@ -116,7 +116,7 @@ export const AssetsView: React.FC = () => {
       <div className="space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Tabs por Categoria */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start max-w-full overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start flex-wrap">
             {[
               { id: 'todos', label: 'Todos os Ativos' },
               { id: 'hardware', label: 'Hardware' },
@@ -304,15 +304,15 @@ export const AssetsView: React.FC = () => {
         /* Tabela de Ativos Físicos (Hardware, Periféricos, Telefonia) */
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="tabela-cartoes w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
                   <th className="py-3 px-4">Patrimônio</th>
                   <th className="py-3 px-4">Equipamento / Modelo</th>
-                  <th className="py-3 px-4">Número de Série</th>
+                  <th className="hidden xl:table-cell py-3 px-4">Número de Série</th>
                   <th className="py-3 px-4">Custodiante atual</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Garantia</th>
+                  <th className="hidden xl:table-cell py-3 px-4">Garantia</th>
                   <th className="py-3 px-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -327,10 +327,10 @@ export const AssetsView: React.FC = () => {
                         key={asset.id}
                         className="hover:bg-slate-50/70 transition-colors"
                       >
-                        <td className="py-3 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
+                        <td data-label="Patrimônio" className="py-3 px-4 font-mono font-bold text-blue-700">
                           {asset.tag}
                         </td>
-                        <td className="py-3 px-4">
+                        <td data-label="Equipamento / Modelo" className="py-3 px-4">
                           <button
                             type="button"
                             onClick={() => setSelectedAssetIdFor360(asset.id)}
@@ -342,12 +342,12 @@ export const AssetsView: React.FC = () => {
                             {asset.marca} {asset.modelo}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">
+                        <td data-label="Número de Série" className="hidden xl:table-cell py-3 px-4 font-mono text-slate-600">
                           {asset.serialNumber}
                         </td>
 
                         {/* Custodiante com link contextual 360° */}
-                        <td className="py-3 px-4">
+                        <td data-label="Custodiante atual" className="py-3 px-4">
                           {custodian ? (
                             <button
                               type="button"
@@ -363,7 +363,7 @@ export const AssetsView: React.FC = () => {
                           )}
                         </td>
 
-                        <td className="py-3 px-4 whitespace-nowrap">
+                        <td data-label="Status" className="py-3 px-4">
                           <span
                             className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${
                               asset.status === 'em_uso'
@@ -378,7 +378,7 @@ export const AssetsView: React.FC = () => {
                         </td>
 
                         {/* Badge sutil de garantia */}
-                        <td className="py-3 px-4 whitespace-nowrap">
+                        <td data-label="Garantia" className="hidden xl:table-cell py-3 px-4">
                           {warranty.status === 'valida' && (
                             <span className="text-emerald-700 flex items-center gap-1 font-medium text-xs">
                               <ShieldCheck className="w-3.5 h-3.5" />
@@ -397,7 +397,7 @@ export const AssetsView: React.FC = () => {
                         </td>
 
                         {/* Ações */}
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                        <td data-label="Ações" className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"

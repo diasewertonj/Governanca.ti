@@ -86,8 +86,8 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     : [
         { id: 'todos', label: 'Todos os Chamados' },
         { id: 'suporte', label: 'Suporte Técnico' },
-        { id: 'onboarding', label: 'Onboarding (RH)' },
-        { id: 'offboarding', label: 'Offboarding (RH)' },
+        { id: 'onboarding', label: 'Admissões' },
+        { id: 'offboarding', label: 'Desligamentos' },
       ];
 
   return (
@@ -119,7 +119,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
       <div className="space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Tabs de Tipo */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start max-w-full overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start flex-wrap">
             {tabsToDisplay.map((tab) => (
               <button
                 key={tab.id}
@@ -176,8 +176,8 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
       </div>
 
       {/* Fila de Chamados */}
-      {/* Fase 7: no celular, a fila vira cartões */}
-      <ul className="md:hidden space-y-2" aria-label="Fila de chamados">
+      {/* Fila em cartões até 1279px; tabela só onde cabe sem rolagem */}
+      <ul className="xl:hidden space-y-2" aria-label="Fila de chamados">
         {filteredTickets.length === 0 ? (
           <li className="bg-white border border-slate-200 rounded-xl p-5 text-center text-sm text-slate-600">
             Nenhum chamado encontrado com os filtros selecionados.
@@ -215,7 +215,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
         )}
       </ul>
 
-      <div className="hidden md:block bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="hidden xl:block bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -223,10 +223,10 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                 <th className="py-3 px-4">Código</th>
                 <th className="py-3 px-4">Título do Chamado</th>
                 <th className="py-3 px-4">Solicitante</th>
-                <th className="py-3 px-4">Ativo vinculado</th>
+                <th className="hidden py-3 px-4">Ativo vinculado</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Prioridade</th>
-                <th className="py-3 px-4">Técnico TI</th>
+                <th className="hidden 2xl:table-cell py-3 px-4">Técnico TI</th>
                 <th className="py-3 px-4 text-right">Abertura</th>
               </tr>
             </thead>
@@ -243,7 +243,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                       onClick={() => setSelectedTicketIdForDetail(tkt.id)}
                       className="hover:bg-slate-50/70 transition-colors cursor-pointer"
                     >
-                      <td className="py-3 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-800">
                         {tkt.codigo}
                       </td>
 
@@ -267,7 +267,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -283,7 +283,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                       </td>
 
                       {/* Ativo Físico ou Software com link contextual 360° */}
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="hidden py-3 px-4">
                         {asset ? (
                           <button
                             type="button"
@@ -314,23 +314,23 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                         )}
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4">
                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${statusInfo.cls}`}>
                           {statusInfo.label}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4">
                         <span className={`text-xs ${priorityInfo.cls}`}>
                           {priorityInfo.label}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-600">
+                      <td className="hidden 2xl:table-cell py-3 px-4 text-slate-600">
                         {tkt.tecnicoResponsavelNome || <span className="text-slate-500 italic">Pendente</span>}
                       </td>
 
-                      <td className="py-3 px-4 text-right whitespace-nowrap text-slate-500">
+                      <td className="py-3 px-4 text-right text-slate-500">
                         {formatDate(tkt.dataCriacao)}
                       </td>
                     </tr>
