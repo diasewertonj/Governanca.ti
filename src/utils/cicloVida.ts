@@ -94,7 +94,7 @@ export function erroAoAbrirManutencao(asset: ComManutencoes & Pick<Asset, 'statu
 }
 
 /** Status ao sair da manutenção: em uso se está com alguém, senão disponível */
-export const statusAposManutencao = (asset: Pick<Asset, 'custodianteId'>): AssetStatus =>
+export const statusAposManutencao = (asset: Pick<Asset, 'custodianteId'>): 'em_uso' | 'disponivel' =>
   asset.custodianteId ? 'em_uso' : 'disponivel';
 
 /**
