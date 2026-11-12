@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Paperclip, Plus, Receipt, Trash2, Upload, 
 import { useApp } from '../../context/AppContext.tsx';
 import type { Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
+import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
 import { formatCurrency, formatDate, isoLocal } from '../../utils/formatters.ts';
 import {
@@ -324,7 +325,11 @@ const FormFatura: React.FC<{
   const chave = alvo.licencaId ? `licenca:${alvo.licencaId}` : `contrato:${alvo.contratoId}`;
   const valores = JSON.stringify([competencia, valor, vencimento, status, pagoEm, numeroDocumento, observacoes]);
   const [valoresIniciais] = useState(valores);
-  useRegistrarPendencias(`fatura:${chave}`, valores !== valoresIniciais || arquivo ? ['Fatura nova não lançada'] : []);
+  const pendenciasFatura = valores !== valoresIniciais || arquivo ? ['Fatura nova não lançada'] : [];
+  useRegistrarPendencias(`fatura:${chave}`, pendenciasFatura);
+  const cancelarDigitacao = () => {
+    if (confirmarDescarte(pendenciasFatura)) onFechar();
+  };
 
   const mudarCompetencia = (nova: string) => {
     setCompetencia(nova);
@@ -489,7 +494,7 @@ const FormFatura: React.FC<{
       <div className="flex flex-wrap justify-end gap-2">
         <button
           type="button"
-          onClick={onFechar}
+          onClick={cancelarDigitacao}
           className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg"
         >
           Cancelar
