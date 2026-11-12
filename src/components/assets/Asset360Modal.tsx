@@ -19,12 +19,15 @@ import {
   ExternalLink,
   Edit2,
   Lock,
+  Archive,
 } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 import { AnexosAtivo } from './AnexosAtivo.tsx';
 import { LembreteGarantia } from './LembreteGarantia.tsx';
 import { ManutencoesAtivo } from './ManutencoesAtivo.tsx';
 import { FormManutencao } from './FormManutencao.tsx';
+import { FormBaixa } from './FormBaixa.tsx';
+import { BaixaPatrimonial } from './BaixaPatrimonial.tsx';
 import { podeEnviarParaManutencao } from '../../utils/cicloVida.ts';
 
 interface Asset360ModalProps {
@@ -57,6 +60,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [editando, setEditando] = useState(false);
   const [enviandoManutencao, setEnviandoManutencao] = useState(false);
+  const [dandoBaixa, setDandoBaixa] = useState(false);
   const [tempSO, setTempSO] = useState('');
   const [tempBitlocker, setTempBitlocker] = useState('');
 
@@ -143,14 +147,14 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             <span className="font-mono text-sm font-bold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-md border border-blue-200">
               {asset.tag}
             </span>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900 leading-tight">{asset.nome}</h2>
-              <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-slate-900 leading-tight break-words">{asset.nome}</h2>
+              <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500 mt-0.5">
                 <span>{asset.marca} {asset.modelo}</span>
-                <span>·</span>
+                <span aria-hidden="true">·</span>
                 <span className="capitalize">{asset.categoria}</span>
-                <span>·</span>
-                <span className="font-mono">S/N: {asset.serialNumber}</span>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono break-all">S/N: {asset.serialNumber}</span>
               </div>
             </div>
           </div>
@@ -194,6 +198,17 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               >
                 <ArrowRightLeft className="w-3.5 h-3.5" />
                 Mudar Custódia
+              </button>
+            )}
+
+            {currentRole === 'ti_admin' && asset.status !== 'descartado' && (
+              <button
+                type="button"
+                onClick={() => setDandoBaixa(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors shadow-2xs"
+              >
+                <Archive className="w-3.5 h-3.5" aria-hidden="true" />
+                Dar baixa
               </button>
             )}
 
@@ -329,6 +344,9 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               )}
             </div>
           </div>
+
+          {/* Fase 8: baixa patrimonial vigente e estornadas (só TI) */}
+          {isTI && <BaixaPatrimonial asset={asset} />}
 
           {/* Especificações técnicas: SO/BitLocker (hardware) + atributos personalizados */}
           {(asset.categoria === 'hardware' ||
@@ -680,6 +698,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
       {enviandoManutencao && (
         <FormManutencao asset={asset} modo="abrir" onClose={() => setEnviandoManutencao(false)} />
       )}
+      {dandoBaixa && <FormBaixa asset={asset} onClose={() => setDandoBaixa(false)} />}
     </div>
   );
 };
