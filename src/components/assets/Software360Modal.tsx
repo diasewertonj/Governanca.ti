@@ -128,14 +128,14 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 shrink-0 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
               <Key className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-slate-900 leading-tight">{license.nome}</h2>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold text-slate-900 leading-tight break-words">{license.nome}</h2>
                 <span className="text-xs font-mono font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
                   {license.chaveContrato}
                 </span>
@@ -146,7 +146,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {license.urlPainel && (
               <a
                 href={license.urlPainel}
@@ -164,6 +164,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               <button
                 type="button"
                 onClick={() => {
+                  // Fase 8: a ficha fecha; pergunta antes se há fatura em digitação
+                  if (!podeDescartarPendencias()) return;
                   setSoftwareToEdit(license);
                   setSoftwareModalOpen(true);
                   onClose();
