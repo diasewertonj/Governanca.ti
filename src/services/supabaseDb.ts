@@ -1,15 +1,36 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase.ts';
+import type { Json, TablesInsert } from '../types/database.types.ts';
 import {
   Asset,
+  AssetCategory,
+  AssetStatus,
   CompanySettings,
   CustodyHistoryEntry,
+  CustomFieldDefinition,
   Department,
   Employee,
+  EmployeeStatus,
+  FiscalData,
+  OffboardingData,
+  OnboardingData,
   ResponsibilityTerm,
   SoftwareLicense,
   Ticket,
+  TicketAttachment,
   TicketMessage,
+  TicketPriority,
+  TicketStatus,
+  TicketType,
+  UserRole,
 } from '../types/index.ts';
+
+// Fase 4: os mapeadores são tipados pelo banco real (database.types.ts, gerado
+// pelo Supabase). Coluna escrita errada vira erro de compilação. Os helpers
+// genéricos de UPDATE/DELETE usam o cliente sem tipo, pois recebem a tabela
+// como parâmetro.
+const bd = () => supabase as unknown as SupabaseClient;
+const json = (v: unknown) => v as Json;
 
 /**
  * SERVIÇO DE PERSISTÊNCIA EM BANCO SUPABASE POSTGRESQL
@@ -38,13 +59,14 @@ function lancar(error: { message: string; code?: string }): never {
   throw new DbError(error.message, error.code);
 }
 
-async function checar<T>(op: PromiseLike<{ data: T; error: any }>): Promise<T> {
+async function checar<T>(op: PromiseLike<{ data: T; error: { message: string; code?: string } | null }>): Promise<T> {
   const { data, error } = await op;
   if (error) lancar(error);
   return data;
 }
 
-function camposAlterados(antes: Linha, depois: Linha): Linha {
+/** Só as colunas cujo valor mudou (compara por JSON; null e undefined são iguais) */
+export function camposAlterados(antes: Linha, depois: Linha): Linha {
   const diff: Linha = {};
   Object.keys(depois).forEach((k) => {
     if (JSON.stringify(antes[k] ?? null) !== JSON.stringify(depois[k] ?? null)) diff[k] = depois[k];
@@ -54,43 +76,52 @@ function camposAlterados(antes: Linha, depois: Linha): Linha {
 
 const SEM_PERMISSAO = 'Sem permissão para alterar este registro, ou ele não existe mais.';
 
+/** Quantos chamados recentes são carregados no login (os mais antigos ficam no banco) */
+export const LIMITE_CHAMADOS = 500;
+
 async function atualizar(tabela: string, id: string, campos: Linha, chave = 'id') {
   if (!supabase || Object.keys(campos).length === 0) return;
-  const data = await checar(supabase.from(tabela).update(campos).eq(chave, id).select(chave));
+  const data = await checar(bd().from(tabela).update(campos).eq(chave, id).select(chave));
   if (!data || (data as unknown[]).length === 0) throw new DbError(SEM_PERMISSAO, '42501');
 }
 
 async function excluir(tabela: string, id: string, chave = 'id') {
   if (!supabase) return;
-  const data = await checar(supabase.from(tabela).delete().eq(chave, id).select(chave));
+  const data = await checar(bd().from(tabela).delete().eq(chave, id).select(chave));
   if (!data || (data as unknown[]).length === 0) throw new DbError(SEM_PERMISSAO, '42501');
 }
+
+// Mensagens técnicas do Postgres/RLS viram texto genérico; as mensagens de regra
+// de negócio escritas nas funções do banco (em português) são mostradas como estão.
+const MENSAGEM_TECNICA = /violates|permission denied|row-level security|duplicate key|null value/i;
 
 /** Mensagem curta para o usuário a partir de um erro do banco */
 export function mensagemDeErro(err: unknown): string {
   const e = err as { code?: string; message?: string };
+  const msg = e?.message || '';
+  const deNegocio = msg !== '' && !MENSAGEM_TECNICA.test(msg);
   switch (e?.code) {
     case 'validacao':
-      return e.message || 'arquivo inválido';
+      return msg || 'arquivo inválido';
     case '42501':
-      return 'sem permissão para esta ação';
+      return deNegocio && msg !== SEM_PERMISSAO ? msg : 'sem permissão para esta ação';
     case '23505':
-      return 'já existe um registro com esses dados (e-mail, matrícula, tag, série ou código repetido)';
+      return deNegocio ? msg : 'já existe um registro com esses dados (e-mail, matrícula, tag, série ou código repetido)';
     case '23503':
       return 'o registro está vinculado a outros dados (histórico, chamados ou termos) e não pode ser removido';
     case '23514':
-      return e.message?.includes('assento') ? e.message : 'valor não aceito pelo banco';
+      return deNegocio ? msg : 'valor não aceito pelo banco';
     case '23502':
       return 'campo obrigatório não preenchido';
     default:
-      return e?.message || 'falha de comunicação com o banco';
+      return msg || 'falha de comunicação com o banco';
   }
 }
 
 // ---------------------------------------------------------------------------
 // Mapeamento entidade -> linha do banco
 // ---------------------------------------------------------------------------
-const linhaSetor = (d: Department): Linha => ({
+const linhaSetor = (d: Department): TablesInsert<'departamentos'> => ({
   id: d.id,
   nome: d.nome,
   codigo: d.codigo,
@@ -99,7 +130,7 @@ const linhaSetor = (d: Department): Linha => ({
   responsavel_id: d.responsavelId || null,
 });
 
-const linhaColaborador = (e: Employee): Linha => ({
+const linhaColaborador = (e: Employee): TablesInsert<'colaboradores'> => ({
   id: e.id,
   matricula: e.matricula,
   nome: e.nome,
@@ -114,7 +145,7 @@ const linhaColaborador = (e: Employee): Linha => ({
   avatar_url: e.avatarUrl || null,
 });
 
-const linhaAtivo = (a: Asset): Linha => ({
+const linhaAtivo = (a: Asset): TablesInsert<'ativos'> => ({
   id: a.id,
   tag: a.tag,
   nome: a.nome,
@@ -128,11 +159,11 @@ const linhaAtivo = (a: Asset): Linha => ({
   custodiante_id: a.custodianteId || null,
   data_entrega_atual: a.dataEntregaAtual || null,
   sistema_operacional: a.sistemaOperacional || null,
-  fiscal: a.fiscal || {},
-  custom_fields: a.customFields || {},
+  fiscal: json(a.fiscal || {}),
+  custom_fields: json(a.customFields || {}),
 });
 
-const linhaCustodia = (ativoId: string, c: CustodyHistoryEntry): Linha => ({
+const linhaCustodia = (ativoId: string, c: CustodyHistoryEntry): TablesInsert<'historico_custodia'> => ({
   id: c.id,
   ativo_id: ativoId,
   colaborador_id: c.colaboradorId,
@@ -144,7 +175,7 @@ const linhaCustodia = (ativoId: string, c: CustodyHistoryEntry): Linha => ({
   observacoes: c.observacoes || null,
 });
 
-const linhaLicenca = (l: SoftwareLicense): Linha => ({
+const linhaLicenca = (l: SoftwareLicense): TablesInsert<'licencas_software'> => ({
   id: l.id,
   nome: l.nome,
   fornecedor: l.fornecedor,
@@ -157,7 +188,7 @@ const linhaLicenca = (l: SoftwareLicense): Linha => ({
   observacoes: l.observacoes || null,
 });
 
-const linhaChamado = (t: Ticket): Linha => ({
+const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
   id: t.id,
   codigo: t.codigo,
   titulo: t.titulo,
@@ -176,12 +207,12 @@ const linhaChamado = (t: Ticket): Linha => ({
   ativo_id: t.ativoId || null,
   software_id: t.softwareId || null,
   software_nome: t.softwareNome || null,
-  onboarding: t.onboarding || null,
-  offboarding: t.offboarding || null,
-  anexos: t.anexos || [],
+  onboarding: t.onboarding ? json(t.onboarding) : null,
+  offboarding: t.offboarding ? json(t.offboarding) : null,
+  anexos: json(t.anexos || []),
 });
 
-const linhaMensagem = (chamadoId: string, m: TicketMessage): Linha => ({
+const linhaMensagem = (chamadoId: string, m: TicketMessage): TablesInsert<'chamado_mensagens'> => ({
   id: m.id,
   chamado_id: chamadoId,
   autor_id: m.autorId,
@@ -190,10 +221,10 @@ const linhaMensagem = (chamadoId: string, m: TicketMessage): Linha => ({
   texto: m.texto,
   eh_nota_interna: m.ehNotaInterna,
   data_envio: m.data,
-  anexos: m.anexos || [],
+  anexos: json(m.anexos || []),
 });
 
-const linhaTermo = (tm: ResponsibilityTerm): Linha => ({
+const linhaTermo = (tm: ResponsibilityTerm): TablesInsert<'termos_responsabilidade'> => ({
   id: tm.id,
   codigo: tm.codigo,
   tipo: tm.tipo,
@@ -220,7 +251,7 @@ export async function fetchDepartmentsFromDb(): Promise<Department[] | null> {
     console.error('Erro ao buscar departamentos do Supabase:', error);
     return null;
   }
-  return data ? data.map((d: any) => ({
+  return data ? data.map((d) => ({
     id: d.id,
     nome: d.nome,
     codigo: d.codigo,
@@ -253,16 +284,16 @@ export async function fetchEmployeesFromDb(): Promise<Employee[] | null> {
     console.error('Erro ao buscar colaboradores do Supabase:', error);
     return null;
   }
-  return data ? data.map((e: any) => ({
+  return data ? data.map((e) => ({
     id: e.id,
     matricula: e.matricula,
     nome: e.nome,
     email: e.email,
     cargo: e.cargo,
-    setorId: e.setor_id,
+    setorId: e.setor_id || '',
     gestorId: e.gestor_id || undefined,
-    status: e.status,
-    role: e.role,
+    status: e.status as EmployeeStatus,
+    role: e.role as UserRole,
     dataAdmissao: e.data_admissao,
     telefone: e.telefone || undefined,
     avatarUrl: e.avatar_url || undefined,
@@ -302,12 +333,12 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
   // Chaves BitLocker ficam em ativos_segredos (só TI enxerga; para os demais a RLS devolve vazio)
   const { data: segredosData } = await supabase.from('ativos_segredos').select('ativo_id, bitlocker_key');
   const bitlockerByAssetId: Record<string, string> = {};
-  (segredosData || []).forEach((s: any) => {
+  (segredosData || []).forEach((s) => {
     if (s.bitlocker_key) bitlockerByAssetId[s.ativo_id] = s.bitlocker_key;
   });
 
   const custodyByAssetId: Record<string, CustodyHistoryEntry[]> = {};
-  (custodyData || []).forEach((c: any) => {
+  (custodyData || []).forEach((c) => {
     if (!custodyByAssetId[c.ativo_id]) custodyByAssetId[c.ativo_id] = [];
     custodyByAssetId[c.ativo_id].push({
       id: c.id,
@@ -321,23 +352,23 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     });
   });
 
-  return data ? data.map((a: any) => ({
+  return data ? data.map((a) => ({
     id: a.id,
     tag: a.tag,
     nome: a.nome,
-    categoria: a.categoria,
+    categoria: a.categoria as AssetCategory,
     marca: a.marca,
     modelo: a.modelo,
     serialNumber: a.serial_number,
-    status: a.status,
+    status: a.status as AssetStatus,
     localizacaoFisica: a.localizacao_fisica,
     setorId: a.setor_id || undefined,
     custodianteId: a.custodiante_id || undefined,
     dataEntregaAtual: a.data_entrega_atual || undefined,
     sistemaOperacional: a.sistema_operacional || undefined,
     bitlockerKey: bitlockerByAssetId[a.id] || undefined,
-    fiscal: a.fiscal || undefined,
-    customFields: a.custom_fields || {},
+    fiscal: (a.fiscal || {}) as unknown as FiscalData,
+    customFields: (a.custom_fields || {}) as Record<string, string>,
     historicoCustodia: custodyByAssetId[a.id] || [],
     historicoManutencao: [],
   })) : [];
@@ -403,19 +434,19 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
   // Chaves de contrato ficam em licencas_segredos (só TI)
   const { data: segredosData } = await supabase.from('licencas_segredos').select('licenca_id, chave_contrato');
   const chaveByLicId: Record<string, string> = {};
-  (segredosData || []).forEach((s: any) => {
+  (segredosData || []).forEach((s) => {
     if (s.chave_contrato) chaveByLicId[s.licenca_id] = s.chave_contrato;
   });
-  return data ? data.map((l: any) => ({
+  return data ? data.map((l) => ({
     id: l.id,
     nome: l.nome,
     fornecedor: l.fornecedor,
     chaveContrato: chaveByLicId[l.id] || '',
     assentosTotais: l.assentos_totais,
-    assentosAlocados: (l.colaboradores_ids || []).length,
-    colaboradoresIds: l.colaboradores_ids || [],
+    assentosAlocados: ((l.colaboradores_ids || []) as string[]).length,
+    colaboradoresIds: (l.colaboradores_ids || []) as string[],
     valorMensal: Number(l.valor_mensal) || 0,
-    tipoCobranca: l.tipo_cobranca || 'mensal',
+    tipoCobranca: (l.tipo_cobranca || 'mensal') as 'mensal' | 'anual',
     dataRenovacao: l.data_renovacao,
     urlPainel: l.url_painel || undefined,
     observacoes: l.observacoes || undefined,
@@ -475,42 +506,48 @@ export async function revogarLicencaDb(licencaId: string, colaboradorId: string)
 // ---------------------------------------------------------------------------
 export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('chamados').select('*').order('data_criacao', { ascending: false });
+  // Fase 4 (MED-07): janela dos chamados mais recentes, e só as mensagens dessa
+  // janela (antes: todos os chamados e TODAS as mensagens a cada login).
+  const { data, error } = await supabase
+    .from('chamados')
+    .select('*')
+    .order('data_criacao', { ascending: false })
+    .limit(LIMITE_CHAMADOS);
   if (error) {
     console.error('Erro ao buscar chamados do Supabase:', error);
     return null;
   }
 
-  const { data: msgsData, error: msgsError } = await supabase
-    .from('chamado_mensagens')
-    .select('*')
-    .order('data_envio', { ascending: true });
+  const maisAntigo = data && data.length > 0 ? data[data.length - 1].data_criacao : null;
+  let consultaMsgs = supabase.from('chamado_mensagens').select('*').order('data_envio', { ascending: true });
+  if (maisAntigo) consultaMsgs = consultaMsgs.gte('data_envio', maisAntigo);
+  const { data: msgsData, error: msgsError } = await consultaMsgs;
   if (msgsError) console.error('Erro ao buscar mensagens dos chamados:', msgsError);
 
   const messagesByTicketId: Record<string, TicketMessage[]> = {};
-  (msgsData || []).forEach((m: any) => {
+  (msgsData || []).forEach((m) => {
     if (!messagesByTicketId[m.chamado_id]) messagesByTicketId[m.chamado_id] = [];
     messagesByTicketId[m.chamado_id].push({
       id: m.id,
       autorId: m.autor_id,
       autorNome: m.autor_nome,
-      autorRole: m.autor_papel || 'colaborador',
+      autorRole: (m.autor_papel || 'colaborador') as UserRole,
       texto: m.texto,
       ehNotaInterna: Boolean(m.eh_nota_interna),
       data: m.data_envio,
-      anexos: m.anexos || [],
+      anexos: (m.anexos || []) as unknown as TicketAttachment[],
     });
   });
 
-  return data ? data.map((t: any) => ({
+  return data ? data.map((t) => ({
     id: t.id,
     codigo: t.codigo,
     titulo: t.titulo,
     descricao: t.descricao,
-    tipo: t.tipo,
+    tipo: t.tipo as TicketType,
     categoria: t.categoria,
-    prioridade: t.prioridade,
-    status: t.status,
+    prioridade: t.prioridade as TicketPriority,
+    status: t.status as TicketStatus,
     solicitanteId: t.solicitante_id,
     solicitanteNome: t.solicitante_nome,
     solicitanteEmail: t.solicitante_email,
@@ -521,9 +558,9 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     ativoId: t.ativo_id || undefined,
     softwareId: t.software_id || undefined,
     softwareNome: t.software_nome || undefined,
-    onboarding: t.onboarding || undefined,
-    offboarding: t.offboarding || undefined,
-    anexos: t.anexos || [],
+    onboarding: (t.onboarding || undefined) as unknown as OnboardingData | undefined,
+    offboarding: (t.offboarding || undefined) as unknown as OffboardingData | undefined,
+    anexos: (t.anexos || []) as unknown as TicketAttachment[],
     mensagens: messagesByTicketId[t.id] || [],
     dataCriacao: t.data_criacao,
     dataAtualizacao: t.data_atualizacao,
@@ -557,16 +594,16 @@ export async function fetchTermsFromDb(): Promise<ResponsibilityTerm[] | null> {
     console.error('Erro ao buscar termos do Supabase:', error);
     return null;
   }
-  return data ? data.map((tm: any) => ({
+  return data ? data.map((tm) => ({
     id: tm.id,
     codigo: tm.codigo,
-    tipo: tm.tipo,
+    tipo: tm.tipo as 'entrega' | 'devolucao',
     colaboradorId: tm.colaborador_id,
     colaboradorNome: tm.colaborador_nome,
     colaboradorMatricula: tm.colaborador_matricula,
     colaboradorCargo: tm.colaborador_cargo,
     colaboradorSetorNome: tm.colaborador_setor_nome,
-    ativoIds: tm.ativo_ids || [],
+    ativoIds: (tm.ativo_ids || []) as string[],
     dataEmissao: tm.data_emissao,
     statusAssinatura: (tm.status_assinatura === 'assinado' ? 'assinado' : 'gerado') as 'gerado' | 'assinado',
     arquivoAssinadoUrl: tm.arquivo_url || undefined,
@@ -609,7 +646,7 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     telefoneTI: data.telefone_ti,
     textoTermoEntrega: data.texto_termo_entrega,
     textoTermoDevolucao: data.texto_termo_devolucao,
-    camposPersonalizados: data.campos_personalizados || [],
+    camposPersonalizados: (data.campos_personalizados || []) as unknown as CustomFieldDefinition[],
   };
 }
 
@@ -630,7 +667,7 @@ export async function saveSettingsDb(st: CompanySettings) {
         telefone_ti: st.telefoneTI,
         texto_termo_entrega: st.textoTermoEntrega,
         texto_termo_devolucao: st.textoTermoDevolucao,
-        campos_personalizados: st.camposPersonalizados || [],
+        campos_personalizados: json(st.camposPersonalizados || []),
         updated_at: new Date().toISOString(),
       })
       .select('id')
@@ -718,7 +755,7 @@ export interface ResumoOffboarding {
 
 export async function concluirOffboardingDb(chamadoId: string): Promise<ResumoOffboarding | null> {
   if (!supabase) return null;
-  return (await checar(supabase.rpc('concluir_offboarding', { p_chamado: chamadoId }))) as ResumoOffboarding;
+  return (await checar(supabase.rpc('concluir_offboarding', { p_chamado: chamadoId }))) as unknown as ResumoOffboarding;
 }
 
 export async function anonimizarColaboradorDb(colaboradorId: string) {
@@ -764,11 +801,11 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthStatus> {
       tablesExist: true,
       message: 'Conexão ativa e tabelas prontas no Supabase.',
     };
-  } catch (err: any) {
+  } catch (err) {
     return {
       connected: false,
       tablesExist: false,
-      message: err?.message || 'Falha de comunicação com o Supabase.',
+      message: (err as Error)?.message || 'Falha de comunicação com o Supabase.',
     };
   }
 }
@@ -787,9 +824,9 @@ export async function clearAllDatabaseTables(keepEmployeeEmail?: string) {
     'licencas_software',
   ];
   for (const t of tabelas) {
-    await checar(supabase.from(t).delete().neq('id', 'dummy_zero'));
+    await checar(bd().from(t).delete().neq('id', 'dummy_zero'));
   }
   if (keepEmployeeEmail) {
-    await checar(supabase.from('colaboradores').delete().neq('email', keepEmployeeEmail.toLowerCase()));
+    await checar(bd().from('colaboradores').delete().neq('email', keepEmployeeEmail.toLowerCase()));
   }
 }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ResponsibilityTerm } from '../../types/index.ts';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
-import { Printer, X, CheckCircle2, Upload, FileText, Building2 } from 'lucide-react';
+import { Printer, X, CheckCircle2, Upload, FileText } from 'lucide-react';
 import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 
 interface PrintableTermModalProps {

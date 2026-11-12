@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { TicketPriority, TicketAttachment } from '../../types/index.ts';
-import { X, Laptop, Paperclip, Send, AlertCircle, CheckCircle2, User } from 'lucide-react';
+import { X, Paperclip, Send } from 'lucide-react';
 import { enviarAnexoDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 
 interface NewTicketModalProps {

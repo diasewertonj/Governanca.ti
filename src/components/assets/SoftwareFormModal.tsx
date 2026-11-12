@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { SoftwareLicense } from '../../types/index.ts';
-import { X, Key, Save, CheckCircle2, AlertCircle, Globe, DollarSign } from 'lucide-react';
+import { X, Key, Save, AlertCircle } from 'lucide-react';
 
 interface SoftwareFormModalProps {
   onClose: () => void;
@@ -15,7 +15,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
 
   const [nome, setNome] = useState(softwareToEdit?.nome || '');
   const [fornecedor, setFornecedor] = useState(softwareToEdit?.fornecedor || '');
-  const [chaveContrato, setChaveContrato] = useState(
+  const [chaveContrato, setChaveContrato] = useState(() =>
     softwareToEdit?.chaveContrato || `CTR-SaaS-${Date.now().toString().slice(-4)}`
   );
   const [assentosTotais, setAssentosTotais] = useState<number>(softwareToEdit?.assentosTotais || 10);
@@ -23,7 +23,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
   const [tipoCobranca, setTipoCobranca] = useState<'mensal' | 'anual'>(
     softwareToEdit?.tipoCobranca || 'mensal'
   );
-  const [dataRenovacao, setDataRenovacao] = useState(
+  const [dataRenovacao, setDataRenovacao] = useState(() =>
     softwareToEdit?.dataRenovacao ||
       new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
@@ -219,7 +219,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               </label>
               <select
                 value={tipoCobranca}
-                onChange={(e) => setTipoCobranca(e.target.value as any)}
+                onChange={(e) => setTipoCobranca(e.target.value as 'mensal' | 'anual')}
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
               >
                 <option value="mensal">Mensal (Faturamento Recorrente)</option>

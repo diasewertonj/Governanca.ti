@@ -10,8 +10,6 @@ import {
   Settings,
   FolderSync,
   PlusCircle,
-  Shield,
-  HelpCircle,
 } from 'lucide-react';
 
 interface SidebarProps {

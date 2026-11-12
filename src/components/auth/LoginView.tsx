@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { PoliticaPrivacidadeModal } from '../lgpd/PoliticaPrivacidadeModal.tsx';
-import { Shield, Lock, Mail, ArrowRight, UserCheck, Laptop, LifeBuoy, Loader2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
   const { login, loginWithGoogle, settings, authError, isSupabaseConnected, erroLinkAuth, solicitarRecuperacaoSenha } = useApp();
@@ -23,9 +23,11 @@ export const LoginView: React.FC = () => {
         : res.error || 'Não foi possível enviar agora. Tente novamente em alguns minutos.'
     );
   };
-  // Credenciais de exemplo só no modo demonstração (sem Supabase)
-  const [email, setEmail] = useState(isSupabaseConnected ? '' : 'admin.ti@nexuscorp.com.br');
-  const [password, setPassword] = useState(isSupabaseConnected ? '' : 'nexus@2026');
+  // Credenciais de exemplo só no modo demonstração local (dev sem Supabase);
+  // fora do `npm run dev` elas não entram no bundle.
+  const demo = import.meta.env.DEV && !isSupabaseConnected;
+  const [email, setEmail] = useState(demo ? 'admin.ti@nexuscorp.com.br' : '');
+  const [password, setPassword] = useState(demo ? 'nexus@2026' : '');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -50,12 +52,6 @@ export const LoginView: React.FC = () => {
     if (!res.success && res.error) {
       setErrorMessage(res.error);
     }
-  };
-
-  const handleQuickFill = (testEmail: string) => {
-    setEmail(testEmail);
-    setPassword('nexus@2026');
-    setErrorMessage(null);
   };
 
   return (

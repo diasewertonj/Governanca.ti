@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { EmployeeStatus } from '../../types/index.ts';
-import { X, UserPlus, Building, Mail, Phone, UserCheck } from 'lucide-react';
+import { X, UserPlus } from 'lucide-react';
 
 interface NewEmployeeModalProps {
   onClose: () => void;

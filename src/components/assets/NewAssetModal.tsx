@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { AssetCategory } from '../../types/index.ts';
-import { X, Laptop, Receipt, Plus, ShieldCheck } from 'lucide-react';
+import { X, Plus, ShieldCheck } from 'lucide-react';
 
 interface NewAssetModalProps {
   onClose: () => void;
@@ -262,6 +262,24 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
                     ))}
                 </select>
               </div>
+
+              {/* Fase 4: o campo existia no estado, mas não havia como preenchê-lo */}
+              {!custodianteId && (
+                <div>
+                  <label htmlFor="ativo-localizacao" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Localização física no estoque
+                  </label>
+                  <input
+                    id="ativo-localizacao"
+                    type="text"
+                    required
+                    value={localizacaoFisica}
+                    onChange={(e) => setLocalizacaoFisica(e.target.value)}
+                    placeholder="Ex.: Almoxarifado T.I. - Armário B3"
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

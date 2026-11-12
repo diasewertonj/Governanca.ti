@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
-import { Laptop, Key, FileText, LifeBuoy, QrCode, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Laptop, Key, FileText, LifeBuoy, QrCode } from 'lucide-react';
 
 interface MyAssetsViewProps {
   onOpenNewTicketForAsset: (assetId: string) => void;

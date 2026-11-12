@@ -3,29 +3,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext.tsx';
+import { vistaPermitida } from './utils/permissoes.ts';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
 import { LoginView } from './components/auth/LoginView.tsx';
 import { DefinirSenhaView } from './components/auth/DefinirSenhaView.tsx';
-import { DashboardView } from './components/dashboard/DashboardView.tsx';
-import { AssetsView } from './components/assets/AssetsView.tsx';
-import { CollaboratorsView } from './components/collaborators/CollaboratorsView.tsx';
-import { ServiceDeskView } from './components/servicedesk/ServiceDeskView.tsx';
-import { RhProcessesView } from './components/rh/RhProcessesView.tsx';
-import { TermsView } from './components/terms/TermsView.tsx';
-import { SettingsView } from './components/settings/SettingsView.tsx';
-import { MyAssetsView } from './components/collaborators/MyAssetsView.tsx';
-import { MyTicketsView } from './components/servicedesk/MyTicketsView.tsx';
-import { NewTicketModal } from './components/servicedesk/NewTicketModal.tsx';
-import { Asset360Modal } from './components/assets/Asset360Modal.tsx';
-import { Employee360Modal } from './components/collaborators/Employee360Modal.tsx';
-import { TicketDetailModal } from './components/servicedesk/TicketDetailModal.tsx';
-import { PrintableTermModal } from './components/terms/PrintableTermModal.tsx';
-import { QrCodeLabelModal } from './components/assets/QrCodeLabelModal.tsx';
-import { Software360Modal } from './components/assets/Software360Modal.tsx';
-import { SoftwareFormModal } from './components/assets/SoftwareFormModal.tsx';
+
+// Fase 4: telas e modais carregam sob demanda (bundle inicial menor)
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView.tsx').then((m) => ({ default: m.DashboardView })));
+const AssetsView = lazy(() => import('./components/assets/AssetsView.tsx').then((m) => ({ default: m.AssetsView })));
+const CollaboratorsView = lazy(() => import('./components/collaborators/CollaboratorsView.tsx').then((m) => ({ default: m.CollaboratorsView })));
+const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
+const RhProcessesView = lazy(() => import('./components/rh/RhProcessesView.tsx').then((m) => ({ default: m.RhProcessesView })));
+const TermsView = lazy(() => import('./components/terms/TermsView.tsx').then((m) => ({ default: m.TermsView })));
+const SettingsView = lazy(() => import('./components/settings/SettingsView.tsx').then((m) => ({ default: m.SettingsView })));
+const MyAssetsView = lazy(() => import('./components/collaborators/MyAssetsView.tsx').then((m) => ({ default: m.MyAssetsView })));
+const MyTicketsView = lazy(() => import('./components/servicedesk/MyTicketsView.tsx').then((m) => ({ default: m.MyTicketsView })));
+const NewTicketModal = lazy(() => import('./components/servicedesk/NewTicketModal.tsx').then((m) => ({ default: m.NewTicketModal })));
+const Asset360Modal = lazy(() => import('./components/assets/Asset360Modal.tsx').then((m) => ({ default: m.Asset360Modal })));
+const Employee360Modal = lazy(() => import('./components/collaborators/Employee360Modal.tsx').then((m) => ({ default: m.Employee360Modal })));
+const TicketDetailModal = lazy(() => import('./components/servicedesk/TicketDetailModal.tsx').then((m) => ({ default: m.TicketDetailModal })));
+const PrintableTermModal = lazy(() => import('./components/terms/PrintableTermModal.tsx').then((m) => ({ default: m.PrintableTermModal })));
+const QrCodeLabelModal = lazy(() => import('./components/assets/QrCodeLabelModal.tsx').then((m) => ({ default: m.QrCodeLabelModal })));
+const Software360Modal = lazy(() => import('./components/assets/Software360Modal.tsx').then((m) => ({ default: m.Software360Modal })));
+const SoftwareFormModal = lazy(() => import('./components/assets/SoftwareFormModal.tsx').then((m) => ({ default: m.SoftwareFormModal })));
+
+const Carregando = () => (
+  <div className="py-16 flex justify-center" role="status" aria-label="Carregando">
+    <div className="w-6 h-6 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+  </div>
+);
 
 function MainApp() {
   const {
@@ -53,32 +62,12 @@ function MainApp() {
     precisaDefinirSenha,
   } = useApp();
 
-  const [currentView, setCurrentView] = useState<string>('dashboard');
+  const [viewSolicitada, setCurrentView] = useState<string>('dashboard');
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
 
-  // AUDITORIA RBAC: Impedir navegação ou desvios de rotas não autorizadas por papel
-  useEffect(() => {
-    if (!currentUser) return;
-
-    // Fase 0: Configurações (papéis, banco, reset) apenas para ti_admin.
-    // Proteção só de interface; a real fica no banco (trigger da Fase 0 e RLS da Fase 1).
-    if (currentView === 'settings' && currentRole !== 'ti_admin') {
-      setCurrentView(currentRole === 'colaborador' ? 'my_assets' : currentRole === 'rh' ? 'rh_processes' : 'dashboard');
-      return;
-    }
-
-    if (currentRole === 'colaborador') {
-      const allowedColaboradorViews = ['my_assets', 'my_tickets'];
-      if (!allowedColaboradorViews.includes(currentView)) {
-        setCurrentView('my_assets');
-      }
-    } else if (currentRole === 'rh') {
-      const forbiddenRhViews = ['settings', 'dashboard'];
-      if (forbiddenRhViews.includes(currentView)) {
-        setCurrentView('rh_processes');
-      }
-    }
-  }, [currentRole, currentUser, currentView]);
+  // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
+  // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
+  const currentView = vistaPermitida(currentRole, viewSolicitada);
 
   if (authLoading) {
     return (
@@ -136,6 +125,7 @@ function MainApp() {
 
         {/* Viewport Principal com visual leve, respirável e sem densidade pesada */}
         <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+          <Suspense fallback={<Carregando />}>
           {currentView === 'dashboard' && <DashboardView onNavigate={(view) => setCurrentView(view)} />}
           {currentView === 'assets' && <AssetsView />}
           {currentView === 'collaborators' && <CollaboratorsView />}
@@ -147,7 +137,7 @@ function MainApp() {
           {currentView === 'settings' && <SettingsView />}
           {currentView === 'my_assets' && (
             <MyAssetsView
-              onOpenNewTicketForAsset={(assetId) => {
+              onOpenNewTicketForAsset={() => {
                 setShowNewTicketModal(true);
               }}
             />
@@ -155,10 +145,12 @@ function MainApp() {
           {currentView === 'my_tickets' && (
             <MyTicketsView onOpenNewTicketModal={() => setShowNewTicketModal(true)} />
           )}
+          </Suspense>
         </main>
       </div>
 
       {/* Modais Globais de Rastreabilidade Relacional 360° e Impressão */}
+      <Suspense fallback={null}>
       {showNewTicketModal && (
         <NewTicketModal onClose={() => setShowNewTicketModal(false)} />
       )}
@@ -214,6 +206,7 @@ function MainApp() {
           }}
         />
       )}
+      </Suspense>
     </div>
   );
 }

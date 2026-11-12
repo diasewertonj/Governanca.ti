@@ -14,7 +14,6 @@ import {
   Copy,
   Check,
   ArrowRightLeft,
-  Calendar,
   ExternalLink,
   Edit2,
   Lock,

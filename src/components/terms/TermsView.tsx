@@ -2,18 +2,15 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import {
-  FileText,
   Search,
   Printer,
   CheckCircle2,
   Clock,
   User,
-  Plus,
-  ExternalLink,
 } from 'lucide-react';
 
 export const TermsView: React.FC = () => {
-  const { terms, setSelectedTermForPrint, setSelectedEmployeeIdFor360, currentRole } = useApp();
+  const { terms, setSelectedTermForPrint, setSelectedEmployeeIdFor360 } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'todos' | 'entrega' | 'devolucao'>('todos');
@@ -53,7 +50,7 @@ export const TermsView: React.FC = () => {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setTypeFilter(tab.id as any)}
+              onClick={() => setTypeFilter(tab.id as 'todos' | 'entrega' | 'devolucao')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                 typeFilter === tab.id
                   ? 'bg-white text-slate-900 shadow-2xs'

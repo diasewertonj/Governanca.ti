@@ -2,16 +2,13 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import {
-  FolderSync,
   UserPlus,
   UserMinus,
   Laptop,
-  Key,
   Mail,
   HardDrive,
   Truck,
   CheckCircle2,
-  AlertCircle,
   ExternalLink,
   Send,
 } from 'lucide-react';
@@ -33,7 +30,7 @@ export const RhProcessesView: React.FC = () => {
 
   // Estados do Offboarding
   const [selectedColabId, setSelectedColabId] = useState('');
-  const [dataDesligamento, setDataDesligamento] = useState(
+  const [dataDesligamento, setDataDesligamento] = useState(() =>
     new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [redirecionarEmail, setRedirecionarEmail] = useState(true);
@@ -52,7 +49,7 @@ export const RhProcessesView: React.FC = () => {
   const [onbSetorId, setOnbSetorId] = useState(departments[0]?.id || 'dep-1');
   const [onbGestorId, setOnbGestorId] = useState('');
   const [onbPapelAcesso, setOnbPapelAcesso] = useState<'colaborador' | 'rh' | 'ti_suporte' | 'ti_admin'>('colaborador');
-  const [onbDataInicio, setOnbDataInicio] = useState(
+  const [onbDataInicio, setOnbDataInicio] = useState(() =>
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [onbTipoComputador, setOnbTipoComputador] = useState('Notebook Padrão (16GB RAM / Core i5)');
@@ -96,7 +93,7 @@ export const RhProcessesView: React.FC = () => {
       ...(redirecionarEmail && emailDest
         ? [
             {
-              id: `chk-email-${Date.now()}`,
+              id: 'chk-email',
               texto: `Redirecionar e-mails corporativos de ${selectedColaborador.nome} para ${emailDest.nome}`,
               concluido: false,
               categoria: 'acesso' as const,
@@ -106,7 +103,7 @@ export const RhProcessesView: React.FC = () => {
       ...(transferirDrive && driveDest
         ? [
             {
-              id: `chk-drive-${Date.now()}`,
+              id: 'chk-drive',
               texto: `Transferir propriedade dos arquivos e pastas do Google Drive para ${driveDest.nome}`,
               concluido: false,
               categoria: 'acesso' as const,
@@ -126,13 +123,13 @@ export const RhProcessesView: React.FC = () => {
         categoria: 'equipamento' as const,
       })),
       {
-        id: `chk-term-${Date.now()}`,
+        id: 'chk-termo',
         texto: `Emitir, colher assinatura formal e anexar o Termo de Devolução A4`,
         concluido: false,
         categoria: 'termo' as const,
       },
       {
-        id: `chk-block-${Date.now()}`,
+        id: 'chk-bloqueio',
         texto: `Bloquear conta de domínio e revogar acessos de VPN corporativa`,
         concluido: false,
         categoria: 'geral' as const,
@@ -682,7 +679,7 @@ export const RhProcessesView: React.FC = () => {
                 </label>
                 <select
                   value={onbPapelAcesso}
-                  onChange={(e) => setOnbPapelAcesso(e.target.value as any)}
+                  onChange={(e) => setOnbPapelAcesso(e.target.value as 'colaborador' | 'rh' | 'ti_suporte' | 'ti_admin')}
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                 >
                   <option value="colaborador">Colaborador Padrão (Solicitante)</option>

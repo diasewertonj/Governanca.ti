@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { TicketType, TicketStatus, TicketPriority } from '../../types/index.ts';
-import { formatDateTime, formatDate } from '../../utils/formatters.ts';
+import { TicketStatus, TicketPriority } from '../../types/index.ts';
+import { formatDate } from '../../utils/formatters.ts';
 import {
-  LifeBuoy,
   Search,
   Plus,
-  Filter,
   User,
   Laptop,
-  FolderSync,
-  Clock,
-  ExternalLink,
   MessageSquare,
   Key,
 } from 'lucide-react';
@@ -23,7 +18,6 @@ interface ServiceDeskViewProps {
 export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicketModal }) => {
   const {
     tickets,
-    employees,
     assets,
     currentUser,
     currentRole,
