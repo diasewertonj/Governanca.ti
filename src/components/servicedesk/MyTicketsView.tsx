@@ -23,10 +23,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Meus Chamados de Suporte Técnico</h2>
-          <p className="text-xs text-slate-500">
-            Acompanhe o andamento das suas solicitações e as respostas da equipe de T.I.
-          </p>
+          <h2 className="text-sm font-semibold text-slate-900">Meus chamados</h2>
         </div>
 
         <button

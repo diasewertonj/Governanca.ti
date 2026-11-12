@@ -485,7 +485,7 @@ const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string) => st
         onClick={carregar}
         className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-700"
       >
-        <History className="w-3.5 h-3.5" /> Ver trilha de auditoria
+        <History className="w-3.5 h-3.5" /> Ver histórico
         {erro && <span className="text-red-600"> · {erro}</span>}
       </button>
     );
@@ -493,7 +493,7 @@ const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string) => st
   return (
     <div className="space-y-1">
       <p className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-        <History className="w-3.5 h-3.5" /> Trilha de auditoria
+        <History className="w-3.5 h-3.5" /> Histórico
       </p>
       {eventos.length === 0 ? (
         <p className="text-xs text-slate-500">Sem eventos registrados (no modo demonstração a trilha fica no banco).</p>

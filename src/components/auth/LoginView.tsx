@@ -103,11 +103,8 @@ export const LoginView: React.FC = () => {
                   />
                 </svg>
               )}
-              <span>{googleLoading ? 'Autenticando...' : 'Entrar com Conta Google (Supabase)'}</span>
+              <span>{googleLoading ? 'Autenticando...' : 'Entrar com Google'}</span>
             </button>
-            <p className="text-xs text-slate-500 text-center mt-1.5">
-              Autenticação corporativa integrada com Supabase PostgreSQL
-            </p>
           </div>
 
           <div className="relative flex items-center justify-center">
@@ -128,7 +125,7 @@ export const LoginView: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@nexuscorp.com.br"
+                  placeholder="nome@empresa.com.br"
                   className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:bg-white transition-colors"
                 />
                 <Mail className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
@@ -217,7 +214,6 @@ export const LoginView: React.FC = () => {
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-500">
-          Autenticação corporativa segura via Supabase PostgreSQL · Governança 360° ·{' '}
           <button type="button" onClick={() => setMostrarPolitica(true)} className="underline hover:text-slate-600">
             Aviso de privacidade
           </button>
