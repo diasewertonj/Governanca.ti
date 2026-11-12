@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { AssetCategory } from '../../types/index.ts';
-import { X, Plus } from 'lucide-react';
+import { Asset, AssetCategory } from '../../types/index.ts';
+import { X, Plus, Save } from 'lucide-react';
+import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
+import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
+import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
 
 interface NewAssetModalProps {
   onClose: () => void;
+  /** Fase 8: quando informado, o formulário edita este ativo (a custódia muda só por "Transferir") */
+  ativo?: Asset;
 }
 
 const CATEGORIA_LABEL: Record<string, string> = {
@@ -14,49 +19,110 @@ const CATEGORIA_LABEL: Record<string, string> = {
   telefonia: 'Telefonia',
 };
 
-export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
-  const { assets, departments, employees, addAsset, settings, setSelectedAssetIdFor360 } = useApp();
+export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) => {
+  const { assets, departments, employees, addAsset, updateAsset, anexarArquivoAtivo, settings, setSelectedAssetIdFor360 } =
+    useApp();
 
   const nextTagNumber = 1040 + assets.length + 1;
   const defaultTag = `#PAT-${nextTagNumber}`;
+  const fiscalAtual = ativo?.fiscal;
 
-  const [tag, setTag] = useState(defaultTag);
-  const [nome, setNome] = useState('');
-  const [categoria, setCategoria] = useState<AssetCategory>('hardware');
-  const [marca, setMarca] = useState('');
-  const [modelo, setModelo] = useState('');
-  const [serialNumber, setSerialNumber] = useState('');
-  const [localizacaoFisica, setLocalizacaoFisica] = useState('Almoxarifado T.I. - Armário B3');
-  const [setorId, setSetorId] = useState('dep-1');
-  const [custodianteId, setCustodianteId] = useState('');
+  const [tag, setTag] = useState(ativo?.tag ?? defaultTag);
+  const [nome, setNome] = useState(ativo?.nome ?? '');
+  const [categoria, setCategoria] = useState<AssetCategory>(ativo?.categoria ?? 'hardware');
+  const [marca, setMarca] = useState(ativo?.marca ?? '');
+  const [modelo, setModelo] = useState(ativo?.modelo ?? '');
+  const [serialNumber, setSerialNumber] = useState(ativo?.serialNumber ?? '');
+  const [localizacaoFisica, setLocalizacaoFisica] = useState(ativo?.localizacaoFisica ?? 'Almoxarifado T.I. - Armário B3');
+  const [setorId, setSetorId] = useState(ativo?.setorId ?? 'dep-1');
+  const [custodianteId, setCustodianteId] = useState(ativo?.custodianteId ?? '');
 
   // Dados Fiscais
-  const [numeroNF, setNumeroNF] = useState('');
-  const [chaveAcesso44, setChaveAcesso44] = useState('');
-  const [valorCompra, setValorCompra] = useState<number>(0);
-  const [fornecedor, setFornecedor] = useState('');
-  const [dataAquisicao, setDataAquisicao] = useState(new Date().toISOString().split('T')[0]);
-  const [dataGarantia, setDataGarantia] = useState('');
-  const [suporteContato, setSuporteContato] = useState('');
+  const [numeroNF, setNumeroNF] = useState(fiscalAtual?.numeroNF ?? '');
+  const [chaveAcesso44, setChaveAcesso44] = useState(fiscalAtual?.chaveAcesso44 ?? '');
+  const [valorCompra, setValorCompra] = useState<number>(fiscalAtual?.valorCompra ?? 0);
+  const [fornecedor, setFornecedor] = useState(fiscalAtual?.fornecedor ?? '');
+  const [dataAquisicao, setDataAquisicao] = useState(fiscalAtual?.dataAquisicao ?? new Date().toISOString().split('T')[0]);
+  const [dataGarantia, setDataGarantia] = useState(fiscalAtual?.dataGarantia ?? '');
+  const [suporteContato, setSuporteContato] = useState(fiscalAtual?.suporteContato ?? '');
 
   // Segurança e SO (Hardware)
-  const [sistemaOperacional, setSistemaOperacional] = useState('Windows 11 Pro 64-bit');
-  const [bitlockerKey, setBitlockerKey] = useState('');
+  const [sistemaOperacional, setSistemaOperacional] = useState(
+    ativo ? ativo.sistemaOperacional ?? '' : 'Windows 11 Pro 64-bit'
+  );
+  const [bitlockerKey, setBitlockerKey] = useState(ativo?.bitlockerKey ?? '');
 
   // Campos Customizados
-  const [customFields, setCustomFields] = useState<Record<string, string>>({
-    processador: '',
-    memoriaRam: '',
-    armazenamento: '',
-  });
+  const [customFields, setCustomFields] = useState<Record<string, string>>(
+    ativo?.customFields ?? { processador: '', memoriaRam: '', armazenamento: '' }
+  );
+
+  // Fase 8: observações e nota fiscal (o arquivo só sobe ao salvar)
+  const [observacoes, setObservacoes] = useState(ativo?.observacoes ?? '');
+  const [notaFiscal, setNotaFiscal] = useState<File | null>(null);
+  const [erroArquivo, setErroArquivo] = useState('');
 
   const availableCustomFields = settings.camposPersonalizados.filter(
     (cf) => cf.categoria === categoria
   );
 
+  // Aviso ao fechar com alterações não salvas
+  const valores = JSON.stringify([tag, nome, categoria, marca, modelo, serialNumber, localizacaoFisica, setorId,
+    custodianteId, numeroNF, chaveAcesso44, valorCompra, fornecedor, dataAquisicao, dataGarantia, suporteContato,
+    sistemaOperacional, bitlockerKey, customFields, observacoes]);
+  const [valoresIniciais] = useState(valores);
+  const itensPendentes =
+    valores !== valoresIniciais || notaFiscal
+      ? [ativo ? `Edição do ativo ${ativo.tag} não salva` : 'Ativo novo não cadastrado']
+      : [];
+  useRegistrarPendencias(ativo ? `ativo:${ativo.id}` : 'novo-ativo', itensPendentes);
+
+  const fechar = () => {
+    if (confirmarDescarte(itensPendentes)) onClose();
+  };
+
+  const escolherNotaFiscal = (arquivo: File | undefined) => {
+    if (!arquivo) return;
+    const erro = validarArquivo(arquivo);
+    setErroArquivo(erro || '');
+    setNotaFiscal(erro ? null : arquivo);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !marca.trim() || !serialNumber.trim()) return;
+
+    const fiscal = {
+      ...(fiscalAtual || {}),
+      numeroNF: numeroNF.trim(),
+      chaveAcesso44: chaveAcesso44.replace(/\s+/g, '').trim(),
+      valorCompra: Number(valorCompra) || 0,
+      fornecedor: fornecedor.trim(),
+      dataAquisicao,
+      dataGarantia,
+      suporteContato: suporteContato.trim(),
+    };
+
+    if (ativo) {
+      updateAsset(ativo.id, {
+        tag: tag.trim(),
+        nome: nome.trim(),
+        categoria,
+        marca: marca.trim(),
+        modelo: modelo.trim(),
+        serialNumber: serialNumber.trim(),
+        localizacaoFisica: ativo.custodianteId ? ativo.localizacaoFisica : localizacaoFisica.trim(),
+        setorId,
+        sistemaOperacional: categoria === 'hardware' ? sistemaOperacional || undefined : undefined,
+        bitlockerKey: categoria === 'hardware' && bitlockerKey.trim() ? bitlockerKey.trim() : undefined,
+        fiscal,
+        customFields,
+        observacoes: observacoes.trim() || undefined,
+      });
+      if (notaFiscal) void anexarArquivoAtivo(ativo.id, notaFiscal, 'nota_fiscal');
+      onClose();
+      return;
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const isEmUso = Boolean(custodianteId);
@@ -78,16 +144,9 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
       dataEntregaAtual: isEmUso ? today : undefined,
       sistemaOperacional: categoria === 'hardware' ? sistemaOperacional : undefined,
       bitlockerKey: categoria === 'hardware' && bitlockerKey.trim() ? bitlockerKey.trim() : undefined,
-      fiscal: {
-        numeroNF: numeroNF.trim(),
-        chaveAcesso44: chaveAcesso44.replace(/\s+/g, '').trim(),
-        valorCompra: Number(valorCompra) || 0,
-        fornecedor: fornecedor.trim(),
-        dataAquisicao,
-        dataGarantia,
-        suporteContato: suporteContato.trim(),
-      },
+      fiscal,
       customFields,
+      observacoes: observacoes.trim() || undefined,
       historicoCustodia: isEmUso && custodian
         ? [
             {
@@ -101,6 +160,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
         : [],
       historicoManutencao: [],
     });
+    if (notaFiscal) void anexarArquivoAtivo(created.id, notaFiscal, 'nota_fiscal');
 
     onClose();
     setSelectedAssetIdFor360(created.id);
@@ -112,13 +172,19 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Novo Ativo Patrimonial de T.I.</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              {ativo ? `Editar ativo ${ativo.tag}` : 'Novo Ativo Patrimonial de T.I.'}
+            </h2>
             <p className="text-xs text-slate-500">
-              Controle de patrimônio, gestão fiscal e rastreabilidade 1:1
+              {ativo
+                ? 'Corrija os dados do ativo. A custódia muda pelo botão "Transferir" da ficha.'
+                : 'Controle de patrimônio, gestão fiscal e rastreabilidade 1:1'}
             </p>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            aria-label="Fechar"
+            onClick={fechar}
             className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -296,6 +362,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {!ativo && (
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Alocação Inicial (1:1)
@@ -317,6 +384,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
                   </optgroup>
                 </select>
               </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -454,13 +522,57 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
                   className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 />
               </div>
+
+              {/* Fase 8: arquivo da NF (PDF ou foto), enviado só ao salvar */}
+              <div className="md:col-span-3">
+                <label htmlFor="ativo-nf-arquivo" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Arquivo da nota fiscal (PDF ou foto)
+                </label>
+                <input
+                  id="ativo-nf-arquivo"
+                  type="file"
+                  accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
+                  onChange={(e) => escolherNotaFiscal(e.target.files?.[0])}
+                  className="block w-full max-w-full text-xs text-slate-700 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 file:text-xs file:font-semibold"
+                />
+                {erroArquivo ? (
+                  <p className="mt-1 text-xs text-red-700" role="alert">{erroArquivo}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {ativo?.anexos?.some((a) => a.categoria === 'nota_fiscal')
+                      ? 'Este ativo já tem nota fiscal anexada; um novo arquivo fica junto dos anteriores.'
+                      : 'Até 10 MB. O arquivo fica no armazenamento privado e só a T.I. abre.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Seção 5: Observações */}
+          <div className="space-y-3 pt-3 border-t border-slate-100">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">5. Observações</h3>
+            <div>
+              <label htmlFor="ativo-observacoes" className="sr-only">
+                Observações do ativo
+              </label>
+              <textarea
+                id="ativo-observacoes"
+                rows={3}
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                placeholder="Ex.: tecla Enter com folga; acompanha carregador original."
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Visível para quem vê o ativo, inclusive o colaborador que está com ele.
+              </p>
             </div>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
-              onClick={onClose}
+              onClick={fechar}
               className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               Cancelar
@@ -469,8 +581,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose }) => {
               type="submit"
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
             >
-              <Plus className="w-3.5 h-3.5" />
-              Cadastrar Ativo Patrimonial
+              {ativo ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              {ativo ? 'Salvar alterações' : 'Cadastrar Ativo Patrimonial'}
             </button>
           </div>
         </form>

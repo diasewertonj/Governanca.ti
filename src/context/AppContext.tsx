@@ -1,6 +1,8 @@
-import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useState, useEffect } from 'react';
 import { confirmarDescarte } from '../components/comum/BarraAlteracoes.tsx';
 import {
+  AnexoAtivo,
+  CategoriaAnexoAtivo,
   Asset,
   CatalogoItem,
   ColaboradorRecurso,
@@ -53,6 +55,8 @@ import {
   deleteEmployeeDb,
   fetchAssetsFromDb,
   insertAssetDb,
+  enviarAnexoAtivoDb,
+  removerAnexoAtivoDb,
   updateAssetDb,
   fetchLicensesFromDb,
   insertLicenseDb,
@@ -146,6 +150,14 @@ interface AppContextType {
   // Ações de Ativos
   addAsset: (asset: Omit<Asset, 'id'>) => Asset;
   updateAsset: (id: string, updates: Partial<Asset>) => void;
+  /** Fase 8: envia o arquivo e só então mostra o anexo (devolve false se falhar) */
+  anexarArquivoAtivo: (
+    ativoId: string,
+    arquivo: File,
+    categoria: CategoriaAnexoAtivo,
+    vinculo?: { manutencaoId?: string; baixaId?: string }
+  ) => Promise<boolean>;
+  removerAnexoAtivo: (anexo: AnexoAtivo) => Promise<boolean>;
   transferAssetCustody: (
     assetId: string,
     newColaboradorId: string | null,
@@ -847,12 +859,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       historicoCustodia: (data.historicoCustodia || []).map((c) => ({ ...c, id: novoId('cust') })),
     };
     setAssets((prev) => [novo, ...prev]);
+    const insercao = insertAssetDb(novo);
+    insercoesDeAtivo.current.set(novo.id, insercao);
     persistir(
-      insertAssetDb(novo),
+      insercao,
       () => setAssets((prev) => prev.filter((a) => a.id !== novo.id)),
       `Não foi possível cadastrar o ativo ${novo.tag}`
     );
     return novo;
+  };
+
+  // Fase 8: o anexo de um ativo recém-cadastrado espera a gravação do ativo terminar
+  const insercoesDeAtivo = useRef(new Map<string, Promise<unknown>>());
+
+  const anexarArquivoAtivo: AppContextType['anexarArquivoAtivo'] = async (ativoId, arquivo, categoria, vinculo) => {
+    try {
+      await insercoesDeAtivo.current.get(ativoId);
+      const anexo = await enviarAnexoAtivoDb(ativoId, arquivo, categoria, vinculo);
+      setAssets((prev) => prev.map((a) => (a.id === ativoId ? { ...a, anexos: [...(a.anexos || []), anexo] } : a)));
+      return true;
+    } catch (err) {
+      console.error('Anexo do ativo', err);
+      setDbErro(`Não foi possível anexar "${arquivo.name}": ${mensagemDeErro(err)}.`);
+      return false;
+    }
+  };
+
+  const removerAnexoAtivo = async (anexo: AnexoAtivo) => {
+    try {
+      await removerAnexoAtivoDb(anexo);
+      setAssets((prev) =>
+        prev.map((a) => (a.id === anexo.ativoId ? { ...a, anexos: (a.anexos || []).filter((x) => x.id !== anexo.id) } : a))
+      );
+      return true;
+    } catch (err) {
+      console.error('Remover anexo do ativo', err);
+      setDbErro(`Não foi possível remover "${anexo.nome}": ${mensagemDeErro(err)}.`);
+      return false;
+    }
   };
 
   const updateAsset = (id: string, updates: Partial<Asset>) => {
@@ -1653,6 +1697,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteDepartment,
         addAsset,
         updateAsset,
+        anexarArquivoAtivo,
+        removerAnexoAtivo,
         transferAssetCustody,
         addLicense,
         updateLicense,
