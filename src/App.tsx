@@ -8,6 +8,7 @@ import { AppProvider, useApp } from './context/AppContext.tsx';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
 import { LoginView } from './components/auth/LoginView.tsx';
+import { DefinirSenhaView } from './components/auth/DefinirSenhaView.tsx';
 import { DashboardView } from './components/dashboard/DashboardView.tsx';
 import { AssetsView } from './components/assets/AssetsView.tsx';
 import { CollaboratorsView } from './components/collaborators/CollaboratorsView.tsx';
@@ -49,6 +50,7 @@ function MainApp() {
     setSelectedAssetForQrCode,
     dbErro,
     limparDbErro,
+    precisaDefinirSenha,
   } = useApp();
 
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -89,6 +91,11 @@ function MainApp() {
         </div>
       </div>
     );
+  }
+
+  // Fase 3: aberto por link de convite/recuperação -> definir a senha primeiro
+  if (precisaDefinirSenha) {
+    return <DefinirSenhaView />;
   }
 
   // Se não estiver logado, exibe tela de login corporativo

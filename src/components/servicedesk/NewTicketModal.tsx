@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { TicketPriority, TicketAttachment } from '../../types/index.ts';
 import { X, Laptop, Paperclip, Send, AlertCircle, CheckCircle2, User } from 'lucide-react';
+import { enviarAnexoDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 
 interface NewTicketModalProps {
   onClose: () => void;
 }
 
 export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
-  const { currentUser, departments, assets, licenses, createTicket, setSelectedTicketIdForDetail } = useApp();
+  const { currentUser, supabaseUser, departments, assets, licenses, createTicket, setSelectedTicketIdForDetail } = useApp();
+  const [enviandoAnexo, setEnviandoAnexo] = useState(false);
+  const [erroAnexo, setErroAnexo] = useState<string | null>(null);
+  const [enviandoChamado, setEnviandoChamado] = useState(false);
 
   const [titulo, setTitulo] = useState('');
   const [categoria, setCategoria] = useState('Hardware / Equipamento');
@@ -16,7 +20,6 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
   const [objetoSelecionado, setObjetoSelecionado] = useState<string>('');
   const [descricao, setDescricao] = useState('');
   const [anexos, setAnexos] = useState<TicketAttachment[]>([]);
-  const [novoAnexoNome, setNovoAnexoNome] = useState('');
 
   if (!currentUser) return null;
 
@@ -29,18 +32,25 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
   const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(currentUser.id));
   const otherLicenses = licenses.filter((l) => !l.colaboradoresIds.includes(currentUser.id));
 
-  const handleAddAttachment = () => {
-    if (!novoAnexoNome.trim()) return;
-    const novo: TicketAttachment = {
-      id: `att-${Date.now()}`,
-      nome: novoAnexoNome.trim(),
-      url: 'https://images.unsplash.com/photo-1544652478-6653e09f18a2?auto=format&fit=crop&w=600&q=80',
-      tipo: 'image/jpeg',
-      tamanho: '850 KB',
-      dataUpload: new Date().toISOString(),
-    };
-    setAnexos([...anexos, novo]);
-    setNovoAnexoNome('');
+  // Fase 3 (MED-04): envio real para o Storage privado, com validação de tipo/tamanho
+  const handleSelecionarArquivos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivos = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (arquivos.length === 0) return;
+    setErroAnexo(null);
+    setEnviandoAnexo(true);
+    const enviados: TicketAttachment[] = [];
+    const erros: string[] = [];
+    for (const arquivo of arquivos) {
+      try {
+        enviados.push(await enviarAnexoDb(arquivo, supabaseUser?.id));
+      } catch (err) {
+        erros.push(mensagemDeErro(err));
+      }
+    }
+    setErroAnexo(erros.length ? erros.join(' ') : null);
+    setAnexos((prev) => [...prev, ...enviados]);
+    setEnviandoAnexo(false);
   };
 
   const handleRemoveAttachment = (attId: string) => {
@@ -62,6 +72,8 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
       softwareNome = licenses.find((l) => l.id === softwareId)?.nome;
     }
 
+    if (enviandoChamado || enviandoAnexo) return;
+    setEnviandoChamado(true);
     const created = await createTicket({
       tipo: 'suporte',
       solicitanteId: currentUser.id,
@@ -79,6 +91,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
       descricao: descricao.trim(),
       anexos,
     });
+    setEnviandoChamado(false);
     if (!created) return; // o modal fica aberto; o erro aparece no aviso global
 
     onClose();
@@ -162,7 +175,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                 <optgroup label="Minhas Licenças & Softwares em Uso (SaaS)">
                   {myLicenses.map((lic) => (
                     <option key={lic.id} value={`software:${lic.id}`}>
-                      🔑 {lic.nome} ({lic.fornecedor} - Contrato: {lic.chaveContrato})
+                      🔑 {lic.nome} ({lic.fornecedor})
                     </option>
                   ))}
                 </optgroup>
@@ -254,23 +267,25 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
               Anexos (Prints de erro, fotos do estado físico, logs)
             </label>
 
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={novoAnexoNome}
-                onChange={(e) => setNovoAnexoNome(e.target.value)}
-                placeholder="Nome do print ou foto (ex: print_erro_tela_azul.png)"
-                className="flex-1 text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
-              />
-              <button
-                type="button"
-                onClick={handleAddAttachment}
-                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1 shrink-0"
+            <div className="flex items-center gap-3">
+              <label
+                className={`px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer ${
+                  enviandoAnexo ? 'opacity-50 pointer-events-none' : ''
+                }`}
               >
                 <Paperclip className="w-3.5 h-3.5" />
-                Adicionar Anexo
-              </button>
+                {enviandoAnexo ? 'Enviando...' : 'Escolher arquivos'}
+                <input
+                  type="file"
+                  multiple
+                  accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
+                  onChange={handleSelecionarArquivos}
+                  className="sr-only"
+                />
+              </label>
+              <span className="text-[11px] text-slate-500">PDF, PNG, JPG, WEBP ou TXT · até 10 MB cada</span>
             </div>
+            {erroAnexo && <p className="text-[11px] text-rose-700">{erroAnexo}</p>}
 
             {anexos.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -304,7 +319,8 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+              disabled={enviandoChamado || enviandoAnexo}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
               Enviar Chamado para T.I.

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
+import { MeusDadosModal } from '../lgpd/MeusDadosModal.tsx';
 import {
   Shield,
   User,
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
     resetToInitialData,
   } = useApp();
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
+  const [showMeusDados, setShowMeusDados] = useState(false);
 
   const viewTitles: Record<string, string> = {
     dashboard: 'Painel Geral',
@@ -131,6 +133,17 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
                   type="button"
                   onClick={() => {
                     setShowSwitchMenu(false);
+                    setShowMeusDados(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-50 transition-colors font-medium text-left"
+                >
+                  <Shield className="w-4 h-4 text-slate-500" />
+                  <span>Meus dados (LGPD)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSwitchMenu(false);
                     logout();
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-600 hover:bg-rose-50 transition-colors font-medium text-left"
@@ -143,6 +156,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
           )}
         </div>
       </div>
+      {showMeusDados && <MeusDadosModal onClose={() => setShowMeusDados(false)} />}
     </header>
   );
 };

@@ -70,6 +70,8 @@ async function excluir(tabela: string, id: string, chave = 'id') {
 export function mensagemDeErro(err: unknown): string {
   const e = err as { code?: string; message?: string };
   switch (e?.code) {
+    case 'validacao':
+      return e.message || 'arquivo inválido';
     case '42501':
       return 'sem permissão para esta ação';
     case '23505':
@@ -634,6 +636,94 @@ export async function saveSettingsDb(st: CompanySettings) {
       .select('id')
   );
   if (!data || (data as unknown[]).length === 0) throw new DbError(SEM_PERMISSAO, '42501');
+}
+
+// ---------------------------------------------------------------------------
+// 7b. Arquivos no Storage privado (Fase 3 · MED-04)
+// ---------------------------------------------------------------------------
+const BUCKET = 'documentos';
+export const TIPOS_ARQUIVO_ACEITOS = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/plain'];
+export const TAMANHO_MAXIMO_ARQUIVO = 10 * 1024 * 1024;
+
+/** Valida tipo e tamanho antes de enviar (o bucket valida de novo no servidor) */
+export function validarArquivo(arquivo: File): string | null {
+  if (!TIPOS_ARQUIVO_ACEITOS.includes(arquivo.type)) {
+    return `"${arquivo.name}": tipo não aceito. Envie PDF, PNG, JPG, WEBP ou TXT.`;
+  }
+  if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) {
+    return `"${arquivo.name}": maior que 10 MB.`;
+  }
+  return null;
+}
+
+const nomeSeguro = (nome: string) =>
+  nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+
+export const formatarTamanho = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+async function enviar(caminho: string, arquivo: File) {
+  if (!supabase) return;
+  await checar(
+    supabase.storage.from(BUCKET).upload(caminho, arquivo, { contentType: arquivo.type, upsert: false })
+  );
+}
+
+/** Anexo de chamado: vai para a pasta da própria pessoa (usuarios/<uid>/...) */
+export async function enviarAnexoDb(arquivo: File, authUserId: string | undefined) {
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new DbError(erro, 'validacao');
+  const id = `att-${crypto.randomUUID()}`;
+  const base = {
+    id,
+    nome: arquivo.name,
+    tipo: arquivo.type,
+    tamanho: formatarTamanho(arquivo.size),
+    dataUpload: new Date().toISOString(),
+  };
+  if (!supabase || !authUserId) {
+    // Modo demonstração: arquivo só no navegador
+    return { ...base, url: URL.createObjectURL(arquivo) };
+  }
+  const caminho = `usuarios/${authUserId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
+  await enviar(caminho, arquivo);
+  return { ...base, url: '', caminho };
+}
+
+/** Termo assinado: só TI envia (termos/<termo_id>/...); devolve o caminho */
+export async function enviarTermoAssinadoDb(termoId: string, arquivo: File): Promise<string> {
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new DbError(erro, 'validacao');
+  if (!supabase) return URL.createObjectURL(arquivo);
+  const caminho = `termos/${termoId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
+  await enviar(caminho, arquivo);
+  return caminho;
+}
+
+/** Gera um link temporário (5 min) para um arquivo do Storage, respeitando a RLS */
+export async function linkTemporarioDb(caminhoOuUrl: string): Promise<string> {
+  if (!supabase || /^(https?:|blob:)/.test(caminhoOuUrl)) return caminhoOuUrl;
+  const data = await checar(supabase.storage.from(BUCKET).createSignedUrl(caminhoOuUrl, 300));
+  return (data as { signedUrl: string }).signedUrl;
+}
+
+// ---------------------------------------------------------------------------
+// 7c. Processos (Fase 3): offboarding automático e LGPD
+// ---------------------------------------------------------------------------
+export interface ResumoOffboarding {
+  colaboradorId: string;
+  ativosDevolvidos: number;
+  licencasLiberadas: number;
+}
+
+export async function concluirOffboardingDb(chamadoId: string): Promise<ResumoOffboarding | null> {
+  if (!supabase) return null;
+  return (await checar(supabase.rpc('concluir_offboarding', { p_chamado: chamadoId }))) as ResumoOffboarding;
+}
+
+export async function anonimizarColaboradorDb(colaboradorId: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('anonimizar_colaborador', { p_colaborador: colaboradorId }));
 }
 
 // ---------------------------------------------------------------------------

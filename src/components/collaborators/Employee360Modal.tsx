@@ -35,9 +35,26 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     createTerm,
     currentUser,
     currentRole,
+    anonimizarColaborador,
   } = useApp();
 
   const [termSuccess, setTermSuccess] = useState<string | null>(null);
+  const [anonimizando, setAnonimizando] = useState(false);
+
+  // Fase 3 · LGPD: só ti_admin, só desligados; preserva a trilha sem identificar a pessoa
+  const handleAnonimizar = async () => {
+    if (!employee) return;
+    const ok = window.confirm(
+      `Anonimizar os dados pessoais de ${employee.nome}?\n\n` +
+        'Nome, e-mail, matrícula e telefone serão substituídos em todo o sistema (cadastro, histórico, chamados e termos). ' +
+        'O histórico de equipamentos e chamados continua existindo, sem identificar a pessoa.\n\nNão é possível desfazer.'
+    );
+    if (!ok) return;
+    setAnonimizando(true);
+    const feito = await anonimizarColaborador(employee.id);
+    setAnonimizando(false);
+    if (feito) setTermSuccess('Dados pessoais anonimizados. O histórico foi preservado sem identificação.');
+  };
 
   const employee = employees.find((e) => e.id === employeeId);
 
@@ -166,7 +183,17 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </div>
 
           <div className="flex items-center gap-2">
-            {(currentRole === 'ti_admin' || currentRole === 'ti_suporte') && (
+            {currentRole === 'ti_admin' && employee.status === 'desligado' && !employee.email.endsWith('@anonimizado.invalid') && (
+              <button
+                type="button"
+                onClick={handleAnonimizar}
+                disabled={anonimizando}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
+              >
+                {anonimizando ? 'Anonimizando...' : 'Anonimizar dados (LGPD)'}
+              </button>
+            )}
+            {(currentRole === 'ti_admin' || currentRole === 'ti_suporte') && employee.status !== 'desligado' && (
               <button
                 type="button"
                 onClick={() => handleGenerateTerm('entrega')}

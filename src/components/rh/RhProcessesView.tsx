@@ -159,6 +159,7 @@ export const RhProcessesView: React.FC = () => {
       } licença(s) ativa(s). ${observacoesOff}`,
       anexos: [],
       offboarding: {
+        colaboradorId: selectedColaborador.id, // Fase 3: usado na conclusão automática
         dataDesligamento,
         redirecionarEmail,
         redirecionarEmailParaId: destinatarioEmailId || undefined,

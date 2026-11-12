@@ -28,6 +28,10 @@ import {
   signInWithGoogleSupabase,
   signInWithPasswordSupabase,
   signOutSupabase,
+  solicitarRecuperacaoSenhaSupabase,
+  definirSenhaSupabase,
+  tipoLinkAuth,
+  erroLinkAuth,
   SupabaseAuthUser,
 } from '../services/supabase.ts';
 
@@ -63,6 +67,9 @@ import {
   insertCustodyEntryDb,
   updateCustodyEntryDb,
   mensagemDeErro,
+  concluirOffboardingDb,
+  anonimizarColaboradorDb,
+  ResumoOffboarding,
   SupabaseHealthStatus,
 } from '../services/supabaseDb.ts';
 
@@ -140,6 +147,15 @@ interface AppContextType {
     term: Omit<ResponsibilityTerm, 'id' | 'codigo' | 'dataEmissao'>
   ) => Promise<ResponsibilityTerm | null>;
   markTermSigned: (termId: string, arquivoUrl?: string) => void;
+
+  // Fase 3 · Processos
+  concluirOffboarding: (ticketId: string) => Promise<ResumoOffboarding | null>;
+  anonimizarColaborador: (employeeId: string) => Promise<boolean>;
+  precisaDefinirSenha: boolean;
+  tipoLinkSenha: 'recovery' | 'invite' | null;
+  erroLinkAuth: string | null;
+  solicitarRecuperacaoSenha: (email: string) => Promise<{ success: boolean; error?: string }>;
+  definirNovaSenha: (senha: string) => Promise<{ success: boolean; error?: string }>;
 
   // Configurações e Reset
   updateSettings: (updates: Partial<CompanySettings>) => void;
@@ -270,6 +286,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Em produção, a tela fica em "carregando" até o Supabase dizer se há sessão
   const [authLoading, setAuthLoading] = useState<boolean>(isSupabaseConfigured);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Fase 3: aberto por link de convite/recuperação -> pedir nova senha antes de tudo
+  const [precisaDefinirSenha, setPrecisaDefinirSenha] = useState<boolean>(Boolean(tipoLinkAuth));
+  const [tipoLinkSenha, setTipoLinkSenha] = useState<'recovery' | 'invite' | null>(
+    tipoLinkAuth as 'recovery' | 'invite' | null
+  );
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     if (isProduction) return null;
@@ -407,6 +428,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (!session?.user) {
         limparEstado();
+        setAuthLoading(false);
+        return;
+      }
+
+      // Link de recuperação/convite: a pessoa define a senha primeiro; os dados
+      // carregam depois (a página recarrega ao salvar a senha).
+      if (event === 'PASSWORD_RECOVERY' || tipoLinkAuth) {
+        setTipoLinkSenha(event === 'PASSWORD_RECOVERY' ? 'recovery' : (tipoLinkAuth as 'recovery' | 'invite'));
+        setPrecisaDefinirSenha(true);
         setAuthLoading(false);
         return;
       }
@@ -993,6 +1023,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     persistir(updateTermDb(antes, depois), () => setTerms((prev) => trocar(prev, antes)), `Não foi possível registrar a assinatura de ${antes.codigo}`);
   };
 
+  // ---------------------------------------------------------------------------
+  // Fase 3 · Offboarding automático e LGPD
+  // ---------------------------------------------------------------------------
+  const concluirOffboarding = async (ticketId: string): Promise<ResumoOffboarding | null> => {
+    const tkt = tickets.find((t) => t.id === ticketId);
+    const colabId = tkt?.offboarding?.colaboradorId;
+    if (!tkt || !colabId) return null;
+
+    if (isProduction) {
+      try {
+        // Uma transação no banco: devolve ativos, libera licenças, desliga e resolve
+        const resumo = await concluirOffboardingDb(ticketId);
+        await loadDataFromSupabase();
+        return resumo;
+      } catch (err) {
+        console.error('Erro ao concluir offboarding', err);
+        setDbErro(`Não foi possível concluir o desligamento: ${mensagemDeErro(err)}.`);
+        return null;
+      }
+    }
+
+    // Modo demonstração: mesma regra, só na memória
+    const hoje = new Date().toISOString().split('T')[0];
+    const ativosDoColab = assets.filter((a) => a.custodianteId === colabId);
+    const licsDoColab = licenses.filter((l) => l.colaboradoresIds.includes(colabId));
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.custodianteId !== colabId
+          ? a
+          : {
+              ...a,
+              custodianteId: undefined,
+              status: 'disponivel',
+              dataEntregaAtual: undefined,
+              historicoCustodia: a.historicoCustodia.map((h) =>
+                h.colaboradorId === colabId && !h.dataDevolucao
+                  ? { ...h, dataDevolucao: hoje, motivoDevolucao: `Devolução por desligamento (${tkt.codigo})` }
+                  : h
+              ),
+            }
+      )
+    );
+    setLicenses((prev) =>
+      prev.map((l) => {
+        if (!l.colaboradoresIds.includes(colabId)) return l;
+        const ids = l.colaboradoresIds.filter((x) => x !== colabId);
+        return { ...l, colaboradoresIds: ids, assentosAlocados: ids.length };
+      })
+    );
+    setEmployees((prev) => prev.map((e) => (e.id === colabId ? { ...e, status: 'desligado' } : e)));
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.id !== ticketId || !t.offboarding
+          ? t
+          : {
+              ...t,
+              status: 'resolvido',
+              offboarding: { ...t.offboarding, checklist: t.offboarding.checklist.map((c) => ({ ...c, concluido: true })) },
+            }
+      )
+    );
+    return { colaboradorId: colabId, ativosDevolvidos: ativosDoColab.length, licencasLiberadas: licsDoColab.length };
+  };
+
+  const anonimizarColaborador = async (employeeId: string): Promise<boolean> => {
+    if (isProduction) {
+      try {
+        await anonimizarColaboradorDb(employeeId);
+        await loadDataFromSupabase();
+        return true;
+      } catch (err) {
+        console.error('Erro ao anonimizar', err);
+        setDbErro(`Não foi possível anonimizar: ${mensagemDeErro(err)}.`);
+        return false;
+      }
+    }
+    const rotulo = 'Titular anonimizado';
+    setEmployees((prev) =>
+      prev.map((e) =>
+        e.id === employeeId
+          ? { ...e, nome: rotulo, email: `anonimizado.${e.id}@anonimizado.invalid`, telefone: undefined, avatarUrl: undefined }
+          : e
+      )
+    );
+    return true;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Fase 3 · Senha (recuperação e convite)
+  // ---------------------------------------------------------------------------
+  const solicitarRecuperacaoSenha = async (email: string) => {
+    const res = await solicitarRecuperacaoSenhaSupabase(email);
+    return res.error ? { success: false, error: res.error } : { success: true };
+  };
+
+  const definirNovaSenha = async (senha: string) => {
+    const res = await definirSenhaSupabase(senha);
+    if (res.error) return { success: false, error: res.error };
+    setPrecisaDefinirSenha(false);
+    // Recarrega sem o link na URL: a sessão segue ativa e o fluxo normal carrega os dados
+    window.location.replace(window.location.origin);
+    return { success: true };
+  };
+
   const updateSettings = (updates: Partial<CompanySettings>) => {
     const antes = settings;
     const depois = { ...settings, ...updates };
@@ -1080,6 +1214,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authError,
         dbErro,
         limparDbErro: () => setDbErro(null),
+        concluirOffboarding,
+        anonimizarColaborador,
+        precisaDefinirSenha,
+        tipoLinkSenha,
+        erroLinkAuth,
+        solicitarRecuperacaoSenha,
+        definirNovaSenha,
         loginWithGoogle,
         currentUser,
         currentRole,
