@@ -56,6 +56,79 @@ export type Database = {
         }
         Relationships: []
       }
+      ativo_baixas: {
+        Row: {
+          ativo_id: string
+          criado_em: string
+          criado_por: string | null
+          data_baixa: string
+          destinatario: string | null
+          destino: string
+          documento: string | null
+          estornada_em: string | null
+          estornada_por: string | null
+          id: string
+          motivo: string
+          motivo_estorno: string | null
+          observacoes: string | null
+          valor_venda: number | null
+        }
+        Insert: {
+          ativo_id: string
+          criado_em?: string
+          criado_por?: string | null
+          data_baixa?: string
+          destinatario?: string | null
+          destino: string
+          documento?: string | null
+          estornada_em?: string | null
+          estornada_por?: string | null
+          id?: string
+          motivo: string
+          motivo_estorno?: string | null
+          observacoes?: string | null
+          valor_venda?: number | null
+        }
+        Update: {
+          ativo_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          data_baixa?: string
+          destinatario?: string | null
+          destino?: string
+          documento?: string | null
+          estornada_em?: string | null
+          estornada_por?: string | null
+          id?: string
+          motivo?: string
+          motivo_estorno?: string | null
+          observacoes?: string | null
+          valor_venda?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ativo_baixas_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ativo_baixas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ativo_baixas_estornada_por_fkey"
+            columns: ["estornada_por"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ativos: {
         Row: {
           categoria: string
@@ -839,6 +912,115 @@ export type Database = {
           },
         ]
       }
+      manutencoes: {
+        Row: {
+          aberta_em: string
+          ativo_id: string
+          chamado_id: string | null
+          coberto_garantia: boolean
+          concluida_em: string | null
+          contrato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          custo: number
+          descricao: string
+          encerrado_em: string | null
+          encerrado_por: string | null
+          fornecedor_id: string | null
+          id: string
+          numero_os: string | null
+          observacoes: string | null
+          previsao: string | null
+          status: string
+          tipo: string
+        }
+        Insert: {
+          aberta_em?: string
+          ativo_id: string
+          chamado_id?: string | null
+          coberto_garantia?: boolean
+          concluida_em?: string | null
+          contrato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          custo?: number
+          descricao: string
+          encerrado_em?: string | null
+          encerrado_por?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          numero_os?: string | null
+          observacoes?: string | null
+          previsao?: string | null
+          status?: string
+          tipo: string
+        }
+        Update: {
+          aberta_em?: string
+          ativo_id?: string
+          chamado_id?: string | null
+          coberto_garantia?: boolean
+          concluida_em?: string | null
+          contrato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          custo?: number
+          descricao?: string
+          encerrado_em?: string | null
+          encerrado_por?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          numero_os?: string | null
+          observacoes?: string | null
+          previsao?: string | null
+          status?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manutencoes_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manutencoes_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "chamados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manutencoes_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manutencoes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manutencoes_encerrado_por_fkey"
+            columns: ["encerrado_por"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manutencoes_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       termos_responsabilidade: {
         Row: {
           aceite_colaborador_em: string | null
@@ -1221,6 +1403,19 @@ export type Database = {
       revogar_licenca: {
         Args: { p_colaborador: string; p_licenca: string }
         Returns: Json
+      }
+      abrir_manutencao: {
+        Args: { p_ativo: string; p_dados: Json }
+        Returns: string
+      }
+      baixar_ativo: { Args: { p_ativo: string; p_dados: Json }; Returns: string }
+      encerrar_manutencao: {
+        Args: { p_dados?: Json; p_manutencao: string; p_status: string }
+        Returns: undefined
+      }
+      estornar_baixa: {
+        Args: { p_baixa: string; p_motivo: string }
+        Returns: undefined
       }
     }
     Enums: {

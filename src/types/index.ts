@@ -72,14 +72,77 @@ export interface CustodyHistoryEntry {
   observacoes?: string;
 }
 
-export interface MaintenanceEntry {
+// -----------------------------------------------------------------------------
+// Fase 8 · Manutenção e baixa patrimonial (só a T.I. lê; o colaborador vê só o status)
+// -----------------------------------------------------------------------------
+export type TipoManutencao = 'corretiva' | 'preventiva' | 'upgrade' | 'garantia';
+export type StatusManutencao = 'em_andamento' | 'concluida' | 'cancelada';
+
+export interface Manutencao {
   id: string;
-  data: string;
+  ativoId: string;
+  tipo: TipoManutencao;
   descricao: string;
-  fornecedor: string;
+  numeroOs?: string;
+  fornecedorId?: string; // vazio = feita pela própria T.I.
+  contratoId?: string; // contrato que cobre o serviço
+  chamadoId?: string; // chamado de origem
+  abertaEm: string;
+  previsao?: string;
+  concluidaEm?: string;
   custo: number;
-  status: 'concluido' | 'em_andamento';
+  cobertoGarantia: boolean;
+  status: StatusManutencao;
+  observacoes?: string;
+  criadoPor?: string; // quem abriu (carimbado pelo banco)
+  criadoEm: string;
+  encerradoPor?: string; // quem concluiu ou cancelou
+  encerradoEm?: string;
 }
+
+/** O que o formulário informa ao abrir ou registrar uma manutenção */
+export type DadosManutencao = Pick<
+  Manutencao,
+  | 'tipo'
+  | 'descricao'
+  | 'numeroOs'
+  | 'fornecedorId'
+  | 'contratoId'
+  | 'chamadoId'
+  | 'abertaEm'
+  | 'previsao'
+  | 'custo'
+  | 'cobertoGarantia'
+  | 'observacoes'
+>;
+
+/** Conclusão ou cancelamento: data, custo final e observação (todos opcionais) */
+export type DadosEncerramentoManutencao = Partial<Pick<Manutencao, 'concluidaEm' | 'custo' | 'observacoes'>>;
+
+export type MotivoBaixa = 'obsoleto' | 'defeito' | 'perda' | 'roubo_furto' | 'sinistro' | 'devolucao_locadora' | 'outro';
+export type DestinoBaixa = 'doacao' | 'venda' | 'descarte' | 'reciclagem' | 'devolucao_locadora' | 'nao_se_aplica';
+
+export interface BaixaAtivo {
+  id: string;
+  ativoId: string;
+  dataBaixa: string;
+  motivo: MotivoBaixa;
+  destino: DestinoBaixa;
+  destinatario?: string;
+  valorVenda?: number; // só quando o destino é venda
+  documento?: string; // laudo, certificado de descarte, BO...
+  observacoes?: string;
+  criadoPor?: string; // quem registrou (carimbado pelo banco)
+  criadoEm: string;
+  estornadaEm?: string;
+  estornadaPor?: string;
+  motivoEstorno?: string;
+}
+
+export type DadosBaixa = Pick<
+  BaixaAtivo,
+  'dataBaixa' | 'motivo' | 'destino' | 'destinatario' | 'valorVenda' | 'documento' | 'observacoes'
+>;
 
 export interface Asset {
   id: string;
@@ -103,7 +166,8 @@ export interface Asset {
   fornecedorId?: string; // Fase 8: vínculo com o cadastro de fornecedores
   anexos?: AnexoAtivo[]; // Fase 8: só a TI recebe
   historicoCustodia: CustodyHistoryEntry[];
-  historicoManutencao: MaintenanceEntry[];
+  historicoManutencao: Manutencao[]; // Fase 8: só a T.I. recebe
+  baixas?: BaixaAtivo[]; // Fase 8: vigente e estornadas (só a T.I. recebe)
 }
 
 export interface SoftwareLicense {

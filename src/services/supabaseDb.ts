@@ -4,7 +4,16 @@ import type { Json, Tables, TablesInsert } from '../types/database.types.ts';
 import {
   AnexoAtivo,
   Asset,
+  BaixaAtivo,
   CategoriaAnexoAtivo,
+  DadosBaixa,
+  DadosEncerramentoManutencao,
+  DadosManutencao,
+  DestinoBaixa,
+  Manutencao,
+  MotivoBaixa,
+  StatusManutencao,
+  TipoManutencao,
   AssetCategory,
   AssetStatus,
   CatalogoItem,
@@ -131,6 +140,13 @@ const MENSAGEM_DA_REGRA: Record<string, string> = {
   chk_fatura_competencia: 'A competência deve ser o primeiro dia do mês',
   uq_fatura_licenca_comp: 'Já existe fatura não cancelada para esta competência',
   uq_fatura_contrato_comp: 'Já existe fatura não cancelada para esta competência',
+  uq_manutencao_aberta: 'O ativo já tem uma manutenção em andamento',
+  manutencoes_custo_check: 'O custo da manutenção não pode ser negativo',
+  manutencoes_descricao_check: 'Descreva o problema ou o serviço',
+  chk_manutencao_conclusao: 'Manutenção concluída precisa da data de conclusão',
+  uq_baixa_vigente: 'O ativo já está baixado',
+  chk_baixa_venda: 'O valor de venda só vale quando o destino é venda',
+  ativo_baixas_valor_venda_check: 'O valor de venda não pode ser negativo',
 };
 
 // Exclusão recusada por vínculo (23503), conforme a tabela de onde se tentou excluir
@@ -403,11 +419,24 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     if (s.bitlocker_key) bitlockerByAssetId[s.ativo_id] = s.bitlocker_key;
   });
 
-  // Fase 8: anexos (só TI; antes da migration a tabela não existe e a lista fica vazia)
-  const { data: anexosData } = await supabase.from('ativo_anexos').select('*').order('criado_em');
+  // Fase 8: anexos, manutenções e baixas (só TI; para os demais a RLS devolve vazio, e
+  // antes da migration as tabelas não existem: o erro é ignorado e as listas ficam vazias)
+  const [{ data: anexosData }, { data: manutencoesData }, { data: baixasData }] = await Promise.all([
+    supabase.from('ativo_anexos').select('*').order('criado_em'),
+    supabase.from('manutencoes').select('*').order('aberta_em'),
+    supabase.from('ativo_baixas').select('*').order('criado_em'),
+  ]);
   const anexosPorAtivo: Record<string, AnexoAtivo[]> = {};
   (anexosData || []).forEach((l) => {
     (anexosPorAtivo[l.ativo_id] ||= []).push(anexoAtivoDeLinha(l));
+  });
+  const manutencoesPorAtivo: Record<string, Manutencao[]> = {};
+  (manutencoesData || []).forEach((l) => {
+    (manutencoesPorAtivo[l.ativo_id] ||= []).push(manutencaoDeLinha(l));
+  });
+  const baixasPorAtivo: Record<string, BaixaAtivo[]> = {};
+  (baixasData || []).forEach((l) => {
+    (baixasPorAtivo[l.ativo_id] ||= []).push(baixaDeLinha(l));
   });
 
   const custodyByAssetId: Record<string, CustodyHistoryEntry[]> = {};
@@ -446,8 +475,134 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     fornecedorId: a.fornecedor_id || undefined,
     anexos: anexosPorAtivo[a.id] || [],
     historicoCustodia: custodyByAssetId[a.id] || [],
-    historicoManutencao: [],
+    historicoManutencao: manutencoesPorAtivo[a.id] || [],
+    baixas: baixasPorAtivo[a.id] || [],
   })) : [];
+}
+
+// ---------------------------------------------------------------------------
+// 3a. Fase 8 · Manutenções e baixa patrimonial (só a T.I., pela RLS).
+// Enviar para manutenção, concluir/cancelar, dar baixa e estornar passam pelas
+// funções do banco, que mudam o status e a custódia do ativo na mesma
+// transação. "Manutenção já feita" é um INSERT direto (não muda o status).
+// ---------------------------------------------------------------------------
+const manutencaoDeLinha = (l: Tables<'manutencoes'>): Manutencao => ({
+  id: l.id,
+  ativoId: l.ativo_id,
+  tipo: l.tipo as TipoManutencao,
+  descricao: l.descricao,
+  numeroOs: l.numero_os || undefined,
+  fornecedorId: l.fornecedor_id || undefined,
+  contratoId: l.contrato_id || undefined,
+  chamadoId: l.chamado_id || undefined,
+  abertaEm: l.aberta_em,
+  previsao: l.previsao || undefined,
+  concluidaEm: l.concluida_em || undefined,
+  custo: Number(l.custo) || 0,
+  cobertoGarantia: l.coberto_garantia,
+  status: l.status as StatusManutencao,
+  observacoes: l.observacoes || undefined,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+  encerradoPor: l.encerrado_por || undefined,
+  encerradoEm: l.encerrado_em || undefined,
+});
+
+const baixaDeLinha = (l: Tables<'ativo_baixas'>): BaixaAtivo => ({
+  id: l.id,
+  ativoId: l.ativo_id,
+  dataBaixa: l.data_baixa,
+  motivo: l.motivo as MotivoBaixa,
+  destino: l.destino as DestinoBaixa,
+  destinatario: l.destinatario || undefined,
+  valorVenda: l.valor_venda ?? undefined,
+  documento: l.documento || undefined,
+  observacoes: l.observacoes || undefined,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+  estornadaEm: l.estornada_em || undefined,
+  estornadaPor: l.estornada_por || undefined,
+  motivoEstorno: l.motivo_estorno || undefined,
+});
+
+// Campos da manutenção nos nomes das colunas (texto vazio vira nulo, como nas funções do banco)
+const colunasManutencao = (d: DadosManutencao) => ({
+  tipo: d.tipo,
+  descricao: d.descricao.trim(),
+  numero_os: d.numeroOs?.trim() || null,
+  fornecedor_id: d.fornecedorId || null,
+  contrato_id: d.contratoId || null,
+  chamado_id: d.chamadoId || null,
+  aberta_em: d.abertaEm,
+  previsao: d.previsao || null,
+  custo: d.custo,
+  coberto_garantia: d.cobertoGarantia,
+  observacoes: d.observacoes?.trim() || null,
+});
+
+/** Envia o ativo para manutenção (grava e muda o status); devolve o id da manutenção */
+export async function abrirManutencaoDb(ativoId: string, dados: DadosManutencao): Promise<string> {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const id = await checar(supabase.rpc('abrir_manutencao', { p_ativo: ativoId, p_dados: json(colunasManutencao(dados)) }));
+  return id as string;
+}
+
+/** Lança no histórico uma manutenção já concluída, sem mexer no status do ativo */
+export async function registrarManutencaoFeitaDb(
+  ativoId: string,
+  dados: DadosManutencao & { concluidaEm: string }
+): Promise<string> {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const linha: TablesInsert<'manutencoes'> = {
+    ...colunasManutencao(dados),
+    ativo_id: ativoId,
+    concluida_em: dados.concluidaEm,
+    status: 'concluida',
+  };
+  const data = await checar(supabase.from('manutencoes').insert(linha).select('id').single());
+  return (data as { id: string }).id;
+}
+
+/** Conclui ou cancela: o banco devolve o ativo para "em uso" ou "disponível" */
+export async function encerrarManutencaoDb(
+  manutencaoId: string,
+  status: 'concluida' | 'cancelada',
+  dados: DadosEncerramentoManutencao
+) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('encerrar_manutencao', {
+      p_manutencao: manutencaoId,
+      p_status: status,
+      p_dados: json({ concluida_em: dados.concluidaEm, custo: dados.custo, observacoes: dados.observacoes }),
+    })
+  );
+}
+
+/** Baixa patrimonial (só ti_admin); devolve o id da baixa */
+export async function baixarAtivoDb(ativoId: string, dados: DadosBaixa): Promise<string> {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const id = await checar(
+    supabase.rpc('baixar_ativo', {
+      p_ativo: ativoId,
+      p_dados: json({
+        data_baixa: dados.dataBaixa,
+        motivo: dados.motivo,
+        destino: dados.destino,
+        destinatario: dados.destinatario,
+        valor_venda: dados.destino === 'venda' ? dados.valorVenda : undefined,
+        documento: dados.documento,
+        observacoes: dados.observacoes,
+      }),
+    })
+  );
+  return id as string;
+}
+
+/** Estorno da baixa (só ti_admin): o registro fica e o ativo volta ao estoque */
+export async function estornarBaixaDb(baixaId: string, motivo: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('estornar_baixa', { p_baixa: baixaId, p_motivo: motivo }));
 }
 
 type LinhaAnexoAtivo = Tables<'ativo_anexos'>;

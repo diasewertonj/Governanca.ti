@@ -659,7 +659,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                     <div>
                       <p className="font-semibold text-slate-900">{man.descricao}</p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {formatDate(man.data)} · Fornecedor: {man.fornecedor}
+                        {formatDate(man.abertaEm)} · Fornecedor:{' '}
+                        {fornecedores.find((f) => f.id === man.fornecedorId)?.nome || 'T.I. interna'}
                       </p>
                     </div>
                     <span className="font-semibold text-slate-800 font-mono">

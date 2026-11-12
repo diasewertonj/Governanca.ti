@@ -70,6 +70,14 @@ export function contratosQueCobrem(ativoId: string, contratos: Contrato[], agora
     .sort((a, b) => (b.fim as string).localeCompare(a.fim as string));
 }
 
+/**
+ * Contratos vigentes de qualquer tipo (suporte, manutenção, locação...) que têm
+ * o ativo entre os itens: as opções de "contrato que cobre" numa manutenção.
+ */
+export function contratosVigentesDoAtivo(ativoId: string, contratos: Contrato[], agora: Date = new Date()): Contrato[] {
+  return contratos.filter((c) => contratoVigente(c, agora) && c.itens.some((i) => i.ativoId === ativoId));
+}
+
 /** Fim da cobertura: a data maior entre a garantia de fábrica e os contratos que cobrem o ativo */
 export function fimCoberturaEfetiva(
   asset: Pick<Asset, 'id' | 'fiscal'>,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Contrato } from '../types/index.ts';
 import {
   contratosQueCobrem,
+  contratosVigentesDoAtivo,
   contratoVigente,
   diferencaItens,
   fimCoberturaEfetiva,
@@ -89,6 +90,17 @@ describe('cobertura efetiva do ativo', () => {
     const lista = [contrato({ id: 'x', fim: '2027-01-31' }), contrato({ id: 'y', tipo: 'garantia_estendida', fim: '2028-03-31' })];
     expect(contratosQueCobrem('ast-1', lista, agora).map((c) => c.id)).toEqual(['y', 'x']);
     expect(fimCoberturaEfetiva(ativo(''), lista, agora)).toBe('2028-03-31');
+  });
+
+  it('na manutenção, servem os contratos vigentes de qualquer tipo que têm o ativo, com ou sem fim', () => {
+    const lista = [
+      contrato({ id: 'a', tipo: 'locacao' }),
+      contrato({ id: 'b', tipo: 'manutencao', fim: undefined }),
+      contrato({ id: 'c', fim: '2026-11-01' }),
+      contrato({ id: 'd', inicio: '2026-12-01' }),
+      contrato({ id: 'e', itens: [{ ativoId: 'ast-2' }] }),
+    ];
+    expect(contratosVigentesDoAtivo('ast-1', lista, agora).map((c) => c.id)).toEqual(['a', 'b']);
   });
 });
 
