@@ -323,7 +323,7 @@ export const SettingsView: React.FC = () => {
         </div>
 
         {/* Fase 7: abas com rolagem lateral no celular */}
-        <div role="tablist" aria-label="Seções das configurações" className="flex gap-1 p-1 bg-slate-100 rounded-lg overflow-x-auto">
+        <div role="tablist" aria-label="Seções das configurações" className="flex gap-1 p-1 bg-slate-100 rounded-lg flex-wrap">
           {ABAS.map((a) => (
             <button
               key={a.id}
