@@ -394,6 +394,7 @@ export const AssetsView: React.FC = () => {
                           {warranty.status === 'expirada' && (
                             <span className="text-slate-500 text-xs">Expirada</span>
                           )}
+                          {warranty.status === 'sem_data' && <span className="text-slate-500 text-xs">Sem data</span>}
                         </td>
 
                         {/* Ações */}

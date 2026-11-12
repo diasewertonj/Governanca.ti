@@ -482,7 +482,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                     {warranty.label}
                   </span>
                 )}
-                {warranty.status === 'expirada' && (
+                {(warranty.status === 'expirada' || warranty.status === 'sem_data') && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-md border border-slate-200">
                     <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
                     {warranty.label}

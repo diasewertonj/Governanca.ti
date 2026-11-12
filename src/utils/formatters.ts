@@ -65,27 +65,35 @@ export const formatDateTime = (dateString?: string): string => {
 };
 
 export interface WarrantyStatus {
-  status: 'valida' | 'expirando' | 'expirada';
+  status: 'valida' | 'expirando' | 'expirada' | 'sem_data';
   label: string;
   diasRestantes: number;
 }
 
-export const getWarrantyStatus = (dataGarantia?: string): WarrantyStatus => {
+/** Dias de antecedência do alerta de garantia */
+export const DIAS_ALERTA_GARANTIA = 30;
+
+/**
+ * 'AAAA-MM-DD' como data local. `new Date('AAAA-MM-DD')` é lido em UTC e,
+ * no Brasil, vira o dia anterior (a contagem ficava com 1 dia a menos).
+ */
+export const dataLocal = (iso: string): Date => {
+  const [ano, mes, dia] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(ano, (mes || 1) - 1, dia || 1);
+};
+
+export const getWarrantyStatus = (dataGarantia?: string, agora: Date = new Date()): WarrantyStatus => {
   if (!dataGarantia) {
-    return { status: 'expirada', label: 'Sem garantia', diasRestantes: 0 };
+    return { status: 'sem_data', label: 'Sem data de garantia', diasRestantes: 0 };
   }
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const dataFinal = new Date(dataGarantia);
-  dataFinal.setHours(0, 0, 0, 0);
-
-  const diffTime = dataFinal.getTime() - hoje.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  // round: absorve a hora a mais/a menos de um eventual horário de verão
+  const diffDays = Math.round((dataLocal(dataGarantia).getTime() - hoje.getTime()) / 86_400_000);
 
   if (diffDays < 0) {
     return { status: 'expirada', label: 'Garantia expirada', diasRestantes: diffDays };
-  } else if (diffDays <= 30) {
+  } else if (diffDays <= DIAS_ALERTA_GARANTIA) {
     return {
       status: 'expirando',
       label: `Expira em ${diffDays} dias`,

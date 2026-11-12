@@ -29,6 +29,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
   // Garantias expirando nos próximos 30 dias
   const expiringWarranties = assets.filter((a) => {
+    if (a.status === 'descartado') return false;
     const w = getWarrantyStatus(a.fiscal?.dataGarantia);
     return w.status === 'expirando';
   });
