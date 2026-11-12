@@ -66,9 +66,12 @@ export function proximaCompetencia(
   return somarMeses(ultima, periodicidade === 'anual' ? 12 : 1);
 }
 
-/** Vencimento sugerido: dia 10 do mês da competência */
-export const vencimentoSugerido = (competencia: string) =>
-  `${competencia.slice(0, 8)}${String(DIA_VENCIMENTO_PADRAO).padStart(2, '0')}`;
+/** Vencimento sugerido: dia 10 do mês da competência, mas nunca antes de hoje */
+export const vencimentoSugerido = (competencia: string, agora: Date = new Date()) => {
+  const sugerido = `${competencia.slice(0, 8)}${String(DIA_VENCIMENTO_PADRAO).padStart(2, '0')}`;
+  const hoje = isoLocal(agora);
+  return sugerido < hoje ? hoje : sugerido;
+};
 
 /** Status para a tela: "vencida" quando está a pagar e o vencimento já passou */
 export function statusExibido(f: Pick<Fatura, 'status' | 'vencimento'>, agora: Date = new Date()): StatusExibidoFatura {

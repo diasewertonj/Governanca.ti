@@ -157,6 +157,8 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato, 
                   {contrato
                     ? situacao?.situacao === 'encerrado'
                       ? `Encerrado em ${formatDate(contrato.fim)}`
+                      : situacao?.situacao === 'a_iniciar'
+                      ? `Começa em ${formatDate(contrato.inicio)}${contrato.fim ? ` e vai até ${formatDate(contrato.fim)}` : ''}`
                       : contrato.fim
                       ? `Vigente até ${formatDate(contrato.fim)}`
                       : 'Sem data de fim'

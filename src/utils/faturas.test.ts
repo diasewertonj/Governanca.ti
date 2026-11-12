@@ -52,7 +52,10 @@ describe('competências', () => {
   });
 
   it('vencimento sugerido no dia 10 da competência', () => {
-    expect(vencimentoSugerido('2026-12-01')).toBe('2026-12-10');
+    const dia12nov = new Date(2026, 10, 12, 9, 0, 0);
+    expect(vencimentoSugerido('2026-12-01', dia12nov)).toBe('2026-12-10');
+    // competência atrasada: o dia 10 já passou, então sugere hoje
+    expect(vencimentoSugerido('2026-11-01', dia12nov)).toBe('2026-11-12');
   });
 
   it('opções do formulário vão do futuro ao passado, incluindo a sugerida', () => {
