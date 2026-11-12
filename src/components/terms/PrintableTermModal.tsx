@@ -137,7 +137,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
   const celula = 'border border-slate-400 px-2 py-1';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
         {/* Barra de ações (fora da impressão) */}
         <div className="no-print flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/80">
@@ -250,7 +250,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
         )}
 
         {/* Folha A4 */}
-        <div className="p-8 md:p-10 bg-white max-h-[75vh] overflow-y-auto print:max-h-none print:p-0">
+        <div className="p-8 md:p-10 bg-white sm:max-h-[75vh] sm:overflow-y-auto print:max-h-none print:p-0">
           <div className="print-a4-page mx-auto text-slate-900 text-xs leading-relaxed space-y-5">
             {/* Cabeçalho do documento controlado */}
             <table className="w-full border-collapse text-[11px]">

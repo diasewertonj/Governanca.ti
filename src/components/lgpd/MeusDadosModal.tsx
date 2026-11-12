@@ -100,7 +100,7 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-slate-900/50 overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl border border-slate-200 my-6">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-2">

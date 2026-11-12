@@ -18,6 +18,11 @@
   }
 }
 
+/* Janela aberta: a página de trás não rola (inclusive no iPhone) */
+body:has(.modal-tela) {
+  overflow: hidden;
+}
+
 /* Fase 7: em telas de toque, área mínima de 40px para botões e campos */
 @media (pointer: coarse) {
   button,
