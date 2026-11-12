@@ -16,6 +16,8 @@ import {
   Globe,
 } from 'lucide-react';
 import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
+import { chamadosDoSoftware } from '../../utils/vinculos.ts';
+import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
 
 interface Software360ModalProps {
   softwareId: string;
@@ -36,6 +38,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     currentRole,
     fornecedores,
     podeDescartarPendencias,
+    tickets,
   } = useApp();
 
   const [selectedColabToAssign, setSelectedColabToAssign] = useState('');
@@ -338,6 +341,12 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             />
           )}
 
+          {/* Fase 9: chamados ligados a este software */}
+          <ChamadosVinculados
+            chamados={chamadosDoSoftware(tickets, license.id)}
+            vazio="Nenhum chamado ligado a este software."
+          />
+
           {license.observacoes && (
             <div className="border border-slate-200 rounded-xl p-4 space-y-1">
               <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
@@ -434,10 +443,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                             <td className="py-2.5 px-4">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  onClose();
-                                  setSelectedEmployeeIdFor360(emp.id);
-                                }}
+                                onClick={() => setSelectedEmployeeIdFor360(emp.id)}
                                 className="font-semibold text-slate-900 hover:text-blue-700 flex items-center gap-2 group text-left"
                               >
                                 <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">

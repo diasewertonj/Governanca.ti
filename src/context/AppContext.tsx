@@ -126,6 +126,16 @@ import {
   estornarBaixaDb,
 } from '../services/supabaseDb.ts';
 import { CATALOGO_PADRAO } from '../utils/processos.ts';
+import {
+  empilharFicha,
+  fecharFichaNaPosicao,
+  fecharUltimaDoTipo,
+  voltarFechaOutras,
+  type FichaAberta,
+  type TipoFicha,
+} from '../utils/fichas.ts';
+import { notaDaManutencao } from '../utils/vinculos.ts';
+import { isoLocal } from '../utils/formatters.ts';
 import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
 import {
   aplicarAbertura,
@@ -154,6 +164,10 @@ export interface AlteracoesChamado {
   status?: TicketStatus;
   tecnicoId?: string; // '' = remover o técnico
   checklist?: Record<string, boolean>; // id do item -> concluído
+  // Fase 9: vínculos do chamado ('' = remover)
+  ativoId?: string;
+  softwareId?: string;
+  colaboradorId?: string;
 }
 
 interface AppContextType {
@@ -315,17 +329,17 @@ interface AppContextType {
   clearAllDataToProduction: () => Promise<void>;
 
   // Navegação Relacional 360° e Modais
-  selectedAssetIdFor360: string | null;
+  // Fase 9: as fichas ficam numa pilha; os set...(id) abrem por cima da atual
+  pilhaFichas: FichaAberta[];
+  abrirFicha: (ficha: FichaAberta) => void;
+  fecharFicha: (posicao: number) => void;
   setSelectedAssetIdFor360: (id: string | null) => void;
-  selectedSoftwareIdFor360: string | null;
   setSelectedSoftwareIdFor360: (id: string | null) => void;
   softwareModalOpen: boolean;
   setSoftwareModalOpen: (open: boolean) => void;
   softwareToEdit: SoftwareLicense | null;
   setSoftwareToEdit: (lic: SoftwareLicense | null) => void;
-  selectedEmployeeIdFor360: string | null;
   setSelectedEmployeeIdFor360: (id: string | null) => void;
-  selectedTicketIdForDetail: string | null;
   setSelectedTicketIdForDetail: (id: string | null) => void;
   selectedTermForPrint: ResponsibilityTerm | null;
   setSelectedTermForPrint: (term: ResponsibilityTerm | null) => void;
@@ -676,12 +690,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Modais de Rastreabilidade Relacional 360°
-  const [selectedAssetIdFor360, setSelectedAssetIdFor360] = useState<string | null>(null);
-  const [selectedSoftwareIdFor360, setSelectedSoftwareIdFor360] = useState<string | null>(null);
+  // Fase 9: pilha de fichas. Abrir uma ficha de dentro de outra não fecha a
+  // anterior; fechar a de cima volta para ela (com o rascunho intacto).
+  const [pilhaFichas, setPilhaFichas] = useState<FichaAberta[]>([]);
+  const abrirFicha = (ficha: FichaAberta) => {
+    // Voltar a uma ficha que está mais abaixo fecha as de cima: confirma se houver rascunho
+    if (voltarFechaOutras(pilhaFichas, ficha) && !podeDescartarPendencias()) return;
+    setPilhaFichas((p) => empilharFicha(p, ficha));
+  };
+  const fecharFicha = (posicao: number) => setPilhaFichas((p) => fecharFichaNaPosicao(p, posicao));
+  const abrirOuFechar = (tipo: TipoFicha) => (id: string | null) => {
+    if (id) abrirFicha({ tipo, id });
+    else setPilhaFichas((p) => fecharUltimaDoTipo(p, tipo));
+  };
+  const setSelectedAssetIdFor360 = abrirOuFechar('ativo');
+  const setSelectedSoftwareIdFor360 = abrirOuFechar('software');
+  const setSelectedEmployeeIdFor360 = abrirOuFechar('colaborador');
+  const setSelectedTicketIdForDetail = abrirOuFechar('chamado');
   const [softwareModalOpen, setSoftwareModalOpen] = useState<boolean>(false);
   const [softwareToEdit, setSoftwareToEdit] = useState<SoftwareLicense | null>(null);
-  const [selectedEmployeeIdFor360, setSelectedEmployeeIdFor360] = useState<string | null>(null);
-  const [selectedTicketIdForDetail, setSelectedTicketIdForDetail] = useState<string | null>(null);
   const [selectedTermForPrint, setSelectedTermForPrint] = useState<ResponsibilityTerm | null>(null);
   const [selectedAssetForQrCode, setSelectedAssetForQrCode] = useState<Asset | null>(null);
 
@@ -1088,6 +1115,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   };
 
+  // Fase 9: o chamado de origem ganha uma nota interna a cada passo da manutenção
+  // (não muda o status do chamado; quem resolve continua sendo a T.I.)
+  const registrarNoChamado = (chamadoId: string | undefined, texto: string) => {
+    if (chamadoId && tickets.some((t) => t.id === chamadoId)) addTicketMessage(chamadoId, texto, true);
+  };
+
   const abrirManutencao = async (ativoId: string, dados: DadosManutencao): Promise<ResultadoRegistro> => {
     const ativo = assets.find((a) => a.id === ativoId);
     if (!ativo) return { erro: 'Ativo não encontrado.' };
@@ -1099,6 +1132,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const mudar = (a: Asset) => aplicarAbertura(a, novaManutencao(id, ativoId, dados, currentUser?.id, new Date()));
       if (isProduction) await refletirDoBanco(ativoId, mudar);
       else aplicarNoAtivo(ativoId, mudar);
+      registrarNoChamado(dados.chamadoId, notaDaManutencao('aberta', { ...dados, tag: ativo.tag }));
       return { id };
     } catch (err) {
       console.error('Enviar para manutenção', err);
@@ -1119,6 +1153,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       aplicarNoAtivo(ativoId, (a) =>
         aplicarManutencaoFeita(a, novaManutencao(id, ativoId, dados, currentUser?.id, new Date(), dados.concluidaEm))
       );
+      const tag = assets.find((a) => a.id === ativoId)?.tag || '';
+      registrarNoChamado(dados.chamadoId, notaDaManutencao('feita', { ...dados, tag }));
       return { id };
     } catch (err) {
       console.error('Registrar manutenção já feita', err);
@@ -1147,6 +1183,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         aplicarNoAtivo(ativo.id, mudar);
       }
+      registrarNoChamado(
+        manutencao.chamadoId,
+        notaDaManutencao(status, {
+          tag: ativo.tag,
+          tipo: manutencao.tipo,
+          descricao: manutencao.descricao,
+          concluidaEm: status === 'concluida' ? dados.concluidaEm || isoLocal(new Date()) : undefined,
+          custo: dados.custo ?? manutencao.custo,
+        })
+      );
       return null;
     } catch (err) {
       console.error('Encerrar manutenção', err);
@@ -1565,6 +1611,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ),
             },
           };
+        }
+        if (mudancas.ativoId !== undefined) novo = { ...novo, ativoId: mudancas.ativoId || undefined };
+        if (mudancas.softwareId !== undefined) {
+          novo = {
+            ...novo,
+            softwareId: mudancas.softwareId || undefined,
+            softwareNome: mudancas.softwareId ? licenses.find((l) => l.id === mudancas.softwareId)?.nome : undefined,
+          };
+        }
+        // Admissão e desligamento: a pessoa do processo não muda por aqui
+        if (mudancas.colaboradorId !== undefined && t.tipo === 'suporte') {
+          novo = { ...novo, colaboradorId: mudancas.colaboradorId || undefined };
         }
         return novo;
       },
@@ -2138,17 +2196,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSettings,
         resetToInitialData,
         clearAllDataToProduction,
-        selectedAssetIdFor360,
+        pilhaFichas,
+        abrirFicha,
+        fecharFicha,
         setSelectedAssetIdFor360,
-        selectedSoftwareIdFor360,
         setSelectedSoftwareIdFor360,
         softwareModalOpen,
         setSoftwareModalOpen,
         softwareToEdit,
         setSoftwareToEdit,
-        selectedEmployeeIdFor360,
         setSelectedEmployeeIdFor360,
-        selectedTicketIdForDetail,
         setSelectedTicketIdForDetail,
         selectedTermForPrint,
         setSelectedTermForPrint,

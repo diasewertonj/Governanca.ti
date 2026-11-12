@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
+import { chamadosDaPessoa, papelNoChamado } from '../../utils/vinculos.ts';
+import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
 import {
   X,
   User,
@@ -29,6 +31,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     assets,
     licenses,
     terms,
+    tickets,
     setSelectedAssetIdFor360,
     setSelectedTermForPrint,
     createTerm,
@@ -129,7 +132,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   const employeeTerms = terms.filter((t) => t.colaboradorId === employee.id);
 
   const handleOpenAsset = (assetId: string) => {
-    onClose();
+    // Fase 9: abre por cima; fechar o equipamento volta para esta ficha
     setSelectedAssetIdFor360(assetId);
   };
 
@@ -437,6 +440,13 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               <p className="text-xs text-slate-500 py-2">Nenhum termo emitido para este colaborador ainda.</p>
             )}
           </div>
+
+          {/* Fase 9: chamados que a pessoa abriu ou em que é o colaborador relacionado */}
+          <ChamadosVinculados
+            chamados={chamadosDaPessoa(tickets, employee.id)}
+            etiqueta={(t) => papelNoChamado(t, employee.id)}
+            vazio="Nenhum chamado desta pessoa."
+          />
 
           {/* 4. Histórico de Devoluções Passadas */}
           {returnedHistory.length > 0 && (

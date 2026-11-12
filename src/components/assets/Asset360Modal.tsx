@@ -29,17 +29,22 @@ import { FormManutencao } from './FormManutencao.tsx';
 import { FormBaixa } from './FormBaixa.tsx';
 import { BaixaPatrimonial } from './BaixaPatrimonial.tsx';
 import { podeEnviarParaManutencao } from '../../utils/cicloVida.ts';
+import { chamadosDoAtivo } from '../../utils/vinculos.ts';
+import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
 
 interface Asset360ModalProps {
   assetId: string;
+  /** Fase 9: aberta pelo chamado já com "Enviar para manutenção" ligado a ele */
+  manutencaoDoChamado?: string;
   onClose: () => void;
 }
 
-export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }) => {
+export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutencaoDoChamado, onClose }) => {
   const {
     assets,
     employees,
     departments,
+    tickets,
     setSelectedEmployeeIdFor360,
     setSelectedAssetForQrCode,
     setSelectedTermForPrint,
@@ -59,7 +64,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   const [motivoDevolucao, setMotivoDevolucao] = useState('');
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [editando, setEditando] = useState(false);
-  const [enviandoManutencao, setEnviandoManutencao] = useState(false);
+  const [enviandoManutencao, setEnviandoManutencao] = useState(Boolean(manutencaoDoChamado));
   const [dandoBaixa, setDandoBaixa] = useState(false);
   const [tempSO, setTempSO] = useState('');
   const [tempBitlocker, setTempBitlocker] = useState('');
@@ -106,7 +111,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
       alert('Acesso restrito: Colaboradores não têm permissão para acessar o cadastro de outros colaboradores.');
       return;
     }
-    onClose();
+    // Fase 9: abre por cima; fechar a ficha da pessoa volta para este equipamento
     setSelectedEmployeeIdFor360(empId);
   };
 
@@ -679,6 +684,12 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             )}
           </div>
 
+          {/* Fase 9: chamados ligados a este equipamento (cada perfil vê os que o banco libera) */}
+          <ChamadosVinculados
+            chamados={chamadosDoAtivo(tickets, asset.id)}
+            vazio="Nenhum chamado ligado a este equipamento."
+          />
+
           {/* Fase 8: manutenções com custos (só TI; o colaborador vê só o status) */}
           {isTI && <ManutencoesAtivo asset={asset} podeEditar={asset.status !== 'descartado'} />}
 
@@ -699,8 +710,13 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
     {/* Fora da janela da ficha: o fundo desfocado (backdrop-filter) prenderia a janela nova na
         rolagem da ficha, e no celular ela abriria fora da tela */}
     {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
-    {enviandoManutencao && (
-      <FormManutencao asset={asset} modo="abrir" onClose={() => setEnviandoManutencao(false)} />
+    {enviandoManutencao && isTI && podeEnviarParaManutencao(asset) && (
+      <FormManutencao
+        asset={asset}
+        modo="abrir"
+        chamadoInicial={manutencaoDoChamado}
+        onClose={() => setEnviandoManutencao(false)}
+      />
     )}
     {dandoBaixa && <FormBaixa asset={asset} onClose={() => setDandoBaixa(false)} />}
     </>

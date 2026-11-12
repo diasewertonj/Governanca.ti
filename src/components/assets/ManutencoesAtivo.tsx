@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, Plus, ShieldCheck, Wrench, XCircle } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Plus, ShieldCheck, Wrench, XCircle } from 'lucide-react';
+import { comQuemEstava } from '../../utils/vinculos.ts';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Asset, Manutencao, StatusManutencao } from '../../types/index.ts';
 import { formatCurrency, formatDate } from '../../utils/formatters.ts';
@@ -23,6 +24,8 @@ const COR_STATUS: Record<StatusManutencao, string> = {
 };
 
 const BOTAO_LINHA = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border';
+/** Fase 9: chamado e pessoas da manutenção abrem a ficha por cima */
+const LINK = 'inline-flex items-center gap-0.5 font-medium text-blue-700 hover:underline';
 
 /**
  * Fase 8: manutenções do ativo (só a T.I.), da mais recente para a mais antiga,
@@ -30,7 +33,7 @@ const BOTAO_LINHA = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-mediu
  * e "Cancelar"; "Registrar manutenção já feita" lança histórico sem mudar o status.
  */
 export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ asset, podeEditar }) => {
-  const { fornecedores, contratos, tickets } = useApp();
+  const { fornecedores, contratos, tickets, employees, setSelectedTicketIdForDetail, setSelectedEmployeeIdFor360 } = useApp();
   const [form, setForm] = useState<{ modo: ModoManutencao; manutencao?: Manutencao } | null>(null);
 
   const lista = manutencoesOrdenadas(asset.historicoManutencao);
@@ -60,6 +63,9 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
             const ct = contrato(m.contratoId);
             const tk = chamado(m.chamadoId);
             const arquivos = (asset.anexos || []).filter((a) => a.manutencaoId === m.id);
+            // Fase 9: com quem estava o equipamento no dia e quem abriu (ambos abrem a ficha da pessoa)
+            const comQuem = comQuemEstava(asset, m.abertaEm);
+            const abriu = m.criadoPor ? employees.find((e) => e.id === m.criadoPor) : undefined;
             return (
               <li key={m.id} className="p-3 bg-slate-50 rounded-md border border-slate-200 text-xs space-y-1.5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -95,7 +101,39 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
                   <p className="text-slate-600 break-words">
                     {ct && <>Contrato: {nomeContrato(ct)}</>}
                     {ct && tk && ' · '}
-                    {tk && <>Chamado: {tk.codigo}</>}
+                    {tk && (
+                      <>
+                        Chamado:{' '}
+                        <button type="button" onClick={() => setSelectedTicketIdForDetail(tk.id)} className={LINK}>
+                          {tk.codigo}
+                          <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                        </button>
+                      </>
+                    )}
+                  </p>
+                )}
+                {(comQuem || abriu) && (
+                  <p className="text-slate-600 break-words">
+                    {comQuem && (
+                      <>
+                        {comQuem.devolvidoEm ? 'Último a usar' : 'Com'}:{' '}
+                        <button type="button" onClick={() => setSelectedEmployeeIdFor360(comQuem.colaboradorId)} className={LINK}>
+                          {comQuem.colaboradorNome}
+                          <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                        </button>
+                        {comQuem.devolvidoEm && ` (devolvido em ${formatDate(comQuem.devolvidoEm)})`}
+                      </>
+                    )}
+                    {comQuem && abriu && ' · '}
+                    {abriu && (
+                      <>
+                        Aberta por:{' '}
+                        <button type="button" onClick={() => setSelectedEmployeeIdFor360(abriu.id)} className={LINK}>
+                          {abriu.nome}
+                          <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                        </button>
+                      </>
+                    )}
                   </p>
                 )}
                 {m.observacoes && <p className="text-slate-700 whitespace-pre-wrap break-words">{m.observacoes}</p>}

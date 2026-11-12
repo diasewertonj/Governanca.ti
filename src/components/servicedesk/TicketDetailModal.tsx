@@ -7,6 +7,8 @@ import { AlteracoesChamado } from '../../context/AppContext.tsx';
 import { BarraAlteracoes, confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { ChecklistProcesso } from '../processos/ChecklistProcesso.tsx';
+import { VinculosChamado } from './VinculosChamado.tsx';
+import { RASCUNHO_VAZIO, ROTULO_VINCULO, mudancasVinculos, type RascunhoVinculos } from '../../utils/vinculos.ts';
 import {
   X,
   Lock,
@@ -17,7 +19,6 @@ import {
   Paperclip,
   UserPlus,
   ShieldCheck,
-  Key,
 } from 'lucide-react';
 
 interface TicketDetailModalProps {
@@ -36,10 +37,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     processoItens,
     addTicketMessage,
     salvarAlteracoesChamado,
-    setSelectedAssetIdFor360,
-    setSelectedSoftwareIdFor360,
     setSelectedEmployeeIdFor360,
     concluirOffboarding,
+    licenses,
   } = useApp();
 
   const [newMessageText, setNewMessageText] = useState('');
@@ -52,6 +52,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   const [rascStatus, setRascStatus] = useState<TicketStatus | null>(null);
   const [rascTecnico, setRascTecnico] = useState<string | null>(null);
   const [rascChecklist, setRascChecklist] = useState<Record<string, boolean>>({});
+  // Fase 9: vínculos (equipamento, software, colaborador relacionado) também em rascunho
+  const [rascVinculos, setRascVinculos] = useState<RascunhoVinculos>(RASCUNHO_VAZIO);
 
   const ticket = tickets.find((t) => t.id === ticketId);
 
@@ -75,6 +77,17 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     if (checklistAlterado.length > 0) {
       itensPendentes.push(`Checklist: ${checklistAlterado.length} item(ns) marcado(s) ou desmarcado(s)`);
     }
+    for (const campo of mudancasVinculos(ticket, rascVinculos)) {
+      const rotulo = (id?: string) => {
+        if (!id) return 'nenhum';
+        if (campo === 'ativoId') return assets.find((a) => a.id === id)?.tag || 'equipamento';
+        if (campo === 'softwareId') return licenses.find((l) => l.id === id)?.nome || ticket.softwareNome || 'software';
+        return employees.find((e) => e.id === id)?.nome || 'colaborador';
+      };
+      itensPendentes.push(
+        `${ROTULO_VINCULO[campo]}: ${rotulo(ticket[campo])} → ${rotulo(rascVinculos[campo] || undefined)}`
+      );
+    }
   }
   useRegistrarPendencias(`chamado:${ticketId}`, itensPendentes);
 
@@ -88,6 +101,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     setRascStatus(null);
     setRascTecnico(null);
     setRascChecklist({});
+    setRascVinculos(RASCUNHO_VAZIO);
   };
 
   const salvarRascunho = () => {
@@ -100,6 +114,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
       )
     );
     if (Object.keys(marcados).length > 0) mudancas.checklist = marcados;
+    for (const campo of mudancasVinculos(ticket, rascVinculos)) mudancas[campo] = rascVinculos[campo] as string;
     salvarAlteracoesChamado(ticket.id, mudancas);
     descartarRascunho();
   };
@@ -149,7 +164,6 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     }
   };
 
-  const linkedAsset = assets.find((a) => a.id === ticket.ativoId);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
   const isColaboradorJaCadastrado = ticket.onboarding
@@ -579,65 +593,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               </div>
             )}
 
-            {/* Vínculo ao Equipamento com Defeito (360°) */}
-            {linkedAsset && (
-            <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
-                Equipamento Vinculado ao Chamado
-              </span>
-              {linkedAsset && (
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-blue-700">{linkedAsset.tag}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        setSelectedAssetIdFor360(linkedAsset.id);
-                      }}
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                    >
-                      Ver ficha
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <p className="font-medium text-slate-900 mt-0.5">{linkedAsset.nome}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {linkedAsset.marca} {linkedAsset.modelo} · S/N: <span className="font-mono">{linkedAsset.serialNumber}</span>
-                  </p>
-                </div>
-              )}
-            </div>
-            )}
-
-            {/* Vínculo a Software / SaaS (360°) */}
-            {ticket.softwareId && (
-              <div className="bg-white p-4 rounded-lg border border-purple-200 bg-purple-50/20 space-y-2">
-                <span className="text-xs uppercase font-bold text-purple-700 block tracking-wide flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5" />
-                  Software / SaaS Vinculado
-                </span>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-900">{ticket.softwareNome || 'Licença de Software'}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        setSelectedSoftwareIdFor360(ticket.softwareId!);
-                      }}
-                      className="text-xs text-purple-700 hover:underline flex items-center gap-1 font-medium"
-                    >
-                      Ficha
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Assinatura Corporativa monitorada pela T.I.
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* Fase 9: equipamento, software e colaborador relacionado (abrem a ficha por cima) */}
+            <VinculosChamado
+              ticket={ticket}
+              rascunho={rascVinculos}
+              onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
+            />
 
             {/* Solicitante do Chamado */}
             <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
@@ -652,10 +613,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      onClose();
-                      setSelectedEmployeeIdFor360(ticket.solicitanteId);
-                    }}
+                    onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)}
                     className="font-bold text-slate-900 hover:text-blue-700 flex items-center gap-1"
                   >
                     {ticket.solicitanteNome}

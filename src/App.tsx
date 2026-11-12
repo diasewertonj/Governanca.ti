@@ -44,18 +44,12 @@ function MainApp() {
     currentUser,
     currentRole,
     authLoading,
-    selectedAssetIdFor360,
-    setSelectedAssetIdFor360,
-    selectedEmployeeIdFor360,
-    setSelectedEmployeeIdFor360,
-    selectedSoftwareIdFor360,
-    setSelectedSoftwareIdFor360,
+    pilhaFichas,
+    fecharFicha,
     softwareModalOpen,
     setSoftwareModalOpen,
     softwareToEdit,
     setSoftwareToEdit,
-    selectedTicketIdForDetail,
-    setSelectedTicketIdForDetail,
     selectedTermForPrint,
     setSelectedTermForPrint,
     selectedAssetForQrCode,
@@ -171,26 +165,24 @@ function MainApp() {
         <NewTicketModal onClose={() => setShowNewTicketModal(false)} />
       )}
 
-      {selectedAssetIdFor360 && (
-        <Asset360Modal
-          assetId={selectedAssetIdFor360}
-          onClose={() => setSelectedAssetIdFor360(null)}
-        />
-      )}
-
-      {selectedEmployeeIdFor360 && (
-        <Employee360Modal
-          employeeId={selectedEmployeeIdFor360}
-          onClose={() => setSelectedEmployeeIdFor360(null)}
-        />
-      )}
-
-      {selectedTicketIdForDetail && (
-        <TicketDetailModal
-          ticketId={selectedTicketIdForDetail}
-          onClose={() => setSelectedTicketIdForDetail(null)}
-        />
-      )}
+      {/* Fase 9: fichas empilhadas. Só a de cima aparece; as de baixo ficam
+          montadas (escondidas) para voltar a elas do jeito que estavam. */}
+      {pilhaFichas.map((ficha, posicao) => {
+        const fechar = () => fecharFicha(posicao);
+        return (
+          <div
+            key={`${posicao}:${ficha.tipo}:${ficha.id}:${ficha.manutencaoDoChamado ?? ''}`}
+            className={posicao === pilhaFichas.length - 1 ? undefined : 'hidden'}
+          >
+            {ficha.tipo === 'ativo' && (
+              <Asset360Modal assetId={ficha.id} manutencaoDoChamado={ficha.manutencaoDoChamado} onClose={fechar} />
+            )}
+            {ficha.tipo === 'colaborador' && <Employee360Modal employeeId={ficha.id} onClose={fechar} />}
+            {ficha.tipo === 'chamado' && <TicketDetailModal ticketId={ficha.id} onClose={fechar} />}
+            {ficha.tipo === 'software' && <Software360Modal softwareId={ficha.id} onClose={fechar} />}
+          </div>
+        );
+      })}
 
       {selectedTermForPrint && (
         <PrintableTermModal
@@ -203,13 +195,6 @@ function MainApp() {
         <QrCodeLabelModal
           asset={selectedAssetForQrCode}
           onClose={() => setSelectedAssetForQrCode(null)}
-        />
-      )}
-
-      {selectedSoftwareIdFor360 && (
-        <Software360Modal
-          softwareId={selectedSoftwareIdFor360}
-          onClose={() => setSelectedSoftwareIdFor360(null)}
         />
       )}
 

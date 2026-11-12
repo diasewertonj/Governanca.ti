@@ -9,6 +9,7 @@ import { contratosVigentesDoAtivo, nomeContrato } from '../../utils/contratos.ts
 import { ROTULO_TIPO_MANUTENCAO, statusAposManutencao } from '../../utils/cicloVida.ts';
 import { formatCurrency, formatDate, isoLocal } from '../../utils/formatters.ts';
 import { ArquivosParaEnviar, enviarArquivos, type ArquivoParaEnviar } from './ArquivosParaEnviar.tsx';
+import { chamadoEmAberto, chamadosDaPessoa, chamadosDoAtivo } from '../../utils/vinculos.ts';
 
 /** abrir = "Enviar para manutenção"; feita = histórico sem mudar o status; concluir/cancelar = encerrar a aberta */
 export type ModoManutencao = 'abrir' | 'feita' | 'concluir' | 'cancelar';
@@ -33,6 +34,8 @@ interface FormManutencaoProps {
   modo: ModoManutencao;
   /** A manutenção em andamento (concluir ou cancelar) */
   manutencao?: Manutencao;
+  /** Fase 9: aberto pelo botão do chamado, já ligado a ele */
+  chamadoInicial?: string;
   onClose: () => void;
 }
 
@@ -41,7 +44,7 @@ interface FormManutencaoProps {
  * Nada grava antes do clique no botão; os anexos sobem só depois que a
  * manutenção existe, ligados a ela.
  */
-export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, manutencao, onClose }) => {
+export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, manutencao, chamadoInicial, onClose }) => {
   const {
     fornecedores,
     contratos,
@@ -60,7 +63,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
   const [descricao, setDescricao] = useState('');
   const [numeroOs, setNumeroOs] = useState('');
   const [contratoId, setContratoId] = useState('');
-  const [chamadoId, setChamadoId] = useState('');
+  const [chamadoId, setChamadoId] = useState(chamadoInicial ?? '');
   const [abertaEm, setAbertaEm] = useState(hoje);
   const [previsao, setPrevisao] = useState('');
   const [custo, setCusto] = useState(encerrando && manutencao ? String(manutencao.custo) : '');
@@ -74,9 +77,12 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
 
   const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
   const opcoesContrato = contratosVigentesDoAtivo(asset.id, contratos);
-  const chamadosDoAtivo = tickets
-    .filter((t) => t.ativoId === asset.id)
-    .sort((a, b) => b.dataCriacao.localeCompare(a.dataCriacao));
+  // Fase 9: primeiro os chamados deste equipamento; depois os em aberto de quem está com ele
+  const chamadosDoEquipamento = chamadosDoAtivo(tickets, asset.id);
+  const chamadosDoCustodiante = asset.custodianteId
+    ? chamadosDaPessoa(tickets, asset.custodianteId).filter((t) => t.ativoId !== asset.id && chamadoEmAberto(t))
+    : [];
+  const temChamados = chamadosDoEquipamento.length + chamadosDoCustodiante.length > 0;
   const retorno = ROTULO_RETORNO[statusAposManutencao(asset)];
 
   const valores = JSON.stringify([tipo, fornecedorId, descricao, numeroOs, contratoId, chamadoId, abertaEm, previsao,
@@ -265,18 +271,31 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
                   </p>
                 )}
               </div>
-              {chamadosDoAtivo.length > 0 && (
+              {temChamados && (
                 <div className="md:col-span-2">
                   <label htmlFor={id('chamado')} className={CLASSE_ROTULO}>
                     Chamado de origem
                   </label>
                   <select id={id('chamado')} value={chamadoId} onChange={(e) => setChamadoId(e.target.value)} className={CLASSE_CAMPO}>
                     <option value="">— nenhum —</option>
-                    {chamadosDoAtivo.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.codigo} · {t.titulo}
-                      </option>
-                    ))}
+                    {chamadosDoEquipamento.length > 0 && (
+                      <optgroup label="Deste equipamento">
+                        {chamadosDoEquipamento.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.codigo} · {t.titulo}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {chamadosDoCustodiante.length > 0 && (
+                      <optgroup label="Em aberto de quem está com ele">
+                        {chamadosDoCustodiante.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.codigo} · {t.titulo}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
               )}
