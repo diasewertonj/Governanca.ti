@@ -1,8 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase.ts';
-import type { Json, TablesInsert } from '../types/database.types.ts';
+import type { Json, Tables, TablesInsert } from '../types/database.types.ts';
 import {
+  AnexoAtivo,
   Asset,
+  CategoriaAnexoAtivo,
   AssetCategory,
   AssetStatus,
   CatalogoItem,
@@ -175,6 +177,8 @@ const linhaAtivo = (a: Asset): TablesInsert<'ativos'> => ({
   sistema_operacional: a.sistemaOperacional || null,
   fiscal: json(a.fiscal || {}),
   custom_fields: json(a.customFields || {}),
+  observacoes: a.observacoes?.trim() || null,
+  fornecedor_id: a.fornecedorId || null,
 });
 
 const linhaCustodia = (ativoId: string, c: CustodyHistoryEntry): TablesInsert<'historico_custodia'> => ({
@@ -362,6 +366,13 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     if (s.bitlocker_key) bitlockerByAssetId[s.ativo_id] = s.bitlocker_key;
   });
 
+  // Fase 8: anexos (só TI; antes da migration a tabela não existe e a lista fica vazia)
+  const { data: anexosData } = await supabase.from('ativo_anexos').select('*').order('criado_em');
+  const anexosPorAtivo: Record<string, AnexoAtivo[]> = {};
+  (anexosData || []).forEach((l) => {
+    (anexosPorAtivo[l.ativo_id] ||= []).push(anexoAtivoDeLinha(l));
+  });
+
   const custodyByAssetId: Record<string, CustodyHistoryEntry[]> = {};
   (custodyData || []).forEach((c) => {
     if (!custodyByAssetId[c.ativo_id]) custodyByAssetId[c.ativo_id] = [];
@@ -394,9 +405,73 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     bitlockerKey: bitlockerByAssetId[a.id] || undefined,
     fiscal: (a.fiscal || {}) as unknown as FiscalData,
     customFields: (a.custom_fields || {}) as Record<string, string>,
+    observacoes: a.observacoes || undefined,
+    fornecedorId: a.fornecedor_id || undefined,
+    anexos: anexosPorAtivo[a.id] || [],
     historicoCustodia: custodyByAssetId[a.id] || [],
     historicoManutencao: [],
   })) : [];
+}
+
+type LinhaAnexoAtivo = Tables<'ativo_anexos'>;
+const anexoAtivoDeLinha = (l: LinhaAnexoAtivo): AnexoAtivo => ({
+  id: l.id,
+  ativoId: l.ativo_id,
+  categoria: l.categoria as CategoriaAnexoAtivo,
+  nome: l.nome,
+  caminho: l.caminho,
+  tipo: l.tipo || undefined,
+  tamanho: l.tamanho ?? undefined,
+  manutencaoId: l.manutencao_id || undefined,
+  baixaId: l.baixa_id || undefined,
+  criadoPor: l.criado_por || undefined,
+  criadoEm: l.criado_em,
+});
+
+/** Fase 8: anexa um arquivo ao ativo (pasta ativos/<id>/ do bucket privado; só TI) */
+export async function enviarAnexoAtivoDb(
+  ativoId: string,
+  arquivo: File,
+  categoria: CategoriaAnexoAtivo,
+  vinculo: { manutencaoId?: string; baixaId?: string } = {}
+): Promise<AnexoAtivo> {
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new DbError(erro, 'validacao');
+  const caminho = `ativos/${ativoId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
+  const linha: TablesInsert<'ativo_anexos'> = {
+    ativo_id: ativoId,
+    categoria,
+    nome: arquivo.name,
+    caminho,
+    tipo: arquivo.type,
+    tamanho: arquivo.size,
+    manutencao_id: vinculo.manutencaoId || null,
+    baixa_id: vinculo.baixaId || null,
+  };
+  if (!supabase) {
+    // Modo demonstração: arquivo só no navegador
+    return anexoAtivoDeLinha({
+      ...linha,
+      id: crypto.randomUUID(),
+      caminho: URL.createObjectURL(arquivo),
+      criado_em: new Date().toISOString(),
+    } as LinhaAnexoAtivo);
+  }
+  await enviar(caminho, arquivo);
+  try {
+    const data = await checar(supabase.from('ativo_anexos').insert(linha).select().single());
+    return anexoAtivoDeLinha(data as LinhaAnexoAtivo);
+  } catch (err) {
+    await removerArquivosDb([caminho]).catch(() => undefined);
+    throw err;
+  }
+}
+
+/** Fase 8: remove o registro e o arquivo do anexo */
+export async function removerAnexoAtivoDb(anexo: AnexoAtivo) {
+  if (!supabase) return;
+  await excluir('ativo_anexos', anexo.id);
+  await removerArquivosDb([anexo.caminho]);
 }
 
 async function gravarSegredoAtivo(ativoId: string, chave?: string) {

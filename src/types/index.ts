@@ -42,7 +42,23 @@ export interface FiscalData {
   dataAquisicao: string;
   dataGarantia: string;
   suporteContato?: string;
-  notaFiscalArquivoUrl?: string;
+}
+
+/** Fase 8: arquivo ligado ao ativo (NF, orçamento, OS, laudo, foto, evidência de baixa) */
+export type CategoriaAnexoAtivo = 'nota_fiscal' | 'orcamento' | 'os' | 'laudo' | 'foto' | 'evidencia_baixa' | 'outro';
+
+export interface AnexoAtivo {
+  id: string;
+  ativoId: string;
+  categoria: CategoriaAnexoAtivo;
+  nome: string;
+  caminho: string;
+  tipo?: string;
+  tamanho?: number;
+  manutencaoId?: string;
+  baixaId?: string;
+  criadoPor?: string;
+  criadoEm: string;
 }
 
 export interface CustodyHistoryEntry {
@@ -83,6 +99,9 @@ export interface Asset {
   bitlockerKey?: string; // Chave de recuperação BitLocker (até 48 dígitos)
   customFields?: Record<string, string>;
   fotos?: string[];
+  observacoes?: string; // Fase 8
+  fornecedorId?: string; // Fase 8: vínculo com o cadastro de fornecedores
+  anexos?: AnexoAtivo[]; // Fase 8: só a TI recebe
   historicoCustodia: CustodyHistoryEntry[];
   historicoManutencao: MaintenanceEntry[];
 }

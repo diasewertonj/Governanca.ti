@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      ativo_anexos: {
+        Row: {
+          ativo_id: string
+          baixa_id: string | null
+          caminho: string
+          categoria: string
+          criado_em: string
+          criado_por: string | null
+          id: string
+          manutencao_id: string | null
+          nome: string
+          tamanho: number | null
+          tipo: string | null
+        }
+        Insert: {
+          ativo_id: string
+          baixa_id?: string | null
+          caminho: string
+          categoria: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          manutencao_id?: string | null
+          nome: string
+          tamanho?: number | null
+          tipo?: string | null
+        }
+        Update: {
+          ativo_id?: string
+          baixa_id?: string | null
+          caminho?: string
+          categoria?: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          manutencao_id?: string | null
+          nome?: string
+          tamanho?: number | null
+          tipo?: string | null
+        }
+        Relationships: []
+      }
       ativos: {
         Row: {
           categoria: string
@@ -22,11 +64,13 @@ export type Database = {
           custom_fields: Json | null
           data_entrega_atual: string | null
           fiscal: Json | null
+          fornecedor_id: string | null
           id: string
           localizacao_fisica: string
           marca: string
           modelo: string
           nome: string
+          observacoes: string | null
           serial_number: string
           setor_id: string | null
           sistema_operacional: string | null
@@ -40,11 +84,13 @@ export type Database = {
           custom_fields?: Json | null
           data_entrega_atual?: string | null
           fiscal?: Json | null
+          fornecedor_id?: string | null
           id: string
           localizacao_fisica: string
           marca: string
           modelo: string
           nome: string
+          observacoes?: string | null
           serial_number: string
           setor_id?: string | null
           sistema_operacional?: string | null
@@ -58,11 +104,13 @@ export type Database = {
           custom_fields?: Json | null
           data_entrega_atual?: string | null
           fiscal?: Json | null
+          fornecedor_id?: string | null
           id?: string
           localizacao_fisica?: string
           marca?: string
           modelo?: string
           nome?: string
+          observacoes?: string | null
           serial_number?: string
           setor_id?: string | null
           sistema_operacional?: string | null

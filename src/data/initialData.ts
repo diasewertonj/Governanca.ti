@@ -190,7 +190,6 @@ export const INITIAL_ASSETS: Asset[] = [
       dataAquisicao: '2024-01-03',
       dataGarantia: '2027-01-03', // Em garantia
       suporteContato: '0800 970 3355 (ProSupport 24x7)',
-      notaFiscalArquivoUrl: 'https://cdn.nexuscorp.com.br/docs/nf-004821.pdf',
     },
     sistemaOperacional: 'Windows 11 Pro 64-bit',
     bitlockerKey: '419204-183029-482019-582019-391029-482019-281920-492019',
