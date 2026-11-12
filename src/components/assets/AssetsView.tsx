@@ -381,7 +381,9 @@ export const AssetsView: React.FC = () => {
                               <ExternalLink className="w-3 h-3 text-blue-400" />
                             </button>
                           ) : (
-                            <span className="text-slate-500 italic">Disponível em Estoque</span>
+                            <span className="text-slate-500 italic">
+                              {asset.status === 'descartado' ? 'Baixado (fora do estoque)' : 'Disponível em Estoque'}
+                            </span>
                           )}
                         </td>
 

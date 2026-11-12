@@ -663,7 +663,9 @@ export async function enviarAnexoAtivoDb(
 export async function removerAnexoAtivoDb(anexo: AnexoAtivo) {
   if (!supabase) return;
   await excluir('ativo_anexos', anexo.id);
-  await removerArquivosDb([anexo.caminho]);
+  // O registro já saiu: se apagar o arquivo falhar, o anexo some da tela do mesmo jeito
+  // (o arquivo fica só no Storage privado, sem link para ninguém abrir)
+  await removerArquivosDb([anexo.caminho]).catch((err) => console.error('Arquivo do anexo não apagado', err));
 }
 
 async function gravarSegredoAtivo(ativoId: string, chave?: string) {
