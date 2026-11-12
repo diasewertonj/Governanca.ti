@@ -392,10 +392,13 @@ export const AssetsView: React.FC = () => {
                                 ? 'text-blue-700 bg-blue-50'
                                 : asset.status === 'disponivel'
                                 ? 'text-emerald-700 bg-emerald-50'
+                                : asset.status === 'descartado'
+                                ? 'text-slate-600 bg-slate-100'
                                 : 'text-amber-700 bg-amber-50'
                             }`}
                           >
-                            {asset.status.replace('_', ' ')}
+                            {/* Fase 8: o status "descartado" é a baixa patrimonial (como na ficha e no filtro) */}
+                            {asset.status === 'descartado' ? 'Baixado' : asset.status.replace('_', ' ')}
                           </span>
                         </td>
 
