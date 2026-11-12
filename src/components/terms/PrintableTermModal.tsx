@@ -3,6 +3,7 @@ import { ResponsibilityTerm } from '../../types/index.ts';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { Printer, X, CheckCircle2, Upload, FileText, Building2 } from 'lucide-react';
+import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 
 interface PrintableTermModalProps {
   term: ResponsibilityTerm;
@@ -10,9 +11,13 @@ interface PrintableTermModalProps {
 }
 
 export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, onClose }) => {
-  const { settings, assets, markTermSigned } = useApp();
+  const { settings, assets, markTermSigned, currentRole, terms } = useApp();
   const [uploadingSigned, setUploadingSigned] = useState(false);
   const [uploadedSuccess, setUploadedSuccess] = useState(false);
+  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
+  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  // Usa a versão mais recente do termo (o modal recebe uma cópia do momento da abertura)
+  const termoAtual = terms.find((t) => t.id === term.id) || term;
 
   // Buscar detalhes dos ativos incluídos no termo
   const termAssets = assets.filter((a) => term.ativoIds.includes(a.id));
@@ -21,14 +26,39 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
     window.print();
   };
 
-  const handleSimulateUploadSigned = () => {
+  // Fase 3 (MED-04): o scan assinado vai para o Storage privado; só a TI envia
+  const handleEnviarAssinado = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!arquivo) return;
+    setErroArquivo(null);
     setUploadingSigned(true);
-    setTimeout(() => {
-      markTermSigned(term.id, 'https://cdn.nexuscorp.com.br/termos/scan-assinado.pdf');
-      setUploadingSigned(false);
+    try {
+      const caminho = await enviarTermoAssinadoDb(term.id, arquivo);
+      markTermSigned(term.id, caminho);
       setUploadedSuccess(true);
       setTimeout(() => setUploadedSuccess(false), 3000);
-    }, 700);
+    } catch (err) {
+      setErroArquivo(`Não foi possível anexar: ${mensagemDeErro(err)}`);
+    } finally {
+      setUploadingSigned(false);
+    }
+  };
+
+  const handleVerAssinado = async () => {
+    if (!termoAtual.arquivoAssinadoUrl) return;
+    setErroArquivo(null);
+    const janela = window.open('', '_blank');
+    try {
+      const url = await linkTemporarioDb(termoAtual.arquivoAssinadoUrl);
+      if (janela) {
+        janela.opener = null;
+        janela.location.href = url;
+      }
+    } catch (err) {
+      janela?.close();
+      setErroArquivo(`Não foi possível abrir o termo assinado: ${mensagemDeErro(err)}`);
+    }
   };
 
   const isEntrega = term.tipo === 'entrega';
@@ -56,21 +86,41 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
           </div>
 
           <div className="flex items-center gap-2">
-            {term.statusAssinatura === 'assinado' ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md border border-emerald-200">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Termo Assinado & Arquivado
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSimulateUploadSigned}
-                disabled={uploadingSigned}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+            {erroArquivo && <span className="text-[11px] text-rose-700 max-w-xs">{erroArquivo}</span>}
+            {uploadedSuccess && <span className="text-[11px] text-emerald-700">Termo assinado anexado.</span>}
+            {termoAtual.statusAssinatura === 'assinado' ? (
+              termoAtual.arquivoAssinadoUrl ? (
+                <button
+                  type="button"
+                  onClick={handleVerAssinado}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md border border-emerald-200 hover:bg-emerald-100"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Ver termo assinado
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md border border-emerald-200">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Termo Assinado & Arquivado
+                </span>
+              )
+            ) : isTI ? (
+              <label
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer ${
+                  uploadingSigned ? 'opacity-50 pointer-events-none' : ''
+                }`}
               >
                 <Upload className="w-3.5 h-3.5" />
-                {uploadingSigned ? 'Anexando...' : 'Anexar Termo Assinado (Scan)'}
-              </button>
+                {uploadingSigned ? 'Enviando...' : 'Anexar termo assinado (PDF ou foto)'}
+                <input
+                  type="file"
+                  accept={TIPOS_ARQUIVO_ACEITOS.filter((t) => t !== 'text/plain').join(',')}
+                  onChange={handleEnviarAssinado}
+                  className="sr-only"
+                />
+              </label>
+            ) : (
+              <span className="text-[11px] text-slate-500">Aguardando assinatura</span>
             )}
 
             <button

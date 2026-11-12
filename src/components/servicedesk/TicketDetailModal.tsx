@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { TicketStatus, TicketPriority } from '../../types/index.ts';
 import { formatDateTime, formatDate, rotuloStatus, rotuloPrioridade } from '../../utils/formatters.ts';
+import { linkTemporarioDb, mensagemDeErro } from '../../services/supabaseDb.ts';
 import {
   X,
   User,
@@ -43,15 +44,60 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     setSelectedAssetIdFor360,
     setSelectedSoftwareIdFor360,
     setSelectedEmployeeIdFor360,
+    concluirOffboarding,
   } = useApp();
 
   const [newMessageText, setNewMessageText] = useState('');
   const [isInternalNote, setIsInternalNote] = useState(false);
   const [onboardingSuccess, setOnboardingSuccess] = useState<string | null>(null);
+  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
+  const [concluindoOffboarding, setConcluindoOffboarding] = useState(false);
+  const [resumoOffboarding, setResumoOffboarding] = useState<string | null>(null);
 
   const ticket = tickets.find((t) => t.id === ticketId);
 
   if (!ticket) return null;
+
+  // Fase 3: anexos privados abrem por link temporário (5 min).
+  // A janela é aberta antes do await para não ser barrada pelo bloqueador de pop-up.
+  const abrirAnexo = async (caminhoOuUrl: string) => {
+    setErroArquivo(null);
+    const janela = window.open('', '_blank');
+    try {
+      const url = await linkTemporarioDb(caminhoOuUrl);
+      if (janela) {
+        janela.opener = null;
+        janela.location.href = url;
+      }
+    } catch (err) {
+      janela?.close();
+      setErroArquivo(`Não foi possível abrir o anexo: ${mensagemDeErro(err)}.`);
+    }
+  };
+
+  const colaboradorDesligado = ticket.offboarding?.colaboradorId
+    ? employees.find((e) => e.id === ticket.offboarding?.colaboradorId)
+    : undefined;
+
+  const handleConcluirOffboarding = async () => {
+    if (!colaboradorDesligado) return;
+    const ok = window.confirm(
+      `Concluir o desligamento de ${colaboradorDesligado.nome}?\n\n` +
+        '• Todos os equipamentos voltam ao estoque (custódia fechada hoje)\n' +
+        '• Todas as licenças são liberadas\n' +
+        '• O acesso ao sistema é encerrado (status "desligado")\n' +
+        '• O chamado é resolvido\n\nEssa ação é registrada e não pode ser desfeita pela tela.'
+    );
+    if (!ok) return;
+    setConcluindoOffboarding(true);
+    const resumo = await concluirOffboarding(ticket.id);
+    setConcluindoOffboarding(false);
+    if (resumo) {
+      setResumoOffboarding(
+        `Desligamento concluído: ${resumo.ativosDevolvidos} equipamento(s) devolvido(s) ao estoque e ${resumo.licencasLiberadas} licença(s) liberada(s).`
+      );
+    }
+  };
 
   const linkedAsset = assets.find((a) => a.id === ticket.ativoId);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
@@ -85,13 +131,19 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
       gestorId: onb.gestorId,
       status: 'ativo',
       dataAdmissao: onb.dataAdmissao,
-      role: onb.papelAcessoSugerido || 'colaborador',
+      // Fase 3: papel de gestão sugerido pelo RH só vale se quem efetiva é ti_admin
+      // (o banco recusaria de qualquer forma); os demais criam como colaborador.
+      role: currentRole === 'ti_admin' ? onb.papelAcessoSugerido || 'colaborador' : 'colaborador',
     });
 
     updateTicketStatus(ticket.id, 'resolvido');
     addTicketMessage(
       ticket.id,
-      `Admissão concluída com sucesso pela equipe de T.I.! Colaborador ${newEmp.nome} cadastrado com matrícula ${newEmp.matricula} e nível de acesso "${newEmp.role || 'colaborador'}".`,
+      `Admissão concluída com sucesso pela equipe de T.I.! Colaborador ${newEmp.nome} cadastrado com matrícula ${newEmp.matricula} e nível de acesso "${newEmp.role || 'colaborador'}".` +
+        (onb.papelAcessoSugerido && onb.papelAcessoSugerido !== newEmp.role
+          ? ` O papel sugerido pelo RH ("${onb.papelAcessoSugerido}") precisa ser aplicado por um Administrador de T.I. em Configurações.`
+          : '') +
+        ' Próximo passo: convidar o e-mail em Authentication → Users no Supabase.',
       false
     );
     setOnboardingSuccess(`Colaborador ${newEmp.nome} cadastrado e chamado finalizado!`);
@@ -182,19 +234,19 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 {ticket.anexos && ticket.anexos.length > 0 && (
                   <div className="pt-2 border-t border-slate-200 mt-2 space-y-1">
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">Anexos</span>
+                    {erroArquivo && <p className="text-[11px] text-rose-700">{erroArquivo}</p>}
                     <div className="flex flex-wrap gap-2">
                       {ticket.anexos.map((att) => (
-                        <a
+                        <button
+                          type="button"
                           key={att.id}
-                          href={att.url}
-                          target="_blank"
-                          rel="noreferrer"
+                          onClick={() => abrirAnexo(att.caminho || att.url)}
                           className="flex items-center gap-1.5 text-xs text-blue-700 bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-blue-50 transition-colors"
                         >
                           <Paperclip className="w-3 h-3 text-slate-400" />
                           <span>{att.nome}</span>
                           <span className="text-[10px] text-slate-400">({att.tamanho})</span>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -241,6 +293,33 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     <div className="text-[11px] text-amber-900 bg-white/80 p-2 rounded border border-amber-200">
                       <span className="font-semibold">Logística:</span> {ticket.offboarding.recolhimentoInstrucoes}
                     </div>
+                  )}
+
+                  {/* Fase 3: conclusão automática (devolve ativos, libera licenças, desliga, resolve) */}
+                  {resumoOffboarding && (
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{resumoOffboarding}</span>
+                    </div>
+                  )}
+                  {isTI && ticket.status !== 'resolvido' && (
+                    colaboradorDesligado ? (
+                      <button
+                        type="button"
+                        onClick={handleConcluirOffboarding}
+                        disabled={concluindoOffboarding}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        {concluindoOffboarding
+                          ? 'Concluindo desligamento...'
+                          : `Concluir desligamento de ${colaboradorDesligado.nome}`}
+                      </button>
+                    ) : (
+                      <p className="text-[11px] text-amber-800">
+                        Este chamado foi aberto antes da automação e não identifica o colaborador: conclua o checklist manualmente.
+                      </p>
+                    )
                   )}
                 </div>
               )}

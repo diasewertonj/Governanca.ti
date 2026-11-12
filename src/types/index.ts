@@ -110,6 +110,9 @@ export interface TicketAttachment {
   id: string;
   nome: string;
   url: string;
+  // Fase 3: caminho no Storage privado (bucket "documentos"). Quando existe,
+  // o link é gerado na hora (URL temporária); `url` fica só para dados antigos/demo.
+  caminho?: string;
   tipo: string;
   tamanho?: string;
   dataUpload: string;
@@ -134,6 +137,7 @@ export interface OffboardingChecklistItem {
 }
 
 export interface OffboardingData {
+  colaboradorId?: string; // Fase 3: quem será desligado (usado pelo offboarding automático)
   dataDesligamento: string;
   redirecionarEmail: boolean;
   redirecionarEmailParaId?: string;

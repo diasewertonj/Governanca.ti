@@ -1,9 +1,28 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
+import { PoliticaPrivacidadeModal } from '../lgpd/PoliticaPrivacidadeModal.tsx';
 import { Shield, Lock, Mail, ArrowRight, UserCheck, Laptop, LifeBuoy, Loader2 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
-  const { login, loginWithGoogle, settings, authError, isSupabaseConnected } = useApp();
+  const { login, loginWithGoogle, settings, authError, isSupabaseConnected, erroLinkAuth, solicitarRecuperacaoSenha } = useApp();
+  const [modoRecuperar, setModoRecuperar] = useState(false);
+  const [msgRecuperacao, setMsgRecuperacao] = useState<string | null>(null);
+  const [enviandoRecuperacao, setEnviandoRecuperacao] = useState(false);
+  const [mostrarPolitica, setMostrarPolitica] = useState(false);
+
+  const handleRecuperar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setEnviandoRecuperacao(true);
+    const res = await solicitarRecuperacaoSenha(email);
+    setEnviandoRecuperacao(false);
+    // Mesma mensagem exista ou não o e-mail (não revela quem tem conta)
+    setMsgRecuperacao(
+      res.success
+        ? 'Se este e-mail tiver acesso ao sistema, você receberá em instantes um link para definir uma nova senha.'
+        : res.error || 'Não foi possível enviar agora. Tente novamente em alguns minutos.'
+    );
+  };
   // Credenciais de exemplo só no modo demonstração (sem Supabase)
   const [email, setEmail] = useState(isSupabaseConnected ? '' : 'admin.ti@nexuscorp.com.br');
   const [password, setPassword] = useState(isSupabaseConnected ? '' : 'nexus@2026');
@@ -137,9 +156,11 @@ export const LoginView: React.FC = () => {
               </div>
             </div>
 
-            {(errorMessage || authError) && (
+            {(errorMessage || authError || erroLinkAuth) && (
               <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
-                {errorMessage || authError}
+                {errorMessage ||
+                  authError ||
+                  `O link do e-mail não é mais válido (${erroLinkAuth}). Peça um novo em "Esqueci minha senha".`}
               </div>
             )}
 
@@ -158,12 +179,55 @@ export const LoginView: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* Fase 3: recuperação de senha */}
+          {isSupabaseConnected && (
+            <div className="border-t border-slate-100 pt-4">
+              {!modoRecuperar ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoRecuperar(true);
+                    setMsgRecuperacao(null);
+                  }}
+                  className="text-xs text-blue-700 hover:underline"
+                >
+                  Esqueci minha senha
+                </button>
+              ) : (
+                <form onSubmit={handleRecuperar} className="space-y-2">
+                  <p className="text-xs text-slate-600">
+                    Informe seu e-mail corporativo no campo acima e enviaremos um link para definir uma nova senha.
+                  </p>
+                  {msgRecuperacao && (
+                    <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">{msgRecuperacao}</div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={enviandoRecuperacao || !email.trim()}
+                      className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg disabled:opacity-50"
+                    >
+                      {enviandoRecuperacao ? 'Enviando...' : 'Enviar link de redefinição'}
+                    </button>
+                    <button type="button" onClick={() => setModoRecuperar(false)} className="text-xs text-slate-500 hover:text-slate-700">
+                      Voltar
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-400">
-          Autenticação corporativa segura via Supabase PostgreSQL · Governança 360°
+          Autenticação corporativa segura via Supabase PostgreSQL · Governança 360° ·{' '}
+          <button type="button" onClick={() => setMostrarPolitica(true)} className="underline hover:text-slate-600">
+            Aviso de privacidade
+          </button>
         </p>
       </div>
+      {mostrarPolitica && <PoliticaPrivacidadeModal settings={settings} onClose={() => setMostrarPolitica(false)} />}
     </div>
   );
 };
