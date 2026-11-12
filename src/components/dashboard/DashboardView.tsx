@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatDate, getWarrantyStatus, formatCurrency, rotuloStatus } from '../../utils/formatters.ts';
+import { formatDate, getWarrantyStatus, rotuloStatus } from '../../utils/formatters.ts';
 import {
   Laptop,
   LifeBuoy,
@@ -8,8 +8,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   ArrowRight,
-  Clock,
-  CheckCircle2,
   AlertTriangle,
   FolderSync,
 } from 'lucide-react';

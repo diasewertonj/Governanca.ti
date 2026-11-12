@@ -12,12 +12,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
-  Minus,
   Search,
-  Building2,
-  Calendar,
   Globe,
-  Receipt,
 } from 'lucide-react';
 
 interface Software360ModalProps {

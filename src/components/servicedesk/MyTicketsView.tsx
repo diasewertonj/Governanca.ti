@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
-import { LifeBuoy, Plus, Laptop, MessageSquare, Clock } from 'lucide-react';
+import { Plus, Laptop } from 'lucide-react';
 
 interface MyTicketsViewProps {
   onOpenNewTicketModal: () => void;

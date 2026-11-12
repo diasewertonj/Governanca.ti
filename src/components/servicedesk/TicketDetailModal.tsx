@@ -1,21 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { TicketStatus, TicketPriority } from '../../types/index.ts';
+import { TicketStatus } from '../../types/index.ts';
 import { formatDateTime, formatDate, rotuloStatus, rotuloPrioridade } from '../../utils/formatters.ts';
 import { linkTemporarioDb, mensagemDeErro } from '../../services/supabaseDb.ts';
 import {
   X,
-  User,
-  Laptop,
-  MessageSquare,
   Lock,
   Send,
   CheckCircle2,
-  Clock,
-  AlertCircle,
   ExternalLink,
-  ShieldAlert,
-  ArrowRight,
   FileCheck,
   Paperclip,
   UserPlus,

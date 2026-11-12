@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatDate } from '../../utils/formatters.ts';
+import {  } from '../../utils/formatters.ts';
 import {
-  Users,
   Search,
   UserPlus,
   Laptop,
   ExternalLink,
-  ShieldCheck,
-  Building,
   User,
 } from 'lucide-react';
 import { NewEmployeeModal } from './NewEmployeeModal.tsx';

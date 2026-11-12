@@ -468,6 +468,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ativo = false;
       subscription.unsubscribe();
     };
+    // Assinatura única do listener de sessão. limparEstado/loadDataFromSupabase/
+    // vincularUsuarioComColaborador só usam setters de estado e o cliente
+    // Supabase (estáveis); reassinar a cada render duplicaria os eventos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -572,7 +576,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     }
 
-    // 2. Modo Offline / Demonstração: Exige senha padrão segura (nexus@2026)
+    // 2. Modo demonstração: só em desenvolvimento local (npm run dev sem Supabase).
+    // No build de produção este trecho e a senha demo nem entram no bundle
+    // (import.meta.env.DEV vira false e o minificador remove o código).
+    if (!import.meta.env.DEV) {
+      return {
+        success: false,
+        error: 'Sistema sem conexão com o banco (Supabase não configurado). Fale com a equipe de T.I.',
+      };
+    }
     const found = employees.find((e) => e.email.toLowerCase() === cleanEmail);
     if (!found) {
       return {

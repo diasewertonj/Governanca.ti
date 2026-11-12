@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../types/database.types.ts';
 
 // Variáveis de ambiente configuráveis na Vercel ou localmente
 const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/^["']|["']$/g, '');
@@ -39,7 +40,7 @@ export const erroLinkAuth = linkAuth.erro;
 
 // Cria o cliente Supabase se as credenciais estiverem preenchidas
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,

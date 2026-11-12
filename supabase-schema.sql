@@ -1,8 +1,12 @@
 -- ==============================================================================
--- NEXUS IT & HR - SCHEMA DE PRODUÇÃO POSTGRESQL (SUPABASE DDL)
+-- NEXUS IT & HR - SCHEMA ORIGINAL (LINHA DE BASE)
 -- ==============================================================================
--- Execute este script no SQL Editor do seu Dashboard Supabase:
--- https://supabase.com/dashboard/project/_/sql
+-- ATENÇÃO: este arquivo é só o ponto de partida histórico. Sozinho ele cria um
+-- banco INSEGURO (policies "using (true)").
+--
+-- Banco novo = este arquivo + TODAS as migrations de supabase/migrations, em
+-- ordem de nome. Veja o README ("Banco de dados"). Os testes (npm run test:db)
+-- montam o banco exatamente assim.
 -- ==============================================================================
 
 -- 1. Habilitar extensão UUID

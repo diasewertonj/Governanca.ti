@@ -2,16 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { AssetCategory, UserRole } from '../../types/index.ts';
 import {
-  Settings,
-  Building2,
-  FolderTree,
-  Sliders,
-  Users,
   CheckCircle2,
   AlertTriangle,
   Plus,
   Trash2,
-  Edit2,
   Database,
   Key,
   RotateCcw,
@@ -562,7 +556,7 @@ export const SettingsView: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo de Dado</label>
                 <select
                   value={novoCampoTipo}
-                  onChange={(e) => setNovoCampoTipo(e.target.value as any)}
+                  onChange={(e) => setNovoCampoTipo(e.target.value as 'text' | 'number' | 'date')}
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                 >
                   <option value="text">Texto Livre</option>
@@ -640,7 +634,7 @@ export const SettingsView: React.FC = () => {
 
               <select
                 value={equipeFilter}
-                onChange={(e) => setEquipeFilter(e.target.value as any)}
+                onChange={(e) => setEquipeFilter(e.target.value as 'todos' | 'operadores')}
                 className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700"
               >
                 <option value="todos">Todos os Colaboradores</option>

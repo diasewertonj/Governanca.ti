@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { AssetCategory, AssetStatus } from '../../types/index.ts';
+import {  } from '../../types/index.ts';
 import { formatDate, formatCurrency, getWarrantyStatus } from '../../utils/formatters.ts';
 import {
-  Laptop,
   Search,
   Plus,
   QrCode,
@@ -13,8 +12,6 @@ import {
   User,
   Users,
   Key,
-  Layers,
-  CheckCircle2,
 } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 
@@ -23,7 +20,6 @@ export const AssetsView: React.FC = () => {
     assets,
     licenses,
     employees,
-    departments,
     setSelectedAssetIdFor360,
     setSelectedSoftwareIdFor360,
     setSoftwareModalOpen,
@@ -53,10 +49,6 @@ export const AssetsView: React.FC = () => {
 
     return matchesCategory && matchesStatus && matchesSearch;
   });
-
-  const getDepartmentName = (depId?: string) => {
-    return departments.find((d) => d.id === depId)?.nome || '-';
-  };
 
   const getCustodian = (colabId?: string) => {
     return employees.find((e) => e.id === colabId);

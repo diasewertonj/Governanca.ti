@@ -12,10 +12,8 @@ import {
   PlusCircle,
   CheckCircle2,
   AlertCircle,
-  Building,
   Mail,
   Phone,
-  ShieldCheck,
 } from 'lucide-react';
 
 interface Employee360ModalProps {
@@ -113,15 +111,6 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   const handleOpenAsset = (assetId: string) => {
     onClose();
     setSelectedAssetIdFor360(assetId);
-  };
-
-  const handleOpenManager = (managerId: string) => {
-    // Alterna para o gestor
-    onClose();
-    setTimeout(() => {
-      // Reabre para o gestor
-      // AppContext seleciona
-    }, 50);
   };
 
   const handleGenerateTerm = async (tipo: 'entrega' | 'devolucao') => {

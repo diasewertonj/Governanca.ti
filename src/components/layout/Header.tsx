@@ -3,13 +3,8 @@ import { useApp } from '../../context/AppContext.tsx';
 import { MeusDadosModal } from '../lgpd/MeusDadosModal.tsx';
 import {
   Shield,
-  User,
-  Users,
   LogOut,
   ChevronDown,
-  RotateCcw,
-  Building2,
-  Check,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -21,10 +16,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
     currentUser,
     currentRole,
     supabaseUser,
-    isSupabaseConnected,
     logout,
-    employees,
-    resetToInitialData,
   } = useApp();
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showMeusDados, setShowMeusDados] = useState(false);
@@ -46,12 +38,6 @@ export const Header: React.FC<HeaderProps> = ({ currentView }) => {
     ti_suporte: { label: 'Suporte T.I.', badgeClass: 'text-cyan-700 bg-cyan-50 border-cyan-200' },
     rh: { label: 'Recursos Humanos', badgeClass: 'text-purple-700 bg-purple-50 border-purple-200' },
     colaborador: { label: 'Colaborador', badgeClass: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-  };
-
-  const handleResetData = () => {
-    if (window.confirm('Deseja restaurar todos os dados para os valores de demonstração padrão?')) {
-      resetToInitialData();
-    }
   };
 
   const userAvatar = currentUser?.avatarUrl || supabaseUser?.avatarUrl;
