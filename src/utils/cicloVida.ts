@@ -82,9 +82,12 @@ export const custoAcumulado = (asset: ComManutencoes & Pick<Asset, 'fiscal'>): n
 export const baixaVigente = (asset: Pick<Asset, 'baixas'>): BaixaAtivo | undefined =>
   asset.baixas?.find((b) => !b.estornadaEm);
 
-/** "Enviar para manutenção": só no estoque ou em uso, sem outra manutenção aberta */
+/**
+ * "Enviar para manutenção": ativo não baixado e sem outra manutenção aberta. Inclui o
+ * status "manutencao" sem registro (devolvido com avaria no desligamento), que ganha o registro.
+ */
 export const podeEnviarParaManutencao = (asset: ComManutencoes & Pick<Asset, 'status'>): boolean =>
-  (asset.status === 'disponivel' || asset.status === 'em_uso') && !manutencaoEmAndamento(asset);
+  asset.status !== 'descartado' && !manutencaoEmAndamento(asset);
 
 /** Por que o banco recusaria abrir a manutenção (null = pode abrir) */
 export function erroAoAbrirManutencao(asset: ComManutencoes & Pick<Asset, 'status' | 'tag'>): string | null {

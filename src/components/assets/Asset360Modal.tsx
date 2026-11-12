@@ -177,7 +177,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors shadow-2xs"
               >
                 <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
-                Enviar para manutenção
+                {asset.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
               </button>
             )}
             <button

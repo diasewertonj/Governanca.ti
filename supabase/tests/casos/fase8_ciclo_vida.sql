@@ -180,6 +180,14 @@ select harness.rodar('fase8', 'M13 sem manutenção aberta, o status "em manuten
     perform harness.afeta($s$update public.ativos set status = 'disponivel' where id = 'ast-8'$s$, 1);
     perform harness.espera($s$select 1 from public.ativos where id = 'ast-8' and status = 'disponivel'$s$, 1);
   end $x$$q$);
+select harness.rodar('fase8', 'M14 ativo "em manutenção" sem registro (avaria no desligamento) ganha o registro', 'ok', :'sup', 'authenticated',
+  $q$do $x$ declare v text; begin
+    perform harness.afeta($s$update public.ativos set status = 'manutencao' where id = 'ast-8'$s$, 1);
+    v := public.abrir_manutencao('ast-8', '{"descricao":"Tela trincada na devolução"}');
+    perform harness.espera($s$select 1 from public.manutencoes where ativo_id = 'ast-8' and status = 'em_andamento'$s$, 1);
+    perform public.encerrar_manutencao(v, 'concluida');
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-8' and status = 'disponivel'$s$, 1);
+  end $x$$q$);
 
 -- Baixa patrimonial
 select harness.rodar('fase8', 'B1 suporte não dá baixa', 'bloqueado', :'sup', 'authenticated',

@@ -89,10 +89,15 @@ describe('custos das manutenções', () => {
 });
 
 describe('enviar para manutenção e concluir', () => {
-  it('só abre com o ativo no estoque ou em uso e sem outra manutenção aberta', () => {
+  it('só abre com o ativo não baixado e sem outra manutenção aberta', () => {
     expect(erroAoAbrirManutencao(ativo())).toBeNull();
     expect(erroAoAbrirManutencao(ativo({ status: 'descartado' }))).toBe('O ativo #P1 está baixado');
-    expect(erroAoAbrirManutencao(ativo({ status: 'manutencao' }))).toBe('O ativo #P1 já está em manutenção');
+    // "em manutenção" sem registro (avaria no desligamento) pode ganhar o registro
+    expect(erroAoAbrirManutencao(ativo({ status: 'manutencao' }))).toBeNull();
+    const aberta = novaManutencao('m-8', 'ast-1', dados, 'emp-sup', agora);
+    expect(erroAoAbrirManutencao(ativo({ status: 'manutencao', historicoManutencao: [aberta] }))).toBe(
+      'O ativo #P1 já está em manutenção'
+    );
   });
 
   it('abrir põe o ativo em manutenção sem mexer na custódia', () => {

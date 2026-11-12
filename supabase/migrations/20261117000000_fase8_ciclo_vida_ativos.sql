@@ -382,8 +382,8 @@ begin
   if v_ativo.status = 'descartado' then
     raise exception 'O ativo % está baixado', v_ativo.tag using errcode = '23514';
   end if;
-  if v_ativo.status = 'manutencao'
-     or exists (select 1 from public.manutencoes where ativo_id = p_ativo and status = 'em_andamento') then
+  -- Status "manutencao" sem registro (ex.: devolvido com avaria no desligamento) pode ganhar o registro
+  if exists (select 1 from public.manutencoes where ativo_id = p_ativo and status = 'em_andamento') then
     raise exception 'O ativo % já está em manutenção', v_ativo.tag using errcode = '23514';
   end if;
 
