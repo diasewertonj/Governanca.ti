@@ -9,6 +9,7 @@ import {
   Clock,
   Receipt,
   Wrench,
+  Pencil,
   ShieldAlert,
   ShieldCheck,
   Copy,
@@ -18,6 +19,8 @@ import {
   Edit2,
   Lock,
 } from 'lucide-react';
+import { NewAssetModal } from './NewAssetModal.tsx';
+import { AnexosAtivo } from './AnexosAtivo.tsx';
 
 interface Asset360ModalProps {
   assetId: string;
@@ -45,6 +48,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   const [selectedNewUser, setSelectedNewUser] = useState<string>('');
   const [motivoDevolucao, setMotivoDevolucao] = useState('');
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
+  const [editando, setEditando] = useState(false);
   const [tempSO, setTempSO] = useState('');
   const [tempBitlocker, setTempBitlocker] = useState('');
 
@@ -123,8 +127,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
+          <div className="flex items-center gap-3 min-w-0">
             <span className="font-mono text-sm font-bold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-md border border-blue-200">
               {asset.tag}
             </span>
@@ -140,7 +144,17 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isTI && asset.status !== 'descartado' && (
+              <button
+                type="button"
+                onClick={() => setEditando(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
+              >
+                <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                Editar
+              </button>
+            )}
             <button
               type="button"
               onClick={handleOpenQrCode}
@@ -151,7 +165,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               Etiqueta QR Code
             </button>
 
-            {(currentRole === 'ti_admin' || currentRole === 'ti_suporte') && (
+            {isTI && asset.status !== 'descartado' && (
               <button
                 type="button"
                 onClick={() => setShowTransferModal(true)}
@@ -636,8 +650,21 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
               </div>
             </div>
           )}
+
+          {/* Fase 8: arquivos (só TI) e observações (todos que veem o ativo) */}
+          {isTI && <AnexosAtivo asset={asset} podeEditar={asset.status !== 'descartado'} />}
+
+          {asset.observacoes && (
+            <div className="border border-slate-200 rounded-lg p-4 space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-100">
+                Observações
+              </h3>
+              <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">{asset.observacoes}</p>
+            </div>
+          )}
         </div>
       </div>
+      {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
     </div>
   );
 };
