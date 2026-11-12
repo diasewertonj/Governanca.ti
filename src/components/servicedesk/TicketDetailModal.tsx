@@ -193,8 +193,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   }[ticket.prioridade];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 overflow-hidden my-0 sm:my-6">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
+      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Barra Superior */}
         {/* Fase 7: no celular o cabeçalho quebra em duas linhas (etiquetas em cima, título embaixo) */}
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50">
@@ -386,7 +386,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     </div>
                   </div>
 
-                  <div className="space-y-2 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                     <div className="bg-white p-2.5 rounded border border-slate-200">
                       <span className="font-semibold text-slate-800 block text-xs">
                         Sugestão de Perfil de Equipamento:
@@ -537,7 +537,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           </div>
 
           {/* Coluna Lateral: Dados Relacionais e Controles */}
-          <div className="p-6 space-y-6 bg-slate-50/50 text-xs">
+          <div className="order-first lg:order-none p-6 space-y-6 bg-slate-50/50 text-xs">
             {/* Controles de Status (para TI) */}
             {isTI && (
               <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
@@ -580,11 +580,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             )}
 
             {/* Vínculo ao Equipamento com Defeito (360°) */}
+            {linkedAsset && (
             <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
               <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
                 Equipamento Vinculado ao Chamado
               </span>
-              {linkedAsset ? (
+              {linkedAsset && (
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-blue-700">{linkedAsset.tag}</span>
@@ -605,10 +606,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     {linkedAsset.marca} {linkedAsset.modelo} · S/N: <span className="font-mono">{linkedAsset.serialNumber}</span>
                   </p>
                 </div>
-              ) : (
-                <p className="text-slate-500 text-xs">Nenhum equipamento físico vinculado.</p>
               )}
             </div>
+            )}
 
             {/* Vínculo a Software / SaaS (360°) */}
             {ticket.softwareId && (
@@ -666,24 +666,19 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 <p className="text-xs text-slate-500">{ticket.solicitanteSetorNome}</p>
                 <p className="text-xs text-slate-500 mt-1">{ticket.solicitanteEmail}</p>
               </div>
-            </div>
-
-            {/* Informações de Categoria */}
-            <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-1.5">
-              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
-                Metadados do Chamado
-              </span>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Tipo:</span>
-                <span className="font-medium capitalize text-slate-800">{ticket.tipo}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Categoria:</span>
-                <span className="font-medium text-slate-800">{ticket.categoria}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Última Atualização:</span>
-                <span className="font-medium text-slate-800">{formatDate(ticket.dataAtualizacao)}</span>
+              <div className="pt-2 mt-1 border-t border-slate-100 space-y-0.5 text-xs">
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Tipo:</span>
+                  <span className="font-medium capitalize text-slate-800">{ticket.tipo}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Categoria:</span>
+                  <span className="font-medium text-slate-800 text-right">{ticket.categoria}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Última atualização:</span>
+                  <span className="font-medium text-slate-800">{formatDate(ticket.dataAtualizacao)}</span>
+                </div>
               </div>
             </div>
           </div>

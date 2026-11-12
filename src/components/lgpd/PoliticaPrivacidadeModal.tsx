@@ -11,7 +11,7 @@ interface Props {
 // ATENÇÃO: texto-base técnico. Deve ser revisado pelo jurídico / encarregado (DPO)
 // antes de ser considerado a política oficial da empresa.
 export const PoliticaPrivacidadeModal: React.FC<Props> = ({ settings, onClose }) => (
-  <div className="fixed inset-0 z-[70] flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 overflow-y-auto">
+  <div className="fixed inset-0 z-[70] flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 overflow-y-auto overscroll-contain modal-tela">
     <div className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 my-0 sm:my-6">
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
         <div className="flex items-center gap-2">

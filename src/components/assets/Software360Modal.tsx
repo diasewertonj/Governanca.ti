@@ -116,8 +116,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 overflow-hidden my-0 sm:my-6">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
+      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-3">
@@ -132,7 +132,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                {license.fornecedor} · Renovação: {formatDate(license.dataRenovacao)}
+                {license.fornecedor}
               </p>
             </div>
           </div>
@@ -194,13 +194,13 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
         )}
 
         {/* Conteúdo em 2 seções */}
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+        <div className="p-6 space-y-6 sm:max-h-[75vh] sm:overflow-y-auto">
           {/* Card de Gestão de Capacidade & Assentos */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
-                  Controle de Capacidade Contratada
+                  Capacidade
                 </span>
                 <div className="flex items-baseline gap-2 mt-0.5">
                   <span className="text-xl font-bold font-mono text-slate-900">
@@ -282,15 +282,15 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   style={{ width: `${Math.min(100, occupancyPercentage)}%` }}
                 />
               </div>
-              <div className="flex justify-between text-xs text-slate-500 font-mono">
-                <span>0</span>
-                <span>{Math.round(license.assentosTotais / 2)}</span>
-                <span>{license.assentosTotais} max</span>
-              </div>
             </div>
+          </div>
 
-            {/* Dados Financeiros e Vigência */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-200/80 text-xs">
+          {/* Card: Contrato e custo */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
+              Contrato e custo
+            </span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div>
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Custo Mensal</span>
                 <span className="font-semibold text-slate-900 font-mono">
@@ -315,6 +315,15 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               </div>
             </div>
           </div>
+
+          {license.observacoes && (
+            <div className="border border-slate-200 rounded-xl p-4 space-y-1">
+              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
+                Observações
+              </span>
+              <p className="text-xs text-slate-700 whitespace-pre-line">{license.observacoes}</p>
+            </div>
+          )}
 
           {/* Seção 2: Atribuição / Alocação de Assento */}
           {isTI && (

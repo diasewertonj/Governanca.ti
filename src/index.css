@@ -18,6 +18,11 @@
   }
 }
 
+/* Janela aberta: a página de trás não rola (inclusive no iPhone) */
+body:has(.modal-tela) {
+  overflow: hidden;
+}
+
 /* Fase 7: em telas de toque, área mínima de 40px para botões e campos */
 @media (pointer: coarse) {
   button,
@@ -28,40 +33,71 @@
   }
 }
 
-/* Sem rolagem lateral: abaixo de 768px cada linha da tabela vira um cartão
-   "rótulo: valor" (o rótulo vem do data-label de cada célula). */
+/* Sem rolagem lateral: abaixo de 768px cada linha da tabela vira um cartão.
+   - 1ª célula (nome/código) é o título do cartão, sem rótulo;
+   - campos do meio: rótulo pequeno em cima, valor embaixo, em 2 colunas
+     (1 coluna em telas bem estreitas);
+   - última célula (ação) no rodapé do cartão.
+   O rótulo vem do data-label de cada célula. */
 @media (max-width: 767px) {
   .tabela-cartoes thead {
     display: none;
   }
   .tabela-cartoes,
-  .tabela-cartoes tbody,
-  .tabela-cartoes tr {
+  .tabela-cartoes tbody {
     display: block;
     width: 100%;
   }
   .tabela-cartoes tr {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e2e8f0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+    margin: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
   }
   .tabela-cartoes td {
     display: flex;
+    flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
-    width: 100%;
-    padding: 0.25rem 0;
+    gap: 0.125rem;
+    min-width: 0;
+    padding: 0;
     text-align: left;
     white-space: normal;
-  }
-  .tabela-cartoes td > * {
-    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .tabela-cartoes td[data-label]::before {
     content: attr(data-label);
-    flex: 0 0 7rem;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     font-size: 0.75rem;
-    font-weight: 600;
-    color: #475569;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #64748b;
+  }
+  .tabela-cartoes td:first-child,
+  .tabela-cartoes td:last-child,
+  .tabela-cartoes td[colspan] {
+    grid-column: 1 / -1;
+  }
+  .tabela-cartoes td:first-child::before,
+  .tabela-cartoes td:last-child::before {
+    display: none;
+  }
+  .tabela-cartoes td:last-child:not([colspan]) {
+    flex-direction: row;
+    justify-content: flex-end;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+  }
+}
+
+@media (max-width: 420px) {
+  .tabela-cartoes tr {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

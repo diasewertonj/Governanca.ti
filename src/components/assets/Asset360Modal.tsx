@@ -120,8 +120,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
   }[asset.status];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 overflow-hidden my-0 sm:my-6">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
+      <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-3">
@@ -239,7 +239,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
         )}
 
         {/* Conteúdo com scroll */}
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+        <div className="p-6 space-y-6 sm:max-h-[75vh] sm:overflow-y-auto">
           {/* Card de Status & Custódia Atual (Rastreabilidade 360°) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
@@ -293,9 +293,15 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             </div>
           </div>
 
-          {/* Sistema Operacional & Segurança BitLocker (Hardware) */}
+          {/* Especificações técnicas: SO/BitLocker (hardware) + atributos personalizados */}
+          {(asset.categoria === 'hardware' ||
+            (asset.customFields && Object.keys(asset.customFields).length > 0)) && (
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-white">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-100">
+            Especificações técnicas
+          </h3>
           {asset.categoria === 'hardware' && (
-            <div className="border border-slate-200 rounded-lg p-5 space-y-3 bg-white">
+            <div className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-blue-600" />
@@ -436,17 +442,34 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             </div>
           )}
 
+          {asset.customFields && Object.keys(asset.customFields).length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+              {Object.entries(asset.customFields).map(([key, value]) => (
+                <div key={key} className="bg-slate-50/70 p-2 rounded border border-slate-100">
+                  <span className="text-xs text-slate-500 uppercase font-semibold block">{key}</span>
+                  <span className="font-medium text-slate-800">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          </div>
+          )}
+
           {/* Dados Fiscais e Garantia com Alerta Visual */}
-          <div className="border border-slate-200 rounded-lg p-5 space-y-4">
+          <div className="border border-slate-200 rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-slate-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Dados Fiscais, Financeiros & Garantia
+                  Dados fiscais, financeiros e garantia
                 </h3>
               </div>
               {/* Badge de Garantia */}
               <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500">
+                  <span className="uppercase font-semibold">Fim da garantia:</span>{' '}
+                  <span className="font-medium text-slate-800">{formatDate(asset.fiscal?.dataGarantia)}</span>
+                </span>
                 {warranty.status === 'valida' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md border border-emerald-200">
                     <ShieldCheck className="w-3.5 h-3.5" />
@@ -525,25 +548,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
             )}
           </div>
 
-          {/* Atributos Personalizados por Categoria */}
-          {asset.customFields && Object.keys(asset.customFields).length > 0 && (
-            <div className="border border-slate-200 rounded-lg p-5 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-100">
-                Especificações Técnicas Personalizadas
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                {Object.entries(asset.customFields).map(([key, value]) => (
-                  <div key={key} className="bg-slate-50/70 p-2 rounded border border-slate-100">
-                    <span className="text-xs text-slate-500 uppercase font-semibold block">{key}</span>
-                    <span className="font-medium text-slate-800">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Histórico Cronológico de Custódia (Rastreabilidade 360°) */}
-          <div className="border border-slate-200 rounded-lg p-5 space-y-3">
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between pb-1 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-slate-600" />
@@ -606,7 +612,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
 
           {/* Histórico de Manutenções e Upgrades */}
           {asset.historicoManutencao.length > 0 && (
-            <div className="border border-slate-200 rounded-lg p-5 space-y-3">
+            <div className="border border-slate-200 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
                 <Wrench className="w-4 h-4 text-slate-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
