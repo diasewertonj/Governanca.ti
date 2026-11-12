@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 import { AnexosAtivo } from './AnexosAtivo.tsx';
+import { LembreteGarantia } from './LembreteGarantia.tsx';
 
 interface Asset360ModalProps {
   assetId: string;
@@ -120,7 +121,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
     disponivel: { label: 'Disponível em Estoque', textClass: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
     em_uso: { label: 'Em Uso / Alocado', textClass: 'text-blue-700 bg-blue-50 border-blue-200' },
     manutencao: { label: 'Em Manutenção', textClass: 'text-amber-700 bg-amber-50 border-amber-200' },
-    descartado: { label: 'Baixado / Descartado', textClass: 'text-slate-500 bg-slate-100 border-slate-200' },
+    descartado: { label: 'Baixado', textClass: 'text-slate-500 bg-slate-100 border-slate-200' },
   }[asset.status];
 
   return (
@@ -501,6 +502,9 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, onClose }
                     <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
                     {warranty.label}
                   </span>
+                )}
+                {(warranty.status === 'expirando' || warranty.status === 'expirada') && asset.status !== 'descartado' && (
+                  <LembreteGarantia asset={asset} />
                 )}
               </div>
             </div>

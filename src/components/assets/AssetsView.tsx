@@ -32,14 +32,18 @@ export const AssetsView: React.FC = () => {
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
   const [categoryFilter, setCategoryFilter] = useState<string>('todos');
-  const [statusFilter, setStatusFilter] = useState<string>('todos');
+  const [statusFilter, setStatusFilter] = useState<string>('ativos');
+  const [garantiaFilter, setGarantiaFilter] = useState<string>('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewAssetModal, setShowNewAssetModal] = useState(false);
 
   // Filtro de ativos
   const filteredAssets = assets.filter((asset) => {
     const matchesCategory = categoryFilter === 'todos' || asset.categoria === categoryFilter;
-    const matchesStatus = statusFilter === 'todos' || asset.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'ativos' ? asset.status !== 'descartado' : asset.status === statusFilter;
+    const matchesGarantia =
+      garantiaFilter === 'todas' || getWarrantyStatus(asset.fiscal?.dataGarantia).status === garantiaFilter;
     const matchesSearch =
       asset.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       asset.tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -47,7 +51,7 @@ export const AssetsView: React.FC = () => {
       asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (asset.fiscal?.numeroNF && asset.fiscal.numeroNF.includes(searchTerm));
 
-    return matchesCategory && matchesStatus && matchesSearch;
+    return matchesCategory && matchesStatus && matchesGarantia && matchesSearch;
   });
 
   const getCustodian = (colabId?: string) => {
@@ -156,12 +160,26 @@ export const AssetsView: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700"
+                aria-label="Filtrar por status"
+                className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
               >
-                <option value="todos">Todos os Status</option>
+                <option value="ativos">Todos (exceto baixados)</option>
                 <option value="em_uso">Em Uso (Alocado)</option>
                 <option value="disponivel">Disponível em Estoque</option>
                 <option value="manutencao">Em Manutenção</option>
+                <option value="descartado">Baixados</option>
+              </select>
+
+              <select
+                value={garantiaFilter}
+                onChange={(e) => setGarantiaFilter(e.target.value)}
+                aria-label="Filtrar por garantia"
+                className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+              >
+                <option value="todas">Garantia: todas</option>
+                <option value="expirando">Vencendo</option>
+                <option value="expirada">Vencida</option>
+                <option value="sem_data">Sem data</option>
               </select>
             </div>
           )}

@@ -304,6 +304,8 @@ export interface Lembrete {
   status: 'aberto' | 'feito' | 'cancelado';
   chamadoId?: string;
   colaboradorId?: string;
+  ativoId?: string;
+  contratoId?: string;
   itemId?: string;
   criadoPor?: string;
   criadoEm: string;

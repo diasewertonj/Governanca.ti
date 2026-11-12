@@ -792,10 +792,12 @@ export type Database = {
       }
       lembretes: {
         Row: {
+          ativo_id: string | null
           chamado_id: string | null
           colaborador_id: string | null
           concluido_em: string | null
           concluido_por: string | null
+          contrato_id: string | null
           criado_em: string
           criado_por: string | null
           descricao: string | null
@@ -807,10 +809,12 @@ export type Database = {
           vence_em: string
         }
         Insert: {
+          ativo_id?: string | null
           chamado_id?: string | null
           colaborador_id?: string | null
           concluido_em?: string | null
           concluido_por?: string | null
+          contrato_id?: string | null
           criado_em?: string
           criado_por?: string | null
           descricao?: string | null
@@ -822,10 +826,12 @@ export type Database = {
           vence_em: string
         }
         Update: {
+          ativo_id?: string | null
           chamado_id?: string | null
           colaborador_id?: string | null
           concluido_em?: string | null
           concluido_por?: string | null
+          contrato_id?: string | null
           criado_em?: string
           criado_por?: string | null
           descricao?: string | null

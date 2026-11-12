@@ -1072,6 +1072,8 @@ export async function fetchLembretesFromDb(): Promise<Lembrete[] | null> {
     status: l.status as Lembrete['status'],
     chamadoId: l.chamado_id || undefined,
     colaboradorId: l.colaborador_id || undefined,
+    ativoId: l.ativo_id || undefined,
+    contratoId: l.contrato_id || undefined,
     itemId: l.item_id || undefined,
     criadoPor: l.criado_por || undefined,
     criadoEm: l.criado_em,
@@ -1081,7 +1083,9 @@ export async function fetchLembretesFromDb(): Promise<Lembrete[] | null> {
   }));
 }
 
-export async function criarLembreteDb(l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId'>) {
+export async function criarLembreteDb(
+  l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId'>
+) {
   if (!supabase) return null;
   const data = await checar(
     supabase
@@ -1092,6 +1096,8 @@ export async function criarLembreteDb(l: Pick<Lembrete, 'titulo' | 'descricao' |
         vence_em: l.venceEm,
         chamado_id: l.chamadoId || null,
         colaborador_id: l.colaboradorId || null,
+        ativo_id: l.ativoId || null,
+        contrato_id: l.contratoId || null,
       })
       .select('id')
       .single()
