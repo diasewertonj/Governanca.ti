@@ -7,9 +7,12 @@ import {
   CatalogoItem,
   ColaboradorRecurso,
   CompanySettings,
+  Contrato,
   CustodyHistoryEntry,
   Department,
   Employee,
+  Fatura,
+  Fornecedor,
   Lembrete,
   ProcessoItem,
   ProcessoItemRascunho,
@@ -24,8 +27,11 @@ import {
 import {
   INITIAL_ASSETS,
   INITIAL_COMPANY_SETTINGS,
+  INITIAL_CONTRATOS,
   INITIAL_DEPARTMENTS,
   INITIAL_EMPLOYEES,
+  INITIAL_FATURAS,
+  INITIAL_FORNECEDORES,
   INITIAL_LICENSES,
   INITIAL_TERMS,
   INITIAL_TICKETS,
@@ -97,6 +103,19 @@ import {
   aceitarTermoDb,
   dispensarAssinaturaTermoDb,
   acessoNexusDb,
+  fetchFornecedoresFromDb,
+  insertFornecedorDb,
+  updateFornecedorDb,
+  deleteFornecedorDb,
+  fetchContratosFromDb,
+  insertContratoDb,
+  updateContratoDb,
+  deleteContratoDb,
+  fetchFaturasFromDb,
+  insertFaturaDb,
+  updateFaturaDb,
+  deleteFaturaDb,
+  gravarArquivoDb,
 } from '../services/supabaseDb.ts';
 import { CATALOGO_PADRAO } from '../utils/processos.ts';
 
@@ -229,6 +248,24 @@ interface AppContextType {
   encerrarLembrete: (id: string, status: 'feito' | 'cancelado', observacao?: string) => Promise<string | null>;
   aceitarTermo: (termoId: string) => Promise<string | null>;
   dispensarAssinaturaTermo: (termoId: string, motivo: string) => Promise<string | null>;
+
+  // Fase 8 · Fornecedores, contratos e faturas (só a T.I.; gravação otimista)
+  fornecedores: Fornecedor[];
+  contratos: Contrato[];
+  faturas: Fatura[];
+  criarFornecedor: (dados: Omit<Fornecedor, 'id' | 'criadoEm' | 'criadoPor'>) => Fornecedor;
+  alterarFornecedor: (id: string, mudancas: Partial<Fornecedor>) => void;
+  excluirFornecedor: (id: string) => { success: boolean; message?: string };
+  criarContrato: (dados: Omit<Contrato, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>) => Contrato;
+  alterarContrato: (id: string, mudancas: Partial<Contrato>) => void;
+  excluirContrato: (id: string) => { success: boolean; message?: string };
+  lancarFatura: (dados: Omit<Fatura, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>) => Fatura;
+  alterarFatura: (id: string, mudancas: Partial<Fatura>) => void;
+  excluirFatura: (id: string) => void;
+  /** Sobe o arquivo do contrato/fatura (espera o registro novo ser gravado); false se falhar */
+  anexarArquivoContrato: (contratoId: string, arquivo: File) => Promise<boolean>;
+  anexarArquivoFatura: (faturaId: string, arquivo: File) => Promise<boolean>;
+
   erroLinkAuth: string | null;
   solicitarRecuperacaoSenha: (email: string) => Promise<{ success: boolean; error?: string }>;
   definirNovaSenha: (senha: string) => Promise<{ success: boolean; error?: string }>;
@@ -372,6 +409,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [recursos, setRecursos] = useState<ColaboradorRecurso[]>([]);
   const [lembretes, setLembretes] = useState<Lembrete[]>([]);
 
+  // Fase 8: fornecedores, contratos e faturas (no modo demonstração, só em memória)
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(isProduction ? [] : INITIAL_FORNECEDORES);
+  const [contratos, setContratos] = useState<Contrato[]>(isProduction ? [] : INITIAL_CONTRATOS);
+  const [faturas, setFaturas] = useState<Fatura[]>(isProduction ? [] : INITIAL_FATURAS);
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     if (isProduction) return null;
     return localStorage.getItem(STORAGE_KEYS.USER) || 'emp-1';
@@ -406,6 +448,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProcessoItens([]);
     setRecursos([]);
     setLembretes([]);
+    setFornecedores([]);
+    setContratos([]);
+    setFaturas([]);
     setCurrentUserId(null);
     setSupabaseUser(null);
     limparCacheLocal();
@@ -486,6 +531,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbItens) setProcessoItens(dbItens);
         if (dbRecursos) setRecursos(dbRecursos);
         if (dbLembretes) setLembretes(dbLembretes);
+
+        // Fase 8: só a T.I. lê (para os demais a RLS devolve vazio; sem a migration, também)
+        const [dbFornecedores, dbContratos, dbFaturas] = await Promise.all([
+          fetchFornecedoresFromDb(),
+          fetchContratosFromDb(),
+          fetchFaturasFromDb(),
+        ]);
+        if (dbFornecedores) setFornecedores(dbFornecedores);
+        if (dbContratos) setContratos(dbContratos);
+        if (dbFaturas) setFaturas(dbFaturas);
 
         // Configurações
         if (dbSettings) {
@@ -862,7 +917,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setAssets((prev) => [novo, ...prev]);
     const insercao = insertAssetDb(novo);
-    insercoesDeAtivo.current.set(novo.id, insercao);
+    insercoes.current.set(novo.id, insercao);
     persistir(
       insercao,
       () => setAssets((prev) => prev.filter((a) => a.id !== novo.id)),
@@ -871,12 +926,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return novo;
   };
 
-  // Fase 8: o anexo de um ativo recém-cadastrado espera a gravação do ativo terminar
-  const insercoesDeAtivo = useRef(new Map<string, Promise<unknown>>());
+  // Fase 8: o arquivo de um registro recém-cadastrado (ativo, contrato, fatura)
+  // espera a gravação do registro terminar
+  const insercoes = useRef(new Map<string, Promise<unknown>>());
 
   const anexarArquivoAtivo: AppContextType['anexarArquivoAtivo'] = async (ativoId, arquivo, categoria, vinculo) => {
     try {
-      await insercoesDeAtivo.current.get(ativoId);
+      await insercoes.current.get(ativoId);
       const anexo = await enviarAnexoAtivoDb(ativoId, arquivo, categoria, vinculo);
       setAssets((prev) => prev.map((a) => (a.id === ativoId ? { ...a, anexos: [...(a.anexos || []), anexo] } : a)));
       return true;
@@ -999,6 +1055,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: `Não é possível excluir. Existem ${found.colaboradoresIds.length} colaborador(es) com assento ativo nesta licença. Libere os assentos primeiro.`,
       };
     }
+    // Fase 8: faturas e contratos guardam o histórico de custo da licença
+    if (faturas.some((f) => f.licencaId === id) || contratos.some((c) => c.itens.some((i) => i.licencaId === id))) {
+      return {
+        success: false,
+        message: 'Não é possível excluir. A licença tem faturas lançadas ou está coberta por um contrato.',
+      };
+    }
     setLicenses((prev) => prev.filter((l) => l.id !== id));
     persistir(deleteLicenseDb(id), () => setLicenses((prev) => [found, ...prev]), `Não foi possível excluir a licença ${found.nome}`);
     return { success: true };
@@ -1037,6 +1100,155 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Não foi possível liberar o assento em ${antes.nome}`
     );
   };
+
+  // ---------------------------------------------------------------------------
+  // Fase 8 · Fornecedores, contratos e faturas (só a T.I.). A tela muda na hora
+  // e volta atrás se o banco recusar (persistir). Arquivos sobem depois do registro.
+  // ---------------------------------------------------------------------------
+  const criarFornecedor = (dados: Omit<Fornecedor, 'id' | 'criadoEm' | 'criadoPor'>): Fornecedor => {
+    const novo: Fornecedor = { ...dados, id: novoId('forn'), criadoEm: new Date().toISOString() };
+    setFornecedores((prev) => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+    persistir(
+      insertFornecedorDb(novo),
+      () => setFornecedores((prev) => prev.filter((f) => f.id !== novo.id)),
+      `Não foi possível cadastrar o fornecedor ${novo.nome}`
+    );
+    return novo;
+  };
+
+  const alterarFornecedor = (id: string, mudancas: Partial<Fornecedor>) => {
+    const antes = fornecedores.find((f) => f.id === id);
+    if (!antes) return;
+    const depois: Fornecedor = { ...antes, ...mudancas };
+    setFornecedores((prev) => trocar(prev, depois));
+    persistir(
+      updateFornecedorDb(antes, depois),
+      () => setFornecedores((prev) => trocar(prev, antes)),
+      `Não foi possível salvar o fornecedor ${antes.nome}`
+    );
+  };
+
+  const excluirFornecedor = (id: string): { success: boolean; message?: string } => {
+    const antes = fornecedores.find((f) => f.id === id);
+    if (!antes) return { success: false, message: 'Fornecedor não encontrado.' };
+    const vinculado =
+      contratos.some((c) => c.fornecedorId === id) ||
+      assets.some((a) => a.fornecedorId === id) ||
+      licenses.some((l) => l.fornecedorId === id);
+    if (vinculado) {
+      return {
+        success: false,
+        message: `${antes.nome} está vinculado a contratos, ativos ou licenças e não pode ser excluído. Desative o fornecedor para tirá-lo das listas de escolha.`,
+      };
+    }
+    setFornecedores((prev) => prev.filter((f) => f.id !== id));
+    persistir(
+      deleteFornecedorDb(id),
+      () => setFornecedores((prev) => [...prev, antes].sort((a, b) => a.nome.localeCompare(b.nome))),
+      `Não foi possível excluir o fornecedor ${antes.nome}`
+    );
+    return { success: true };
+  };
+
+  const criarContrato = (dados: Omit<Contrato, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>): Contrato => {
+    const novo: Contrato = { ...dados, id: novoId('ctr'), criadoEm: new Date().toISOString() };
+    setContratos((prev) => [novo, ...prev]);
+    const insercao = insertContratoDb(novo);
+    insercoes.current.set(novo.id, insercao);
+    persistir(
+      insercao,
+      () => setContratos((prev) => prev.filter((c) => c.id !== novo.id)),
+      `Não foi possível cadastrar o contrato ${novo.numero || novo.descricao}`
+    );
+    return novo;
+  };
+
+  const alterarContrato = (id: string, mudancas: Partial<Contrato>) => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return;
+    const depois: Contrato = { ...antes, ...mudancas };
+    setContratos((prev) => trocar(prev, depois));
+    persistir(
+      updateContratoDb(antes, depois),
+      () => setContratos((prev) => trocar(prev, antes)),
+      `Não foi possível salvar o contrato ${antes.numero || antes.descricao}`
+    );
+  };
+
+  const excluirContrato = (id: string): { success: boolean; message?: string } => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return { success: false, message: 'Contrato não encontrado.' };
+    const qtdFaturas = faturas.filter((f) => f.contratoId === id).length;
+    if (qtdFaturas > 0) {
+      return {
+        success: false,
+        message: `O contrato tem ${qtdFaturas} fatura(s) lançada(s) e não pode ser excluído. As faturas guardam o histórico de custo.`,
+      };
+    }
+    setContratos((prev) => prev.filter((c) => c.id !== id));
+    persistir(
+      deleteContratoDb(antes),
+      () => setContratos((prev) => [antes, ...prev]),
+      `Não foi possível excluir o contrato ${antes.numero || antes.descricao}`
+    );
+    return { success: true };
+  };
+
+  const lancarFatura = (dados: Omit<Fatura, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>): Fatura => {
+    const nova: Fatura = { ...dados, id: novoId('fat'), criadoEm: new Date().toISOString() };
+    setFaturas((prev) => [nova, ...prev]);
+    const insercao = insertFaturaDb(nova);
+    insercoes.current.set(nova.id, insercao);
+    persistir(
+      insercao,
+      () => setFaturas((prev) => prev.filter((f) => f.id !== nova.id)),
+      'Não foi possível lançar a fatura'
+    );
+    return nova;
+  };
+
+  const alterarFatura = (id: string, mudancas: Partial<Fatura>) => {
+    const antes = faturas.find((f) => f.id === id);
+    if (!antes) return;
+    const depois: Fatura = { ...antes, ...mudancas };
+    setFaturas((prev) => trocar(prev, depois));
+    persistir(updateFaturaDb(antes, depois), () => setFaturas((prev) => trocar(prev, antes)), 'Não foi possível salvar a fatura');
+  };
+
+  const excluirFatura = (id: string) => {
+    const antes = faturas.find((f) => f.id === id);
+    if (!antes) return;
+    setFaturas((prev) => prev.filter((f) => f.id !== id));
+    persistir(deleteFaturaDb(antes), () => setFaturas((prev) => [antes, ...prev]), 'Não foi possível excluir a fatura');
+  };
+
+  const anexarArquivoRegistro = async (
+    tabela: 'contratos' | 'faturas',
+    id: string,
+    arquivo: File,
+    anterior: string | undefined,
+    aplicar: (caminho: string) => void
+  ) => {
+    try {
+      await insercoes.current.get(id);
+      aplicar(await gravarArquivoDb(tabela, id, arquivo, anterior));
+      return true;
+    } catch (err) {
+      console.error(`Arquivo (${tabela})`, err);
+      setDbErro(`Não foi possível anexar "${arquivo.name}": ${mensagemDeErro(err)}.`);
+      return false;
+    }
+  };
+
+  const anexarArquivoContrato = (contratoId: string, arquivo: File) =>
+    anexarArquivoRegistro('contratos', contratoId, arquivo, contratos.find((c) => c.id === contratoId)?.arquivoCaminho, (caminho) =>
+      setContratos((prev) => prev.map((c) => (c.id === contratoId ? { ...c, arquivoCaminho: caminho } : c)))
+    );
+
+  const anexarArquivoFatura = (faturaId: string, arquivo: File) =>
+    anexarArquivoRegistro('faturas', faturaId, arquivo, faturas.find((f) => f.id === faturaId)?.arquivoCaminho, (caminho) =>
+      setFaturas((prev) => prev.map((f) => (f.id === faturaId ? { ...f, arquivoCaminho: caminho } : f)))
+    );
 
   // Service Desk / Chamados
   const createTicket = async (
@@ -1585,6 +1797,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTickets(INITIAL_TICKETS);
     setTerms(INITIAL_TERMS);
     setSettings(INITIAL_COMPANY_SETTINGS);
+    setFornecedores(INITIAL_FORNECEDORES);
+    setContratos(INITIAL_CONTRATOS);
+    setFaturas(INITIAL_FATURAS);
     setCurrentUserId('emp-1');
   };
 
@@ -1629,6 +1844,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLicenses([]);
     setTickets([]);
     setTerms([]);
+    setFornecedores([]);
+    setContratos([]);
+    setFaturas([]);
     if (activeAdmin) {
       setCurrentUserId(activeAdmin.id);
       localStorage.setItem(STORAGE_KEYS.USER, activeAdmin.id);
@@ -1676,6 +1894,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         encerrarLembrete,
         aceitarTermo,
         dispensarAssinaturaTermo,
+        fornecedores,
+        contratos,
+        faturas,
+        criarFornecedor,
+        alterarFornecedor,
+        excluirFornecedor,
+        criarContrato,
+        alterarContrato,
+        excluirContrato,
+        lancarFatura,
+        alterarFatura,
+        excluirFatura,
+        anexarArquivoContrato,
+        anexarArquivoFatura,
         solicitarRecuperacaoSenha,
         definirNovaSenha,
         loginWithGoogle,
