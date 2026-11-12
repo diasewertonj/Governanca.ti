@@ -5,6 +5,7 @@ import { X, Plus, Save } from 'lucide-react';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
+import { isoLocal } from '../../utils/formatters.ts';
 
 interface NewAssetModalProps {
   onClose: () => void;
@@ -54,7 +55,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   const [fornecedorId, setFornecedorId] = useState(ativo?.fornecedorId ?? '');
   const [fornecedor, setFornecedor] = useState(fiscalAtual?.fornecedor ?? '');
   const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
-  const [dataAquisicao, setDataAquisicao] = useState(fiscalAtual?.dataAquisicao ?? new Date().toISOString().split('T')[0]);
+  const [dataAquisicao, setDataAquisicao] = useState(() => fiscalAtual?.dataAquisicao ?? isoLocal(new Date()));
   const [dataGarantia, setDataGarantia] = useState(fiscalAtual?.dataGarantia ?? '');
   const [suporteContato, setSuporteContato] = useState(fiscalAtual?.suporteContato ?? '');
 
@@ -137,7 +138,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = isoLocal(new Date());
     const isEmUso = Boolean(custodianteId);
     const custodian = employees.find((e) => e.id === custodianteId);
 
