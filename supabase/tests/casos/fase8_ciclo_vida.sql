@@ -147,6 +147,39 @@ select harness.rodar('fase8', 'M8 manutenção já feita (histórico) não muda 
   end $x$$q$);
 select harness.rodar('fase8', 'M9 descrição vazia é recusada', 'erro: Descreva o problema ou o serviço', :'sup', 'authenticated',
   $q$select public.abrir_manutencao('ast-8', '{"descricao":"  "}')$q$);
+select harness.rodar('fase8', 'M10 devolução no desligamento mantém "em manutenção"; concluir volta para "disponível"', 'ok', :'sup', 'authenticated',
+  $q$do $x$ declare v text; begin
+    v := public.abrir_manutencao('ast-1', '{"descricao":"Teclado"}');
+    perform public.concluir_offboarding('tkt-off1');
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-1' and status = 'manutencao' and custodiante_id is null$s$, 1);
+    perform harness.espera($s$select 1 from public.historico_custodia where id = 'h-1' and data_devolucao = current_date$s$, 1);
+    perform public.encerrar_manutencao(v, 'concluida');
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-1' and status = 'disponivel'$s$, 1);
+  end $x$$q$);
+select harness.rodar('fase8', 'M11 transferência mantém "em manutenção" e troca a custódia; concluir volta para "em uso"', 'ok', :'sup', 'authenticated',
+  $q$do $x$ declare v text; begin
+    v := public.abrir_manutencao('ast-2', '{"descricao":"Bateria"}');
+    perform harness.afeta($s$update public.ativos set custodiante_id = 'emp-colab', status = 'em_uso', data_entrega_atual = current_date
+      where id = 'ast-2'$s$, 1);
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-2' and status = 'manutencao' and custodiante_id = 'emp-colab'$s$, 1);
+    perform public.encerrar_manutencao(v, 'concluida', '{"custo":"200"}');
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-2' and status = 'em_uso' and custodiante_id = 'emp-colab'$s$, 1);
+  end $x$$q$);
+select harness.rodar('fase8', 'M12 devolução de ativo em manutenção, depois cancelada, volta para "disponível"', 'ok', :'sup', 'authenticated',
+  $q$do $x$ declare v text; begin
+    v := public.abrir_manutencao('ast-2', '{"descricao":"Tela"}');
+    perform harness.afeta($s$update public.ativos set custodiante_id = null, status = 'disponivel', data_entrega_atual = null
+      where id = 'ast-2'$s$, 1);
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-2' and status = 'manutencao'$s$, 1);
+    perform public.encerrar_manutencao(v, 'cancelada');
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-2' and status = 'disponivel' and custodiante_id is null$s$, 1);
+  end $x$$q$);
+select harness.rodar('fase8', 'M13 sem manutenção aberta, o status "em manutenção" sai normalmente', 'ok', :'sup', 'authenticated',
+  $q$do $x$ begin
+    perform harness.afeta($s$update public.ativos set status = 'manutencao' where id = 'ast-8'$s$, 1);
+    perform harness.afeta($s$update public.ativos set status = 'disponivel' where id = 'ast-8'$s$, 1);
+    perform harness.espera($s$select 1 from public.ativos where id = 'ast-8' and status = 'disponivel'$s$, 1);
+  end $x$$q$);
 
 -- Baixa patrimonial
 select harness.rodar('fase8', 'B1 suporte não dá baixa', 'bloqueado', :'sup', 'authenticated',

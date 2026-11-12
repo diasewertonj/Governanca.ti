@@ -11,7 +11,8 @@
 -- 6. ativo_baixas            baixa patrimonial com motivo, destino e estorno
 -- 7. ativo_anexos            NF, orçamento, OS, laudo, foto, evidência (arquivo no Storage)
 -- 8. lembretes               + ativo_id e contrato_id
--- 9. triggers                autoria carimbada pelo banco; proteção do ativo baixado
+-- 9. triggers                autoria carimbada pelo banco; proteção do ativo baixado;
+--                            ativo em manutenção não perde o status ao mudar de mãos
 -- 10. RLS e Storage          só TI lê e grava; baixa só ti_admin; pastas ativos/, contratos/, faturas/
 -- 11. RPCs                   abrir_manutencao, encerrar_manutencao, baixar_ativo, estornar_baixa
 -- ==============================================================================
@@ -237,6 +238,35 @@ create or replace trigger trg_ativos_proteger_baixa
   before insert or update on public.ativos
   for each row execute function public.proteger_ativo_baixado();
 
+-- Ativo com manutenção em andamento continua "em manutenção" quando muda de mãos (devolução no
+-- desligamento das Fases 3/6, transferência de custódia). Só encerrar_manutencao o tira desse
+-- estado (flag app.operacao_manutencao). security definer: a devolução pode ser feita por quem
+-- não lê manutenções (RLS), e mesmo assim o status precisa ser mantido.
+-- Ordem: dispara antes de trg_ativos_proteger_baixa (gatilhos BEFORE seguem a ordem alfabética
+-- do nome). Não há conflito: este só troca disponível/em uso por manutenção; aquele só trata o
+-- estado "descartado", que nenhum dos dois produz aqui.
+create or replace function public.manter_status_manutencao()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('app.operacao_manutencao', true), '') <> 'sim'
+     and exists (select 1 from public.manutencoes where ativo_id = old.id and status = 'em_andamento') then
+    new.status := 'manutencao';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.manter_status_manutencao() from public, anon, authenticated;
+
+create or replace trigger trg_ativos_manter_manutencao
+  before update on public.ativos
+  for each row
+  when (old.status = 'manutencao' and new.status in ('disponivel', 'em_uso'))
+  execute function public.manter_status_manutencao();
+
 -- Registro de baixa não é apagado; só o estorno altera
 create or replace function public.proteger_registro_baixa()
 returns trigger
@@ -412,9 +442,12 @@ begin
       encerrado_em  = now()
   where id = p_manutencao;
 
+  -- Única saída de "em manutenção" quando há manutenção aberta (ver manter_status_manutencao)
+  perform set_config('app.operacao_manutencao', 'sim', true);
   update public.ativos
   set status = case when custodiante_id is not null then 'em_uso' else 'disponivel' end
   where id = v_m.ativo_id and status = 'manutencao';
+  perform set_config('app.operacao_manutencao', '', true);
 end;
 $$;
 
