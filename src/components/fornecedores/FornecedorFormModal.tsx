@@ -75,7 +75,9 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
       alterarFornecedor(fornecedor.id, dados);
       onSalvo?.({ ...fornecedor, ...dados });
     } else {
-      onSalvo?.(criarFornecedor(dados));
+      // Fora da chamada opcional: `onSalvo?.(criarFornecedor(...))` nem chega a criar quando não há onSalvo
+      const novo = criarFornecedor(dados);
+      onSalvo?.(novo);
     }
     onClose();
   };
