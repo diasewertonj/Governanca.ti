@@ -228,7 +228,9 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             )}
 
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Fechar"
               className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
             >
               <X className="w-5 h-5" />

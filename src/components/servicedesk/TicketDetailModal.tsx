@@ -54,6 +54,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   const [rascChecklist, setRascChecklist] = useState<Record<string, boolean>>({});
   // Fase 9: vínculos (equipamento, software, colaborador relacionado) também em rascunho
   const [rascVinculos, setRascVinculos] = useState<RascunhoVinculos>(RASCUNHO_VAZIO);
+  // Muda a cada "Salvar alterações": recria o bloco de vínculos com os campos recolhidos
+  const [salvamentos, setSalvamentos] = useState(0);
 
   const ticket = tickets.find((t) => t.id === ticketId);
 
@@ -117,6 +119,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     for (const campo of mudancasVinculos(ticket, rascVinculos)) mudancas[campo] = rascVinculos[campo] as string;
     salvarAlteracoesChamado(ticket.id, mudancas);
     descartarRascunho();
+    setSalvamentos((n) => n + 1);
   };
 
   const fechar = () => {
@@ -595,6 +598,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
             {/* Fase 9: equipamento, software e colaborador relacionado (abrem a ficha por cima) */}
             <VinculosChamado
+              key={salvamentos}
               ticket={ticket}
               rascunho={rascVinculos}
               onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
