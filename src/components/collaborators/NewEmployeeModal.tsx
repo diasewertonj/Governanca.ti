@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext.tsx';
-import { EmployeeStatus } from '../../types/index.ts';
+import type { Employee, EmployeeStatus, UserRole } from '../../types/index.ts';
 import { X, UserPlus } from 'lucide-react';
 
 /** Fase 10: dados que já vêm preenchidos (ex.: do chamado de admissão) */
@@ -11,37 +12,71 @@ export interface DadosIniciaisColaborador {
   setorId?: string;
   gestorId?: string;
   dataAdmissao?: string;
+  /** Papel de acesso (só o admin de T.I. passa algo além de colaborador) */
+  papel?: UserRole;
 }
 
 interface NewEmployeeModalProps {
   onClose: () => void;
   inicial?: DadosIniciaisColaborador;
-  /** Chamado ao cadastrar; sem ele, abre a ficha da pessoa */
-  onCriado?: (colaboradorId: string) => void;
+  /** Chamado depois que o banco confirma o cadastro; sem ele, abre a ficha da pessoa */
+  onCriado?: (colaboradorId: string) => void | Promise<void>;
+  /** Editar dados de quem já está cadastrado (mesmo formulário) */
+  colaborador?: Employee;
 }
 
-export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, inicial, onCriado }) => {
-  const { employees, departments, addEmployee, setSelectedEmployeeIdFor360 } = useApp();
+export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, inicial, onCriado, colaborador }) => {
+  const { employees, departments, cadastrarColaborador, updateEmployee, setSelectedEmployeeIdFor360, currentRole } = useApp();
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const editando = !!colaborador;
+  // E-mail é a identidade da pessoa: na edição, só o administrador de T.I. muda
+  const podeMudarEmail = !editando || currentRole === 'ti_admin';
 
   const nextMatricula = `NX-${1000 + employees.length + 1}`;
 
-  const [nome, setNome] = useState(inicial?.nome ?? '');
-  const [email, setEmail] = useState(inicial?.email ?? '');
-  const [matricula, setMatricula] = useState(nextMatricula);
-  const [cargo, setCargo] = useState(inicial?.cargo ?? '');
-  const [setorId, setSetorId] = useState(inicial?.setorId || departments[0]?.id || 'dep-1');
-  const [gestorId, setGestorId] = useState(inicial?.gestorId ?? '');
-  const [status, setStatus] = useState<EmployeeStatus>('ativo');
-  const [dataAdmissao, setDataAdmissao] = useState(inicial?.dataAdmissao || new Date().toISOString().split('T')[0]);
-  const [telefone, setTelefone] = useState('');
+  const [nome, setNome] = useState(colaborador?.nome ?? inicial?.nome ?? '');
+  const [email, setEmail] = useState(colaborador?.email ?? inicial?.email ?? '');
+  const [matricula, setMatricula] = useState(colaborador?.matricula ?? nextMatricula);
+  const [cargo, setCargo] = useState(colaborador?.cargo ?? inicial?.cargo ?? '');
+  const [setorId, setSetorId] = useState(colaborador?.setorId || inicial?.setorId || departments[0]?.id || 'dep-1');
+  const [gestorId, setGestorId] = useState(colaborador?.gestorId ?? inicial?.gestorId ?? '');
+  const [status, setStatus] = useState<EmployeeStatus>(colaborador?.status ?? 'ativo');
+  const [dataAdmissao, setDataAdmissao] = useState(
+    colaborador?.dataAdmissao || inicial?.dataAdmissao || new Date().toISOString().split('T')[0]
+  );
+  const [telefone, setTelefone] = useState(colaborador?.telefone ?? '');
+  const emailMudou = editando && email.trim().toLowerCase() !== colaborador.email;
 
-  const activeEmployees = employees.filter((e) => e.status === 'ativo');
+  const activeEmployees = employees.filter((e) => e.status === 'ativo' && e.id !== colaborador?.id);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Edição: grava só o que mudou (o banco confere as permissões de cada perfil)
+  const salvarEdicao = () => {
+    if (!colaborador) return;
+    const novo = {
+      nome: nome.trim(),
+      email: email.trim().toLowerCase(),
+      cargo: cargo.trim(),
+      setorId,
+      gestorId: gestorId || undefined,
+      status,
+      dataAdmissao,
+      telefone: telefone.trim() || undefined,
+    };
+    const mudou = (Object.keys(novo) as (keyof typeof novo)[]).filter((k) => (novo[k] || undefined) !== (colaborador[k] || undefined));
+    if (mudou.length === 0) return onClose();
+    updateEmployee(colaborador.id, Object.fromEntries(mudou.map((k) => [k, novo[k]])));
+    onClose();
+  };
+
+  // Espera o banco confirmar: quem chamou (ex.: o checklist) usa o id logo em seguida
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !email.trim() || !cargo.trim()) return;
-
-    const created = addEmployee({
+    if (!nome.trim() || !email.trim() || !cargo.trim() || salvando) return;
+    if (editando) return salvarEdicao();
+    setErro(null);
+    setSalvando(true);
+    const { colaborador, erro: falha } = await cadastrarColaborador({
       nome: nome.trim(),
       email: email.trim().toLowerCase(),
       matricula: matricula.trim(),
@@ -51,22 +86,30 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
       status,
       dataAdmissao,
       telefone: telefone.trim(),
+      ...(inicial?.papel ? { role: inicial.papel } : {}),
     });
+    setSalvando(false);
+    if (!colaborador) return setErro(falha || 'Não foi possível cadastrar.');
 
     onClose();
-    if (onCriado) onCriado(created.id);
-    else setSelectedEmployeeIdFor360(created.id);
+    if (onCriado) await onCriado(colaborador.id);
+    else setSelectedEmployeeIdFor360(colaborador.id);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
+  // Em portal e acima das outras janelas: abre por cima do chamado sem ficar presa nele
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Novo colaborador</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              {editando ? `Editar dados de ${colaborador.nome}` : 'Novo colaborador'}
+            </h2>
           </div>
           <button
+            type="button"
+            aria-label="Fechar"
             onClick={onClose}
             className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
@@ -101,8 +144,9 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   type="text"
                   required
                   value={matricula}
+                  disabled={editando}
                   onChange={(e) => setMatricula(e.target.value)}
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
                 />
               </div>
             </div>
@@ -119,10 +163,19 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   type="email"
                   required
                   value={email}
+                  disabled={!podeMudarEmail}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nome@empresa.com.br"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
                 />
+                {editando && !podeMudarEmail && (
+                  <p className="text-xs text-slate-500 mt-1">Só o administrador de T.I. altera o e-mail.</p>
+                )}
+                {emailMudou && (
+                  <p className="text-xs text-amber-800 mt-1">
+                    Se a pessoa já tem login, o acesso continua com o e-mail antigo até a T.I. atualizar o login.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -212,7 +265,8 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                 >
                   <option value="ativo">Ativo</option>
                   <option value="ferias">Férias</option>
-                  <option value="desligado">Desligado</option>
+                  {/* Na edição, desligar é pelo processo de desligamento (recolhe equipamentos e acessos) */}
+                  {(!editando || colaborador.status === 'desligado') && <option value="desligado">Desligado</option>}
                 </select>
               </div>
 
@@ -230,6 +284,11 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
             </div>
           </div>
 
+          {erro && (
+            <p role="alert" className="text-xs text-rose-700">
+              {erro}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
@@ -240,14 +299,22 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+              disabled={salvando}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              Cadastrar Colaborador
+              {editando
+                ? 'Salvar alterações'
+                : salvando
+                  ? 'Cadastrando…'
+                  : onCriado
+                    ? 'Cadastrar e concluir o passo'
+                    : 'Cadastrar colaborador'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
