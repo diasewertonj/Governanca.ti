@@ -367,13 +367,14 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   USER: 'nexus_user_id',
-  EMPLOYEES: 'nexus_employees_v1',
-  DEPARTMENTS: 'nexus_departments_v1',
-  ASSETS: 'nexus_assets_v1',
-  LICENSES: 'nexus_licenses_v1',
-  TICKETS: 'nexus_tickets_v1',
-  TERMS: 'nexus_terms_v1',
-  SETTINGS: 'nexus_settings_v1',
+  // v2: dados de exemplo ampliados (mais softwares e atribuições); o demo recomeça limpo
+  EMPLOYEES: 'nexus_employees_v2',
+  DEPARTMENTS: 'nexus_departments_v2',
+  ASSETS: 'nexus_assets_v2',
+  LICENSES: 'nexus_licenses_v2',
+  TICKETS: 'nexus_tickets_v2',
+  TERMS: 'nexus_terms_v2',
+  SETTINGS: 'nexus_settings_v2',
 };
 
 // Fase 1: com Supabase (produção), dados de negócio NÃO ficam no navegador.
