@@ -1621,7 +1621,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
         // Admissão e desligamento: a pessoa do processo não muda por aqui
-        if (mudancas.colaboradorId !== undefined && t.tipo === 'suporte') {
+        // Fase 10: na admissão, liga a pessoa cadastrada ao chamado (só enquanto não houver uma)
+        if (mudancas.colaboradorId !== undefined && (t.tipo === 'suporte' || (t.tipo === 'onboarding' && !t.colaboradorId))) {
           novo = { ...novo, colaboradorId: mudancas.colaboradorId || undefined };
         }
         return novo;
