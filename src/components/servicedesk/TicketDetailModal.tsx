@@ -11,6 +11,8 @@ import { VinculosChamado } from './VinculosChamado.tsx';
 import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
 import { BlocoCancelamento, BlocoResolucao, FormCancelamento, FormResolucao } from './AtendimentoChamado.tsx';
 import { imprimirRelatorio } from './relatorioChamado.ts';
+import { PrazosChamado } from './SeloSla.tsx';
+import { situacaoSla } from '../../utils/sla.ts';
 import { chamadoEncerrado, podeCancelar, rotuloSituacao, ROTULO_AGUARDANDO } from '../../utils/atendimento.ts';
 import type { AguardandoMotivo } from '../../types/index.ts';
 import { Printer } from 'lucide-react';
@@ -47,6 +49,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     setSelectedEmployeeIdFor360,
     concluirOffboarding,
     licenses,
+    eventosSla,
+    prazosSla,
   } = useApp();
 
   const [newMessageText, setNewMessageText] = useState('');
@@ -245,7 +249,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </span>
             <button
               type="button"
-              onClick={() => imprimirRelatorio(ticket, employees, isTI)}
+              onClick={() =>
+                imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla))
+              }
               title="Relatório do chamado (imprimir ou salvar em PDF)"
               className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-md hover:bg-slate-100"
             >
@@ -654,6 +660,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 </div>
               </div>
             )}
+
+            {/* Fase 10 C1: prazos de 1ª resposta e de solução */}
+            <PrazosChamado tkt={ticket} />
 
             {/* Fase 9: equipamento, software e colaborador relacionado (abrem a ficha por cima) */}
             <VinculosChamado

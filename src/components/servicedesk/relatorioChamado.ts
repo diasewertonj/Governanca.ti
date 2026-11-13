@@ -9,13 +9,14 @@ import {
   ROTULO_MOTIVO_CANCELAMENTO,
   ROTULO_TIPO_SOLUCAO,
 } from '../../utils/atendimento.ts';
+import { ROTULO_ESTADO_SLA, type SituacaoSla } from '../../utils/sla.ts';
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const texto = (s?: string) => (s ? esc(s).replace(/\n/g, '<br>') : '');
 
 /** Monta o HTML do relatório (notas internas só entram para a T.I.) */
-export function htmlRelatorio(t: Ticket, employees: Employee[], incluirNotas: boolean): string {
+export function htmlRelatorio(t: Ticket, employees: Employee[], incluirNotas: boolean, sla?: SituacaoSla | null): string {
   const nome = (id?: string) => employees.find((e) => e.id === id)?.nome || '';
   const r = t.resolucao;
   const c = t.cancelamento;
@@ -45,6 +46,8 @@ ${linha('Aberto por', `${esc(t.solicitanteNome)} (${esc(t.solicitanteSetorNome)}
 ${linha('Técnico', esc(t.tecnicoResponsavelNome || 'não atribuído'))}
 ${linha('Software', t.softwareNome ? esc(t.softwareNome) : undefined)}
 ${linha('Reaberturas', t.reaberturas ? String(t.reaberturas) : undefined)}
+${linha('Prazo de solução', sla ? `${esc(ROTULO_ESTADO_SLA[sla.solucao.estado])} (até ${esc(formatDateTime(sla.solucao.vence.toISOString()))})` : undefined)}
+${linha('1ª resposta', sla ? (sla.resposta.respondidaEm ? `${sla.resposta.atrasada ? 'fora do prazo' : 'no prazo'}, ${esc(formatDateTime(sla.resposta.respondidaEm.toISOString()))}` : 'sem resposta registrada') : undefined)}
 </table>
 
 <h2>Problema relatado</h2>
@@ -87,11 +90,11 @@ ${
 </body></html>`;
 }
 
-export function imprimirRelatorio(t: Ticket, employees: Employee[], incluirNotas: boolean) {
+export function imprimirRelatorio(t: Ticket, employees: Employee[], incluirNotas: boolean, sla?: SituacaoSla | null) {
   const janela = window.open('', '_blank');
   if (!janela) return;
   janela.opener = null;
-  janela.document.write(htmlRelatorio(t, employees, incluirNotas));
+  janela.document.write(htmlRelatorio(t, employees, incluirNotas, sla));
   janela.document.close();
   // A política de segurança do site não permite script dentro do relatório: imprime daqui
   janela.focus();

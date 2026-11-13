@@ -82,6 +82,7 @@ import {
   avaliarChamadoDb,
   fetchChamadoDb,
   fetchEventosChamadoDb,
+  fetchEventosStatusDb,
   insertTicketMessageDb,
   fetchTermsFromDb,
   insertTermDb,
@@ -143,6 +144,7 @@ import {
 import { notaDaManutencao } from '../utils/vinculos.ts';
 import type { AguardandoMotivo, DadosResolucao, EventoChamado, MotivoCancelamento } from '../types/index.ts';
 import { erroCancelamento, erroResolucao } from '../utils/atendimento.ts';
+import { prazosEfetivos, type PrazosSla } from '../utils/sla.ts';
 import { isoLocal } from '../utils/formatters.ts';
 import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
 import {
@@ -271,6 +273,9 @@ interface AppContextType {
   reabrirChamado: (ticketId: string, motivo: string) => Promise<string | null>;
   avaliarChamado: (ticketId: string, nota: number, comentario?: string) => Promise<string | null>;
   carregarEventosChamado: (ticketId: string) => Promise<EventoChamado[]>;
+  // Fase 10 C1: prazos e pausas ("aguardando") de cada chamado
+  prazosSla: PrazosSla;
+  eventosSla: Record<string, EventoChamado[]>;
 
   // Fase 5: alterações não salvas
   registrarPendencias: (origem: string, itens: string[]) => void;
@@ -1565,7 +1570,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Não regrava o chamado: o banco atualiza data_atualizacao ao receber a mensagem
     setTickets((prev) =>
       prev.map((tkt) =>
-        tkt.id === ticketId ? { ...tkt, dataAtualizacao: now, mensagens: [...tkt.mensagens, newMessage] } : tkt
+        tkt.id === ticketId
+          ? {
+              ...tkt,
+              dataAtualizacao: now,
+              mensagens: [...tkt.mensagens, newMessage],
+              // Fase 10 C1: resposta pública da T.I. conta como 1ª resposta
+              primeiraRespostaEm: tkt.primeiraRespostaEm || (ehTI && !ehNotaInterna ? now : undefined),
+            }
+          : tkt
       )
     );
     persistir(
@@ -1609,6 +1622,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           novo = { ...novo, status: mudancas.status, dataResolucao: mudancas.status === 'resolvido' ? agora : t.dataResolucao };
         }
         if (mudancas.aguardandoMotivo !== undefined) novo = { ...novo, aguardandoMotivo: mudancas.aguardandoMotivo || undefined };
+        // Fase 10 C1: a T.I. assumir ou mudar a situação conta como 1ª resposta (o banco faz o mesmo)
+        if (ehTI && !novo.primeiraRespostaEm && (mudancas.status || mudancas.tecnicoId !== undefined)) {
+          novo = { ...novo, primeiraRespostaEm: agora };
+        }
         // O banco limpa o motivo quando o chamado deixa de aguardar; a tela acompanha
         if (novo.status !== 'aguardando_terceiro') novo = { ...novo, aguardandoMotivo: undefined };
         if (mudancas.tecnicoId !== undefined) {
@@ -1797,6 +1814,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'Avaliar chamado'
     );
   };
+
+  // Fase 10 C1: as mudanças de situação (pausas do prazo) acompanham os chamados
+  const [eventosSla, setEventosSla] = useState<Record<string, EventoChamado[]>>({});
+  const chaveSla = tickets.map((t) => `${t.id}:${t.status}:${t.aguardandoMotivo || ''}`).join('|');
+  useEffect(() => {
+    if (!isProduction || !currentUser) return;
+    let vivo = true;
+    void fetchEventosStatusDb().then((e) => {
+      if (vivo) setEventosSla(e);
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveSla, currentUser?.id]);
+  const prazosSla = prazosEfetivos(settings.sla);
 
   const carregarEventosChamado = async (ticketId: string): Promise<EventoChamado[]> => {
     if (isProduction) return fetchEventosChamadoDb(ticketId);
@@ -2341,6 +2374,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reabrirChamado,
         avaliarChamado,
         carregarEventosChamado,
+        prazosSla,
+        eventosSla,
         registrarPendencias,
         podeDescartarPendencias,
         createTerm,

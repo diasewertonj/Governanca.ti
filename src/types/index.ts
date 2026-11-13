@@ -342,6 +342,7 @@ export interface Ticket {
   reaberturas?: number;
   avaliacao?: { nota: number; comentario?: string };
   aguardandoMotivo?: AguardandoMotivo;
+  primeiraRespostaEm?: string; // Fase 10 C1: carimbada pelo banco
 }
 
 // -----------------------------------------------------------------------------
@@ -573,6 +574,8 @@ export interface CompanySettings {
   emailTI: string;
   telefoneTI: string;
   logoUrl?: string;
+  /** Fase 10 C1: prazos por prioridade em minutos úteis (vazio = padrão) */
+  sla?: Partial<Record<TicketPriority, { resposta?: number; solucao?: number }>>;
   textoTermoEntrega: string;
   textoTermoDevolucao: string;
   camposPersonalizados: CustomFieldDefinition[];

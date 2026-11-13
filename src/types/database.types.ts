@@ -307,6 +307,7 @@ export type Database = {
           avaliacao: number | null
           avaliacao_comentario: string | null
           aguardando_motivo: string | null
+          primeira_resposta_em: string | null
           anexos: Json | null
           ativo_id: string | null
           categoria: string
@@ -347,6 +348,7 @@ export type Database = {
           avaliacao?: number | null
           avaliacao_comentario?: string | null
           aguardando_motivo?: string | null
+          primeira_resposta_em?: string | null
           anexos?: Json | null
           ativo_id?: string | null
           categoria: string
@@ -387,6 +389,7 @@ export type Database = {
           avaliacao?: number | null
           avaliacao_comentario?: string | null
           aguardando_motivo?: string | null
+          primeira_resposta_em?: string | null
           anexos?: Json | null
           ativo_id?: string | null
           categoria?: string
@@ -511,6 +514,7 @@ export type Database = {
       configuracoes_empresa: {
         Row: {
           logo_url: string | null
+          sla: Json | null
           doc_devolucao: Json
           doc_entrega: Json
           campos_personalizados: Json | null
@@ -529,6 +533,7 @@ export type Database = {
         }
         Insert: {
           logo_url?: string | null
+          sla?: Json | null
           doc_devolucao?: Json
           doc_entrega?: Json
           campos_personalizados?: Json | null
@@ -547,6 +552,7 @@ export type Database = {
         }
         Update: {
           logo_url?: string | null
+          sla?: Json | null
           doc_devolucao?: Json
           doc_entrega?: Json
           campos_personalizados?: Json | null
