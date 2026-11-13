@@ -25,7 +25,7 @@ describe('valores de chamado batem com o banco (CRIT-03 não pode voltar)', () =
     const doBanco = valoresDoCheck('status');
     expect(doBanco).toContain('aguardando_terceiro');
     for (const v of doBanco) expect(rotuloStatus(v)).not.toBe(v);
-    expect(rotuloStatus('aguardando_terceiro')).toBe('Aguardando peça');
+    expect(rotuloStatus('aguardando_terceiro')).toBe('Aguardando');
   });
 
   it('o site só usa valores que o banco aceita', () => {
@@ -33,7 +33,21 @@ describe('valores de chamado batem com o banco (CRIT-03 não pode voltar)', () =
       .map((f) => fs.readFileSync(path.resolve(__dirname, '../components', f), 'utf8'))
       .join('\n');
     const usados = [...fonte.matchAll(/<option value="([a-z_]+)"/g)].map((m) => m[1]);
-    const aceitos = new Set([...valoresDoCheck('prioridade'), ...valoresDoCheck('status'), 'todos', 'suporte', 'onboarding', 'offboarding']);
+    // Fase 10: motivos de "aguardando" (check chk_chamado_aguardando_motivo da migration fase10)
+    const aguardando = fs
+      .readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261118000000_fase10_atendimento.sql'), 'utf8')
+      .match(/aguardando_motivo in \(([^)]+)\)/)![1]
+      .split(',')
+      .map((v) => v.trim().replace(/'/g, ''));
+    const aceitos = new Set([
+      ...valoresDoCheck('prioridade'),
+      ...valoresDoCheck('status'),
+      ...aguardando,
+      'todos',
+      'suporte',
+      'onboarding',
+      'offboarding',
+    ]);
     const fora = usados.filter((v) => !aceitos.has(v));
     expect(fora).toEqual([]);
   });

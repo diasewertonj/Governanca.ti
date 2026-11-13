@@ -9,6 +9,11 @@ import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { ChecklistProcesso } from '../processos/ChecklistProcesso.tsx';
 import { VinculosChamado } from './VinculosChamado.tsx';
 import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
+import { BlocoCancelamento, BlocoResolucao, FormCancelamento, FormResolucao } from './AtendimentoChamado.tsx';
+import { imprimirRelatorio } from './relatorioChamado.ts';
+import { chamadoEncerrado, podeCancelar, rotuloSituacao, ROTULO_AGUARDANDO } from '../../utils/atendimento.ts';
+import type { AguardandoMotivo } from '../../types/index.ts';
+import { Printer } from 'lucide-react';
 import { ConversaChamado, ProblemaRelatado } from './ConversaChamado.tsx';
 import { ROTULO_TIPO_CHAMADO } from '../../utils/conversa.ts';
 import { RASCUNHO_VAZIO, ROTULO_VINCULO, mudancasVinculos, type RascunhoVinculos } from '../../utils/vinculos.ts';
@@ -60,6 +65,10 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   const [salvamentos, setSalvamentos] = useState(0);
   // Fase 10: cadastro do admitido direto pelo chamado de admissão
   const [cadastrandoAdmitido, setCadastrandoAdmitido] = useState(false);
+  // Fase 10: motivo da espera (rascunho), registrar solução e cancelar
+  const [rascAguardando, setRascAguardando] = useState<AguardandoMotivo | '' | null>(null);
+  const [resolvendo, setResolvendo] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
 
   const ticket = tickets.find((t) => t.id === ticketId);
 
@@ -83,6 +92,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     if (checklistAlterado.length > 0) {
       itensPendentes.push(`Checklist: ${checklistAlterado.length} item(ns) marcado(s) ou desmarcado(s)`);
     }
+    if (rascAguardando !== null && rascAguardando !== (ticket.aguardandoMotivo || '')) {
+      itensPendentes.push(`Aguardando: ${rascAguardando ? ROTULO_AGUARDANDO[rascAguardando] : 'sem motivo'}`);
+    }
     for (const campo of mudancasVinculos(ticket, rascVinculos)) {
       const rotulo = (id?: string) => {
         if (!id) return 'nenhum';
@@ -99,6 +111,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
   if (!ticket) return null;
 
+  const encerrado = chamadoEncerrado(ticket);
   const statusExibido = rascStatus ?? ticket.status;
   const tecnicoExibido = rascTecnico ?? (ticket.tecnicoResponsavelId || '');
   const concluidoExibido = (item: { id: string; concluido: boolean }) => rascChecklist[item.id] ?? item.concluido;
@@ -108,6 +121,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     setRascTecnico(null);
     setRascChecklist({});
     setRascVinculos(RASCUNHO_VAZIO);
+    setRascAguardando(null);
   };
 
   const salvarRascunho = () => {
@@ -121,6 +135,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     );
     if (Object.keys(marcados).length > 0) mudancas.checklist = marcados;
     for (const campo of mudancasVinculos(ticket, rascVinculos)) mudancas[campo] = rascVinculos[campo] as string;
+    if (rascAguardando !== null && rascAguardando !== (ticket.aguardandoMotivo || '')) mudancas.aguardandoMotivo = rascAguardando;
     salvarAlteracoesChamado(ticket.id, mudancas);
     descartarRascunho();
     setSalvamentos((n) => n + 1);
@@ -226,8 +241,17 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </span>
             <span className="flex-1" />
             <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
-              {rotuloStatus(ticket.status)}
+              {rotuloSituacao(ticket)}
             </span>
+            <button
+              type="button"
+              onClick={() => imprimirRelatorio(ticket, employees, isTI)}
+              title="Relatório do chamado (imprimir ou salvar em PDF)"
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-md hover:bg-slate-100"
+            >
+              <Printer className="w-3.5 h-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">Relatório</span>
+            </button>
             <span className={`text-xs px-2 py-0.5 rounded-md ${priorityColors}`}>
               Prioridade {rotuloPrioridade(ticket.prioridade).toLowerCase()}
             </span>
@@ -256,6 +280,24 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             onAbrirAnexo={abrirAnexo}
             erroArquivo={erroArquivo}
           />
+          {/* Fase 10: a solução (ou o cancelamento) logo depois do problema */}
+          {ticket.status === 'resolvido' && ticket.resolucao && (
+            <div className="mt-4">
+              <BlocoResolucao ticket={ticket} />
+            </div>
+          )}
+          {ticket.status === 'cancelado' && ticket.cancelamento && (
+            <div className="mt-4">
+              <BlocoCancelamento ticket={ticket} />
+            </div>
+          )}
+          {!isTI && podeCancelar(ticket, currentRole, currentUser?.id) && (
+            <div className="mt-2 text-right">
+              <button type="button" onClick={() => setCancelando(true)} className="text-xs text-slate-600 hover:text-rose-700 hover:underline">
+                Não precisa mais? Cancelar chamado
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Corpo do Chamado em 2 Colunas */}
@@ -466,6 +508,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </div>
 
             {/* Caixa de Resposta */}
+            {encerrado ? (
+              <p className="pt-4 border-t border-slate-200 text-xs text-slate-500">
+                Chamado {ticket.status === 'cancelado' ? 'cancelado' : 'encerrado'}: a conversa fica registrada como está.
+                {ticket.status === 'resolvido' && ticket.tipo === 'suporte' && ' Se o problema voltar, reabra o chamado.'}
+              </p>
+            ) : (
             <form onSubmit={handleSendMessage} className="pt-4 border-t border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
                 <label htmlFor={`resposta-${ticket.id}`} className="text-xs font-medium text-slate-700">
@@ -515,6 +563,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 </button>
               </div>
             </form>
+            )}
           </div>
 
           {/* Coluna Lateral: Dados Relacionais e Controles */}
@@ -526,20 +575,66 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   Gerenciamento de Atendimento
                 </span>
 
+                {encerrado && ticket.tipo === 'suporte' ? (
+                  <p className="text-xs text-slate-600">
+                    Chamado {ticket.status === 'cancelado' ? 'cancelado' : 'encerrado com solução registrada'}. Para continuar o
+                    atendimento, reabra o chamado.
+                  </p>
+                ) : (
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Status do Chamado</label>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Situação</label>
                   <select
                     value={statusExibido}
                     onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
                     className="w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
                   >
-                    <option value="aberto">Aberto (Na Fila)</option>
-                    <option value="em_andamento">Em Andamento</option>
-                    <option value="aguardando_terceiro">Aguardando Peça / Fornecedor</option>
-                    <option value="resolvido">Resolvido / Finalizado</option>
-                    <option value="cancelado">Cancelado</option>
+                    <option value="aberto">Aberto (na fila)</option>
+                    <option value="em_andamento">Em atendimento</option>
+                    <option value="aguardando_terceiro">Aguardando…</option>
+                    {/* Suporte encerra por "Registrar solução" e "Cancelar"; processos seguem o checklist */}
+                    {ticket.tipo !== 'suporte' && <option value="resolvido">Concluído</option>}
+                    {ticket.tipo !== 'suporte' && <option value="cancelado">Cancelado</option>}
                   </select>
+                  {statusExibido === 'aguardando_terceiro' && (
+                    <select
+                      aria-label="Aguardando o quê"
+                      value={rascAguardando ?? (ticket.aguardandoMotivo || '')}
+                      onChange={(e) => setRascAguardando(e.target.value as AguardandoMotivo | '')}
+                      className="mt-2 w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+                    >
+                      <option value="">Aguardando o quê?</option>
+                      <option value="peca">Peça</option>
+                      <option value="fornecedor">Fornecedor</option>
+                      <option value="solicitante">Resposta do solicitante</option>
+                    </select>
+                  )}
                 </div>
+                )}
+
+                {/* Fase 10: encerrar é registrar a solução; cancelar pede motivo */}
+                {!encerrado && (
+                  <div className="flex flex-wrap gap-2">
+                    {ticket.tipo === 'suporte' && (
+                      <button
+                        type="button"
+                        onClick={() => setResolvendo(true)}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                        Registrar solução
+                      </button>
+                    )}
+                    {ticket.tipo === 'suporte' && (
+                      <button
+                        type="button"
+                        onClick={() => setCancelando(true)}
+                        className="px-3 py-2 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="text-xs font-medium text-slate-700 block mb-1">Técnico Responsável</label>
@@ -604,6 +699,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
         </div>
         <BarraAlteracoes itens={itensPendentes} onCancelar={descartarRascunho} onSalvar={salvarRascunho} />
       </div>
+      {resolvendo && <FormResolucao ticket={ticket} onClose={() => setResolvendo(false)} />}
+      {cancelando && <FormCancelamento ticket={ticket} onClose={() => setCancelando(false)} />}
       {cadastrandoAdmitido && ticket.onboarding && (
         <NewEmployeeModal
           inicial={{

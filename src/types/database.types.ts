@@ -284,9 +284,29 @@ export type Database = {
           },
         ]
       }
+      chamado_eventos: {
+        Row: { autor_id: string | null; chamado_id: string; criado_em: string; de: string | null; detalhe: string | null; id: string; para: string | null; tipo: string }
+        Insert: { autor_id?: string | null; chamado_id: string; criado_em?: string; de?: string | null; detalhe?: string | null; id?: string; para?: string | null; tipo: string }
+        Update: { autor_id?: string | null; chamado_id?: string; criado_em?: string; de?: string | null; detalhe?: string | null; id?: string; para?: string | null; tipo?: string }
+        Relationships: []
+      }
       chamados: {
         Row: {
           colaborador_id: string | null
+          resolucao_causa: string | null
+          resolucao_solucao: string | null
+          resolucao_tipo: string | null
+          resolucao_proximo_passo: string | null
+          resolucao_tempo_min: number | null
+          resolvido_por: string | null
+          resolvido_em: string | null
+          cancelamento_motivo: string | null
+          cancelamento_detalhe: string | null
+          cancelado_por: string | null
+          reaberturas: number
+          avaliacao: number | null
+          avaliacao_comentario: string | null
+          aguardando_motivo: string | null
           anexos: Json | null
           ativo_id: string | null
           categoria: string
@@ -313,6 +333,20 @@ export type Database = {
         }
         Insert: {
           colaborador_id?: string | null
+          resolucao_causa?: string | null
+          resolucao_solucao?: string | null
+          resolucao_tipo?: string | null
+          resolucao_proximo_passo?: string | null
+          resolucao_tempo_min?: number | null
+          resolvido_por?: string | null
+          resolvido_em?: string | null
+          cancelamento_motivo?: string | null
+          cancelamento_detalhe?: string | null
+          cancelado_por?: string | null
+          reaberturas?: number
+          avaliacao?: number | null
+          avaliacao_comentario?: string | null
+          aguardando_motivo?: string | null
           anexos?: Json | null
           ativo_id?: string | null
           categoria: string
@@ -339,6 +373,20 @@ export type Database = {
         }
         Update: {
           colaborador_id?: string | null
+          resolucao_causa?: string | null
+          resolucao_solucao?: string | null
+          resolucao_tipo?: string | null
+          resolucao_proximo_passo?: string | null
+          resolucao_tempo_min?: number | null
+          resolvido_por?: string | null
+          resolvido_em?: string | null
+          cancelamento_motivo?: string | null
+          cancelamento_detalhe?: string | null
+          cancelado_por?: string | null
+          reaberturas?: number
+          avaliacao?: number | null
+          avaliacao_comentario?: string | null
+          aguardando_motivo?: string | null
           anexos?: Json | null
           ativo_id?: string | null
           categoria?: string
@@ -1379,6 +1427,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      resolver_chamado: {
+        Args: { p_causa: string; p_chamado: string; p_proximo_passo?: string; p_solucao: string; p_tempo_min?: number; p_tipo: string }
+        Returns: undefined
+      }
+      cancelar_chamado: { Args: { p_chamado: string; p_detalhe?: string; p_motivo: string }; Returns: undefined }
+      reabrir_chamado: { Args: { p_chamado: string; p_motivo: string }; Returns: undefined }
+      avaliar_chamado: { Args: { p_chamado: string; p_comentario?: string; p_nota: number }; Returns: undefined }
       aceitar_termo: { Args: { p_termo: string }; Returns: Json }
       concluir_processo: { Args: { p_chamado: string }; Returns: Json }
       dispensar_assinatura_termo: {

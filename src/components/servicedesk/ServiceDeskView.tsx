@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { TicketStatus, TicketPriority } from '../../types/index.ts';
+import { TicketStatus, TicketPriority, type Ticket } from '../../types/index.ts';
+import { chamadoEncerrado, ROTULO_CAUSA } from '../../utils/atendimento.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import {
   Search,
@@ -45,17 +46,38 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
       )
     : tickets;
 
+  // Fase 10: duas filas — o trabalho em andamento e o histórico de encerrados
+  const [fila, setFila] = useState<'atendimento' | 'encerrados'>('atendimento');
+  const naFila = (t: Ticket) => (fila === 'encerrados' ? chamadoEncerrado(t) : !chamadoEncerrado(t));
+  const qtdAtendimento = baseTickets.filter((t) => !chamadoEncerrado(t)).length;
+  const qtdEncerrados = baseTickets.length - qtdAtendimento;
+  const trocarFila = (nova: 'atendimento' | 'encerrados') => {
+    setFila(nova);
+    setStatusFilter('todos');
+  };
+
   const filteredTickets = baseTickets.filter((tkt) => {
     const matchesType = typeFilter === 'todos' || tkt.tipo === typeFilter;
     const matchesStatus = statusFilter === 'todos' || tkt.status === statusFilter;
     const matchesPriority = priorityFilter === 'todos' || tkt.prioridade === priorityFilter;
-    const matchesSearch =
-      tkt.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tkt.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tkt.solicitanteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tkt.categoria.toLowerCase().includes(searchTerm.toLowerCase());
+    // A busca também acha pelo equipamento, software, causa e solução registrada
+    const termo = searchTerm.trim().toLowerCase();
+    const textoBusca = [
+      tkt.titulo,
+      tkt.codigo,
+      tkt.solicitanteNome,
+      tkt.categoria,
+      tkt.softwareNome,
+      assets.find((a) => a.id === tkt.ativoId)?.tag,
+      tkt.resolucao && ROTULO_CAUSA[tkt.resolucao.causa],
+      tkt.resolucao?.solucao,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    const matchesSearch = !termo || textoBusca.includes(termo);
 
-    return matchesType && matchesStatus && matchesPriority && matchesSearch;
+    return naFila(tkt) && matchesType && matchesStatus && matchesPriority && matchesSearch;
   });
 
   const getAsset = (assetId?: string) => {
@@ -64,9 +86,9 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
 
   const statusBadges: Record<TicketStatus, { label: string; cls: string }> = {
     aberto: { label: 'Aberto', cls: 'text-blue-700 bg-blue-50 border-blue-200' },
-    em_andamento: { label: 'Em Andamento', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
-    aguardando_terceiro: { label: 'Aguardando Peça', cls: 'text-purple-700 bg-purple-50 border-purple-200' },
-    resolvido: { label: 'Resolvido', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+    em_andamento: { label: 'Em atendimento', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+    aguardando_terceiro: { label: 'Aguardando', cls: 'text-purple-700 bg-purple-50 border-purple-200' },
+    resolvido: { label: 'Encerrado', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
     cancelado: { label: 'Cancelado', cls: 'text-slate-500 bg-slate-100 border-slate-200' },
   };
 
@@ -116,6 +138,29 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
         </button>
       </div>
 
+      {/* Fase 10: fila de atendimento × encerrados (histórico pesquisável) */}
+      <div role="tablist" aria-label="Filas" className="flex gap-2 border-b border-slate-200">
+        {(
+          [
+            ['atendimento', 'Em atendimento', qtdAtendimento],
+            ['encerrados', 'Encerrados', qtdEncerrados],
+          ] as const
+        ).map(([id, rotulo, qtd]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={fila === id}
+            onClick={() => trocarFila(id)}
+            className={`-mb-px px-3 py-2 text-sm font-medium border-b-2 ${
+              fila === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            {rotulo} <span className="text-xs text-slate-500">({qtd})</span>
+          </button>
+        ))}
+      </div>
+
       {/* Filtros e Busca */}
       <div className="space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -143,7 +188,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar chamado, código ou solicitante..."
+                placeholder={fila === 'encerrados' ? 'Buscar por equipamento, causa, solução…' : 'Buscar chamado, código ou solicitante…'}
                 className="w-full sm:w-64 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
               />
               <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
@@ -154,11 +199,19 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
               onChange={(e) => setStatusFilter(e.target.value)}
               className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700"
             >
-              <option value="todos">Todos os Status</option>
-              <option value="aberto">Aberto</option>
-              <option value="em_andamento">Em Andamento</option>
-              <option value="aguardando_terceiro">Aguardando Peça</option>
-              <option value="resolvido">Resolvido</option>
+              <option value="todos">Todas as situações</option>
+              {fila === 'atendimento' ? (
+                <>
+                  <option value="aberto">Aberto</option>
+                  <option value="em_andamento">Em atendimento</option>
+                  <option value="aguardando_terceiro">Aguardando</option>
+                </>
+              ) : (
+                <>
+                  <option value="resolvido">Encerrado com solução</option>
+                  <option value="cancelado">Cancelado</option>
+                </>
+              )}
             </select>
 
             <select

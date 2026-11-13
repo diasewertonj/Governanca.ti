@@ -76,6 +76,12 @@ import {
   fetchTicketsFromDb,
   insertTicketDb,
   updateTicketDb,
+  resolverChamadoDb,
+  cancelarChamadoDb,
+  reabrirChamadoDb,
+  avaliarChamadoDb,
+  fetchChamadoDb,
+  fetchEventosChamadoDb,
   insertTicketMessageDb,
   fetchTermsFromDb,
   insertTermDb,
@@ -135,6 +141,8 @@ import {
   type TipoFicha,
 } from '../utils/fichas.ts';
 import { notaDaManutencao } from '../utils/vinculos.ts';
+import type { AguardandoMotivo, DadosResolucao, EventoChamado, MotivoCancelamento } from '../types/index.ts';
+import { erroCancelamento, erroResolucao } from '../utils/atendimento.ts';
 import { isoLocal } from '../utils/formatters.ts';
 import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
 import {
@@ -164,6 +172,7 @@ export interface AlteracoesChamado {
   status?: TicketStatus;
   tecnicoId?: string; // '' = remover o técnico
   checklist?: Record<string, boolean>; // id do item -> concluído
+  aguardandoMotivo?: AguardandoMotivo | ''; // Fase 10: por que está aguardando
   // Fase 9: vínculos do chamado ('' = remover)
   ativoId?: string;
   softwareId?: string;
@@ -256,6 +265,12 @@ interface AppContextType {
   ) => void;
   updateTicketStatus: (ticketId: string, status: TicketStatus) => void;
   salvarAlteracoesChamado: (ticketId: string, mudancas: AlteracoesChamado) => void;
+  // Fase 10: atendimento documentado (devolvem o erro em texto ou null)
+  resolverChamado: (ticketId: string, dados: DadosResolucao) => Promise<string | null>;
+  cancelarChamado: (ticketId: string, motivo: MotivoCancelamento, detalhe?: string) => Promise<string | null>;
+  reabrirChamado: (ticketId: string, motivo: string) => Promise<string | null>;
+  avaliarChamado: (ticketId: string, nota: number, comentario?: string) => Promise<string | null>;
+  carregarEventosChamado: (ticketId: string) => Promise<EventoChamado[]>;
 
   // Fase 5: alterações não salvas
   registrarPendencias: (origem: string, itens: string[]) => void;
@@ -1593,6 +1608,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (mudancas.status) {
           novo = { ...novo, status: mudancas.status, dataResolucao: mudancas.status === 'resolvido' ? agora : t.dataResolucao };
         }
+        if (mudancas.aguardandoMotivo !== undefined) novo = { ...novo, aguardandoMotivo: mudancas.aguardandoMotivo || undefined };
+        // O banco limpa o motivo quando o chamado deixa de aguardar; a tela acompanha
+        if (novo.status !== 'aguardando_terceiro') novo = { ...novo, aguardandoMotivo: undefined };
         if (mudancas.tecnicoId !== undefined) {
           novo = {
             ...novo,
@@ -1665,6 +1683,134 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setTerms((prev) => trocar(prev, depois));
     persistir(updateTermDb(antes, depois), () => setTerms((prev) => trocar(prev, antes)), `Não foi possível registrar a assinatura de ${antes.codigo}`);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Fase 10 · Atendimento documentado (as regras e o histórico ficam no banco)
+  // ---------------------------------------------------------------------------
+  const mudarNoChamado = (ticketId: string, mudar: (t: Ticket) => Ticket) =>
+    setTickets((prev) => prev.map((t) => (t.id === ticketId ? mudar(t) : t)));
+
+  /** Executa a função do banco e relê o chamado; no modo demonstração, aplica localmente */
+  const acaoNoChamado = async (
+    ticketId: string,
+    noBanco: () => Promise<void>,
+    local: (t: Ticket) => Ticket,
+    contexto: string
+  ): Promise<string | null> => {
+    try {
+      if (isProduction) {
+        await noBanco();
+        const relido = await fetchChamadoDb(ticketId);
+        if (relido) {
+          // Campos que o banco limpou somem também na tela
+          mudarNoChamado(ticketId, (t) => ({
+            ...t,
+            resolucao: undefined,
+            cancelamento: undefined,
+            avaliacao: undefined,
+            aguardandoMotivo: undefined,
+            ...relido,
+          }));
+        }
+      } else {
+        mudarNoChamado(ticketId, (t) => ({ ...local(t), dataAtualizacao: new Date().toISOString() }));
+      }
+      return null;
+    } catch (err) {
+      console.error(contexto, err);
+      return mensagemDeErro(err);
+    }
+  };
+
+  const resolverChamado = async (ticketId: string, dados: DadosResolucao) => {
+    const problema = erroResolucao(dados);
+    if (problema) return problema;
+    if (!isProduction && !ehTI) return 'Apenas a T.I. registra a solução de um chamado.';
+    const agora = new Date().toISOString();
+    return acaoNoChamado(
+      ticketId,
+      () => resolverChamadoDb(ticketId, dados),
+      (t) => ({
+        ...t,
+        status: 'resolvido',
+        dataResolucao: agora,
+        avaliacao: undefined,
+        resolucao: { ...dados, solucao: dados.solucao.trim(), resolvidoPor: currentUser?.id, resolvidoEm: agora },
+      }),
+      'Registrar solução'
+    );
+  };
+
+  const cancelarChamado = async (ticketId: string, motivo: MotivoCancelamento, detalhe?: string) => {
+    const problema = erroCancelamento(motivo, detalhe || '');
+    if (problema) return problema;
+    return acaoNoChamado(
+      ticketId,
+      () => cancelarChamadoDb(ticketId, motivo, detalhe?.trim()),
+      (t) => ({ ...t, status: 'cancelado', cancelamento: { motivo, detalhe: detalhe?.trim() || undefined, canceladoPor: currentUser?.id } }),
+      'Cancelar chamado'
+    );
+  };
+
+  const reabrirChamado = async (ticketId: string, motivo: string) => {
+    if (motivo.trim().length < 5) return 'Explique por que o problema continua.';
+    const erro = await acaoNoChamado(
+      ticketId,
+      () => reabrirChamadoDb(ticketId, motivo.trim()),
+      (t) => ({
+        ...t,
+        status: t.tecnicoResponsavelId ? 'em_andamento' : 'aberto',
+        reaberturas: (t.reaberturas || 0) + 1,
+        resolucao: undefined,
+        avaliacao: undefined,
+      }),
+      'Reabrir chamado'
+    );
+    // O banco já gravou o motivo na conversa; aqui só aparece na tela
+    if (!erro && currentUser) {
+      mudarNoChamado(ticketId, (t) => ({
+        ...t,
+        mensagens: [
+          ...t.mensagens,
+          {
+            id: novoId('msg'),
+            autorId: currentUser.id,
+            autorNome: currentUser.nome,
+            autorRole: currentRole,
+            texto: `Reaberto: ${motivo.trim()}`,
+            ehNotaInterna: false,
+            data: new Date().toISOString(),
+          },
+        ],
+      }));
+    }
+    return erro;
+  };
+
+  const avaliarChamado = async (ticketId: string, nota: number, comentario?: string) => {
+    if (nota < 1 || nota > 5) return 'A avaliação vai de 1 a 5.';
+    return acaoNoChamado(
+      ticketId,
+      () => avaliarChamadoDb(ticketId, nota, comentario?.trim()),
+      (t) => ({ ...t, avaliacao: { nota, comentario: comentario?.trim() || undefined } }),
+      'Avaliar chamado'
+    );
+  };
+
+  const carregarEventosChamado = async (ticketId: string): Promise<EventoChamado[]> => {
+    if (isProduction) return fetchEventosChamadoDb(ticketId);
+    // Demonstração: um histórico mínimo a partir do próprio chamado
+    const t = tickets.find((x) => x.id === ticketId);
+    if (!t) return [];
+    const eventos: EventoChamado[] = [{ id: `${t.id}-a`, chamadoId: t.id, tipo: 'aberto', criadoEm: t.dataCriacao, autorId: t.solicitanteId }];
+    if (t.resolucao) {
+      eventos.push({ id: `${t.id}-r`, chamadoId: t.id, tipo: 'resolvido', criadoEm: t.resolucao.resolvidoEm || t.dataAtualizacao, autorId: t.resolucao.resolvidoPor });
+    }
+    if (t.cancelamento) {
+      eventos.push({ id: `${t.id}-c`, chamadoId: t.id, tipo: 'cancelado', detalhe: t.cancelamento.motivo, criadoEm: t.dataAtualizacao, autorId: t.cancelamento.canceladoPor });
+    }
+    return eventos;
   };
 
   // ---------------------------------------------------------------------------
@@ -2190,6 +2336,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addTicketMessage,
         updateTicketStatus,
         salvarAlteracoesChamado,
+        resolverChamado,
+        cancelarChamado,
+        reabrirChamado,
+        avaliarChamado,
+        carregarEventosChamado,
         registrarPendencias,
         podeDescartarPendencias,
         createTerm,

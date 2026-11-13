@@ -3,6 +3,7 @@ import { Key, Laptop, Lock, Paperclip } from 'lucide-react';
 import type { Asset, Ticket } from '../../types/index.ts';
 import { formatDateTime } from '../../utils/formatters.ts';
 import { inicial, mensagensDaConversa, ROTULO_PAPEL } from '../../utils/conversa.ts';
+import { HistoricoChamado } from './AtendimentoChamado.tsx';
 
 interface ProblemaRelatadoProps {
   ticket: Ticket;
@@ -58,7 +59,7 @@ export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, ativ
   </section>
 );
 
-const Aba: React.FC<{ ativa: boolean; onClick: () => void; rotulo: string; n: number }> = ({ ativa, onClick, rotulo, n }) => (
+const Aba: React.FC<{ ativa: boolean; onClick: () => void; rotulo: string; n?: number }> = ({ ativa, onClick, rotulo, n }) => (
   <button
     type="button"
     role="tab"
@@ -68,7 +69,7 @@ const Aba: React.FC<{ ativa: boolean; onClick: () => void; rotulo: string; n: nu
       ativa ? 'bg-white text-slate-900 shadow-2xs border border-slate-200' : 'text-slate-600 hover:text-slate-900'
     }`}
   >
-    {rotulo} <span className="text-slate-500">({n})</span>
+    {rotulo} {n !== undefined && <span className="text-slate-500">({n})</span>}
   </button>
 );
 
@@ -84,7 +85,7 @@ interface ConversaChamadoProps {
  * aba separada. A descrição não se repete aqui (fica em "Problema relatado").
  */
 export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVerNotas, meuId }) => {
-  const [aba, setAba] = useState<'conversa' | 'notas'>('conversa');
+  const [aba, setAba] = useState<'conversa' | 'notas' | 'historico'>('conversa');
   const todas = mensagensDaConversa(ticket, podeVerNotas);
   const conversa = todas.filter((m) => !m.ehNotaInterna);
   const notas = todas.filter((m) => m.ehNotaInterna);
@@ -96,15 +97,17 @@ export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVe
         <h3 id={`atendimento-${ticket.id}`} className="text-sm font-semibold text-slate-900">
           Atendimento
         </h3>
-        {podeVerNotas && (
-          <div role="tablist" aria-label="Atendimento" className="flex gap-1 p-0.5 rounded-lg bg-slate-100">
-            <Aba ativa={aba === 'conversa'} onClick={() => setAba('conversa')} rotulo="Conversa" n={conversa.length} />
-            <Aba ativa={aba === 'notas'} onClick={() => setAba('notas')} rotulo="Notas internas" n={notas.length} />
-          </div>
-        )}
+        <div role="tablist" aria-label="Atendimento" className="flex gap-1 p-0.5 rounded-lg bg-slate-100">
+          <Aba ativa={aba === 'conversa'} onClick={() => setAba('conversa')} rotulo="Conversa" n={conversa.length} />
+          {podeVerNotas && <Aba ativa={aba === 'notas'} onClick={() => setAba('notas')} rotulo="Notas internas" n={notas.length} />}
+          <Aba ativa={aba === 'historico'} onClick={() => setAba('historico')} rotulo="Histórico" />
+        </div>
       </div>
 
-      {lista.length === 0 ? (
+      {/* Fase 10: histórico automático de cada mudança */}
+      {aba === 'historico' ? (
+        <HistoricoChamado ticket={ticket} />
+      ) : lista.length === 0 ? (
         <p className="text-xs text-slate-500">
           {aba === 'notas' ? 'Nenhuma nota interna.' : 'Ainda sem respostas.'}
         </p>
