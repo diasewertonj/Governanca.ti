@@ -33,8 +33,8 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato, 
     fornecedores,
     faturas,
     currentRole,
-    criarContrato,
-    alterarContrato,
+    cadastrarContrato,
+    editarContrato,
     excluirContrato,
     anexarArquivoContrato,
     podeDescartarPendencias,
@@ -56,6 +56,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato, 
   const [erroArquivo, setErroArquivo] = useState('');
   const [erro, setErro] = useState('');
   const [novoFornecedor, setNovoFornecedor] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   // Aviso ao fechar com alterações não salvas (inclui o rascunho de fatura, que se registra sozinho)
   const valores = JSON.stringify([fornecedorId, tipo, numero, descricao, inicio, fim, valor, periodicidade, sla,
@@ -82,8 +83,9 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato, 
     setArquivo(msg ? null : f);
   };
 
-  const salvar = (e: React.FormEvent) => {
+  const salvar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (salvando) return;
     const valorNumero = valor === '' ? 0 : Number(valor);
     const problema = !fornecedorId
       ? 'Escolha o fornecedor.'
@@ -114,9 +116,26 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato, 
       itens,
       observacoes: observacoes.trim() || undefined,
     };
-    const id = contrato ? contrato.id : criarContrato(dados).id;
-    if (contrato) alterarContrato(contrato.id, dados);
-    if (arquivo) void anexarArquivoContrato(id, arquivo);
+    // Lote 1: só fecha depois do banco confirmar; se recusar, o digitado continua aqui
+    setErro('');
+    setSalvando(true);
+    let id = contrato?.id;
+    if (contrato) {
+      const falha = await editarContrato(contrato.id, dados);
+      if (falha) {
+        setSalvando(false);
+        return setErro(`Não foi possível salvar: ${falha}`);
+      }
+    } else {
+      const { item, erro: falha } = await cadastrarContrato(dados);
+      if (!item) {
+        setSalvando(false);
+        return setErro(`Não foi possível cadastrar: ${falha || 'erro desconhecido'}`);
+      }
+      id = item.id;
+    }
+    setSalvando(false);
+    if (arquivo && id) void anexarArquivoContrato(id, arquivo);
     onClose();
   };
 
@@ -471,10 +490,11 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato, 
               <button
                 type="submit"
                 form="form-contrato"
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                disabled={salvando}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
-                {contrato ? 'Salvar alterações' : 'Cadastrar contrato'}
+                {salvando ? 'Salvando…' : contrato ? 'Salvar alterações' : 'Cadastrar contrato'}
               </button>
             </div>
           </div>

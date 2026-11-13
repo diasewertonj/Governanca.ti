@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { menuDoPapel, type Contador, type Icone } from '../../utils/navegacao.ts';
+import { termoAberto } from '../../utils/termos.ts';
 
 const ICONES: Record<Icone, LucideIcon> = {
   inicio: House,
@@ -63,8 +64,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     chamados: tickets.filter((t) => emAberto(t.status)).length,
     lembretes: lembretes.filter((l) => l.status === 'aberto' && l.venceEm <= hoje).length,
     meus_chamados: tickets.filter((t) => t.solicitanteId === currentUser?.id && emAberto(t.status)).length,
+    // Lote 1: termo cancelado/substituído não conta (mesma regra de "Meus termos")
     termos_para_assinar: terms.filter(
-      (t) => t.colaboradorId === currentUser?.id && t.formaAssinatura === 'pendente' && !t.aceiteColaboradorEm
+      (t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm
     ).length,
   };
   const corContador: Record<Contador, string> = {

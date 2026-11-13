@@ -5,6 +5,7 @@ import { formatDate, formatDateTime } from '../../utils/formatters.ts';
 import { Printer, X, CheckCircle2, Upload, FileText, PenLine, Ban } from 'lucide-react';
 import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO, SEM_TOMBO } from '../../utils/processos.ts';
+import { erroCancelarTermo, situacaoTermo, termoCancelado } from '../../utils/termos.ts';
 
 interface PrintableTermModalProps {
   term: ResponsibilityTerm;
@@ -35,19 +36,34 @@ const Caixa: React.FC<{ marcada: boolean; rotulo: string }> = ({ marcada, rotulo
  * anexado ou dispensa com motivo (ex.: desligamento não amigável).
  */
 export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, onClose }) => {
-  const { settings, assets, markTermSigned, currentRole, currentUser, terms, aceitarTermo, dispensarAssinaturaTermo } =
-    useApp();
+  const {
+    settings,
+    assets,
+    markTermSigned,
+    currentRole,
+    currentUser,
+    terms,
+    aceitarTermo,
+    dispensarAssinaturaTermo,
+    cancelarTermo,
+    employees,
+  } = useApp();
   const [uploadingSigned, setUploadingSigned] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [dispensando, setDispensando] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   // Usa a versão mais recente do termo (o modal recebe uma cópia do momento da abertura)
   const t = terms.find((x) => x.id === term.id) || term;
   const isEntrega = t.tipo === 'entrega';
   const forma = t.formaAssinatura || (t.statusAssinatura === 'assinado' ? 'documento' : 'pendente');
-  const encerrado = forma !== 'pendente';
+  // Lote 1: termo cancelado/substituído não recebe mais assinatura
+  const cancelado = termoCancelado(t);
+  const substituto = terms.find((x) => x.id === t.substituidoPor);
+  const situacao = situacaoTermo(t, false, substituto?.codigo);
+  const encerrado = forma !== 'pendente' || cancelado;
   const souColaborador = currentUser?.id === t.colaboradorId;
 
   const padrao = isEntrega ? settings.docEntrega || DOC_ENTREGA_PADRAO : settings.docDevolucao || DOC_DEVOLUCAO_PADRAO;
@@ -131,6 +147,22 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
     setAviso('Dispensa registrada.');
   };
 
+  const confirmarCancelamento = async () => {
+    const problema = erroCancelarTermo(cancelando || '');
+    if (problema) return setErro(problema);
+    setErro(null);
+    setGravando(true);
+    const falha = await cancelarTermo(t.id, (cancelando || '').trim());
+    setGravando(false);
+    if (falha) return setErro(falha);
+    setCancelando(null);
+    setAviso(
+      t.chamadoId
+        ? 'Termo cancelado. Com o processo ainda aberto, gere o correto no passo "Termo"; termo de entrega também pode ser gerado pela ficha da pessoa.'
+        : 'Termo cancelado. Ele continua no histórico com o motivo. Para emitir o correto, use "Gerar termo de entrega" na ficha da pessoa.'
+    );
+  };
+
   const podeAceitarColab = !encerrado && souColaborador && !t.aceiteColaboradorEm && Boolean(t.formaAssinatura);
   const podeAceitarTI = !encerrado && isTI && !souColaborador && !t.aceiteTiEm && Boolean(t.formaAssinatura);
 
@@ -148,9 +180,13 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
                 {doc.codigo} · {t.codigo}
               </h2>
             </div>
-            <p className={`text-xs ${encerrado ? 'text-emerald-700' : 'text-amber-700'}`}>
-              {ROTULO_FORMA[forma]}
-              {forma === 'pendente' && (
+            <p className={`text-xs ${cancelado ? 'text-rose-700' : encerrado ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {cancelado
+                ? `${situacao.rotulo} em ${formatDate(t.canceladoEm || '')}${
+                    t.canceladoPor ? ` por ${employees.find((e) => e.id === t.canceladoPor)?.nome || 'T.I.'}` : ''
+                  } — ${t.cancelamentoMotivo || 'sem motivo'}`
+                : ROTULO_FORMA[forma]}
+              {!cancelado && forma === 'pendente' && (
                 <>
                   {' · '}colaborador {t.aceiteColaboradorEm ? '✓' : 'pendente'} · T.I. {t.aceiteTiEm ? '✓' : 'pendente'}
                 </>
@@ -206,6 +242,15 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
                 )}
               </>
             )}
+            {isTI && !cancelado && (
+              <button
+                type="button"
+                onClick={() => setCancelando(cancelando === null ? '' : null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
+              >
+                <Ban className="w-3.5 h-3.5" /> Cancelar termo
+              </button>
+            )}
             <button
               type="button"
               onClick={() => window.print()}
@@ -224,10 +269,33 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
           </div>
         </div>
 
-        {(aviso || erro || dispensando !== null) && (
+        {(aviso || erro || dispensando !== null || cancelando !== null) && (
           <div className="no-print px-6 py-2 border-b border-slate-200 space-y-2 text-xs">
             {aviso && <p className="text-emerald-700">{aviso}</p>}
             {erro && <p className="text-rose-700">{erro}</p>}
+            {cancelando !== null && (
+              <div className="space-y-1.5">
+                <p className="text-slate-600">
+                  O termo não é apagado: fica no histórico como cancelado, com o motivo, e não pode mais ser assinado.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={cancelando}
+                    onChange={(e) => setCancelando(e.target.value)}
+                    placeholder="Motivo (ex.: patrimônio errado; item que não foi entregue)"
+                    className="flex-1 min-w-[16rem] px-2.5 py-1.5 border border-slate-300 rounded-md"
+                  />
+                  <button
+                    type="button"
+                    disabled={gravando}
+                    onClick={confirmarCancelamento}
+                    className="px-3 py-1.5 font-semibold text-white bg-rose-600 rounded-md disabled:opacity-50"
+                  >
+                    Confirmar cancelamento
+                  </button>
+                </div>
+              </div>
+            )}
             {dispensando !== null && (
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -252,6 +320,11 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
         {/* Folha A4 */}
         <div className="p-8 md:p-10 bg-white sm:max-h-[75vh] sm:overflow-y-auto print:max-h-none print:p-0">
           <div className="print-a4-page mx-auto text-slate-900 text-xs leading-relaxed space-y-5">
+            {cancelado && (
+              <p className="border-2 border-rose-600 text-rose-700 font-bold uppercase text-center py-1.5 tracking-wider">
+                Documento {situacao.rotulo.toLowerCase()} — sem validade
+              </p>
+            )}
             {/* Cabeçalho do documento controlado */}
             <table className="w-full border-collapse text-[11px]">
               <tbody>

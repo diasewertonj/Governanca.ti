@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Contrato } from '../types/index.ts';
 import {
+  contratoQuePagaLicenca,
   contratosQueCobrem,
   contratosVigentesDoAtivo,
   contratoVigente,
@@ -145,5 +146,16 @@ describe('itens cobertos', () => {
   it('nome do contrato usa número quando houver', () => {
     expect(nomeContrato({ numero: '#CT-88', descricao: 'Dell ProSupport' })).toBe('#CT-88 · Dell ProSupport');
     expect(nomeContrato({ descricao: 'Dell ProSupport' })).toBe('Dell ProSupport');
+  });
+});
+
+describe('contrato que paga a licença (Lote 1)', () => {
+  const lic = contrato({ tipo: 'licenciamento', itens: [{ licencaId: 'lic-1' }], inicio: '2026-01-01', fim: '2026-12-31' });
+  it('vigente na competência paga a licença; encerrado ou de outro tipo não', () => {
+    expect(contratoQuePagaLicenca('lic-1', [lic], '2026-11-01')?.id).toBe('ct-1');
+    expect(contratoQuePagaLicenca('lic-1', [lic], '2027-01-01')).toBeUndefined();
+    expect(contratoQuePagaLicenca('lic-1', [{ ...lic, tipo: 'suporte' }], '2026-11-01')).toBeUndefined();
+    expect(contratoQuePagaLicenca('lic-2', [lic], '2026-11-01')).toBeUndefined();
+    expect(contratoQuePagaLicenca('lic-1', [lic], undefined, agora)?.id).toBe('ct-1');
   });
 });

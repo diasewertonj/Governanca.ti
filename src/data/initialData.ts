@@ -92,6 +92,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     dataAdmissao: '2023-02-15',
     role: 'ti_admin',
     telefone: '(11) 98765-1001',
+    temLogin: true,
   },
   {
     id: 'emp-2',
@@ -104,6 +105,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     dataAdmissao: '2023-05-10',
     role: 'rh',
     telefone: '(11) 98765-1002',
+    temLogin: true,
   },
   {
     id: 'emp-3',
@@ -117,6 +119,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     dataAdmissao: '2024-01-08',
     role: 'colaborador',
     telefone: '(11) 98765-1003',
+    temLogin: true,
   },
   {
     id: 'emp-4',

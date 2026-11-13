@@ -4,7 +4,10 @@ import { useApp } from '../../context/AppContext.tsx';
 import type { DadosRegistroItem } from '../../services/supabaseDb.ts';
 import { assentosLivres, licencaDaConta } from '../../utils/admissao.ts';
 import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
-import type { CondicaoItem, DestinoRecurso, ProcessoItem, Ticket } from '../../types/index.ts';
+import type { CondicaoItem, DestinoRecurso, ItemTermo, ProcessoItem, Ticket } from '../../types/index.ts';
+import { termoCancelado } from '../../utils/termos.ts';
+import { ConferenciaTermo } from '../terms/ConferenciaTermo.tsx';
+import { licencaAtiva } from '../../utils/licencas.ts';
 import {
   DOC_DEVOLUCAO_PADRAO,
   DOC_ENTREGA_PADRAO,
@@ -58,6 +61,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     acessoNexus,
     allocateLicense,
     createTerm,
+    cancelarTermo,
     setSelectedTermForPrint,
   } = useApp();
 
@@ -84,7 +88,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const [ident, setIdent] = useState(
     item.identificador || (item.tipo === 'conta' ? colab?.email || ob?.emailColaborador || '' : '')
   );
-  const [colaboradorId, setColaboradorId] = useState(colabId || colabPorEmail?.id || '');
+  const [colaboradorId, setColaboradorId] = useState(
+    colabId || (colabPorEmail?.status === 'ativo' ? colabPorEmail.id : '') || ''
+  );
   const [ativoId, setAtivoId] = useState('');
   const [licencaId, setLicencaId] = useState(item.licencaId || '');
   const [destino, setDestino] = useState<DestinoRecurso | ''>(sugestaoDestino ? 'transferir' : '');
@@ -104,15 +110,22 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       const casa = (x: typeof a) => (normalizar(`${x.nome} ${x.categoria}`).includes(alvo) ? 0 : 1);
       return casa(a) - casa(b) || a.tag.localeCompare(b.tag);
     });
-  const licencasLivres = licenses.filter((l) => l.assentosAlocados < l.assentosTotais || l.id === item.licencaId);
+  // Lote 1 (L3): licença inativa sai das listas de atribuição
+  const licencasLivres = licenses.filter(
+    (l) => (licencaAtiva(l) && l.assentosAlocados < l.assentosTotais) || l.id === item.licencaId
+  );
   const pessoas = employees.filter((e) => e.status !== 'desligado' && e.id !== colabId);
 
   // Ajustes da admissão: conta de um software com licença cadastrada já atribui a licença
-  const licencaConta = item.tipo === 'conta' ? licencaDaConta(item.titulo, licenses) : undefined;
+  const licencaConta = item.tipo === 'conta' ? licencaDaConta(item.titulo, licenses.filter(licencaAtiva)) : undefined;
   const jaTemLicenca = !!(licencaConta && colabId && licencaConta.colaboradoresIds.includes(colabId));
   const livresConta = licencaConta ? assentosLivres(licencaConta) : 0;
   const [atribuirLicenca, setAtribuirLicenca] = useState(true);
   const [confirmouExterno, setConfirmouExterno] = useState(false);
+  const [confirmouOutraPessoa, setConfirmouOutraPessoa] = useState(false);
+  const emailDiferente = (p?: { email: string }) =>
+    !!ob && !!p && p.email.trim().toLowerCase() !== ob.emailColaborador.trim().toLowerCase();
+  const pessoaEscolhida = employees.find((e) => e.id === colaboradorId);
   const licencaDoItem =
     item.tipo === 'liberar_licenca'
       ? licenses.find((l) => l.id === item.licencaId)
@@ -136,6 +149,14 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       if (item.tipo === 'cadastro') {
         const escolhido = colaboradorDoCadastro || colaboradorId;
         if (!escolhido) return setErro('Escolha o colaborador cadastrado.');
+        // Lote 1: só pessoa ativa; e-mail diferente do pedido exige confirmação explícita
+        const pessoa = employees.find((e) => e.id === escolhido);
+        if (!colaboradorDoCadastro && pessoa?.status !== 'ativo') {
+          return setErro('A admissão só pode ser ligada a uma pessoa ativa.');
+        }
+        if (!colaboradorDoCadastro && emailDiferente(pessoa) && !confirmouOutraPessoa) {
+          return setErro('O e-mail desta pessoa não é o do pedido do RH. Confirme que é a pessoa certa.');
+        }
         dados.colaborador_id = escolhido;
       }
       if ((item.tipo === 'conta' || item.tipo === 'grupo_email') && !ident.trim())
@@ -204,25 +225,38 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     if (falha) setErro(falha);
   };
 
-  // Termo do processo (entrega no onboarding, devolução no offboarding)
-  const termo = terms.find((t) => t.chamadoId === ticket.id);
+  // Termo do processo (entrega no onboarding, devolução no offboarding).
+  // Lote 1: o válido é o que não foi cancelado; os cancelados ficam no histórico.
+  const termosDoProcesso = terms.filter((t) => t.chamadoId === ticket.id);
+  const termo = termosDoProcesso.find((t) => !termoCancelado(t));
+  const termosCancelados = termosDoProcesso.filter((t) => termoCancelado(t));
   const termoOk = termo && termo.formaAssinatura && termo.formaAssinatura !== 'pendente';
-  const gerarTermo = async () => {
+  const tipoTermo = ticket.tipo === 'onboarding' ? 'entrega' : 'devolucao';
+  // Conferência item a item antes de gerar (null = fechada)
+  const [conferencia, setConferencia] = useState<ItemTermo[] | null>(null);
+
+  const abrirConferencia = () => {
+    setErro(null);
     if (!colab) return setErro('Faça primeiro o passo "Cadastrar colaborador".');
-    const tipo = ticket.tipo === 'onboarding' ? 'entrega' : 'devolucao';
     const linhas = itensDoTermo(
-      tipo,
+      tipoTermo,
       processoItens.filter((i) => i.chamadoId === ticket.id),
       assets,
       recursos
     );
     if (linhas.length === 0) {
       return setErro(
-        tipo === 'entrega'
+        tipoTermo === 'entrega'
           ? 'Registre primeiro a entrega dos equipamentos/acessórios: eles formam as linhas do termo.'
           : 'Não há equipamentos ou acessórios neste desligamento para constar no recibo.'
       );
     }
+    setConferencia(linhas);
+  };
+
+  const gerarTermo = async (linhas: ItemTermo[], motivoSubstituicao: string): Promise<string | null> => {
+    if (!colab) return 'Faça primeiro o passo "Cadastrar colaborador".';
+    const tipo = tipoTermo;
     const doc = (tipo === 'entrega' ? settings.docEntrega : settings.docDevolucao) ||
       (tipo === 'entrega' ? DOC_ENTREGA_PADRAO : DOC_DEVOLUCAO_PADRAO);
     setGravando(true);
@@ -247,8 +281,26 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       textoClausula: tipo === 'entrega' ? settings.textoTermoEntrega : settings.textoTermoDevolucao,
       formaAssinatura: 'pendente',
     });
+    if (!novo) {
+      setGravando(false);
+      return 'O termo não foi gerado. Os itens conferidos continuam aqui; tente de novo.';
+    }
+    // Substituição: o anterior vira "substituído" (fica no histórico, sem validade)
+    if (termo) {
+      const falha = await cancelarTermo(termo.id, motivoSubstituicao, novo.id);
+      if (falha) {
+        setGravando(false);
+        setConferencia(null);
+        setErro(
+          `O novo termo ${novo.codigo} foi gerado, mas o anterior (${termo.codigo}) não foi cancelado: ${falha}. Cancele-o na tela do termo.`
+        );
+        return null;
+      }
+    }
     setGravando(false);
-    if (novo) setSelectedTermForPrint(novo);
+    setConferencia(null);
+    setSelectedTermForPrint(novo);
+    return null;
   };
 
   const obsObrigatoria =
@@ -263,17 +315,39 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
         <div className="space-y-2">
           <div>
             <label className={rotulo}>Colaborador cadastrado</label>
-            <select className={campo} value={colaboradorId} onChange={(e) => setColaboradorId(e.target.value)}>
+            <select
+              className={campo}
+              value={colaboradorId}
+              onChange={(e) => {
+                setColaboradorId(e.target.value);
+                setConfirmouOutraPessoa(false);
+              }}
+            >
               <option value="">Escolha...</option>
               {employees
-                .filter((e) => e.status !== 'desligado')
+                .filter((e) => e.status === 'ativo')
                 .map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.nome} · {e.email}
                   </option>
                 ))}
             </select>
+            <p className="text-xs text-slate-500 mt-0.5">Só pessoas ativas.</p>
           </div>
+          {emailDiferente(pessoaEscolhida) && (
+            <label className="flex items-start gap-2 cursor-pointer rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              <input
+                type="checkbox"
+                checked={confirmouOutraPessoa}
+                onChange={(e) => setConfirmouOutraPessoa(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                O pedido do RH é para <strong>{ob?.nomeColaborador}</strong> ({ob?.emailColaborador}), mas você escolheu{' '}
+                <strong>{pessoaEscolhida?.nome}</strong> ({pessoaEscolhida?.email}). Confirmo que é a pessoa desta admissão.
+              </span>
+            </label>
+          )}
           {/* Ajustes da admissão: abre o cadastro preenchido (editável); salvar conclui o passo */}
           {ob && !colabPorEmail && !colaboradorId && (
             <button
@@ -300,7 +374,13 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               onClose={() => setCadastrando(false)}
             />
           )}
-          {ob && colabPorEmail && (
+          {ob && colabPorEmail && colabPorEmail.status !== 'ativo' && (
+            <p className="text-xs text-amber-800">
+              {colabPorEmail.nome} tem o e-mail do pedido, mas está {colabPorEmail.status === 'desligado' ? 'desligada' : 'de férias'}.
+              Admissão só se liga a pessoa ativa; para recontratar, o administrador de T.I. reativa o cadastro antes.
+            </p>
+          )}
+          {ob && colabPorEmail && colabPorEmail.status === 'ativo' && (
             <button
               type="button"
               disabled={gravando}
@@ -522,16 +602,53 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               >
                 Abrir termo
               </button>
+              {!conferencia && (
+                <button
+                  type="button"
+                  disabled={gravando}
+                  onClick={abrirConferencia}
+                  className="px-2 py-1 text-xs font-semibold text-rose-700 bg-white border border-rose-200 rounded hover:bg-rose-50"
+                >
+                  Substituir termo
+                </button>
+              )}
             </div>
           ) : (
-            <button
-              type="button"
-              disabled={gravando}
-              onClick={gerarTermo}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              Gerar {ticket.tipo === 'onboarding' ? 'termo de entrega' : 'recibo de devolução'} a partir do checklist
-            </button>
+            !conferencia && (
+              <button
+                type="button"
+                disabled={gravando}
+                onClick={abrirConferencia}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                Conferir itens e gerar {ticket.tipo === 'onboarding' ? 'termo de entrega' : 'recibo de devolução'}
+              </button>
+            )
+          )}
+          {termosCancelados.length > 0 && (
+            <p className="text-slate-500">
+              Histórico:{' '}
+              {termosCancelados.map((t, i) => (
+                <React.Fragment key={t.id}>
+                  {i > 0 && ', '}
+                  <button type="button" onClick={() => setSelectedTermForPrint(t)} className="underline hover:text-slate-700">
+                    {t.codigo}
+                  </button>{' '}
+                  ({t.substituidoPor ? 'substituído' : 'cancelado'}: {t.cancelamentoMotivo})
+                </React.Fragment>
+              ))}
+            </p>
+          )}
+          {conferencia && (
+            <ConferenciaTermo
+              tipo={tipoTermo}
+              linhasIniciais={conferencia}
+              nomePessoa={colab?.nome.split(' ')[0]}
+              termoAnterior={termo}
+              gravando={gravando}
+              onConfirmar={gerarTermo}
+              onVoltar={() => setConferencia(null)}
+            />
           )}
           {!termoOk && (
             <p className="text-xs text-slate-500">

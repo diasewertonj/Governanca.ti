@@ -7,7 +7,9 @@ import {
   CheckCircle2,
   Clock,
   User,
+  Ban,
 } from 'lucide-react';
+import { CLASSE_TOM, situacaoTermo } from '../../utils/termos.ts';
 
 export const TermsView: React.FC = () => {
   const { terms, setSelectedTermForPrint, setSelectedEmployeeIdFor360 } = useApp();
@@ -138,17 +140,16 @@ export const TermsView: React.FC = () => {
                     </td>
 
                     <td data-label="Status da Assinatura" className="py-3 px-4">
-                      {term.statusAssinatura === 'assinado' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Assinado & Arquivado
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                          <Clock className="w-3 h-3" />
-                          Pendente de Assinatura
-                        </span>
-                      )}
+                      {(() => {
+                        const s = situacaoTermo(term, false, terms.find((x) => x.id === term.substituidoPor)?.codigo);
+                        const Icone = s.tom === 'ok' ? CheckCircle2 : s.tom === 'cancelado' ? Ban : Clock;
+                        return (
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded border ${CLASSE_TOM[s.tom]}`}>
+                            <Icone className="w-3 h-3" />
+                            {s.rotulo}
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     <td data-label="Ação" className="py-3 px-4 text-right">

@@ -19,6 +19,8 @@ export interface Employee {
   role?: UserRole;
   telefone?: string;
   avatarUrl?: string;
+  /** Lote 1: já tem login (auth_user_id no banco). Só leitura: o banco define. */
+  temLogin?: boolean;
 }
 
 export interface Department {
@@ -184,6 +186,22 @@ export interface SoftwareLicense {
   tipoCobranca?: 'mensal' | 'anual';
   observacoes?: string;
   fornecedorId?: string; // Fase 8: vínculo com o cadastro; `fornecedor` guarda o nome (texto)
+  // Lote 1 (L3): inativa sai das listas de atribuição; reativar só o admin
+  status?: 'ativa' | 'inativa';
+  inativadaEm?: string;
+  inativadaPor?: string;
+  inativacaoMotivo?: string;
+}
+
+/** Lote 1 (L4): quem ocupou um assento da licença, de quando a quando */
+export interface AtribuicaoLicenca {
+  id: string;
+  licencaId: string;
+  colaboradorId: string;
+  inicio?: string; // vazio = já tinha o assento antes do histórico começar
+  fim?: string;
+  atribuidoPor?: string;
+  removidoPor?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -552,6 +570,11 @@ export interface ResponsibilityTerm {
   formaAssinatura?: 'pendente' | 'eletronica' | 'documento' | 'dispensada';
   motivoDispensa?: string;
   dataAssinatura?: string;
+  // Lote 1: termo cancelado (com motivo) ou substituído por outro; fica no histórico
+  canceladoEm?: string;
+  canceladoPor?: string;
+  cancelamentoMotivo?: string;
+  substituidoPor?: string;
 }
 
 export interface CustomFieldDefinition {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
+import { CLASSE_TOM, situacaoTermo, termoAberto } from '../../utils/termos.ts';
 import { Laptop, Key, FileText, LifeBuoy, QrCode } from 'lucide-react';
 
 interface MyAssetsViewProps {
@@ -24,7 +25,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
   const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(currentUser.id));
   const myTerms = terms.filter((t) => t.colaboradorId === currentUser.id);
   // Fase 6: termos aguardando o "Li e concordo" do colaborador
-  const termosParaAssinar = myTerms.filter((t) => t.formaAssinatura === 'pendente' && !t.aceiteColaboradorEm);
+  const termosParaAssinar = myTerms.filter((t) => termoAberto(t) && !t.aceiteColaboradorEm);
 
   return (
     <div className="space-y-6">
@@ -180,9 +181,10 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                     <span className="font-semibold text-slate-900 capitalize">
                       Termo de {term.tipo === 'entrega' ? 'Entrega' : 'Devolução'}
                     </span>
-                    <span className="text-emerald-700 bg-emerald-50 text-xs px-2 py-0.5 rounded border border-emerald-200">
-                      Assinado
-                    </span>
+                    {(() => {
+                      const s = situacaoTermo(term, true, terms.find((x) => x.id === term.substituidoPor)?.codigo);
+                      return <span className={`text-xs px-2 py-0.5 rounded border ${CLASSE_TOM[s.tom]}`}>{s.rotulo}</span>;
+                    })()}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
                     Emitido em {formatDate(term.dataEmissao)} · Responsável TI: {term.responsavelTINome}

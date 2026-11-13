@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { descricaoAdmissao } from '../../utils/admissao.ts';
+import { chamadoEncerrado } from '../../utils/atendimento.ts';
 import type { CatalogoItem } from '../../types/index.ts';
 import {
   UserPlus,
@@ -22,6 +23,7 @@ export const RhProcessesView: React.FC = () => {
     assets,
     licenses,
     catalogo,
+    tickets,
     currentUser,
     createTicket,
     setSelectedTicketIdForDetail,
@@ -79,6 +81,15 @@ export const RhProcessesView: React.FC = () => {
 
   const activeEmployees = employees.filter((e) => e.status === 'ativo');
   const selectedColaborador = employees.find((e) => e.id === selectedColabId);
+  // Lote 1: um desligamento aberto por pessoa (o banco também recusa)
+  const desligamentoAberto = (colabId: string) =>
+    tickets.find(
+      (t) =>
+        t.tipo === 'offboarding' &&
+        !chamadoEncerrado(t) &&
+        (t.colaboradorId || t.offboarding?.colaboradorId) === colabId
+    );
+  const desligamentoJaAberto = selectedColabId ? desligamentoAberto(selectedColabId) : undefined;
 
   // INVENTÁRIO INSTANTÂNEO do colaborador selecionado no Offboarding
   const colabAssets = assets.filter((a) => a.custodianteId === selectedColabId);
@@ -87,7 +98,7 @@ export const RhProcessesView: React.FC = () => {
   // Submissão do Offboarding Inteligente
   const handleOffboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedColaborador) return;
+    if (!selectedColaborador || desligamentoJaAberto) return;
 
     // Fase 6: o checklist é montado pela T.I. no chamado, a partir do inventário
     // real da pessoa (contas, grupos, equipamentos, acessórios e licenças).
@@ -268,9 +279,22 @@ export const RhProcessesView: React.FC = () => {
                   {activeEmployees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.nome} ({emp.cargo} · Matrícula {emp.matricula})
+                      {desligamentoAberto(emp.id) ? ' — desligamento em andamento' : ''}
                     </option>
                   ))}
                 </select>
+                {desligamentoJaAberto && (
+                  <div role="alert" className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                    Já existe um desligamento em andamento para esta pessoa ({desligamentoJaAberto.codigo}).{' '}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTicketIdForDetail(desligamentoJaAberto.id)}
+                      className="font-semibold underline hover:text-amber-900"
+                    >
+                      Abrir o processo
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -496,7 +520,7 @@ export const RhProcessesView: React.FC = () => {
             <div className="flex justify-end pt-4 border-t border-slate-100">
               <button
                 type="submit"
-                disabled={!selectedColaborador}
+                disabled={!selectedColaborador || !!desligamentoJaAberto}
                 className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg shadow-xs transition-colors"
               >
                 <Send className="w-4 h-4" />

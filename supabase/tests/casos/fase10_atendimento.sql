@@ -36,8 +36,9 @@ select harness.rodar('fase10', 'R6 suporte registra a solução: encerra, carimb
     perform harness.espera($s$select 1 from public.chamado_eventos where chamado_id = 'tkt-10' and tipo = 'resolvido'
       and detalhe like 'Troquei o rolo%' and autor_id = 'emp-sup'$s$, 1);
   end $x$$q$);
-select harness.rodar('fase10', 'R7 admissão continua encerrando pelo processo, sem solução registrada', 'ok', :'sup', 'authenticated',
-  $q$select harness.afeta($s$update public.chamados set status = 'resolvido' where id = 'tkt-3'$s$, 1)$q$);
+select harness.rodar('fase10', 'R7 admissão não encerra por update direto (só pelo processo, Lote 1)',
+  'erro: Admissão e desligamento só se encerram por "Concluir" (checklist) ou "Cancelar" com motivo.', :'sup', 'authenticated',
+  $q$update public.chamados set status = 'resolvido' where id = 'tkt-3'$q$);
 
 -- Avaliar e reabrir (estado montado dentro de cada cenário; o harness desfaz tudo)
 select harness.rodar('fase10', 'V1 quem abriu avalia o chamado encerrado', 'ok', :'colab', 'authenticated',

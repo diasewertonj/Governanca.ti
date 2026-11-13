@@ -1,94 +1,101 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { SoftwareLicense } from '../../types/index.ts';
-import { X, Key, Save, AlertCircle } from 'lucide-react';
+import { X, Key, Save, AlertCircle, Plus, FileText } from 'lucide-react';
+import { FornecedorFormModal } from '../fornecedores/FornecedorFormModal.tsx';
+import { contratoQuePagaLicenca, nomeContrato } from '../../utils/contratos.ts';
+import { formatDate, isoLocal } from '../../utils/formatters.ts';
+import { erroLicenca } from '../../utils/licencas.ts';
 
 interface SoftwareFormModalProps {
   onClose: () => void;
   softwareToEdit?: SoftwareLicense | null;
 }
 
+const CAMPO =
+  'w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500';
+const ROTULO = 'block text-xs font-semibold text-slate-700 mb-1';
+const SECAO = 'space-y-2 pt-3 border-t border-slate-100';
+const TITULO = 'text-xs font-bold uppercase tracking-wider text-slate-500';
+
+/**
+ * Lote 1 (L1, L2, L5): identificação → fornecedor/contrato → assentos → custo e
+ * renovação (só sem contrato) → painel → observações. Fornecedor só do cadastro
+ * ("+ Novo fornecedor" na hora). Só fecha depois de o banco confirmar.
+ */
 export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, softwareToEdit }) => {
-  const { addLicense, updateLicense, setSelectedSoftwareIdFor360, fornecedores } = useApp();
+  const { cadastrarLicenca, editarLicenca, setSelectedSoftwareIdFor360, fornecedores, contratos } = useApp();
 
   const isEditing = Boolean(softwareToEdit);
+  const emUso = softwareToEdit?.colaboradoresIds.length || 0;
+  // L2: coberta por contrato de licenciamento vigente → custo e faturas pelo contrato
+  const contratoPagador = softwareToEdit ? contratoQuePagaLicenca(softwareToEdit.id, contratos) : undefined;
 
   const [nome, setNome] = useState(softwareToEdit?.nome || '');
-  // Fase 8: fornecedor do cadastro; o texto antigo fica como reserva enquanto não houver vínculo
+  const [chaveContrato, setChaveContrato] = useState(softwareToEdit?.chaveContrato || '');
   const [fornecedorId, setFornecedorId] = useState(softwareToEdit?.fornecedorId || '');
-  const [fornecedor, setFornecedor] = useState(softwareToEdit?.fornecedor || '');
+  const [novoFornecedor, setNovoFornecedor] = useState(false);
   const fornecedorCadastro = fornecedores.find((f) => f.id === fornecedorId);
   const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
-  const [chaveContrato, setChaveContrato] = useState(() =>
-    softwareToEdit?.chaveContrato || `CTR-SaaS-${Date.now().toString().slice(-4)}`
-  );
-  const [assentosTotais, setAssentosTotais] = useState<number>(softwareToEdit?.assentosTotais || 10);
-  const [valorMensal, setValorMensal] = useState<number>(softwareToEdit?.valorMensal || 500);
-  const [tipoCobranca, setTipoCobranca] = useState<'mensal' | 'anual'>(
-    softwareToEdit?.tipoCobranca || 'mensal'
-  );
-  const [dataRenovacao, setDataRenovacao] = useState(() =>
-    softwareToEdit?.dataRenovacao ||
-      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
+  // Texto livre antigo: só exibido (dado legado) enquanto não houver vínculo
+  const fornecedorLegado = !softwareToEdit?.fornecedorId ? softwareToEdit?.fornecedor : undefined;
+
+  const [assentosTotais, setAssentosTotais] = useState<number>(softwareToEdit?.assentosTotais || 1);
+  const [valorMensal, setValorMensal] = useState<number>(softwareToEdit?.valorMensal ?? 0);
+  const [tipoCobranca, setTipoCobranca] = useState<'mensal' | 'anual'>(softwareToEdit?.tipoCobranca || 'mensal');
+  const renovacaoInicial = softwareToEdit?.dataRenovacao || '';
+  const [dataRenovacao, setDataRenovacao] = useState(renovacaoInicial);
   const [urlPainel, setUrlPainel] = useState(softwareToEdit?.urlPainel || '');
   const [observacoes, setObservacoes] = useState(softwareToEdit?.observacoes || '');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Com vínculo, o texto passa a ser o nome do cadastro (é o que as outras telas mostram)
-    const nomeFornecedor = fornecedorCadastro ? fornecedorCadastro.nome : fornecedor.trim();
-    if (!nome.trim() || !nomeFornecedor || !chaveContrato.trim()) {
-      setErrorMsg('Preencha os campos obrigatórios.');
-      return;
-    }
-
-    if (assentosTotais < 1) {
-      setErrorMsg('A quantidade total de assentos deve ser no mínimo 1.');
-      return;
-    }
-
-    if (isEditing && softwareToEdit) {
-      if (assentosTotais < softwareToEdit.colaboradoresIds.length) {
-        setErrorMsg(
-          `O total de assentos (${assentosTotais}) não pode ser inferior aos colaboradores já alocados (${softwareToEdit.colaboradoresIds.length}).`
-        );
-        return;
-      }
-
-      updateLicense(softwareToEdit.id, {
-        nome: nome.trim(),
-        fornecedor: nomeFornecedor,
-        fornecedorId: fornecedorId || undefined,
-        chaveContrato: chaveContrato.trim(),
+    if (salvando) return;
+    const problema = erroLicenca(
+      {
+        nome,
+        fornecedorId,
         assentosTotais: Number(assentosTotais),
-        valorMensal: Number(valorMensal),
-        tipoCobranca,
+        emUso,
         dataRenovacao,
-        urlPainel: urlPainel.trim() || undefined,
-        observacoes: observacoes.trim() || undefined,
-      });
+        renovacaoMudou: dataRenovacao !== renovacaoInicial,
+        pagaPorContrato: !!contratoPagador,
+      },
+      isoLocal(new Date())
+    );
+    if (problema) return setErrorMsg(problema);
+    setErrorMsg(null);
 
+    const dados = {
+      nome: nome.trim(),
+      // O texto passa a ser o nome do cadastro (é o que as outras telas mostram)
+      fornecedor: fornecedorCadastro?.nome || '',
+      fornecedorId,
+      chaveContrato: chaveContrato.trim(),
+      assentosTotais: Number(assentosTotais),
+      // Com contrato, custo e renovação ficam como estavam (quem manda é o contrato)
+      valorMensal: contratoPagador ? softwareToEdit?.valorMensal || 0 : Number(valorMensal) || 0,
+      tipoCobranca: contratoPagador ? softwareToEdit?.tipoCobranca || 'mensal' : tipoCobranca,
+      dataRenovacao: contratoPagador ? renovacaoInicial || contratoPagador.fim || isoLocal(new Date()) : dataRenovacao,
+      urlPainel: urlPainel.trim() || undefined,
+      observacoes: observacoes.trim() || undefined,
+    };
+
+    setSalvando(true);
+    if (isEditing && softwareToEdit) {
+      const falha = await editarLicenca(softwareToEdit.id, dados);
+      setSalvando(false);
+      if (falha) return setErrorMsg(`Não foi possível salvar: ${falha}`);
       onClose();
       setSelectedSoftwareIdFor360(softwareToEdit.id);
     } else {
-      const created = addLicense({
-        nome: nome.trim(),
-        fornecedor: nomeFornecedor,
-        fornecedorId: fornecedorId || undefined,
-        chaveContrato: chaveContrato.trim(),
-        assentosTotais: Number(assentosTotais),
-        colaboradoresIds: [],
-        valorMensal: Number(valorMensal),
-        tipoCobranca,
-        dataRenovacao,
-        urlPainel: urlPainel.trim() || undefined,
-        observacoes: observacoes.trim() || undefined,
-      });
-
+      const { item, erro } = await cadastrarLicenca({ ...dados, colaboradoresIds: [] });
+      setSalvando(false);
+      if (!item) return setErrorMsg(`Não foi possível cadastrar: ${erro || 'erro desconhecido'}`);
       onClose();
-      setSelectedSoftwareIdFor360(created.id);
+      setSelectedSoftwareIdFor360(item.id);
     }
   };
 
@@ -103,11 +110,9 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
             </div>
             <div>
               <h2 className="text-sm font-semibold text-slate-900 leading-tight">
-                {isEditing ? 'Editar Software / Assinatura SaaS' : 'Cadastrar Nova Assinatura de Software / SaaS'}
+                {isEditing ? `Editar licença ${softwareToEdit?.nome}` : 'Nova licença / assinatura'}
               </h2>
-              <p className="text-xs text-slate-500">
-                Parâmetros contratuais, teto de assentos e dados de faturamento
-              </p>
+              <p className="text-xs text-slate-500">Identificação, fornecedor, assentos e custo</p>
             </div>
           </div>
           <button
@@ -120,179 +125,194 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           </button>
         </div>
 
-        {errorMsg && (
-          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* Formulário */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
+          {/* 1. Identificação */}
           <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Identificação</h3>
+            <h3 className={TITULO}>Identificação</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nome do Software / Sistema SaaS *
-                </label>
+                <label htmlFor="licenca-nome" className={ROTULO}>Nome do software *</label>
                 <input
+                  id="licenca-nome"
                   type="text"
                   required
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  placeholder="Ex: Microsoft 365 E5, Figma Enterprise, Slack"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  placeholder="Ex: Microsoft 365 E5, Figma, Slack"
+                  className={CAMPO}
                 />
               </div>
-
               <div>
-                <label htmlFor="licenca-fornecedor" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Fornecedor *
-                </label>
-                <select
-                  id="licenca-fornecedor"
-                  value={fornecedorId}
-                  onChange={(e) => setFornecedorId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">Sem vínculo (informar o nome)</option>
-                  {opcoesFornecedor.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.nome}
-                      {f.ativo ? '' : ' (inativo)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {!fornecedorId && (
-                <div>
-                  <label htmlFor="licenca-fornecedor-texto" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fornecedor (texto) *
-                  </label>
-                  <input
-                    id="licenca-fornecedor-texto"
-                    type="text"
-                    required
-                    value={fornecedor}
-                    onChange={(e) => setFornecedor(e.target.value)}
-                    placeholder="Ex: Microsoft, Google, Adobe, Atlassian"
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                  <span className="text-xs text-slate-500 mt-0.5 block">
-                    Cadastre o fornecedor em "Fornecedores e contratos" para vinculá-lo.
-                  </span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Chave de Contrato / ID da Assinatura *
-                </label>
+                <label htmlFor="licenca-chave" className={ROTULO}>Chave / ID da assinatura</label>
                 <input
+                  id="licenca-chave"
                   type="text"
-                  required
                   value={chaveContrato}
                   onChange={(e) => setChaveContrato(e.target.value)}
-                  className="w-full text-xs font-mono font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  URL do Painel / Console de Administração Web
-                </label>
-                <input
-                  type="url"
-                  value={urlPainel}
-                  onChange={(e) => setUrlPainel(e.target.value)}
-                  placeholder="https://admin.microsoft.com ou https://admin.google.com"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  placeholder="Opcional"
+                  className={`${CAMPO} font-mono`}
                 />
               </div>
             </div>
           </div>
 
-          <div className="space-y-2 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Contrato e custo</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* 2. Fornecedor e contrato */}
+          <div className={SECAO}>
+            <h3 className={TITULO}>Fornecedor e contrato</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Quantidade Total de Assentos *
-                </label>
+                <label htmlFor="licenca-fornecedor" className={ROTULO}>Fornecedor *</label>
+                <div className="flex gap-2">
+                  <select
+                    id="licenca-fornecedor"
+                    value={fornecedorId}
+                    onChange={(e) => setFornecedorId(e.target.value)}
+                    className={CAMPO}
+                  >
+                    <option value="">Escolha…</option>
+                    {opcoesFornecedor.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.nome}
+                        {f.ativo ? '' : ' (inativo)'}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setNovoFornecedor(true)}
+                    className="shrink-0 flex items-center gap-1 px-2.5 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Novo
+                  </button>
+                </div>
+                {fornecedorLegado && !fornecedorId && (
+                  <p className="text-xs text-amber-800 mt-1">
+                    Registro antigo: "{fornecedorLegado}" (texto). Escolha o fornecedor do cadastro para salvar.
+                  </p>
+                )}
+              </div>
+              <div>
+                <span className={ROTULO}>Contrato de licenciamento</span>
+                {contratoPagador ? (
+                  <p className="flex items-start gap-1.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Custo e faturas pelo contrato <strong>{nomeContrato(contratoPagador)}</strong>
+                      {contratoPagador.fim ? ` (até ${formatDate(contratoPagador.fim)})` : ''}.
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500 px-1 py-2">
+                    Sem contrato: o custo e as faturas ficam na própria licença. Para cobrir por contrato, inclua a licença
+                    no contrato de licenciamento (Fornecedores e contratos).
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Assentos */}
+          <div className={SECAO}>
+            <h3 className={TITULO}>Assentos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="licenca-assentos" className={ROTULO}>Total de assentos *</label>
                 <input
+                  id="licenca-assentos"
                   type="number"
-                  min={1}
+                  min={Math.max(1, emUso)}
                   required
                   value={assentosTotais}
                   onChange={(e) => setAssentosTotais(Number(e.target.value))}
-                  className="w-full text-xs font-mono font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className={`${CAMPO} font-mono font-bold`}
                 />
                 <span className="text-xs text-slate-500 mt-0.5 block">
-                  Teto máximo de colaboradores
+                  {isEditing ? `${emUso} em uso — o total não pode ficar abaixo disso` : 'Quantas pessoas podem usar'}
                 </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Data de Renovação / Vigência *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={dataRenovacao}
-                  onChange={(e) => setDataRenovacao(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Periodicidade de Cobrança
-                </label>
-                <select
-                  value={tipoCobranca}
-                  onChange={(e) => setTipoCobranca(e.target.value as 'mensal' | 'anual')}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="mensal">Mensal (Faturamento Recorrente)</option>
-                  <option value="anual">Anual (Contrato Fechado)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Valor Financeiro (R$) *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    required
-                    value={valorMensal}
-                    onChange={(e) => setValorMensal(Number(e.target.value))}
-                    className="w-full text-xs font-mono font-semibold pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                  <span className="absolute left-3 top-2 text-xs font-bold text-slate-500">R$</span>
-                </div>
               </div>
             </div>
           </div>
 
+          {/* 4. Custo e renovação (só sem contrato) */}
+          {!contratoPagador && (
+            <div className={SECAO}>
+              <h3 className={TITULO}>Custo e renovação</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="licenca-valor" className={ROTULO}>Valor (R$) *</label>
+                  <div className="relative">
+                    <input
+                      id="licenca-valor"
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      required
+                      value={valorMensal}
+                      onChange={(e) => setValorMensal(Number(e.target.value))}
+                      className={`${CAMPO} font-mono pl-8`}
+                    />
+                    <span className="absolute left-3 top-2 text-xs font-bold text-slate-500">R$</span>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="licenca-cobranca" className={ROTULO}>Cobrança</label>
+                  <select
+                    id="licenca-cobranca"
+                    value={tipoCobranca}
+                    onChange={(e) => setTipoCobranca(e.target.value as 'mensal' | 'anual')}
+                    className={CAMPO}
+                  >
+                    <option value="mensal">Mensal</option>
+                    <option value="anual">Anual</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="licenca-renovacao" className={ROTULO}>Próxima renovação *</label>
+                  <input
+                    id="licenca-renovacao"
+                    type="date"
+                    required
+                    value={dataRenovacao}
+                    onChange={(e) => setDataRenovacao(e.target.value)}
+                    className={CAMPO}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 5. Painel */}
+          <div className={SECAO}>
+            <label htmlFor="licenca-painel" className={ROTULO}>Painel de administração (URL)</label>
+            <input
+              id="licenca-painel"
+              type="url"
+              value={urlPainel}
+              onChange={(e) => setUrlPainel(e.target.value)}
+              placeholder="https://admin.microsoft.com"
+              className={CAMPO}
+            />
+          </div>
+
+          {/* 6. Observações */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Observações / Cláusulas Contratuais
-            </label>
+            <label htmlFor="licenca-obs" className={ROTULO}>Observações</label>
             <textarea
+              id="licenca-obs"
               rows={2}
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Particularidades do contrato, revendedor autorizado, modelo de licenciamento..."
-              className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              placeholder="Revendedor, modelo de licenciamento, particularidades…"
+              className={`${CAMPO} p-3`}
             />
           </div>
+
+          {errorMsg && (
+            <div role="alert" className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
             <button
@@ -304,14 +324,19 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+              disabled={salvando}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{isEditing ? 'Salvar Alterações' : 'Cadastrar Software / SaaS'}</span>
+              <span>{salvando ? 'Salvando…' : isEditing ? 'Salvar alterações' : 'Cadastrar licença'}</span>
             </button>
           </div>
         </form>
       </div>
+
+      {novoFornecedor && (
+        <FornecedorFormModal onClose={() => setNovoFornecedor(false)} onSalvo={(f) => setFornecedorId(f.id)} />
+      )}
     </div>
   );
 };

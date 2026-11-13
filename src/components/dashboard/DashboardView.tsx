@@ -150,7 +150,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <span className="text-xs text-slate-500">assentos alocados</span>
           </div>
           <div className="mt-2 text-xs text-slate-500">
-            {licenses.length} licenças ativas
+            {licenses.filter((l) => (l.status || 'ativa') === 'ativa').length} licenças ativas
           </div>
         </div>
       </div>
