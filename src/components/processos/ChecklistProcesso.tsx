@@ -264,6 +264,8 @@ const LinhaItem: React.FC<{
   onReabrir: () => void;
   nomeDe: (id?: string) => string | undefined;
 }> = ({ item, ticket, podeEditar, aberto, onAbrir, onFechar, onRemover, onReabrir, nomeDe }) => {
+  const { employees } = useApp();
+  const cadastrada = item.tipo === 'cadastro' ? employees.find((e) => e.id === ticket.colaboradorId) : undefined;
   const icone =
     item.status === 'feito' ? (
       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -310,7 +312,14 @@ const LinhaItem: React.FC<{
           >
             {item.titulo}
           </span>
-          {item.detalhe && <span className="block text-xs text-slate-500">{item.detalhe}</span>}
+          {/* Cadastro concluído: mostra a pessoa como foi cadastrada (o pedido do RH pode ter sido corrigido) */}
+          {item.tipo === 'cadastro' && item.status === 'feito' && cadastrada ? (
+            <span className="block text-xs text-slate-500">
+              {cadastrada.nome} · {cadastrada.email}
+            </span>
+          ) : (
+            item.detalhe && <span className="block text-xs text-slate-500">{item.detalhe}</span>
+          )}
           {item.status !== 'pendente' && (
             <span className="block text-xs text-slate-500 mt-0.5">
               {registro.length > 0 && <>{registro.join(' · ')} · </>}

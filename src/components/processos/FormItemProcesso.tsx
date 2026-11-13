@@ -3,6 +3,7 @@ import { Copy, KeyRound, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { DadosRegistroItem } from '../../services/supabaseDb.ts';
 import { assentosLivres, licencaDaConta } from '../../utils/admissao.ts';
+import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
 import type { CondicaoItem, DestinoRecurso, ProcessoItem, Ticket } from '../../types/index.ts';
 import {
   DOC_DEVOLUCAO_PADRAO,
@@ -55,7 +56,6 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     processoItens,
     registrarItemProcesso,
     acessoNexus,
-    cadastrarColaborador,
     allocateLicense,
     createTerm,
     setSelectedTermForPrint,
@@ -174,27 +174,13 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     if (!senha) onFechar();
   };
 
-  // Cadastro a partir do pedido do RH (mesma regra de papel da Fase 3): cria e já conclui o passo
-  const cadastrarDoRh = async () => {
-    if (!ob) return;
-    setErro(null);
-    setGravando(true);
-    const { colaborador: novo, erro: falha } = await cadastrarColaborador({
-      matricula: `NX-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-      nome: ob.nomeColaborador,
-      email: ob.emailColaborador,
-      cargo: ob.cargo,
-      setorId: ob.setorId,
-      gestorId: ob.gestorId,
-      status: 'ativo',
-      dataAdmissao: ob.dataAdmissao,
-      role: currentRole === 'ti_admin' ? ob.papelAcessoSugerido || 'colaborador' : 'colaborador',
-    });
-    setGravando(false);
-    if (!novo) return setErro(falha || 'Não foi possível cadastrar.');
-    setColaboradorId(novo.id);
-    setAviso(`Cadastro de ${novo.nome} criado (matrícula ${novo.matricula}).`);
-    await registrar('feito', `Cadastro criado com os dados do RH (matrícula ${novo.matricula})`, novo.id);
+  // Cadastro a partir do pedido do RH: abre o formulário já preenchido (dá para corrigir
+  // e-mail, cargo etc.); ao salvar, o passo conclui sozinho (mesma regra de papel da Fase 3)
+  const [cadastrando, setCadastrando] = useState(false);
+  const concluirCadastro = async (id: string) => {
+    setColaboradorId(id);
+    setAviso('Cadastro criado.');
+    await registrar('feito', 'Cadastro criado a partir do pedido do RH', id);
   };
 
   const gerarAcesso = async (acao: 'criar' | 'redefinir') => {
@@ -288,16 +274,31 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                 ))}
             </select>
           </div>
-          {/* Ajustes da admissão: um clique cadastra (ou liga) e já conclui o passo */}
+          {/* Ajustes da admissão: abre o cadastro preenchido (editável); salvar conclui o passo */}
           {ob && !colabPorEmail && !colaboradorId && (
             <button
               type="button"
               disabled={gravando}
-              onClick={cadastrarDoRh}
+              onClick={() => setCadastrando(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
-              <UserPlus className="w-3.5 h-3.5" /> Cadastrar {ob.nomeColaborador} com os dados do RH e concluir
+              <UserPlus className="w-3.5 h-3.5" /> Cadastrar {ob.nomeColaborador} (dados do RH, para conferir)
             </button>
+          )}
+          {cadastrando && ob && (
+            <NewEmployeeModal
+              inicial={{
+                nome: ob.nomeColaborador,
+                email: ob.emailColaborador,
+                cargo: ob.cargo,
+                setorId: ob.setorId,
+                gestorId: ob.gestorId,
+                dataAdmissao: ob.dataAdmissao,
+                papel: currentRole === 'ti_admin' ? ob.papelAcessoSugerido || 'colaborador' : 'colaborador',
+              }}
+              onCriado={concluirCadastro}
+              onClose={() => setCadastrando(false)}
+            />
           )}
           {ob && colabPorEmail && (
             <button
