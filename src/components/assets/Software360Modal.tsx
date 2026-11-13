@@ -18,6 +18,9 @@ import {
 import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
 import { chamadosDoSoftware } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
+import { History, Ban } from 'lucide-react';
+import { contratoQuePagaLicenca, nomeContrato } from '../../utils/contratos.ts';
+import { historicoAssentos, licencaAtiva } from '../../utils/licencas.ts';
 
 interface Software360ModalProps {
   softwareId: string;
@@ -31,7 +34,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     departments,
     allocateLicense,
     revokeLicense,
-    updateLicense,
+    editarLicenca,
     setSelectedEmployeeIdFor360,
     setSoftwareToEdit,
     setSoftwareModalOpen,
@@ -39,7 +42,11 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     fornecedores,
     podeDescartarPendencias,
     tickets,
+    contratos,
+    atribuicoesLicenca,
+    mudarSituacaoLicenca,
   } = useApp();
+  const [motivoInativar, setMotivoInativar] = useState<string | null>(null);
 
   const [selectedColabToAssign, setSelectedColabToAssign] = useState('');
   const [colabFilterSearch, setColabFilterSearch] = useState('');
@@ -52,6 +59,24 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   if (!license) return null;
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  // Lote 1: situação, contrato que paga e histórico de assentos
+  const ativa = licencaAtiva(license);
+  const contratoPagador = contratoQuePagaLicenca(license.id, contratos);
+  const historico = historicoAssentos(atribuicoesLicenca, { licencaId: license.id });
+  const nomePessoa = (id: string) => employees.find((e) => e.id === id)?.nome || 'Pessoa removida';
+
+  const inativar = async () => {
+    if (!motivoInativar) return;
+    const falha = await mudarSituacaoLicenca(license.id, false, motivoInativar);
+    if (falha) return setFeedbackMsg({ text: falha, type: 'error' });
+    setMotivoInativar(null);
+    setFeedbackMsg({ text: 'Licença inativada. Ela sai das listas de atribuição.', type: 'success' });
+  };
+  const reativar = async () => {
+    if (!window.confirm(`Reativar ${license.nome}? Ela volta às listas de atribuição.`)) return;
+    const falha = await mudarSituacaoLicenca(license.id, true);
+    setFeedbackMsg(falha ? { text: falha, type: 'error' } : { text: 'Licença reativada.', type: 'success' });
+  };
   // Fase 8: nome do cadastro de fornecedores; sem vínculo, o texto antigo
   const nomeFornecedor = fornecedores.find((f) => f.id === license.fornecedorId)?.nome || license.fornecedor;
   // Fecha perguntando se houver fatura em digitação
@@ -109,7 +134,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setTimeout(() => setFeedbackMsg(null), 3000);
   };
 
-  const handleSaveTotalSeats = () => {
+  const handleSaveTotalSeats = async () => {
     if (newTotalSeats < license.assentosAlocados) {
       setFeedbackMsg({
         text: `O total de assentos não pode ser menor que os assentos atualmente em uso (${license.assentosAlocados}).`,
@@ -118,7 +143,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
       setTimeout(() => setFeedbackMsg(null), 4000);
       return;
     }
-    updateLicense(license.id, { assentosTotais: newTotalSeats });
+    const falha = await editarLicenca(license.id, { assentosTotais: newTotalSeats });
+    if (falha) return setFeedbackMsg({ text: `Não foi possível salvar: ${falha}`, type: 'error' });
     setIsEditingSeats(false);
     setFeedbackMsg({
       text: `Quantidade total de assentos atualizada para ${newTotalSeats}!`,
@@ -139,13 +165,25 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold text-slate-900 leading-tight break-words">{license.nome}</h2>
-                <span className="text-xs font-mono font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {license.chaveContrato}
-                </span>
+                {license.chaveContrato && (
+                  <span className="text-xs font-mono font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {license.chaveContrato}
+                  </span>
+                )}
+                {!ativa && (
+                  <span className="text-xs font-semibold text-slate-700 bg-slate-200 px-2 py-0.5 rounded">Inativa</span>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 {nomeFornecedor}
+                {contratoPagador && ` · paga pelo contrato ${nomeContrato(contratoPagador)}`}
               </p>
+              {!ativa && (
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Inativada{license.inativadaEm ? ` em ${formatDate(license.inativadaEm)}` : ''}
+                  {license.inativadaPor ? ` por ${nomePessoa(license.inativadaPor)}` : ''}: {license.inativacaoMotivo || 'sem motivo'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -180,6 +218,28 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               </button>
             )}
 
+            {/* Lote 1 (L3): inativar com motivo; reativar só o administrador */}
+            {isTI && ativa && (
+              <button
+                type="button"
+                onClick={() => setMotivoInativar(motivoInativar === null ? '' : null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                <span>Inativar</span>
+              </button>
+            )}
+            {currentRole === 'ti_admin' && !ativa && (
+              <button
+                type="button"
+                onClick={reativar}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Reativar</span>
+              </button>
+            )}
+
             <button
               type="button"
               aria-label="Fechar"
@@ -190,6 +250,33 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             </button>
           </div>
         </div>
+
+        {motivoInativar !== null && (
+          <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 text-xs space-y-2">
+            <p className="text-slate-700">
+              A licença não é excluída: fica no histórico e sai das listas de atribuição.
+              {license.colaboradoresIds.length > 0 &&
+                ` Antes, libere os ${license.colaboradoresIds.length} assento(s) em uso.`}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                aria-label="Motivo da inativação"
+                value={motivoInativar}
+                onChange={(e) => setMotivoInativar(e.target.value)}
+                placeholder="Motivo (ex.: contrato encerrado; trocado pelo Google Workspace)"
+                className="flex-1 min-w-[16rem] px-2.5 py-1.5 border border-slate-300 rounded-md"
+              />
+              <button
+                type="button"
+                onClick={inativar}
+                disabled={license.colaboradoresIds.length > 0}
+                className="px-3 py-1.5 font-semibold text-white bg-slate-700 rounded-md disabled:opacity-50"
+              >
+                Confirmar inativação
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Feedback visual */}
         {feedbackMsg && (
@@ -338,7 +425,46 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               alvo={{ licencaId: license.id }}
               periodicidade={license.tipoCobranca || 'mensal'}
               valorPadrao={license.valorMensal}
+              bloqueioLancamento={
+                contratoPagador
+                  ? `Custo e faturas pelo contrato ${nomeContrato(contratoPagador)}: lance a fatura no contrato. As faturas acima são anteriores ao contrato.`
+                  : undefined
+              }
             />
+          )}
+
+          {/* Lote 1 (L4): quem teve assento, de quando a quando */}
+          {isTI && (
+            <div className="border border-slate-200 rounded-xl p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-slate-600" aria-hidden="true" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Histórico de assentos</h3>
+              </div>
+              {historico.length === 0 ? (
+                <p className="text-xs text-slate-500">Nenhuma atribuição registrada ainda.</p>
+              ) : (
+                <ul className="divide-y divide-slate-100 text-xs">
+                  {historico.map((a) => (
+                    <li key={a.id} className="py-1.5 flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEmployeeIdFor360(a.colaboradorId)}
+                        className="font-medium text-slate-900 hover:text-blue-700"
+                      >
+                        {nomePessoa(a.colaboradorId)}
+                      </button>
+                      <span className="text-slate-600">
+                        {a.inicio ? `desde ${formatDate(a.inicio)}` : 'antes do histórico'}
+                        {a.atribuidoPor ? ` (por ${nomePessoa(a.atribuidoPor)})` : ''}
+                        {a.fim
+                          ? ` · saiu em ${formatDate(a.fim)}${a.removidoPor ? ` (por ${nomePessoa(a.removidoPor)})` : ''}`
+                          : ' · em uso'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {/* Fase 9: chamados ligados a este software */}
@@ -356,8 +482,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             </div>
           )}
 
-          {/* Seção 2: Atribuição / Alocação de Assento */}
-          {isTI && (
+          {/* Seção 2: Atribuição / Alocação de Assento (licença inativa não recebe assento) */}
+          {isTI && ativa && (
             <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-1.5">
                 <UserPlus className="w-4 h-4 text-blue-700" />

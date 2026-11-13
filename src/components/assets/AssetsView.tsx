@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, formatCurrency } from '../../utils/formatters.ts';
 import { garantiaEfetiva } from '../../utils/contratos.ts';
+import { licencaAtiva } from '../../utils/licencas.ts';
 import {
   Search,
   Plus,
@@ -193,13 +194,16 @@ export const AssetsView: React.FC = () => {
       {categoryFilter === 'licencas_tab' ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {licenses.map((lic) => {
+            {/* Lote 1 (L3): inativas no fim, apagadas e marcadas */}
+            {[...licenses].sort((a, b) => Number(!licencaAtiva(a)) - Number(!licencaAtiva(b))).map((lic) => {
               const perc = Math.round((lic.assentosAlocados / lic.assentosTotais) * 100);
               const freeCount = Math.max(0, lic.assentosTotais - lic.assentosAlocados);
               return (
                 <div
                   key={lic.id}
-                  className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4 hover:border-slate-300 transition-colors"
+                  className={`bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4 hover:border-slate-300 transition-colors ${
+                    licencaAtiva(lic) ? '' : 'opacity-60'
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -214,11 +218,19 @@ export const AssetsView: React.FC = () => {
                         <div>
                           <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors flex items-center gap-1.5">
                             <span>{lic.nome}</span>
+                            {!licencaAtiva(lic) && (
+                              <span className="text-xs font-semibold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">Inativa</span>
+                            )}
                             <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h3>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {fornecedores.find((f) => f.id === lic.fornecedorId)?.nome || lic.fornecedor} · Contrato:{' '}
-                            <span className="font-mono">{lic.chaveContrato}</span>
+                            {fornecedores.find((f) => f.id === lic.fornecedorId)?.nome || lic.fornecedor}
+                            {lic.chaveContrato && (
+                              <>
+                                {' · '}
+                                <span className="font-mono">{lic.chaveContrato}</span>
+                              </>
+                            )}
                           </p>
                         </div>
                       </button>

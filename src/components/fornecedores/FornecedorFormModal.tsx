@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Building2, Save, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Fornecedor } from '../../types/index.ts';
@@ -24,7 +25,8 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
     assets,
     licenses,
     currentRole,
-    criarFornecedor,
+    cadastrarFornecedor,
+    editarFornecedor,
     alterarFornecedor,
     excluirFornecedor,
   } = useApp();
@@ -54,8 +56,13 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
     ? vinculosDoFornecedor(fornecedor.id, { contratos, ativos: assets, licencas: licenses })
     : null;
 
-  const salvar = (e: React.FormEvent) => {
+  const [salvando, setSalvando] = useState(false);
+  // Lote 1: só fecha depois do banco confirmar
+  const salvar = async (e: React.FormEvent) => {
     e.preventDefault();
+    // O portal ainda propaga eventos pela árvore do React: não deixa o "submit" chegar ao formulário de fora
+    e.stopPropagation();
+    if (salvando) return;
     if (!nome.trim()) return setErro('Informe o nome do fornecedor.');
     // Mesma regra do banco (uq_fornecedores_nome): nome único, sem diferenciar maiúsculas
     const repetido = fornecedores.some((f) => f.id !== fornecedor?.id && normalizar(f.nome) === normalizar(nome));
@@ -71,12 +78,17 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
       observacoes: observacoes.trim() || undefined,
       ativo,
     };
+    setErro('');
+    setSalvando(true);
     if (fornecedor) {
-      alterarFornecedor(fornecedor.id, dados);
+      const falha = await editarFornecedor(fornecedor.id, dados);
+      setSalvando(false);
+      if (falha) return setErro(`Não foi possível salvar: ${falha}`);
       onSalvo?.({ ...fornecedor, ...dados });
     } else {
-      // Fora da chamada opcional: `onSalvo?.(criarFornecedor(...))` nem chega a criar quando não há onSalvo
-      const novo = criarFornecedor(dados);
+      const { item: novo, erro: falha } = await cadastrarFornecedor(dados);
+      setSalvando(false);
+      if (!novo) return setErro(`Não foi possível cadastrar: ${falha || 'erro desconhecido'}`);
       onSalvo?.(novo);
     }
     onClose();
@@ -104,8 +116,9 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
     else setErro(r.message || 'Não foi possível excluir o fornecedor.');
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
+  // Em portal: abre por cima de outro formulário (licença, ativo, contrato) sem ficar dentro dele
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
       <div
         role="dialog"
         aria-modal="true"
@@ -275,15 +288,17 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
               </button>
               <button
                 type="submit"
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                disabled={salvando}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
-                {fornecedor ? 'Salvar alterações' : 'Cadastrar fornecedor'}
+                {salvando ? 'Salvando…' : fornecedor ? 'Salvar alterações' : 'Cadastrar fornecedor'}
               </button>
             </div>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

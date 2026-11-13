@@ -65,17 +65,35 @@ export function erroResolucao(d: Partial<DadosResolucao>): string | null {
   return null;
 }
 
-export function erroCancelamento(motivo: MotivoCancelamento | '', detalhe: string): string | null {
+export const ehProcesso = (t: Pick<Ticket, 'tipo'>) => t.tipo === 'onboarding' || t.tipo === 'offboarding';
+
+export function erroCancelamento(
+  motivo: MotivoCancelamento | '',
+  detalhe: string,
+  tipo: Ticket['tipo'] = 'suporte'
+): string | null {
   if (!motivo) return 'Escolha o motivo.';
+  if (ehProcesso({ tipo }) && !detalhe.trim()) return 'Para cancelar uma admissão ou um desligamento, descreva o motivo.';
   if (motivo === 'outro' && !detalhe.trim()) return 'Motivo "outro": descreva o motivo do cancelamento.';
   return null;
 }
 
+/** Passos que já mexeram no inventário: impedem cancelar o processo (mesma lista do banco) */
+const TIPOS_COM_INVENTARIO = new Set([
+  'conta', 'grupo_email', 'equipamento', 'acessorio', 'licenca', 'encerrar_recurso', 'devolver_equipamento', 'liberar_licenca',
+]);
+export const passosQueImpedemCancelar = <T extends { tipo: string; status: string; titulo: string }>(itens: T[]) =>
+  itens.filter((i) => i.status === 'feito' && TIPOS_COM_INVENTARIO.has(i.tipo));
+
 const ehTI = (papel: UserRole) => papel === 'ti_admin' || papel === 'ti_suporte';
 
-/** Quem abriu cancela enquanto ninguém começou; a T.I. cancela qualquer um em aberto */
+/**
+ * Suporte: quem abriu cancela enquanto ninguém começou; a T.I. cancela qualquer um em aberto.
+ * Admissão/desligamento: só a T.I.
+ */
 export const podeCancelar = (t: Pick<Ticket, 'status' | 'solicitanteId' | 'tipo'>, papel: UserRole, meuId?: string) =>
-  !chamadoEncerrado(t) && (ehTI(papel) || (t.solicitanteId === meuId && t.status === 'aberto'));
+  !chamadoEncerrado(t) &&
+  (ehTI(papel) || (t.tipo === 'suporte' && t.solicitanteId === meuId && t.status === 'aberto'));
 
 /** Reabrir: chamado de suporte encerrado; quem abriu ou a T.I. */
 export const podeReabrirChamado = (t: Pick<Ticket, 'status' | 'solicitanteId' | 'tipo'>, papel: UserRole, meuId?: string) =>

@@ -927,6 +927,10 @@ export type Database = {
           tipo_cobranca: string | null
           url_painel: string | null
           valor_mensal: number
+          status: string
+          inativada_em: string | null
+          inativada_por: string | null
+          inativacao_motivo: string | null
         }
         Insert: {
           assentos_totais?: number
@@ -941,6 +945,10 @@ export type Database = {
           tipo_cobranca?: string | null
           url_painel?: string | null
           valor_mensal?: number
+          status?: string
+          inativada_em?: string | null
+          inativada_por?: string | null
+          inativacao_motivo?: string | null
         }
         Update: {
           assentos_totais?: number
@@ -955,6 +963,10 @@ export type Database = {
           tipo_cobranca?: string | null
           url_painel?: string | null
           valor_mensal?: number
+          status?: string
+          inativada_em?: string | null
+          inativada_por?: string | null
+          inativacao_motivo?: string | null
         }
         Relationships: [
           {
@@ -1108,6 +1120,10 @@ export type Database = {
           responsavel_ti_nome: string
           status_assinatura: string
           tipo: string
+          cancelado_em: string | null
+          cancelado_por: string | null
+          cancelamento_motivo: string | null
+          substituido_por: string | null
         }
         Insert: {
           aceite_colaborador_em?: string | null
@@ -1266,6 +1282,36 @@ export type Database = {
           observacao?: string | null
           status?: string
           tipo?: string
+        }
+        Relationships: []
+      }
+      licenca_atribuicoes: {
+        Row: {
+          id: string
+          licenca_id: string
+          colaborador_id: string
+          inicio: string | null
+          fim: string | null
+          atribuido_por: string | null
+          removido_por: string | null
+        }
+        Insert: {
+          id?: string
+          licenca_id: string
+          colaborador_id: string
+          inicio?: string | null
+          fim?: string | null
+          atribuido_por?: string | null
+          removido_por?: string | null
+        }
+        Update: {
+          id?: string
+          licenca_id?: string
+          colaborador_id?: string
+          inicio?: string | null
+          fim?: string | null
+          atribuido_por?: string | null
+          removido_por?: string | null
         }
         Relationships: []
       }
@@ -1438,6 +1484,8 @@ export type Database = {
         Returns: undefined
       }
       cancelar_chamado: { Args: { p_chamado: string; p_detalhe?: string; p_motivo: string }; Returns: undefined }
+      cancelar_termo: { Args: { p_termo: string; p_motivo: string; p_substituto?: string }; Returns: undefined }
+      limpar_base: { Args: { p_confirmacao: string; p_manter_email?: string }; Returns: undefined }
       reabrir_chamado: { Args: { p_chamado: string; p_motivo: string }; Returns: undefined }
       avaliar_chamado: { Args: { p_chamado: string; p_comentario?: string; p_nota: number }; Returns: undefined }
       aceitar_termo: { Args: { p_termo: string }; Returns: Json }

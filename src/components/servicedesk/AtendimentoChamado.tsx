@@ -331,7 +331,7 @@ export const FormCancelamento: React.FC<{ ticket: Ticket; onClose: () => void }>
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
-    const problema = erroCancelamento(motivo, detalhe);
+    const problema = erroCancelamento(motivo, detalhe, ticket.tipo);
     if (problema) return setErro(problema);
     setSalvando(true);
     const falha = await cancelarChamado(ticket.id, motivo as MotivoCancelamento, detalhe);
@@ -339,10 +339,21 @@ export const FormCancelamento: React.FC<{ ticket: Ticket; onClose: () => void }>
     if (falha) setErro(falha);
     else onClose();
   };
+  const processo = ticket.tipo !== 'suporte';
+  const detalheObrigatorio = processo || motivo === 'outro';
 
   return (
-    <Janela titulo={`Cancelar chamado · ${ticket.codigo}`} onClose={onClose}>
+    <Janela
+      titulo={`Cancelar ${ticket.tipo === 'onboarding' ? 'admissão' : ticket.tipo === 'offboarding' ? 'desligamento' : 'chamado'} · ${ticket.codigo}`}
+      onClose={onClose}
+    >
       <form onSubmit={enviar} className="p-5 space-y-4 text-xs">
+        {processo && (
+          <p className="text-slate-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            O processo fica registrado como cancelado. Só é possível cancelar enquanto nenhum passo mexeu no inventário
+            (contas, equipamentos, licenças); se já mexeu, conclua o processo ou desfaça esses passos antes.
+          </p>
+        )}
         <div>
           <label htmlFor={`${id}-motivo`} className={CLASSE_ROTULO}>Motivo *</label>
           <select id={`${id}-motivo`} value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoCancelamento)} className={CLASSE_CAMPO} required>
@@ -353,14 +364,14 @@ export const FormCancelamento: React.FC<{ ticket: Ticket; onClose: () => void }>
           </select>
         </div>
         <div>
-          <label htmlFor={`${id}-detalhe`} className={CLASSE_ROTULO}>Detalhe {motivo === 'outro' ? '*' : '(opcional)'}</label>
+          <label htmlFor={`${id}-detalhe`} className={CLASSE_ROTULO}>{processo ? 'Descreva o motivo *' : `Detalhe ${detalheObrigatorio ? '*' : '(opcional)'}`}</label>
           <textarea id={`${id}-detalhe`} rows={3} value={detalhe} onChange={(e) => setDetalhe(e.target.value)} className={CLASSE_CAMPO} />
         </div>
         {erro && <p role="alert" className="text-rose-700">{erro}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Voltar</button>
           <button type="submit" disabled={salvando} className="px-4 py-2 font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-50">
-            {salvando ? 'Cancelando…' : 'Cancelar chamado'}
+            {salvando ? 'Cancelando…' : processo ? 'Cancelar processo' : 'Cancelar chamado'}
           </button>
         </div>
       </form>

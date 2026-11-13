@@ -113,7 +113,7 @@ select harness.rodar('fase6', 'F3 offboarding completo: conta suspensa, fone dev
     perform harness.espera($s$select 1 from public.chamados where id = 'tkt-off6' and status = 'resolvido'$s$, 1);
   end $x$$q$);
 select harness.rodar('fase6', 'F4 item de chamado encerrado não muda mais', 'erro: encerrado', :'sup', 'authenticated',
-  $q$do $x$ begin update public.chamados set status = 'resolvido' where id = 'tkt-off6';
+  $q$do $x$ begin perform public.cancelar_chamado('tkt-off6', 'engano', 'Aberto por engano');
     perform public.registrar_item_processo('o-drive', 'feito', null);
     exception when others then if sqlerrm like 'O chamado #CH-% já foi encerrado' then raise exception 'encerrado'; else raise; end if; end $x$$q$);
 

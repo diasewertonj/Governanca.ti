@@ -154,6 +154,29 @@ export const resumoVinculos = (v: VinculosFornecedor) =>
 
 export const temVinculos = (v: VinculosFornecedor) => v.contratos + v.ativos + v.licencas > 0;
 
+/** Último dia do mês de uma competência "AAAA-MM-01" */
+const fimDoMes = (competencia: string) => {
+  const [a, m] = competencia.split('-').map(Number);
+  return isoLocal(new Date(a, m, 0));
+};
+
+/**
+ * Lote 1 (L2): contrato de licenciamento que paga a licença — vigente na competência
+ * informada (ou hoje). Mesma regra do banco: com ele, a licença não tem fatura própria.
+ */
+export function contratoQuePagaLicenca(
+  licencaId: string,
+  contratos: Contrato[],
+  competencia?: string,
+  agora: Date = new Date()
+): Contrato | undefined {
+  return contratos.find((c) => {
+    if (c.tipo !== 'licenciamento' || !c.itens.some((i) => i.licencaId === licencaId)) return false;
+    if (!competencia) return contratoVigente(c, agora);
+    return c.inicio <= fimDoMes(competencia) && (!c.fim || c.fim >= competencia);
+  });
+}
+
 /** Nome curto do contrato: número e descrição (ex.: "#CT-88 · Dell ProSupport") */
 export const nomeContrato = (c: Pick<Contrato, 'numero' | 'descricao'>) =>
   c.numero ? `${c.numero} · ${c.descricao}` : c.descricao;

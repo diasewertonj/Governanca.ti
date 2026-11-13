@@ -4,6 +4,11 @@ import { formatDate } from '../../utils/formatters.ts';
 import { chamadosDaPessoa, papelNoChamado } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
 import { NewEmployeeModal } from './NewEmployeeModal.tsx';
+import { ConferenciaTermo } from '../terms/ConferenciaTermo.tsx';
+import type { ItemTermo } from '../../types/index.ts';
+import { DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
+import { CLASSE_TOM, situacaoTermo } from '../../utils/termos.ts';
+import { historicoAssentos } from '../../utils/licencas.ts';
 import {
   X,
   User,
@@ -41,9 +46,13 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     currentRole,
     anonimizarColaborador,
     acessoNexus,
+    settings,
+    atribuicoesLicenca,
   } = useApp();
 
   const [termSuccess, setTermSuccess] = useState<string | null>(null);
+  const [conferencia, setConferencia] = useState<ItemTermo[] | null>(null);
+  const [gerandoTermo, setGerandoTermo] = useState(false);
   const [anonimizando, setAnonimizando] = useState(false);
   // Fase 7: senha provisória fora do onboarding (esqueceu a senha; não depende de e-mail)
   const [gerandoSenha, setGerandoSenha] = useState(false);
@@ -139,30 +148,59 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     setSelectedAssetIdFor360(assetId);
   };
 
-  const handleGenerateTerm = async (tipo: 'entrega' | 'devolucao') => {
-    if (currentAssets.length === 0 && tipo === 'entrega') {
+  // Lote 1 (1.12): antes de gerar, a T.I. confere item a item (nada vem marcado "Bom")
+  const abrirConferencia = () => {
+    if (currentAssets.length === 0) {
       alert('O colaborador não possui equipamentos vinculados para gerar o termo.');
       return;
     }
+    setConferencia(
+      currentAssets.map((a) => ({
+        descricao: a.nome,
+        patrimonio: [a.tag, a.serialNumber].filter(Boolean).join(' / '),
+        marcaModelo: [a.marca, a.modelo].filter(Boolean).join(' ') || undefined,
+        situacao: 'entregue',
+        ativoId: a.id,
+      }))
+    );
+  };
 
+  const handleGenerateTerm = async (linhas: ItemTermo[]): Promise<string | null> => {
+    const doc = settings.docEntrega || DOC_ENTREGA_PADRAO;
+    setGerandoTermo(true);
     const newTerm = await createTerm({
-      tipo,
+      tipo: 'entrega',
       colaboradorId: employee.id,
       colaboradorNome: employee.nome,
       colaboradorMatricula: employee.matricula,
       colaboradorCargo: employee.cargo,
       colaboradorSetorNome: department?.nome || 'Setor',
-      ativoIds: currentAssets.map((a) => a.id),
+      ativoIds: linhas.map((l) => l.ativoId).filter((x): x is string => Boolean(x)),
       statusAssinatura: 'gerado',
       responsavelTIId: currentUser?.id || 'emp-1',
       responsavelTINome: currentUser?.nome || 'Responsável T.I.',
+      itens: linhas,
+      localUnidade: settings.cidadeUF,
+      docCodigo: doc.codigo,
+      docVersao: doc.versao,
+      docReferencia: doc.referencia,
+      docTitulo: doc.titulo,
+      textoClausula: settings.textoTermoEntrega,
+      formaAssinatura: 'pendente',
     });
-    if (!newTerm) return; // o erro já aparece no aviso global
+    setGerandoTermo(false);
+    if (!newTerm) return 'O termo não foi gerado. Os itens conferidos continuam aqui; tente de novo.';
 
+    setConferencia(null);
     setTermSuccess(`Termo ${newTerm.codigo} gerado com sucesso!`);
     setTimeout(() => setTermSuccess(null), 3000);
     setSelectedTermForPrint(newTerm);
+    return null;
   };
+
+  // Lote 1 (L4): licenças que a pessoa já teve (histórico de assentos)
+  const historicoLicencas = historicoAssentos(atribuicoesLicenca, { colaboradorId: employee.id });
+  const nomeLicenca = (id: string) => licenses.find((l) => l.id === id)?.nome || 'Licença removida';
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
@@ -234,7 +272,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             {(currentRole === 'ti_admin' || currentRole === 'ti_suporte') && employee.status !== 'desligado' && (
               <button
                 type="button"
-                onClick={() => handleGenerateTerm('entrega')}
+                onClick={abrirConferencia}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-2xs"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
@@ -292,6 +330,18 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </div>
         )}
 
+        {conferencia && (
+          <div className="px-6 py-3 border-b border-slate-200 bg-blue-50/40">
+            <ConferenciaTermo
+              tipo="entrega"
+              linhasIniciais={conferencia}
+              nomePessoa={employee.nome.split(' ')[0]}
+              gravando={gerandoTermo}
+              onConfirmar={(linhas) => handleGenerateTerm(linhas)}
+              onVoltar={() => setConferencia(null)}
+            />
+          </div>
+        )}
         {termSuccess && (
           <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-2 text-xs text-emerald-700 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
@@ -404,6 +454,20 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             ) : (
               <p className="text-xs text-slate-500 py-2">Nenhuma licença vinculada.</p>
             )}
+            {historicoLicencas.some((a) => a.fim) && (
+              <div className="pt-2 border-t border-slate-100 space-y-1">
+                <p className="text-xs font-semibold text-slate-600">Licenças que já teve</p>
+                <ul className="text-xs text-slate-600 space-y-0.5">
+                  {historicoLicencas
+                    .filter((a) => a.fim)
+                    .map((a) => (
+                      <li key={a.id}>
+                        {nomeLicenca(a.licencaId)}: {a.inicio ? formatDate(a.inicio) : 'antes do histórico'} até {formatDate(a.fim || '')}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* 3. Documentos e Termos de Responsabilidade */}
@@ -427,15 +491,10 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                         <span className="capitalize font-medium text-slate-700">
                           Termo de {term.tipo === 'entrega' ? 'Entrega' : 'Devolução'}
                         </span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded border ${
-                            term.statusAssinatura === 'assinado'
-                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                              : 'text-amber-700 bg-amber-50 border-amber-200'
-                          }`}
-                        >
-                          {term.statusAssinatura === 'assinado' ? 'Assinado' : 'Pendente de Assinatura'}
-                        </span>
+                        {(() => {
+                          const s = situacaoTermo(term, false, terms.find((x) => x.id === term.substituidoPor)?.codigo);
+                          return <span className={`text-xs px-2 py-0.5 rounded border ${CLASSE_TOM[s.tom]}`}>{s.rotulo}</span>;
+                        })()}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
                         Emitido em {formatDate(term.dataEmissao)} por {term.responsavelTINome}

@@ -592,10 +592,11 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   Gerenciamento de Atendimento
                 </span>
 
-                {encerrado && ticket.tipo === 'suporte' ? (
+                {encerrado ? (
                   <p className="text-xs text-slate-600">
-                    Chamado {ticket.status === 'cancelado' ? 'cancelado' : 'encerrado com solução registrada'}. Para continuar o
-                    atendimento, reabra o chamado.
+                    {ticket.tipo === 'suporte'
+                      ? `Chamado ${ticket.status === 'cancelado' ? 'cancelado' : 'encerrado com solução registrada'}. Para continuar o atendimento, reabra o chamado.`
+                      : `Processo ${ticket.status === 'cancelado' ? 'cancelado' : 'concluído'}. Processo encerrado não é reaberto; se faltou algo, abra um chamado novo.`}
                   </p>
                 ) : (
                 <div>
@@ -608,9 +609,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     <option value="aberto">Aberto (na fila)</option>
                     <option value="em_andamento">Em atendimento</option>
                     <option value="aguardando_terceiro">Aguardando…</option>
-                    {/* Suporte encerra por "Registrar solução" e "Cancelar"; processos seguem o checklist */}
-                    {ticket.tipo !== 'suporte' && <option value="resolvido">Concluído</option>}
-                    {ticket.tipo !== 'suporte' && <option value="cancelado">Cancelado</option>}
+                    {/* Encerrar: suporte por "Registrar solução"; processos por "Concluir" no checklist; ambos por "Cancelar" */}
                   </select>
                   {statusExibido === 'aguardando_terceiro' && (
                     <select
@@ -641,15 +640,13 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                         Registrar solução
                       </button>
                     )}
-                    {ticket.tipo === 'suporte' && (
-                      <button
-                        type="button"
-                        onClick={() => setCancelando(true)}
-                        className="px-3 py-2 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
-                      >
-                        Cancelar
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setCancelando(true)}
+                      className="px-3 py-2 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
+                    >
+                      {ticket.tipo === 'suporte' ? 'Cancelar' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
+                    </button>
                   </div>
                 )}
 

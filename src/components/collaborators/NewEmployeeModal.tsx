@@ -26,12 +26,18 @@ interface NewEmployeeModalProps {
 }
 
 export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, inicial, onCriado, colaborador }) => {
-  const { employees, departments, cadastrarColaborador, updateEmployee, setSelectedEmployeeIdFor360, currentRole } = useApp();
+  const { employees, departments, cadastrarColaborador, salvarColaborador, setSelectedEmployeeIdFor360, currentRole } = useApp();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const editando = !!colaborador;
-  // E-mail é a identidade da pessoa: na edição, só o administrador de T.I. muda
-  const podeMudarEmail = !editando || currentRole === 'ti_admin';
+  // E-mail é a identidade da pessoa. Quem já tem login não troca o e-mail aqui
+  // (derrubaria o acesso); sem login, a T.I. corrige. Perfis de gestão: só o admin.
+  const temLogin = !!colaborador?.temLogin;
+  const podeMudarEmail =
+    !editando || (!temLogin && (currentRole === 'ti_admin' || (colaborador.role || 'colaborador') === 'colaborador'));
+  // Desligado só volta a ativo pelo administrador de T.I.
+  const desligado = colaborador?.status === 'desligado';
+  const podeReativar = !desligado || currentRole === 'ti_admin';
 
   const nextMatricula = `NX-${1000 + employees.length + 1}`;
 
@@ -50,8 +56,8 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
 
   const activeEmployees = employees.filter((e) => e.status === 'ativo' && e.id !== colaborador?.id);
 
-  // Edição: grava só o que mudou (o banco confere as permissões de cada perfil)
-  const salvarEdicao = () => {
+  // Edição: grava só o que mudou e só fecha depois do banco confirmar
+  const salvarEdicao = async () => {
     if (!colaborador) return;
     const novo = {
       nome: nome.trim(),
@@ -65,7 +71,20 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
     };
     const mudou = (Object.keys(novo) as (keyof typeof novo)[]).filter((k) => (novo[k] || undefined) !== (colaborador[k] || undefined));
     if (mudou.length === 0) return onClose();
-    updateEmployee(colaborador.id, Object.fromEntries(mudou.map((k) => [k, novo[k]])));
+    if (
+      desligado &&
+      status !== 'desligado' &&
+      !window.confirm(
+        `Reativar ${colaborador.nome}?\n\nA pessoa volta a aparecer como ativa. Se tinha login, o acesso ao sistema volta a funcionar.`
+      )
+    ) {
+      return;
+    }
+    setErro(null);
+    setSalvando(true);
+    const falha = await salvarColaborador(colaborador.id, Object.fromEntries(mudou.map((k) => [k, novo[k]])));
+    setSalvando(false);
+    if (falha) return setErro(`Não foi possível salvar: ${falha}`);
     onClose();
   };
 
@@ -168,12 +187,17 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   placeholder="nome@empresa.com.br"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
                 />
-                {editando && !podeMudarEmail && (
-                  <p className="text-xs text-slate-500 mt-1">Só o administrador de T.I. altera o e-mail.</p>
+                {editando && temLogin && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Esta pessoa já tem login. Para trocar o e-mail de quem já tem login, use "Trocar login" — em breve.
+                  </p>
+                )}
+                {editando && !temLogin && !podeMudarEmail && (
+                  <p className="text-xs text-slate-500 mt-1">Só o administrador de T.I. altera o e-mail de perfis de gestão.</p>
                 )}
                 {emailMudou && (
                   <p className="text-xs text-amber-800 mt-1">
-                    Se a pessoa já tem login, o acesso continua com o e-mail antigo até a T.I. atualizar o login.
+                    Confira o novo e-mail: ele será usado quando a pessoa receber o acesso ao sistema.
                   </p>
                 )}
               </div>
@@ -260,14 +284,18 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                 </label>
                 <select
                   value={status}
+                  disabled={!podeReativar}
                   onChange={(e) => setStatus(e.target.value as EmployeeStatus)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
                 >
-                  <option value="ativo">Ativo</option>
+                  <option value="ativo">{desligado ? 'Ativo (reativar)' : 'Ativo'}</option>
                   <option value="ferias">Férias</option>
                   {/* Na edição, desligar é pelo processo de desligamento (recolhe equipamentos e acessos) */}
-                  {(!editando || colaborador.status === 'desligado') && <option value="desligado">Desligado</option>}
+                  {(!editando || desligado) && <option value="desligado">Desligado</option>}
                 </select>
+                {!podeReativar && (
+                  <p className="text-xs text-slate-500 mt-1">Só o administrador de T.I. reativa uma pessoa desligada.</p>
+                )}
               </div>
 
               <div>
@@ -304,7 +332,9 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
             >
               <UserPlus className="w-3.5 h-3.5" />
               {editando
-                ? 'Salvar alterações'
+                ? salvando
+                  ? 'Salvando…'
+                  : 'Salvar alterações'
                 : salvando
                   ? 'Cadastrando…'
                   : onCriado

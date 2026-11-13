@@ -48,6 +48,7 @@ import {
   OnboardingData,
   ResponsibilityTerm,
   SoftwareLicense,
+  AtribuicaoLicenca,
   Ticket,
   TicketAttachment,
   TicketMessage,
@@ -262,6 +263,9 @@ const linhaLicenca = (l: SoftwareLicense): TablesInsert<'licencas_software'> => 
   url_painel: l.urlPainel || null,
   observacoes: l.observacoes || null,
   fornecedor_id: l.fornecedorId || null,
+  // Lote 1 (L3): quem/quando da inativação é carimbado pelo banco
+  status: l.status || 'ativa',
+  inativacao_motivo: l.inativacaoMotivo || null,
 });
 
 const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
@@ -287,6 +291,7 @@ const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
   offboarding: t.offboarding ? json(t.offboarding) : null,
   anexos: json(t.anexos || []),
   colaborador_id: t.colaboradorId || null,
+  aguardando_motivo: t.status === 'aguardando_terceiro' ? t.aguardandoMotivo || null : null,
 });
 
 const linhaMensagem = (chamadoId: string, m: TicketMessage): TablesInsert<'chamado_mensagens'> => ({
@@ -384,6 +389,7 @@ export async function fetchEmployeesFromDb(): Promise<Employee[] | null> {
     dataAdmissao: e.data_admissao,
     telefone: e.telefone || undefined,
     avatarUrl: e.avatar_url || undefined,
+    temLogin: !!e.auth_user_id,
   })) : [];
 }
 
@@ -750,7 +756,33 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     urlPainel: l.url_painel || undefined,
     observacoes: l.observacoes || undefined,
     fornecedorId: l.fornecedor_id || undefined,
+    status: (l.status === 'inativa' ? 'inativa' : 'ativa') as 'ativa' | 'inativa',
+    inativadaEm: l.inativada_em || undefined,
+    inativadaPor: l.inativada_por || undefined,
+    inativacaoMotivo: l.inativacao_motivo || undefined,
   })) : [];
+}
+
+/** Lote 1 (L4): histórico de assentos (a RLS entrega tudo à T.I. e só o próprio aos demais) */
+export async function fetchAtribuicoesLicencaFromDb(): Promise<AtribuicaoLicenca[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('licenca_atribuicoes')
+    .select('*')
+    .order('inicio', { ascending: false, nullsFirst: false });
+  if (error) {
+    if (!tabelaAusente(error)) console.error('Erro ao buscar histórico de assentos:', error);
+    return null;
+  }
+  return (data || []).map((a) => ({
+    id: a.id,
+    licencaId: a.licenca_id,
+    colaboradorId: a.colaborador_id,
+    inicio: a.inicio || undefined,
+    fim: a.fim || undefined,
+    atribuidoPor: a.atribuido_por || undefined,
+    removidoPor: a.removido_por || undefined,
+  }));
 }
 
 async function gravarSegredoLicenca(licencaId: string, chave?: string) {
@@ -1241,7 +1273,19 @@ export async function fetchTermsFromDb(): Promise<ResponsibilityTerm[] | null> {
     formaAssinatura: (tm.forma_assinatura || 'pendente') as ResponsibilityTerm['formaAssinatura'],
     motivoDispensa: tm.motivo_dispensa || undefined,
     dataAssinatura: tm.data_assinatura || undefined,
+    canceladoEm: tm.cancelado_em || undefined,
+    canceladoPor: tm.cancelado_por || undefined,
+    cancelamentoMotivo: tm.cancelamento_motivo || undefined,
+    substituidoPor: tm.substituido_por || undefined,
   })) : [];
+}
+
+/** Lote 1: cancela (ou marca como substituído) o termo; o anterior fica no histórico */
+export async function cancelarTermoDb(termoId: string, motivo: string, substitutoId?: string) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('cancelar_termo', { p_termo: termoId, p_motivo: motivo, p_substituto: substitutoId || undefined })
+  );
 }
 
 /** Cria o termo e devolve o código gerado pelo banco (#TR-AAAA-NNNN) */
@@ -1740,36 +1784,10 @@ const tabelaAusente = (error: { code?: string; message?: string }) =>
 
 export async function clearAllDatabaseTables(keepEmployeeEmail?: string) {
   if (!supabase) return;
-  // Baixa patrimonial não se apaga (o banco recusa, por design). Confere antes de
-  // apagar qualquer coisa, para não deixar a base zerada pela metade.
-  const { count, error } = await supabase.from('ativo_baixas').select('id', { count: 'exact', head: true });
-  if (error && !tabelaAusente(error)) lancar(error);
-  if (count) {
-    throw new DbError(
-      `A base tem ${count} baixa(s) patrimonial(is) registrada(s). Elas fazem parte do histórico e não podem ser apagadas; nada foi apagado`,
-      '23514'
-    );
-  }
-  // Ordem segura das chaves estrangeiras: primeiro quem aponta, depois o apontado
-  const tabelas = [
-    'ativo_anexos', // -> ativos, manutencoes, ativo_baixas
-    'manutencoes', // -> ativos, fornecedores, contratos, chamados
-    'faturas', // -> licencas_software, contratos
-    'contrato_itens', // -> contratos, ativos, licencas_software
-    'contratos', // -> fornecedores
-    'chamado_mensagens',
-    'chamados',
-    'termos_responsabilidade',
-    'historico_custodia',
-    'ativos',
-    'licencas_software',
-    'fornecedores', // <- ativos e licenças (fornecedor_id)
-  ];
-  for (const t of tabelas) {
-    const { error: erroTabela } = await bd().from(t).delete().neq('id', 'dummy_zero');
-    if (erroTabela && !tabelaAusente(erroTabela)) lancar(erroTabela);
-  }
-  if (keepEmployeeEmail) {
-    await checar(bd().from('colaboradores').delete().neq('email', keepEmployeeEmail.toLowerCase()));
-  }
+  // Lote 1: uma função no banco (só ti_admin) apaga tudo numa transação — histórico
+  // do chamado, checklist, recursos e assentos incluídos. Ou apaga tudo, ou nada.
+  // Baixa patrimonial não se apaga: com baixa registrada, nada é apagado.
+  await checar(
+    supabase.rpc('limpar_base', { p_confirmacao: 'APAGAR TUDO', p_manter_email: keepEmployeeEmail?.toLowerCase() })
+  );
 }

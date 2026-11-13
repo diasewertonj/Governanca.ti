@@ -68,6 +68,7 @@ import {
   removerAnexoAtivoDb,
   updateAssetDb,
   fetchLicensesFromDb,
+  fetchAtribuicoesLicencaFromDb,
   insertLicenseDb,
   updateLicenseDb,
   deleteLicenseDb,
@@ -112,6 +113,7 @@ import {
   encerrarLembreteDb,
   aceitarTermoDb,
   dispensarAssinaturaTermoDb,
+  cancelarTermoDb,
   acessoNexusDb,
   fetchFornecedoresFromDb,
   insertFornecedorDb,
@@ -133,6 +135,7 @@ import {
   estornarBaixaDb,
 } from '../services/supabaseDb.ts';
 import { CATALOGO_PADRAO } from '../utils/processos.ts';
+import { erroCancelarTermo } from '../utils/termos.ts';
 import {
   empilharFicha,
   fecharFichaNaPosicao,
@@ -142,11 +145,15 @@ import {
   type TipoFicha,
 } from '../utils/fichas.ts';
 import { notaDaManutencao } from '../utils/vinculos.ts';
-import type { AguardandoMotivo, DadosResolucao, EventoChamado, MotivoCancelamento } from '../types/index.ts';
-import { erroCancelamento, erroResolucao } from '../utils/atendimento.ts';
+import type { AguardandoMotivo, AtribuicaoLicenca, DadosResolucao, EventoChamado, MotivoCancelamento } from '../types/index.ts';
+import { ehProcesso, erroCancelamento, erroResolucao, passosQueImpedemCancelar, podeCancelar } from '../utils/atendimento.ts';
 import { prazosEfetivos, type PrazosSla } from '../utils/sla.ts';
 import { isoLocal } from '../utils/formatters.ts';
-import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
+import { contratoQuePagaLicenca, resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
+import { erroDuplicadoAtivo } from '../utils/patrimonio.ts';
+
+/** Resultado de um cadastro que espera o banco */
+export type Resultado<T> = { item?: T; erro?: string };
 import {
   aplicarAbertura,
   aplicarBaixa,
@@ -211,6 +218,7 @@ interface AppContextType {
   addEmployee: (employee: Omit<Employee, 'id'>) => Employee;
   cadastrarColaborador: (employee: Omit<Employee, 'id'>) => Promise<{ colaborador?: Employee; erro?: string }>;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
+  salvarColaborador: (id: string, updates: Partial<Employee>) => Promise<string | null>;
   updateEmployeeRole: (employeeId: string, role: UserRole) => void;
   deleteEmployee: (id: string) => { success: boolean; message?: string };
 
@@ -322,6 +330,7 @@ interface AppContextType {
   encerrarLembrete: (id: string, status: 'feito' | 'cancelado', observacao?: string) => Promise<string | null>;
   aceitarTermo: (termoId: string) => Promise<string | null>;
   dispensarAssinaturaTermo: (termoId: string, motivo: string) => Promise<string | null>;
+  cancelarTermo: (termoId: string, motivo: string, substitutoId?: string) => Promise<string | null>;
 
   // Fase 8 · Fornecedores, contratos e faturas (só a T.I.; gravação otimista)
   fornecedores: Fornecedor[];
@@ -334,6 +343,19 @@ interface AppContextType {
   alterarContrato: (id: string, mudancas: Partial<Contrato>) => void;
   excluirContrato: (id: string) => { success: boolean; message?: string };
   lancarFatura: (dados: Omit<Fatura, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>) => Fatura;
+  // Lote 1: versões que esperam o banco confirmar (formulário só fecha se gravou)
+  cadastrarAtivo: (asset: Omit<Asset, 'id'>) => Promise<Resultado<Asset>>;
+  editarAtivo: (id: string, updates: Partial<Asset>) => Promise<string | null>;
+  cadastrarLicenca: (license: Omit<SoftwareLicense, 'id' | 'assentosAlocados'>) => Promise<Resultado<SoftwareLicense>>;
+  editarLicenca: (id: string, updates: Partial<SoftwareLicense>) => Promise<string | null>;
+  mudarSituacaoLicenca: (id: string, ativa: boolean, motivo?: string) => Promise<string | null>;
+  cadastrarFornecedor: (dados: Omit<Fornecedor, 'id' | 'criadoEm' | 'criadoPor'>) => Promise<Resultado<Fornecedor>>;
+  editarFornecedor: (id: string, mudancas: Partial<Fornecedor>) => Promise<string | null>;
+  cadastrarContrato: (dados: Omit<Contrato, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>) => Promise<Resultado<Contrato>>;
+  editarContrato: (id: string, mudancas: Partial<Contrato>) => Promise<string | null>;
+  cadastrarFatura: (dados: Omit<Fatura, 'id' | 'criadoEm' | 'criadoPor' | 'arquivoCaminho'>) => Promise<Resultado<Fatura>>;
+  editarFatura: (id: string, mudancas: Partial<Fatura>) => Promise<string | null>;
+  atribuicoesLicenca: AtribuicaoLicenca[];
   alterarFatura: (id: string, mudancas: Partial<Fatura>) => void;
   excluirFatura: (id: string) => void;
   /** Sobe o arquivo do contrato/fatura (espera o registro novo ser gravado); false se falhar */
@@ -442,6 +464,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return isProduction ? [] : INITIAL_ASSETS;
   });
 
+  const [atribuicoesLicenca, setAtribuicoesLicenca] = useState<AtribuicaoLicenca[]>([]);
   const [licenses, setLicenses] = useState<SoftwareLicense[]>(() => {
     const saved = parseStoredOrNull<SoftwareLicense[]>(STORAGE_KEYS.LICENSES, (lic) =>
       lic.some((l) => l.id === 'lic-1' || l.id === 'lic-001')
@@ -619,6 +642,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbFornecedores) setFornecedores(dbFornecedores);
         if (dbContratos) setContratos(dbContratos);
         if (dbFaturas) setFaturas(dbFaturas);
+        // Lote 1: histórico de assentos (T.I. vê tudo; a pessoa, só o dela)
+        const dbAtribuicoes = await fetchAtribuicoesLicencaFromDb();
+        if (dbAtribuicoes) setAtribuicoesLicenca(dbAtribuicoes);
 
         // Configurações
         if (dbSettings) {
@@ -944,6 +970,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const depois: Employee = { ...antes, ...updates };
     setEmployees((prev) => trocar(prev, depois));
     persistir(updateEmployeeDb(antes, depois), () => setEmployees((prev) => trocar(prev, antes)), contexto);
+  };
+
+  /** Lote 1: edição que espera o banco confirmar (o formulário só fecha se gravou) */
+  const salvarColaborador = async (id: string, updates: Partial<Employee>): Promise<string | null> => {
+    const antes = employees.find((e) => e.id === id);
+    if (!antes) return 'Colaborador não encontrado.';
+    if (antes.status === 'desligado' && updates.status && updates.status !== 'desligado' && currentRole !== 'ti_admin') {
+      return 'Só o administrador da T.I. reativa uma pessoa desligada.';
+    }
+    if (antes.temLogin && updates.email !== undefined && updates.email.toLowerCase() !== antes.email.toLowerCase()) {
+      return 'Esta pessoa já tem login: o e-mail não pode ser trocado aqui.';
+    }
+    const depois: Employee = { ...antes, ...updates };
+    try {
+      if (isProduction) await updateEmployeeDb(antes, depois);
+      setEmployees((prev) => trocar(prev, depois));
+      return null;
+    } catch (err) {
+      console.error('Salvar colaborador', err);
+      return mensagemDeErro(err);
+    }
   };
 
   const updateEmployeeRole = (id: string, role: UserRole) => {
@@ -1342,14 +1389,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // Lote 1 (L4): histórico de assentos. No banco, um gatilho registra cada entrada e
+  // saída; aqui a tela relê depois de cada mudança (ou registra localmente na demonstração).
+  const recarregarAtribuicoes = async () => {
+    const lidas = await fetchAtribuicoesLicencaFromDb();
+    if (lidas) setAtribuicoesLicenca(lidas);
+  };
+  const registrarAtribuicaoLocal = (licencaId: string, colaboradorId: string, entrou: boolean) => {
+    const agora = new Date().toISOString();
+    setAtribuicoesLicenca((prev) =>
+      entrou
+        ? [{ id: novoId('atr'), licencaId, colaboradorId, inicio: agora, atribuidoPor: currentUser?.id }, ...prev]
+        : prev.map((a) =>
+            a.licencaId === licencaId && a.colaboradorId === colaboradorId && !a.fim
+              ? { ...a, fim: agora, removidoPor: currentUser?.id }
+              : a
+          )
+    );
+  };
+
   const allocateLicense = (licenseId: string, employeeId: string) => {
     const antes = licenses.find((l) => l.id === licenseId);
     if (!antes || antes.colaboradoresIds.includes(employeeId)) return;
+    if (antes.status === 'inativa') {
+      setDbErro(`A licença ${antes.nome} está inativa e não recebe assentos.`);
+      return;
+    }
     if (antes.colaboradoresIds.length >= antes.assentosTotais) return;
     const ids = [...antes.colaboradoresIds, employeeId];
     setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
+    if (!isProduction) registrarAtribuicaoLocal(licenseId, employeeId, true);
     persistir(
-      alocarLicencaDb(licenseId, employeeId).then((doBanco) => aplicarAssentos(licenseId, doBanco)),
+      alocarLicencaDb(licenseId, employeeId).then((doBanco) => {
+        aplicarAssentos(licenseId, doBanco);
+        if (isProduction) void recarregarAtribuicoes();
+      }),
       () => setLicenses((prev) => trocar(prev, antes)),
       `Não foi possível alocar assento em ${antes.nome}`
     );
@@ -1360,8 +1434,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!antes || !antes.colaboradoresIds.includes(employeeId)) return;
     const ids = antes.colaboradoresIds.filter((x) => x !== employeeId);
     setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
+    if (!isProduction) registrarAtribuicaoLocal(licenseId, employeeId, false);
     persistir(
-      revogarLicencaDb(licenseId, employeeId).then((doBanco) => aplicarAssentos(licenseId, doBanco)),
+      revogarLicencaDb(licenseId, employeeId).then((doBanco) => {
+        aplicarAssentos(licenseId, doBanco);
+        if (isProduction) void recarregarAtribuicoes();
+      }),
       () => setLicenses((prev) => trocar(prev, antes)),
       `Não foi possível liberar o assento em ${antes.nome}`
     );
@@ -1486,6 +1564,154 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     persistir(deleteFaturaDb(antes), () => setFaturas((prev) => [antes, ...prev]), 'Não foi possível excluir a fatura');
   };
 
+  // ---------------------------------------------------------------------------
+  // Lote 1: gravações que ESPERAM o banco. O formulário só fecha se gravou; se o
+  // banco recusar, a mensagem volta para o próprio formulário e nada se perde.
+  // ---------------------------------------------------------------------------
+  const confirmarNoBanco = async (op: () => Promise<unknown>, contexto: string): Promise<string | null> => {
+    try {
+      await op();
+      return null;
+    } catch (err) {
+      console.error(contexto, err);
+      return mensagemDeErro(err);
+    }
+  };
+
+  const cadastrarAtivo: AppContextType['cadastrarAtivo'] = async (data) => {
+    const duplicado = erroDuplicadoAtivo(assets, data.tag, data.serialNumber);
+    if (duplicado) return { erro: duplicado };
+    const novo: Asset = {
+      ...data,
+      id: novoId('ast'),
+      historicoCustodia: (data.historicoCustodia || []).map((c) => ({ ...c, id: novoId('cust') })),
+    };
+    const erro = await confirmarNoBanco(() => insertAssetDb(novo), 'Cadastrar ativo');
+    if (erro) return { erro };
+    setAssets((prev) => [novo, ...prev]);
+    return { item: novo };
+  };
+
+  const editarAtivo: AppContextType['editarAtivo'] = async (id, updates) => {
+    const antes = assets.find((a) => a.id === id);
+    if (!antes) return 'Ativo não encontrado.';
+    const depois: Asset = { ...antes, ...updates };
+    const duplicado = erroDuplicadoAtivo(assets, depois.tag, depois.serialNumber, id);
+    if (duplicado) return duplicado;
+    const erro = await confirmarNoBanco(() => updateAssetDb(antes, depois), 'Salvar ativo');
+    if (erro) return erro;
+    setAssets((prev) => trocar(prev, depois));
+    return null;
+  };
+
+  const cadastrarLicenca: AppContextType['cadastrarLicenca'] = async (data) => {
+    const nova: SoftwareLicense = {
+      ...data,
+      id: novoId('lic'),
+      status: 'ativa',
+      assentosAlocados: data.colaboradoresIds ? data.colaboradoresIds.length : 0,
+      colaboradoresIds: data.colaboradoresIds || [],
+    };
+    const erro = await confirmarNoBanco(() => insertLicenseDb(nova), 'Cadastrar licença');
+    if (erro) return { erro };
+    setLicenses((prev) => [nova, ...prev]);
+    return { item: nova };
+  };
+
+  const editarLicenca: AppContextType['editarLicenca'] = async (id, updates) => {
+    const antes = licenses.find((l) => l.id === id);
+    if (!antes) return 'Licença não encontrada.';
+    const depois: SoftwareLicense = { ...antes, ...updates };
+    if (updates.colaboradoresIds) depois.assentosAlocados = updates.colaboradoresIds.length;
+    if (depois.assentosTotais < depois.assentosAlocados) {
+      return `Assentos totais (${depois.assentosTotais}) não podem ser menos que os ${depois.assentosAlocados} em uso.`;
+    }
+    const erro = await confirmarNoBanco(() => updateLicenseDb(antes, depois), 'Salvar licença');
+    if (erro) return erro;
+    setLicenses((prev) => trocar(prev, depois));
+    return null;
+  };
+
+  /** Lote 1 (L3): inativar com motivo e sem assento em uso; reativar só o admin */
+  const mudarSituacaoLicenca: AppContextType['mudarSituacaoLicenca'] = async (id, ativa, motivo) => {
+    const antes = licenses.find((l) => l.id === id);
+    if (!antes) return 'Licença não encontrada.';
+    if (ativa) {
+      if (currentRole !== 'ti_admin') return 'Só o administrador da T.I. reativa uma licença.';
+      return editarLicenca(id, { status: 'ativa' });
+    }
+    if ((motivo || '').trim().length < 5) return 'Informe o motivo da inativação.';
+    if (antes.colaboradoresIds.length > 0) {
+      return `Libere os ${antes.colaboradoresIds.length} assento(s) em uso antes de inativar a licença.`;
+    }
+    const erro = await editarLicenca(id, {
+      status: 'inativa',
+      inativacaoMotivo: (motivo || '').trim(),
+      inativadaEm: new Date().toISOString(),
+      inativadaPor: currentUser?.id,
+    });
+    return erro;
+  };
+
+  const cadastrarFornecedor: AppContextType['cadastrarFornecedor'] = async (dados) => {
+    const novo: Fornecedor = { ...dados, id: novoId('forn'), criadoEm: new Date().toISOString() };
+    const erro = await confirmarNoBanco(() => insertFornecedorDb(novo), 'Cadastrar fornecedor');
+    if (erro) return { erro };
+    setFornecedores((prev) => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+    return { item: novo };
+  };
+
+  const editarFornecedor: AppContextType['editarFornecedor'] = async (id, mudancas) => {
+    const antes = fornecedores.find((f) => f.id === id);
+    if (!antes) return 'Fornecedor não encontrado.';
+    const depois: Fornecedor = { ...antes, ...mudancas };
+    const erro = await confirmarNoBanco(() => updateFornecedorDb(antes, depois), 'Salvar fornecedor');
+    if (erro) return erro;
+    setFornecedores((prev) => trocar(prev, depois));
+    return null;
+  };
+
+  const cadastrarContrato: AppContextType['cadastrarContrato'] = async (dados) => {
+    const novo: Contrato = { ...dados, id: novoId('ctr'), criadoEm: new Date().toISOString() };
+    const erro = await confirmarNoBanco(() => insertContratoDb(novo), 'Cadastrar contrato');
+    if (erro) return { erro };
+    setContratos((prev) => [novo, ...prev]);
+    return { item: novo };
+  };
+
+  const editarContrato: AppContextType['editarContrato'] = async (id, mudancas) => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return 'Contrato não encontrado.';
+    const depois: Contrato = { ...antes, ...mudancas };
+    const erro = await confirmarNoBanco(() => updateContratoDb(antes, depois), 'Salvar contrato');
+    if (erro) return erro;
+    setContratos((prev) => trocar(prev, depois));
+    return null;
+  };
+
+  const cadastrarFatura: AppContextType['cadastrarFatura'] = async (dados) => {
+    const nova: Fatura = { ...dados, id: novoId('fat'), criadoEm: new Date().toISOString() };
+    // L2: licença paga por contrato de licenciamento vigente não recebe fatura própria (o banco também recusa)
+    if (nova.licencaId) {
+      const contrato = contratoQuePagaLicenca(nova.licencaId, contratos, nova.competencia);
+      if (contrato) return { erro: `Esta licença é paga pelo contrato ${contrato.numero || contrato.descricao}: lance a fatura no contrato.` };
+    }
+    const erro = await confirmarNoBanco(() => insertFaturaDb(nova), 'Lançar fatura');
+    if (erro) return { erro };
+    setFaturas((prev) => [nova, ...prev]);
+    return { item: nova };
+  };
+
+  const editarFatura: AppContextType['editarFatura'] = async (id, mudancas) => {
+    const antes = faturas.find((f) => f.id === id);
+    if (!antes) return 'Fatura não encontrada.';
+    const depois: Fatura = { ...antes, ...mudancas };
+    const erro = await confirmarNoBanco(() => updateFaturaDb(antes, depois), 'Salvar fatura');
+    if (erro) return erro;
+    setFaturas((prev) => trocar(prev, depois));
+    return null;
+  };
+
   const anexarArquivoRegistro = async (
     tabela: 'contratos' | 'faturas',
     id: string,
@@ -1523,24 +1749,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Código definitivo vem do banco; o local só vale no modo demonstração
     const codigoLocal = `#CH-${new Date().getFullYear()}-${(tickets.length + 1).toString().padStart(4, '0')}`;
 
+    // Lote 1: a descrição já é a abertura. A mensagem inicial só existe quando quem
+    // registra é o próprio solicitante; em nome de outra pessoa (T.I.), não há
+    // mensagem (o banco recusaria o autor diferente de quem grava).
+    const emNomeDeOutro = !!currentUser && ticketData.solicitanteId !== currentUser.id;
     const newTicket: Ticket = {
       ...ticketData,
       id,
       codigo: codigoLocal,
       dataCriacao: now,
       dataAtualizacao: now,
-      mensagens: [
-        {
-          id: novoId('msg'),
-          autorId: ticketData.solicitanteId,
-          autorNome: ticketData.solicitanteNome,
-          autorRole: currentRole,
-          texto: ticketData.descricao,
-          ehNotaInterna: false,
-          data: now,
-          anexos: ticketData.anexos,
-        },
-      ],
+      mensagens: emNomeDeOutro
+        ? []
+        : [
+            {
+              id: novoId('msg'),
+              autorId: ticketData.solicitanteId,
+              autorNome: ticketData.solicitanteNome,
+              autorRole: currentRole,
+              texto: ticketData.descricao,
+              ehNotaInterna: false,
+              data: now,
+              anexos: ticketData.anexos,
+            },
+          ],
     };
 
     try {
@@ -1549,7 +1781,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTickets((prev) => [salvo, ...prev]);
       // A mensagem depende do chamado (FK): grava depois dele (MED-02)
       try {
-        await insertTicketMessageDb(id, newTicket.mensagens[0]);
+        if (newTicket.mensagens[0]) await insertTicketMessageDb(id, newTicket.mensagens[0]);
       } catch (err) {
         setDbErro(
           `O chamado ${salvo.codigo} foi aberto, mas a descrição inicial não foi salva como mensagem: ${mensagemDeErro(err)}`
@@ -1775,8 +2007,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const cancelarChamado = async (ticketId: string, motivo: MotivoCancelamento, detalhe?: string) => {
-    const problema = erroCancelamento(motivo, detalhe || '');
+    const chamado = tickets.find((t) => t.id === ticketId);
+    const problema = erroCancelamento(motivo, detalhe || '', chamado?.tipo);
     if (problema) return problema;
+    if (chamado && !podeCancelar(chamado, currentRole, currentUser?.id)) return 'Não é possível cancelar este chamado.';
+    if (chamado && ehProcesso(chamado)) {
+      const feitos = passosQueImpedemCancelar(processoItens.filter((i) => i.chamadoId === ticketId));
+      if (feitos.length) {
+        return `Não dá para cancelar: estes passos já mexeram no inventário e precisam ser desfeitos antes: ${feitos
+          .map((i) => i.titulo)
+          .join('; ')}.`;
+      }
+    }
     return acaoNoChamado(
       ticketId,
       () => cancelarChamadoDb(ticketId, motivo, detalhe?.trim()),
@@ -1987,6 +2229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (chamados) setTickets(chamados);
     if (lems) setLembretes(lems);
     if (termos) setTerms(termos);
+    await recarregarAtribuicoes();
   };
 
   const salvarChecklist = async (chamadoId: string, rascunhos: ProcessoItemRascunho[]) => {
@@ -2202,6 +2445,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   };
 
+  /** Lote 1: cancela ou substitui o termo (o anterior fica no histórico, com o motivo) */
+  const cancelarTermo = async (termoId: string, motivo: string, substitutoId?: string): Promise<string | null> => {
+    const problema = erroCancelarTermo(motivo);
+    if (problema) return problema;
+    if (currentRole !== 'ti_admin' && currentRole !== 'ti_suporte') return 'Apenas a T.I. cancela ou substitui termos';
+    if (isProduction) {
+      try {
+        await cancelarTermoDb(termoId, motivo.trim(), substitutoId);
+        const termos = await fetchTermsFromDb();
+        if (termos) setTerms(termos);
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    const t = terms.find((x) => x.id === termoId);
+    if (!t) return 'Termo não encontrado';
+    if (t.canceladoEm) return 'Este termo já foi cancelado';
+    setTerms((prev) =>
+      trocar(prev, {
+        ...t,
+        canceladoEm: new Date().toISOString(),
+        canceladoPor: currentUserId || undefined,
+        cancelamentoMotivo: motivo.trim(),
+        substituidoPor: substitutoId,
+      })
+    );
+    return null;
+  };
+
   const dispensarAssinaturaTermo = async (termoId: string, motivo: string): Promise<string | null> => {
     if (!motivo.trim()) return 'Informe o motivo da dispensa';
     if (isProduction) {
@@ -2330,6 +2603,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         encerrarLembrete,
         aceitarTermo,
         dispensarAssinaturaTermo,
+        cancelarTermo,
         fornecedores,
         contratos,
         faturas,
@@ -2340,6 +2614,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         alterarContrato,
         excluirContrato,
         lancarFatura,
+        cadastrarAtivo,
+        editarAtivo,
+        cadastrarLicenca,
+        editarLicenca,
+        mudarSituacaoLicenca,
+        cadastrarFornecedor,
+        editarFornecedor,
+        cadastrarContrato,
+        editarContrato,
+        cadastrarFatura,
+        editarFatura,
+        atribuicoesLicenca,
         alterarFatura,
         excluirFatura,
         anexarArquivoContrato,
@@ -2361,6 +2647,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addEmployee,
         cadastrarColaborador,
         updateEmployee,
+        salvarColaborador,
         updateEmployeeRole,
         deleteEmployee,
         addDepartment,

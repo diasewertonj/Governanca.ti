@@ -6,6 +6,8 @@ import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
 import { isoLocal } from '../../utils/formatters.ts';
+import { erroDuplicadoAtivo, proximaTag } from '../../utils/patrimonio.ts';
+import { FornecedorFormModal } from '../fornecedores/FornecedorFormModal.tsx';
 
 interface NewAssetModalProps {
   onClose: () => void;
@@ -26,15 +28,17 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     departments,
     employees,
     fornecedores,
-    addAsset,
-    updateAsset,
+    cadastrarAtivo,
+    editarAtivo,
     anexarArquivoAtivo,
     settings,
     setSelectedAssetIdFor360,
   } = useApp();
 
-  const nextTagNumber = 1040 + assets.length + 1;
-  const defaultTag = `#PAT-${nextTagNumber}`;
+  // Lote 1: próxima tag = maior número já usado + 1 (não repete tag existente)
+  const defaultTag = proximaTag(assets);
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
   const fiscalAtual = ativo?.fiscal;
 
   const [tag, setTag] = useState(ativo?.tag ?? defaultTag);
@@ -53,7 +57,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   const [valorCompra, setValorCompra] = useState<number>(fiscalAtual?.valorCompra ?? 0);
   // Fase 8: fornecedor do cadastro; o texto antigo fica (e aparece) enquanto não houver vínculo
   const [fornecedorId, setFornecedorId] = useState(ativo?.fornecedorId ?? '');
-  const [fornecedor, setFornecedor] = useState(fiscalAtual?.fornecedor ?? '');
+  const [fornecedor] = useState(fiscalAtual?.fornecedor ?? '');
+  const [novoFornecedor, setNovoFornecedor] = useState(false);
   const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
   const [dataAquisicao, setDataAquisicao] = useState(() => fiscalAtual?.dataAquisicao ?? isoLocal(new Date()));
   const [dataGarantia, setDataGarantia] = useState(fiscalAtual?.dataGarantia ?? '');
@@ -101,23 +106,29 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     setNotaFiscal(erro ? null : arquivo);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Lote 1: só fecha depois do banco confirmar; se recusar, o erro aparece aqui e nada se perde
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !marca.trim() || !serialNumber.trim()) return;
+    if (!nome.trim() || !marca.trim() || !serialNumber.trim() || salvando) return;
+    const duplicado = erroDuplicadoAtivo(assets, tag, serialNumber, ativo?.id);
+    if (duplicado) return setErroSalvar(duplicado);
+    setErroSalvar(null);
 
     const fiscal = {
       ...(fiscalAtual || {}),
       numeroNF: numeroNF.trim(),
       chaveAcesso44: chaveAcesso44.replace(/\s+/g, '').trim(),
       valorCompra: Number(valorCompra) || 0,
-      fornecedor: fornecedor.trim(),
+      // Com vínculo, o texto passa a ser o nome do cadastro; sem vínculo, fica o legado
+      fornecedor: fornecedores.find((f) => f.id === fornecedorId)?.nome || fornecedor.trim(),
       dataAquisicao,
       dataGarantia,
       suporteContato: suporteContato.trim(),
     };
 
     if (ativo) {
-      updateAsset(ativo.id, {
+      setSalvando(true);
+      const falha = await editarAtivo(ativo.id, {
         tag: tag.trim(),
         nome: nome.trim(),
         categoria,
@@ -133,6 +144,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
         observacoes: observacoes.trim() || undefined,
         fornecedorId: fornecedorId || undefined,
       });
+      setSalvando(false);
+      if (falha) return setErroSalvar(`Não foi possível salvar: ${falha}`);
       if (notaFiscal) void anexarArquivoAtivo(ativo.id, notaFiscal, 'nota_fiscal');
       onClose();
       return;
@@ -142,7 +155,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     const isEmUso = Boolean(custodianteId);
     const custodian = employees.find((e) => e.id === custodianteId);
 
-    const created = addAsset({
+    setSalvando(true);
+    const { item: created, erro: falhaCadastro } = await cadastrarAtivo({
       tag: tag.trim(),
       nome: nome.trim(),
       categoria,
@@ -175,6 +189,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
         : [],
       historicoManutencao: [],
     });
+    setSalvando(false);
+    if (!created) return setErroSalvar(`Não foi possível cadastrar: ${falhaCadastro || 'erro desconhecido'}`);
     if (notaFiscal) void anexarArquivoAtivo(created.id, notaFiscal, 'nota_fiscal');
 
     onClose();
@@ -478,36 +494,38 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                 <label htmlFor="ativo-fornecedor" className="block text-xs font-semibold text-slate-700 mb-1">
                   Fornecedor
                 </label>
-                <select
-                  id="ativo-fornecedor"
-                  value={fornecedorId}
-                  onChange={(e) => setFornecedorId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">Sem vínculo com o cadastro</option>
-                  {opcoesFornecedor.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.nome}
-                      {f.ativo ? '' : ' (inativo)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {!fornecedorId && (
-                <div>
-                  <label htmlFor="ativo-fornecedor-texto" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fornecedor (texto)
-                  </label>
-                  <input
-                    id="ativo-fornecedor-texto"
-                    type="text"
-                    value={fornecedor}
-                    onChange={(e) => setFornecedor(e.target.value)}
-                    placeholder="Ex: Dell Brasil Ltda"
+                {/* Lote 1 (L1): fornecedor só do cadastro, com "+ Novo" na hora */}
+                <div className="flex gap-2">
+                  <select
+                    id="ativo-fornecedor"
+                    value={fornecedorId}
+                    onChange={(e) => setFornecedorId(e.target.value)}
                     className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
+                  >
+                    <option value="">Não informado</option>
+                    {opcoesFornecedor.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.nome}
+                        {f.ativo ? '' : ' (inativo)'}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setNovoFornecedor(true)}
+                    className="shrink-0 flex items-center gap-1 px-2.5 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Novo
+                  </button>
                 </div>
+                {!fornecedorId && fornecedor && (
+                  <p className="text-xs text-amber-800 mt-1">
+                    Registro antigo: "{fornecedor}" (texto). Escolha o fornecedor do cadastro para vincular.
+                  </p>
+                )}
+              </div>
+              {novoFornecedor && (
+                <FornecedorFormModal onClose={() => setNovoFornecedor(false)} onSalvo={(f) => setFornecedorId(f.id)} />
               )}
 
               <div>
@@ -607,6 +625,11 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
             </div>
           </div>
 
+          {erroSalvar && (
+            <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+              {erroSalvar}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
@@ -617,10 +640,11 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+              disabled={salvando}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
               {ativo ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-              {ativo ? 'Salvar alterações' : 'Cadastrar Ativo Patrimonial'}
+              {salvando ? 'Salvando…' : ativo ? 'Salvar alterações' : 'Cadastrar Ativo Patrimonial'}
             </button>
           </div>
         </form>

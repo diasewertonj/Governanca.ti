@@ -29,6 +29,8 @@ interface FaturasSecaoProps {
   periodicidade: PeriodicidadeContrato;
   /** Valor cadastrado (licença: valor mensal; contrato: valor), sugerido na fatura nova */
   valorPadrao: number;
+  /** Lote 1 (L2): quando informado, não deixa lançar fatura aqui e explica onde lançar */
+  bloqueioLancamento?: string;
 }
 
 const COR_STATUS: Record<StatusExibidoFatura, string> = {
@@ -46,8 +48,8 @@ const BOTAO_LINHA = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-mediu
  * próxima competência e o valor cadastrado), "Marcar como paga" e "Cancelar
  * fatura". Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
-export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade, valorPadrao }) => {
-  const { faturas, currentRole, alterarFatura, excluirFatura, anexarArquivoFatura } = useApp();
+export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade, valorPadrao, bloqueioLancamento }) => {
+  const { faturas, currentRole, alterarFatura, editarFatura, excluirFatura, anexarArquivoFatura } = useApp();
   const [lancando, setLancando] = useState(false);
   const [pagando, setPagando] = useState<{ id: string; data: string } | null>(null);
   // Arquivo de uma fatura já lançada sem arquivo: escolhe e só sobe ao clicar em "Enviar"
@@ -62,10 +64,12 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
   const agora = new Date();
   const ano = agora.getFullYear();
 
-  const confirmarPagamento = () => {
+  // Lote 1: o campo de pagamento só fecha depois do banco confirmar
+  const confirmarPagamento = async () => {
     if (!pagando) return;
     if (!pagando.data) return setErro('Fatura paga precisa da data de pagamento.');
-    alterarFatura(pagando.id, { status: 'paga', pagoEm: pagando.data });
+    const falha = await editarFatura(pagando.id, { status: 'paga', pagoEm: pagando.data });
+    if (falha) return setErro(`Não foi possível marcar como paga: ${falha}`);
     setPagando(null);
     setErro('');
   };
@@ -280,7 +284,9 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
         </p>
       )}
 
-      {lancando ? (
+      {bloqueioLancamento ? (
+        <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5">{bloqueioLancamento}</p>
+      ) : lancando ? (
         <FormFatura
           alvo={alvo}
           periodicidade={periodicidade}
@@ -309,7 +315,8 @@ const FormFatura: React.FC<{
   doMesmoAlvo: Fatura[];
   onFechar: () => void;
 }> = ({ alvo, periodicidade, valorPadrao, doMesmoAlvo, onFechar }) => {
-  const { lancarFatura, anexarArquivoFatura } = useApp();
+  const { cadastrarFatura, anexarArquivoFatura } = useApp();
+  const [salvando, setSalvando] = useState(false);
   const [sugerida] = useState(() => proximaCompetencia(doMesmoAlvo, periodicidade));
   const [competencia, setCompetencia] = useState(sugerida);
   const [valor, setValor] = useState(String(valorPadrao));
@@ -344,8 +351,10 @@ const FormFatura: React.FC<{
     setArquivo(msg ? null : f);
   };
 
-  const lancar = (e: React.FormEvent) => {
+  // Lote 1: só fecha depois do banco confirmar; se recusar, o digitado continua aqui
+  const lancar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (salvando) return;
     const dados = {
       ...alvo,
       competencia,
@@ -358,7 +367,11 @@ const FormFatura: React.FC<{
     };
     const problema = validarFatura({ id: '', ...dados }, doMesmoAlvo);
     if (problema) return setErro(problema);
-    const nova = lancarFatura(dados);
+    setErro('');
+    setSalvando(true);
+    const { item: nova, erro: falha } = await cadastrarFatura(dados);
+    setSalvando(false);
+    if (!nova) return setErro(`Não foi possível lançar: ${falha || 'erro desconhecido'}`);
     if (arquivo) void anexarArquivoFatura(nova.id, arquivo);
     onFechar();
   };
@@ -499,8 +512,12 @@ const FormFatura: React.FC<{
         >
           Cancelar
         </button>
-        <button type="submit" className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
-          <Plus className="w-3.5 h-3.5" /> Lançar fatura
+        <button
+          type="submit"
+          disabled={salvando}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+        >
+          <Plus className="w-3.5 h-3.5" /> {salvando ? 'Lançando…' : 'Lançar fatura'}
         </button>
       </div>
     </form>

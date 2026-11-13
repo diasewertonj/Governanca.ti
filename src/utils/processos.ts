@@ -321,7 +321,8 @@ export function itensDoTermo(
           descricao: a?.nome || i.titulo,
           patrimonio: i.tipo === 'equipamento' ? patrimonio(a) : SEM_TOMBO,
           marcaModelo: marcaModelo(a),
-          condicao: 'bom',
+          // Lote 1: a condição é conferida item a item antes de gerar (nada marcado de antemão)
+          condicao: undefined,
           situacao: 'entregue',
           observacao: i.observacao,
           ativoId: a?.id,
