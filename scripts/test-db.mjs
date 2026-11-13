@@ -36,9 +36,12 @@ function psql(sql, rotulo) {
 function esperarPronto() {
   for (let i = 0; i < 60; i++) {
     try {
-      docker(['exec', container, 'pg_isready', '-U', 'postgres']);
-      // pg_isready responde antes do init terminar; uma consulta real confirma
-      docker(['exec', container, 'psql', '-U', 'postgres', '-c', 'select 1']);
+      // A imagem do Postgres sobe um servidor temporário (só socket local) para o
+      // init e depois reinicia. Conectar por TCP (-h 127.0.0.1) só funciona no
+      // servidor definitivo; sem isso os testes às vezes começavam no meio do
+      // reinício e falhavam no CI (intermitente).
+      docker(['exec', container, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres']);
+      docker(['exec', container, 'psql', '-h', '127.0.0.1', '-U', 'postgres', '-c', 'select 1']);
       return;
     } catch {
       execFileSync(process.platform === 'win32' ? 'powershell' : 'sleep', process.platform === 'win32' ? ['-c', 'Start-Sleep -Milliseconds 500'] : ['0.5']);
