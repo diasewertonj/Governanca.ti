@@ -336,6 +336,55 @@ export interface Ticket {
   offboarding?: OffboardingData;
   onboarding?: OnboardingData;
   colaboradorId?: string; // Fase 6: a pessoa que entra/sai
+  // Fase 10: atendimento documentado
+  resolucao?: ResolucaoChamado;
+  cancelamento?: { motivo: MotivoCancelamento; detalhe?: string; canceladoPor?: string };
+  reaberturas?: number;
+  avaliacao?: { nota: number; comentario?: string };
+  aguardandoMotivo?: AguardandoMotivo;
+}
+
+// -----------------------------------------------------------------------------
+// Fase 10 · Atendimento profissional
+// -----------------------------------------------------------------------------
+export type CausaChamado = 'hardware' | 'configuracao' | 'software' | 'rede' | 'acesso' | 'uso' | 'fornecedor' | 'outro';
+export type TipoSolucao = 'definitiva' | 'paliativa';
+export type MotivoCancelamento = 'duplicado' | 'engano' | 'sem_retorno' | 'outro';
+export type AguardandoMotivo = 'peca' | 'fornecedor' | 'solicitante';
+
+export interface ResolucaoChamado {
+  causa: CausaChamado;
+  solucao: string;
+  tipo: TipoSolucao;
+  proximoPasso?: string;
+  tempoMin?: number;
+  resolvidoPor?: string;
+  resolvidoEm?: string;
+}
+
+/** O que a T.I. informa em "Registrar solução" */
+export type DadosResolucao = Pick<ResolucaoChamado, 'causa' | 'solucao' | 'tipo' | 'proximoPasso' | 'tempoMin'>;
+
+export type TipoEventoChamado =
+  | 'aberto'
+  | 'status'
+  | 'tecnico'
+  | 'prioridade'
+  | 'vinculo'
+  | 'resolvido'
+  | 'cancelado'
+  | 'reaberto'
+  | 'avaliado';
+
+export interface EventoChamado {
+  id: string;
+  chamadoId: string;
+  tipo: TipoEventoChamado;
+  de?: string;
+  para?: string;
+  detalhe?: string;
+  autorId?: string;
+  criadoEm: string;
 }
 
 // -----------------------------------------------------------------------------

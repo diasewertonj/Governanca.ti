@@ -6,9 +6,9 @@
 // aguardando_terceiro); o texto exibido mantém a linguagem da equipe.
 const ROTULO_STATUS: Record<string, string> = {
   aberto: 'Aberto',
-  em_andamento: 'Em andamento',
-  aguardando_terceiro: 'Aguardando peça',
-  resolvido: 'Resolvido',
+  em_andamento: 'Em atendimento',
+  aguardando_terceiro: 'Aguardando',
+  resolvido: 'Encerrado', // Fase 10: encerrado com solução registrada
   cancelado: 'Cancelado',
 };
 

@@ -55,6 +55,12 @@ import {
   TicketStatus,
   TicketType,
   UserRole,
+  AguardandoMotivo,
+  CausaChamado,
+  DadosResolucao,
+  EventoChamado,
+  MotivoCancelamento,
+  TipoSolucao,
 } from '../types/index.ts';
 
 // Fase 4: os mapeadores são tipados pelo banco real (database.types.ts, gerado
@@ -1057,7 +1063,98 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     dataCriacao: t.data_criacao,
     dataAtualizacao: t.data_atualizacao,
     colaboradorId: t.colaborador_id || undefined,
+    ...camposAtendimento(t),
   })) : [];
+}
+
+/** Fase 10: solução, cancelamento, avaliação e "aguardando" vindos do banco */
+function camposAtendimento(t: Tables<'chamados'>): Partial<Ticket> {
+  return {
+    resolucao:
+      t.resolucao_solucao && t.resolucao_causa && t.resolucao_tipo
+        ? {
+            causa: t.resolucao_causa as CausaChamado,
+            solucao: t.resolucao_solucao,
+            tipo: t.resolucao_tipo as TipoSolucao,
+            proximoPasso: t.resolucao_proximo_passo || undefined,
+            tempoMin: t.resolucao_tempo_min ?? undefined,
+            resolvidoPor: t.resolvido_por || undefined,
+            resolvidoEm: t.resolvido_em || undefined,
+          }
+        : undefined,
+    cancelamento: t.cancelamento_motivo
+      ? {
+          motivo: t.cancelamento_motivo as MotivoCancelamento,
+          detalhe: t.cancelamento_detalhe || undefined,
+          canceladoPor: t.cancelado_por || undefined,
+        }
+      : undefined,
+    reaberturas: t.reaberturas ?? 0,
+    avaliacao: t.avaliacao ? { nota: t.avaliacao, comentario: t.avaliacao_comentario || undefined } : undefined,
+    aguardandoMotivo: (t.aguardando_motivo as AguardandoMotivo | null) || undefined,
+  };
+}
+
+// Fase 10: ações do atendimento (funções no banco; validam papel e regras)
+export async function resolverChamadoDb(chamadoId: string, d: DadosResolucao) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('resolver_chamado', {
+      p_chamado: chamadoId,
+      p_causa: d.causa,
+      p_solucao: d.solucao,
+      p_tipo: d.tipo,
+      p_proximo_passo: d.proximoPasso || undefined,
+      p_tempo_min: d.tempoMin ?? undefined,
+    })
+  );
+}
+
+export async function cancelarChamadoDb(chamadoId: string, motivo: MotivoCancelamento, detalhe?: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('cancelar_chamado', { p_chamado: chamadoId, p_motivo: motivo, p_detalhe: detalhe || undefined }));
+}
+
+export async function reabrirChamadoDb(chamadoId: string, motivo: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('reabrir_chamado', { p_chamado: chamadoId, p_motivo: motivo }));
+}
+
+export async function avaliarChamadoDb(chamadoId: string, nota: number, comentario?: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('avaliar_chamado', { p_chamado: chamadoId, p_nota: nota, p_comentario: comentario || undefined }));
+}
+
+/** Um chamado relido do banco (depois de uma ação feita por função) */
+export async function fetchChamadoDb(chamadoId: string): Promise<Partial<Ticket> | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('chamados').select('*').eq('id', chamadoId).single();
+  if (error || !data) return null;
+  return {
+    status: data.status as TicketStatus,
+    dataAtualizacao: data.data_atualizacao,
+    ...camposAtendimento(data),
+  };
+}
+
+export async function fetchEventosChamadoDb(chamadoId: string): Promise<EventoChamado[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('chamado_eventos')
+    .select('*')
+    .eq('chamado_id', chamadoId)
+    .order('criado_em', { ascending: true });
+  if (error || !data) return [];
+  return data.map((e) => ({
+    id: e.id,
+    chamadoId: e.chamado_id,
+    tipo: e.tipo as EventoChamado['tipo'],
+    de: e.de || undefined,
+    para: e.para || undefined,
+    detalhe: e.detalhe || undefined,
+    autorId: e.autor_id || undefined,
+    criadoEm: e.criado_em,
+  }));
 }
 
 /** Cria o chamado e devolve o código gerado pelo banco (#CH-AAAA-NNNN) */

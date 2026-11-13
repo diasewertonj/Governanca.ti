@@ -3,23 +3,36 @@ import { useApp } from '../../context/AppContext.tsx';
 import { EmployeeStatus } from '../../types/index.ts';
 import { X, UserPlus } from 'lucide-react';
 
-interface NewEmployeeModalProps {
-  onClose: () => void;
+/** Fase 10: dados que já vêm preenchidos (ex.: do chamado de admissão) */
+export interface DadosIniciaisColaborador {
+  nome?: string;
+  email?: string;
+  cargo?: string;
+  setorId?: string;
+  gestorId?: string;
+  dataAdmissao?: string;
 }
 
-export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose }) => {
+interface NewEmployeeModalProps {
+  onClose: () => void;
+  inicial?: DadosIniciaisColaborador;
+  /** Chamado ao cadastrar; sem ele, abre a ficha da pessoa */
+  onCriado?: (colaboradorId: string) => void;
+}
+
+export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, inicial, onCriado }) => {
   const { employees, departments, addEmployee, setSelectedEmployeeIdFor360 } = useApp();
 
   const nextMatricula = `NX-${1000 + employees.length + 1}`;
 
-  const [nome, setNome] = useState('');
-  const [email, setEmail] = useState('');
+  const [nome, setNome] = useState(inicial?.nome ?? '');
+  const [email, setEmail] = useState(inicial?.email ?? '');
   const [matricula, setMatricula] = useState(nextMatricula);
-  const [cargo, setCargo] = useState('');
-  const [setorId, setSetorId] = useState(departments[0]?.id || 'dep-1');
-  const [gestorId, setGestorId] = useState('');
+  const [cargo, setCargo] = useState(inicial?.cargo ?? '');
+  const [setorId, setSetorId] = useState(inicial?.setorId || departments[0]?.id || 'dep-1');
+  const [gestorId, setGestorId] = useState(inicial?.gestorId ?? '');
   const [status, setStatus] = useState<EmployeeStatus>('ativo');
-  const [dataAdmissao, setDataAdmissao] = useState(new Date().toISOString().split('T')[0]);
+  const [dataAdmissao, setDataAdmissao] = useState(inicial?.dataAdmissao || new Date().toISOString().split('T')[0]);
   const [telefone, setTelefone] = useState('');
 
   const activeEmployees = employees.filter((e) => e.status === 'ativo');
@@ -41,7 +54,8 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose }) =
     });
 
     onClose();
-    setSelectedEmployeeIdFor360(created.id);
+    if (onCriado) onCriado(created.id);
+    else setSelectedEmployeeIdFor360(created.id);
   };
 
   return (
