@@ -23,10 +23,26 @@ interface AnexoPendente {
 
 interface NewTicketModalProps {
   onClose: () => void;
+  /** Fase 10: aberto pelo painel do equipamento — já vem escolhido */
+  ativoInicial?: string;
 }
 
-export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
-  const { currentUser, supabaseUser, departments, assets, licenses, createTicket, setSelectedTicketIdForDetail } = useApp();
+export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoInicial }) => {
+  const {
+    currentUser,
+    currentRole,
+    supabaseUser,
+    departments,
+    employees,
+    assets,
+    licenses,
+    createTicket,
+    setSelectedTicketIdForDetail,
+  } = useApp();
+  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  // Fase 10: a T.I. pode registrar o chamado em nome de outra pessoa (telefone, presencial)
+  const [solicitanteId, setSolicitanteId] = useState(currentUser?.id ?? '');
+  const [trocandoAtivo, setTrocandoAtivo] = useState(!ativoInicial);
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [erroAnexo, setErroAnexo] = useState<string | null>(null);
   const [enviandoChamado, setEnviandoChamado] = useState(false);
@@ -35,7 +51,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
   const [categoria, setCategoria] = useState('Hardware / Equipamento');
   const [prioridade, setPrioridade] = useState<TicketPriority>('media');
   // Fase 9: equipamento e software são vínculos separados (dá para informar os dois)
-  const [ativoSel, setAtivoSel] = useState('');
+  const [ativoSel, setAtivoSel] = useState(ativoInicial ?? '');
   const [softwareSel, setSoftwareSel] = useState('');
   const [descricao, setDescricao] = useState('');
   const [anexos, setAnexos] = useState<AnexoPendente[]>([]);
@@ -54,14 +70,29 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
 
   if (!currentUser) return null;
 
-  const userDepartment = departments.find((d) => d.id === currentUser.setorId);
+  // Quem pede: o próprio usuário ou, para a T.I., a pessoa escolhida
+  const solicitante = (isTI && employees.find((e) => e.id === solicitanteId)) || currentUser;
+  const emNomeDeOutro = solicitante.id !== currentUser.id;
+  const userDepartment = departments.find((d) => d.id === solicitante.setorId);
+  const pessoasAtivas = employees.filter((e) => e.status !== 'desligado').sort((a, b) => a.nome.localeCompare(b.nome));
 
-  // Equipamentos em posse do solicitante
-  const myCustodyAssets = assets.filter((a) => a.custodianteId === currentUser.id);
+  // Equipamentos em posse do solicitante (o vindo do painel entra mesmo se a lista mudar)
+  const myCustodyAssets = assets.filter(
+    (a) => (a.custodianteId === solicitante.id && a.status !== 'descartado') || a.id === ativoInicial
+  );
+  const ativoEscolhido = assets.find((a) => a.id === ativoSel);
 
   // Softwares alocados para o solicitante
-  const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(currentUser.id));
-  const otherLicenses = licenses.filter((l) => !l.colaboradoresIds.includes(currentUser.id));
+  const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(solicitante.id));
+  const otherLicenses = licenses.filter((l) => !l.colaboradoresIds.includes(solicitante.id));
+
+  const trocarSolicitante = (id: string) => {
+    setSolicitanteId(id);
+    // Equipamento e software são da pessoa: escolhe de novo
+    setAtivoSel('');
+    setSoftwareSel('');
+    setTrocandoAtivo(true);
+  };
 
   // Fase 5: escolher arquivo só valida tipo/tamanho; o envio ao Storage
   // acontece ao clicar em "Enviar Chamado" (cancelar não deixa arquivo órfão)
@@ -118,10 +149,10 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
     }
     const created = await createTicket({
       tipo: 'suporte',
-      solicitanteId: currentUser.id,
-      solicitanteNome: currentUser.nome,
-      solicitanteEmail: currentUser.email,
-      solicitanteCargo: currentUser.cargo,
+      solicitanteId: solicitante.id,
+      solicitanteNome: solicitante.nome,
+      solicitanteEmail: solicitante.email,
+      solicitanteCargo: solicitante.cargo,
       solicitanteSetorNome: userDepartment?.nome || 'Setor',
       ativoId,
       softwareId,
@@ -152,12 +183,11 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Abrir chamado</h2>
-            <p className="text-xs text-slate-500">
-              Solicitação interna de suporte vinculada ao perfil corporativo
-            </p>
           </div>
           <button
+            type="button"
             onClick={fechar}
+            aria-label="Fechar"
             className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -167,23 +197,40 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
           {/* Card com preenchimento automático do Solicitante */}
-          <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-lg flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2.5">
+          <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                {currentUser.nome.charAt(0)}
+                {solicitante.nome.charAt(0)}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-semibold text-slate-900">
-                  {currentUser.nome} <span className="font-mono text-slate-500 font-normal">({currentUser.matricula})</span>
+                  {solicitante.nome} <span className="text-slate-500 font-normal">({solicitante.matricula})</span>
                 </p>
                 <p className="text-xs text-slate-600">
-                  {currentUser.cargo} · {userDepartment?.nome || 'Setor'}
+                  {solicitante.cargo} · {userDepartment?.nome || 'Setor'}
                 </p>
+                {emNomeDeOutro && <p className="text-xs text-blue-800 mt-0.5">Registrado pela T.I. em nome desta pessoa</p>}
               </div>
             </div>
-            <span className="text-xs font-medium text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200 shadow-2xs">
-              Solicitante Identificado
-            </span>
+            {isTI && (
+              <div className="w-full sm:w-64">
+                <label htmlFor="novo-chamado-solicitante" className="sr-only">
+                  Solicitante
+                </label>
+                <select
+                  id="novo-chamado-solicitante"
+                  value={solicitante.id}
+                  onChange={(e) => trocarSolicitante(e.target.value)}
+                  className="w-full text-xs px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-slate-900"
+                >
+                  {pessoasAtivas.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.id === currentUser.id ? `${e.nome} (eu)` : e.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div>
@@ -218,8 +265,23 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
           {/* Fase 9: equipamento e software afetados (opcionais; dá para informar os dois) */}
           <div>
             <label htmlFor="novo-chamado-ativo" className="block text-xs font-semibold text-slate-700 mb-1">
-              Equipamento afetado
+              Equipamento afetado <span className="font-normal text-slate-500">(se houver)</span>
             </label>
+            {/* Fase 10: vindo do painel do equipamento, ele já está escolhido (dá para trocar) */}
+            {!trocandoAtivo && ativoEscolhido ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs">
+                <span className="min-w-0 break-words">
+                  <span className="font-semibold text-slate-900">{ativoEscolhido.tag}</span> · {ativoEscolhido.nome}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTrocandoAtivo(true)}
+                  className="shrink-0 text-xs font-medium text-blue-700 hover:underline"
+                >
+                  Trocar
+                </button>
+              </div>
+            ) : (
             <select
               id="novo-chamado-ativo"
               value={ativoSel}
@@ -236,13 +298,16 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose }) => {
                 </option>
               ))}
             </select>
-            {myCustodyAssets.length === 0 && (
-              <p className="text-xs text-slate-500 mt-1">Nenhum equipamento sob sua responsabilidade.</p>
+            )}
+            {trocandoAtivo && myCustodyAssets.length === 0 && (
+              <p className="text-xs text-slate-500 mt-1">
+                {emNomeDeOutro ? 'Nenhum equipamento com esta pessoa.' : 'Nenhum equipamento sob sua responsabilidade.'}
+              </p>
             )}
           </div>
           <div>
             <label htmlFor="novo-chamado-software" className="block text-xs font-semibold text-slate-700 mb-1">
-              Software / licença afetado
+              Software / licença afetado <span className="font-normal text-slate-500">(se houver)</span>
             </label>
             <select
               id="novo-chamado-software"

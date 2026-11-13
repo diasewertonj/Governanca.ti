@@ -8,7 +8,7 @@ import { BarraAlteracoes, confirmarDescarte } from '../comum/BarraAlteracoes.tsx
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { ChecklistProcesso } from '../processos/ChecklistProcesso.tsx';
 import { VinculosChamado } from './VinculosChamado.tsx';
-import { ConversaChamado } from './ConversaChamado.tsx';
+import { ConversaChamado, ProblemaRelatado } from './ConversaChamado.tsx';
 import { ROTULO_TIPO_CHAMADO } from '../../utils/conversa.ts';
 import { RASCUNHO_VAZIO, ROTULO_VINCULO, mudancasVinculos, type RascunhoVinculos } from '../../utils/vinculos.ts';
 import {
@@ -215,35 +215,49 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
       <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Barra Superior */}
         {/* Fase 7: no celular o cabeçalho quebra em duas linhas (etiquetas em cima, título embaixo) */}
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50">
-          <span className="font-mono text-xs font-bold text-slate-800 bg-white px-2.5 py-1 rounded border border-slate-200">
-            {ticket.codigo}
-          </span>
-          <div className="order-last w-full sm:order-none sm:w-auto sm:flex-1 min-w-0">
-            <h2 className="text-base sm:text-sm font-semibold text-slate-900 leading-tight">{ticket.titulo}</h2>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · {ROTULO_TIPO_CHAMADO[ticket.tipo]} ·{' '}
-              {ticket.categoria}
-            </p>
+        {/* Fase 10: o título é a manchete; código, tipo e categoria numa linha pequena acima */}
+        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-3 pb-4 border-b border-slate-200 bg-slate-50">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs font-semibold text-slate-700">{ticket.codigo}</span>
+            <span className="text-xs text-slate-500">
+              · {ROTULO_TIPO_CHAMADO[ticket.tipo]} · {ticket.categoria}
+            </span>
+            <span className="flex-1" />
+            <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
+              {rotuloStatus(ticket.status)}
+            </span>
+            <span className={`text-xs px-2 py-0.5 rounded-md ${priorityColors}`}>
+              Prioridade {rotuloPrioridade(ticket.prioridade).toLowerCase()}
+            </span>
+            <button
+              type="button"
+              onClick={fechar}
+              aria-label="Fechar chamado"
+              className="p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
-            {rotuloStatus(ticket.status)}
-          </span>
-          <span className={`text-xs px-2 py-0.5 rounded-md ${priorityColors}`}>
-            Prioridade {rotuloPrioridade(ticket.prioridade).toLowerCase()}
-          </span>
-          <button
-            type="button"
-            onClick={fechar}
-            aria-label="Fechar chamado"
-            className="ml-auto sm:ml-0 p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h2 className="mt-1.5 text-xl sm:text-2xl font-bold text-slate-900 leading-tight break-words">{ticket.titulo}</h2>
+          <p className="text-xs text-slate-600 mt-1">
+            Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · Técnico:{' '}
+            {ticket.tecnicoResponsavelNome || 'não atribuído'}
+          </p>
+        </div>
+
+        <div className="sm:max-h-[75vh] sm:overflow-y-auto">
+        {/* Fase 10: o problema relatado logo abaixo do título, em destaque */}
+        <div className="px-4 sm:px-6 pt-4 sm:pt-5">
+          <ProblemaRelatado
+            ticket={ticket}
+            ativo={assets.find((a) => a.id === ticket.ativoId)}
+            onAbrirAnexo={abrirAnexo}
+            erroArquivo={erroArquivo}
+          />
         </div>
 
         {/* Corpo do Chamado em 2 Colunas */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 sm:max-h-[75vh] sm:overflow-y-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
           {/* Coluna Principal: Conversas e Linha do Tempo */}
           <div className="lg:col-span-2 p-4 sm:p-6 space-y-6 flex flex-col justify-between">
             <div className="space-y-5">
@@ -424,13 +438,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               )}
 
               {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
-              <ConversaChamado
-                ticket={ticket}
-                podeVerNotas={isTI}
-                meuId={currentUser?.id}
-                onAbrirAnexo={abrirAnexo}
-                erroArquivo={erroArquivo}
-              />
+              <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} />
             </div>
 
             {/* Caixa de Resposta */}
@@ -568,6 +576,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               </div>
             </div>
           </div>
+        </div>
         </div>
         <BarraAlteracoes itens={itensPendentes} onCancelar={descartarRascunho} onSalvar={salvarRascunho} />
       </div>

@@ -62,6 +62,8 @@ function MainApp() {
 
   const [viewSolicitada, setCurrentView] = useState<string>('dashboard');
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
+  // Fase 10: chamado aberto pelo painel do equipamento já vem com ele escolhido
+  const [ativoNovoChamado, setAtivoNovoChamado] = useState<string | undefined>();
   // Fase 7: menu em gaveta no celular/tablet
   const [menuAberto, setMenuAberto] = useState(false);
   const fecharMenu = useCallback(() => setMenuAberto(false), []);
@@ -147,7 +149,8 @@ function MainApp() {
           {currentView === 'settings' && <SettingsView />}
           {currentView === 'my_assets' && (
             <MyAssetsView
-              onOpenNewTicketForAsset={() => {
+              onOpenNewTicketForAsset={(ativoId) => {
+                setAtivoNovoChamado(ativoId);
                 setShowNewTicketModal(true);
               }}
             />
@@ -162,7 +165,13 @@ function MainApp() {
       {/* Modais Globais de Rastreabilidade Relacional 360° e Impressão */}
       <Suspense fallback={null}>
       {showNewTicketModal && (
-        <NewTicketModal onClose={() => setShowNewTicketModal(false)} />
+        <NewTicketModal
+          ativoInicial={ativoNovoChamado}
+          onClose={() => {
+            setShowNewTicketModal(false);
+            setAtivoNovoChamado(undefined);
+          }}
+        />
       )}
 
       {/* Fase 9: fichas empilhadas. Só a de cima aparece; as de baixo ficam
