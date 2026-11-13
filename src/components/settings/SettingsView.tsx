@@ -12,18 +12,15 @@ import {
   Plus,
   Trash2,
   Database,
-  Key,
   RotateCcw,
   Shield,
   Search,
-  Copy,
   RefreshCw,
-  Check,
 } from 'lucide-react';
 
 const ROTULO_PAPEL: Record<UserRole, string> = {
-  ti_admin: 'Admin T.I.',
-  ti_suporte: 'Suporte T.I.',
+  ti_admin: 'Administrador de T.I.',
+  ti_suporte: 'Suporte de T.I.',
   rh: 'Recursos Humanos',
   colaborador: 'Colaborador',
 };
@@ -57,7 +54,7 @@ const ABAS: { id: Aba; rotulo: string }[] = [
   { id: 'equipe', rotulo: 'Usuários e permissões' },
   { id: 'catalogo', rotulo: 'Catálogo de admissão' },
   { id: 'campos', rotulo: 'Campos dos ativos' },
-  { id: 'banco', rotulo: 'Sistema' },
+  { id: 'banco', rotulo: 'Conexão' },
 ];
 
 export const SettingsView: React.FC = () => {
@@ -82,7 +79,6 @@ export const SettingsView: React.FC = () => {
   const [showResetModal, setShowResetModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -327,7 +323,6 @@ export const SettingsView: React.FC = () => {
       <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">Configurações</h2>
-          <p className="text-sm text-slate-600">Dados da empresa, documentos, estrutura, permissões e catálogo</p>
         </div>
 
         {/* Fase 7: abas com rolagem lateral no celular */}
@@ -372,7 +367,7 @@ export const SettingsView: React.FC = () => {
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-semibold text-slate-900">Identificação Jurídica e Contatos de TI</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Estes dados são carregados dinamicamente nos cabeçalhos dos termos e das etiquetas
+              Aparecem no cabeçalho dos termos e nas etiquetas
             </p>
           </div>
 
@@ -519,7 +514,7 @@ export const SettingsView: React.FC = () => {
                   [
                     ['codigo', 'Código', 'md:col-span-1'],
                     ['versao', 'Versão', 'md:col-span-1'],
-                    ['referencia', 'Ref. (POP)', 'md:col-span-1'],
+                    ['referencia', 'Referência (POP)', 'md:col-span-1'],
                     ['titulo', 'Título', 'col-span-2 md:col-span-3'],
                   ] as const
                 ).map(([chave, rotulo, cols]) => (
@@ -547,11 +542,6 @@ export const SettingsView: React.FC = () => {
           </div>
           </>
           )}
-
-          <p className="pt-4 border-t border-slate-100 text-xs text-slate-500">
-            Ao editar qualquer campo, aparece no fim da página a barra para <strong>salvar</strong> ou{' '}
-            <strong>cancelar</strong> as alterações.
-          </p>
         </form>
       )}
 
@@ -696,7 +686,7 @@ export const SettingsView: React.FC = () => {
       {activeTab === 'campos' && (
         <div className="space-y-6">
           <form onSubmit={handleAddCustomField} className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">Adicionar Atributo Dinâmico por Categoria</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Novo campo</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
@@ -714,7 +704,7 @@ export const SettingsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Rótulo do Campo (Label)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nome do campo</label>
                 <input
                   type="text"
                   required
@@ -743,14 +733,14 @@ export const SettingsView: React.FC = () => {
                 className="self-end flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Salvar Atributo</span>
+                <span>Adicionar campo</span>
               </button>
             </div>
           </form>
 
           {/* Lista de Campos Cadastrados */}
           <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">Atributos Ativos no Sistema</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Campos criados</h3>
             {(Object.keys(ROTULO_CATEGORIA) as AssetCategory[]).map((cat) => {
               const doGrupo = settings.camposPersonalizados.filter((cf) => cf.categoria === cat);
               if (doGrupo.length === 0) return null;
@@ -797,11 +787,9 @@ export const SettingsView: React.FC = () => {
             <div>
               <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                 <Shield className="w-4 h-4 text-blue-600" />
-                <span>Gestão de Operadores e Níveis de Acesso ao Sistema (RBAC)</span>
+                <span>Usuários e permissões</span>
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Defina e altere diretamente os privilégios de quem pode operar a governança de T.I., o suporte e os processos de RH
-              </p>
+              <p className="text-xs text-slate-500 mt-0.5">O perfil define o que cada pessoa vê e faz no sistema</p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -855,7 +843,7 @@ export const SettingsView: React.FC = () => {
                 Recursos Humanos (RH)
               </span>
               <p className="text-xs text-purple-800 leading-tight">
-                Condução de admissões e desligamentos, inventário em tempo real, regras condicionais e chamados próprios.
+                Admissões, desligamentos e os próprios chamados.
               </p>
             </div>
 
@@ -906,8 +894,8 @@ export const SettingsView: React.FC = () => {
                       };
 
                       const roleLabelsText: Record<UserRole, string> = {
-                        ti_admin: 'Admin T.I.',
-                        ti_suporte: 'Suporte T.I.',
+                        ti_admin: 'Administrador de T.I.',
+                        ti_suporte: 'Suporte de T.I.',
                         rh: 'Recursos Humanos',
                         colaborador: 'Colaborador',
                       };
@@ -950,8 +938,8 @@ export const SettingsView: React.FC = () => {
                               aria-label={`Papel de ${emp.nome}`}
                               className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
                             >
-                              <option value="ti_admin">Administrador de T.I. (Acesso Total)</option>
-                              <option value="ti_suporte">Técnico de Suporte T.I.</option>
+                              <option value="ti_admin">Administrador de T.I.</option>
+                              <option value="ti_suporte">Suporte de T.I.</option>
                               <option value="rh">Recursos Humanos (RH)</option>
                               <option value="colaborador">Colaborador Padrão (Sem Acesso de Gestão)</option>
                             </select>
@@ -974,11 +962,8 @@ export const SettingsView: React.FC = () => {
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                   <Database className="w-4 h-4 text-emerald-600" />
-                  Status da Conexão com Supabase (PostgreSQL)
+                  Conexão com o banco de dados
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Conexão direta com banco relacional na nuvem e suporte a Row Level Security (RLS)
-                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -996,7 +981,7 @@ export const SettingsView: React.FC = () => {
                   title="Testar conexão e recarregar dados do banco"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
-                  <span>{isRefreshing ? 'Verificando...' : 'Atualizar Status'}</span>
+                  <span>{isRefreshing ? 'Verificando...' : 'Atualizar status'}</span>
                 </button>
 
                 <span
@@ -1018,108 +1003,16 @@ export const SettingsView: React.FC = () => {
                     }`}
                   />
                   {isSupabaseConnected && supabaseHealth?.tablesExist
-                    ? 'Supabase Conectado (Tabelas Ativas)'
+                    ? 'Conectado'
                     : isSupabaseConnected
-                    ? 'Conectado (Schema Pendente)'
-                    : 'Modo Local (Aguardando Chaves)'}
+                    ? 'Conectado, mas sem as tabelas'
+                    : 'Sem conexão (modo demonstração)'}
                 </span>
               </div>
             </div>
 
-            {/* Aviso especial se conectado mas tabelas ainda não criadas */}
-            {isSupabaseConnected && supabaseHealth && !supabaseHealth.tablesExist && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <h4 className="text-xs font-bold text-amber-900">
-                    Ação Necessária no Supabase: Criar Tabelas via SQL Editor
-                  </h4>
-                </div>
-                <p className="text-xs text-amber-800">
-                  Suas credenciais de conexão estão ativas, mas o PostgreSQL no Supabase ainda não possui as tabelas (ativos, chamados, colaboradores, etc.). Para ativar a persistência em nuvem, copie o arquivo <code className="bg-white/80 px-1 py-0.5 rounded font-mono font-semibold">supabase-schema.sql</code> e execute no <strong>SQL Editor</strong> do painel do Supabase.
-                </p>
-              </div>
-            )}
-
-            {/* Chaves e Instruções de Configuração */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-slate-600" />
-                  Como conectar seu Supabase em 3 Passos
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText('-- Execute o arquivo supabase-schema.sql localizado na raiz do projeto Nexus IT & HR');
-                    setCopiedSql(true);
-                    setTimeout(() => setCopiedSql(false), 2500);
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                >
-                  {copiedSql ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-700 font-semibold">Copiado!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copiar Dica do Schema</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="space-y-3 text-xs text-slate-700">
-                <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
-                    1
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">Execute o Schema no Supabase SQL Editor:</p>
-                    <p className="text-slate-500 mt-0.5">
-                      Copie o conteúdo do arquivo <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-xs">supabase-schema.sql</code> já criado na raiz do projeto e cole na aba <strong>SQL Editor</strong> do painel do Supabase. Em seguida, clique em <strong>Run</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
-                    2
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">Obtenha as Chaves de API:</p>
-                    <p className="text-slate-500 mt-0.5">
-                      No Supabase, acesse <strong>Project Settings &gt; API</strong> e copie a <strong>Project URL</strong> e a chave <strong>anon public</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
-                    3
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">Configure na Vercel ou no arquivo .env:</p>
-                    <p className="text-slate-500 mt-0.5">
-                      Na Vercel, vá em <strong>Settings &gt; Environment Variables</strong> e adicione:
-                    </p>
-                    <pre className="mt-2 bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-xs overflow-x-auto">
-{`VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui`}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Fase 0: com Supabase conectado (produção), "Zerar" e "Restaurar demo" ficam ocultos */}
-            {isSupabaseConnected ? (
-              <div className="border border-slate-200 bg-slate-50 rounded-xl p-5 text-xs text-slate-600">
-                Ações de reset ("Zerar dados" e "Restaurar base de demonstração") estão desativadas com o banco de produção conectado.
-              </div>
-            ) : (
+            {/* Fase 0: com Supabase conectado (produção), "Zerar" e "Restaurar demo" nem aparecem */}
+            {!isSupabaseConnected && (
             <div className="border border-rose-200 bg-rose-50/40 rounded-xl p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />

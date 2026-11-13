@@ -30,10 +30,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
     <div className="space-y-6">
       {/* Cabeçalho */}
       <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
-        <h2 className="text-sm font-semibold text-slate-900">Meus Equipamentos e Licenças sob Custódia</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Lista de patrimônio corporativo de T.I. atualmente vinculada à sua matrícula ({currentUser.matricula})
-        </p>
+        <h2 className="text-sm font-semibold text-slate-900">Meus equipamentos e licenças</h2>
       </div>
 
       {termosParaAssinar.length > 0 && (

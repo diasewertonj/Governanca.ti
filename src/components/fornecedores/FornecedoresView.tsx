@@ -97,7 +97,7 @@ export const FornecedoresView: React.FC = () => {
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-900">Fornecedores e contratos</h2>
           <p className="text-xs text-slate-500">
-            Vigência dos contratos, itens cobertos, faturas e contato de quem atende a T.I.
+            Contratos, itens cobertos e faturas
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

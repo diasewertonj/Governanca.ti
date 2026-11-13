@@ -203,12 +203,7 @@ export const RhProcessesView: React.FC = () => {
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">
-            Processos de RH Integrados (Ciclo de Vida do Colaborador)
-          </h2>
-          <p className="text-xs text-slate-500">
-            Onboarding ágil sem termos técnicos e Offboarding condicional com inventário instantâneo
-          </p>
+          <h2 className="text-sm font-semibold text-slate-900">Admissões e desligamentos</h2>
         </div>
 
         {/* Tabs de Seleção */}
@@ -564,7 +559,7 @@ export const RhProcessesView: React.FC = () => {
                   required
                   value={onbEmail}
                   onChange={(e) => setOnbEmail(e.target.value)}
-                  placeholder="gustavo.ribeiro@nexuscorp.com.br"
+                  placeholder="nome@empresa.com.br"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>

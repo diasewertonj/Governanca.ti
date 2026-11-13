@@ -58,9 +58,6 @@ export const CollaboratorsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Colaboradores</h2>
-          <p className="text-xs text-slate-500">
-            Rastreabilidade completa de equipamentos, termos de responsabilidade e liderança
-          </p>
         </div>
 
         <button
