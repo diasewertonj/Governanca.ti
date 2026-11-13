@@ -11,6 +11,9 @@ import { VinculosChamado } from './VinculosChamado.tsx';
 import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
 import { BlocoCancelamento, BlocoResolucao, FormCancelamento, FormResolucao } from './AtendimentoChamado.tsx';
 import { imprimirRelatorio } from './relatorioChamado.ts';
+import { PrazosChamado } from './SeloSla.tsx';
+import { situacaoSla } from '../../utils/sla.ts';
+import { PedidoDesligamento } from './PedidoDesligamento.tsx';
 import { chamadoEncerrado, podeCancelar, rotuloSituacao, ROTULO_AGUARDANDO } from '../../utils/atendimento.ts';
 import type { AguardandoMotivo } from '../../types/index.ts';
 import { Printer } from 'lucide-react';
@@ -47,6 +50,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     setSelectedEmployeeIdFor360,
     concluirOffboarding,
     licenses,
+    eventosSla,
+    prazosSla,
   } = useApp();
 
   const [newMessageText, setNewMessageText] = useState('');
@@ -245,7 +250,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </span>
             <button
               type="button"
-              onClick={() => imprimirRelatorio(ticket, employees, isTI)}
+              onClick={() =>
+                imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla))
+              }
               title="Relatório do chamado (imprimir ou salvar em PDF)"
               className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-md hover:bg-slate-100"
             >
@@ -274,12 +281,17 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
         <div className="sm:max-h-[75vh] sm:overflow-y-auto">
         {/* Fase 10: o problema relatado logo abaixo do título, em destaque */}
         <div className="px-4 sm:px-6 pt-4 sm:pt-5">
-          <ProblemaRelatado
-            ticket={ticket}
-            ativo={assets.find((a) => a.id === ticket.ativoId)}
-            onAbrirAnexo={abrirAnexo}
-            erroArquivo={erroArquivo}
-          />
+          {/* Admissão: o "Pedido do RH" (painel organizado) substitui o texto montado */}
+          {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
+          {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
+          {ticket.tipo === 'suporte' && (
+            <ProblemaRelatado
+              ticket={ticket}
+              ativo={assets.find((a) => a.id === ticket.ativoId)}
+              onAbrirAnexo={abrirAnexo}
+              erroArquivo={erroArquivo}
+            />
+          )}
           {/* Fase 10: a solução (ou o cancelamento) logo depois do problema */}
           {ticket.status === 'resolvido' && ticket.resolucao && (
             <div className="mt-4">
@@ -383,7 +395,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     <div className="flex items-center gap-1.5">
                       <UserPlus className="w-4 h-4 text-blue-700" />
                       <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wide">
-                        Pacote de Admissão Solicitado pelo RH (Kit de Entrada)
+                        Pedido do RH
                       </h4>
                     </div>
                     {isColaboradorJaCadastrado ? (
@@ -403,8 +415,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                           </button>
                         )}
                       </span>
-                    ) : isTI ? (
-                      // Fase 10: cadastra a pessoa daqui mesmo, com os dados que o RH enviou
+                    ) : isTI && !temChecklistGuiado ? (
+                      // Chamados antigos (sem checklist): cadastra a pessoa daqui, com os dados do RH.
+                      // Com checklist, o cadastro é o passo "Cadastrar colaborador".
                       <button
                         type="button"
                         onClick={() => setCadastrandoAdmitido(true)}
@@ -454,15 +467,13 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                    <div className="bg-white p-2.5 rounded border border-slate-200">
-                      <span className="font-semibold text-slate-800 block text-xs">
-                        Sugestão de Perfil de Equipamento:
-                      </span>
-                      <span className="text-blue-700 font-medium">{ticket.onboarding.tipoComputador}</span>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        * O RH não define a máquina física. A T.I. aloca o equipamento (#PAT) do estoque durante o atendimento.
-                      </p>
-                    </div>
+                    {/* Só o que o RH escreveu (chamados antigos: o perfil escolhido vira observação) */}
+                    {ticket.onboarding.tipoComputador?.trim() && (
+                      <div className="bg-white p-2.5 rounded border border-slate-200">
+                        <span className="font-semibold text-slate-800 block text-xs">Observação sobre o equipamento:</span>
+                        <span className="text-slate-800">{ticket.onboarding.tipoComputador}</span>
+                      </div>
+                    )}
 
                     {ticket.onboarding.perifericos.length > 0 && (
                       <div className="bg-white p-2.5 rounded border border-slate-200">
@@ -495,6 +506,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     )}
                   </div>
 
+                  {ticket.onboarding.observacoes?.trim() && (
+                    <div className="bg-white p-2.5 rounded border border-slate-200 text-xs">
+                      <span className="font-semibold text-slate-800 block">Observações do RH:</span>
+                      <p className="text-slate-800 whitespace-pre-wrap break-words">{ticket.onboarding.observacoes}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -654,6 +671,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 </div>
               </div>
             )}
+
+            {/* Fase 10 C1: prazos de 1ª resposta e de solução */}
+            <PrazosChamado tkt={ticket} />
 
             {/* Fase 9: equipamento, software e colaborador relacionado (abrem a ficha por cima) */}
             <VinculosChamado

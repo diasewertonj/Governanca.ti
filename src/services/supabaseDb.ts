@@ -1092,7 +1092,33 @@ function camposAtendimento(t: Tables<'chamados'>): Partial<Ticket> {
     reaberturas: t.reaberturas ?? 0,
     avaliacao: t.avaliacao ? { nota: t.avaliacao, comentario: t.avaliacao_comentario || undefined } : undefined,
     aguardandoMotivo: (t.aguardando_motivo as AguardandoMotivo | null) || undefined,
+    primeiraRespostaEm: t.primeira_resposta_em || undefined,
   };
+}
+
+/** Fase 10 C1: mudanças de situação de todos os chamados visíveis (pausas do prazo) */
+export async function fetchEventosStatusDb(): Promise<Record<string, EventoChamado[]>> {
+  if (!supabase) return {};
+  const { data, error } = await supabase
+    .from('chamado_eventos')
+    .select('*')
+    .in('tipo', ['status', 'reaberto', 'resolvido', 'cancelado'])
+    .order('criado_em', { ascending: true });
+  if (error || !data) return {};
+  const porChamado: Record<string, EventoChamado[]> = {};
+  for (const e of data) {
+    (porChamado[e.chamado_id] ||= []).push({
+      id: e.id,
+      chamadoId: e.chamado_id,
+      tipo: e.tipo as EventoChamado['tipo'],
+      de: e.de || undefined,
+      para: e.para || undefined,
+      detalhe: e.detalhe || undefined,
+      autorId: e.autor_id || undefined,
+      criadoEm: e.criado_em,
+    });
+  }
+  return porChamado;
 }
 
 // Fase 10: ações do atendimento (funções no banco; validam papel e regras)
@@ -1256,6 +1282,7 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     docEntrega: (data.doc_entrega || undefined) as unknown as ModeloDocumento | undefined,
     docDevolucao: (data.doc_devolucao || undefined) as unknown as ModeloDocumento | undefined,
     logoUrl: data.logo_url || undefined,
+    sla: (data.sla || undefined) as CompanySettings['sla'],
   };
 }
 
@@ -1280,6 +1307,7 @@ export async function saveSettingsDb(st: CompanySettings) {
         ...(st.docEntrega ? { doc_entrega: json(st.docEntrega) } : {}),
         ...(st.docDevolucao ? { doc_devolucao: json(st.docDevolucao) } : {}),
         logo_url: st.logoUrl || null,
+        sla: st.sla ? json(st.sla) : null,
         updated_at: new Date().toISOString(),
       })
       .select('id')

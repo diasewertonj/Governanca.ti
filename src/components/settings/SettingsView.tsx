@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext.tsx';
 import { AssetCategory, Employee, ModeloDocumento, UserRole } from '../../types/index.ts';
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
+import { PrazosSettings } from './PrazosSettings.tsx';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { mensagemDeErro } from '../../services/supabaseDb.ts';
@@ -46,13 +47,14 @@ const ROTULO_CAMPO_EMPRESA = {
 } as const;
 
 // Fase 7: abas com nomes do glossário (a chave interna não muda)
-type Aba = 'empresa' | 'documentos' | 'setores' | 'equipe' | 'catalogo' | 'campos' | 'banco';
+type Aba = 'empresa' | 'documentos' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'banco';
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: 'empresa', rotulo: 'Empresa' },
   { id: 'documentos', rotulo: 'Documentos e termos' },
   { id: 'setores', rotulo: 'Setores' },
   { id: 'equipe', rotulo: 'Usuários e permissões' },
   { id: 'catalogo', rotulo: 'Catálogo de admissão' },
+  { id: 'prazos', rotulo: 'Prazos de atendimento' },
   { id: 'campos', rotulo: 'Campos dos ativos' },
   { id: 'banco', rotulo: 'Conexão' },
 ];
@@ -779,6 +781,7 @@ export const SettingsView: React.FC = () => {
       )}
 
       {activeTab === 'catalogo' && <CatalogoSettings />}
+      {activeTab === 'prazos' && <PrazosSettings />}
 
       {/* ABA 4: EQUIPE TI & RH / DEFINIÇÃO DE QUEM OPERA O SISTEMA */}
       {activeTab === 'equipe' && (

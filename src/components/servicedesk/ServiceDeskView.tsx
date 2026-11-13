@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { TicketStatus, TicketPriority, type Ticket } from '../../types/index.ts';
 import { chamadoEncerrado, ROTULO_CAUSA } from '../../utils/atendimento.ts';
+import { situacaoSla } from '../../utils/sla.ts';
+import { SeloSla } from './SeloSla.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import {
   Search,
@@ -21,6 +23,8 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     tickets,
     assets,
     employees,
+    eventosSla,
+    prazosSla,
     currentUser,
     currentRole,
     setSelectedTicketIdForDetail,
@@ -79,6 +83,11 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
 
     return naFila(tkt) && matchesType && matchesStatus && matchesPriority && matchesSearch;
   });
+  // Fase 10 C1: na fila de atendimento, o que vence primeiro vem antes
+  if (fila === 'atendimento') {
+    const vence = (t: Ticket) => situacaoSla(t, eventosSla[t.id] || [], prazosSla)?.solucao.vence.getTime() ?? Infinity;
+    filteredTickets.sort((a, b) => vence(a) - vence(b));
+  }
 
   const getAsset = (assetId?: string) => {
     return assets.find((a) => a.id === assetId);
@@ -257,7 +266,10 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-mono text-xs font-semibold text-slate-700">{tkt.codigo}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium border ${statusInfo.cls}`}>{statusInfo.label}</span>
+                    <span className="flex flex-wrap justify-end gap-1">
+                      <SeloSla tkt={tkt} />
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium border ${statusInfo.cls}`}>{statusInfo.label}</span>
+                    </span>
                   </span>
                   <span className="block text-sm font-semibold text-slate-900">{tkt.titulo}</span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-slate-600">
@@ -394,6 +406,9 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                       <td className="py-3 px-4">
                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${statusInfo.cls}`}>
                           {statusInfo.label}
+                        </span>
+                        <span className="block mt-1">
+                          <SeloSla tkt={tkt} />
                         </span>
                       </td>
 

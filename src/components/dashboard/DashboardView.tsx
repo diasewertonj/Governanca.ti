@@ -4,6 +4,7 @@ import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
 import { DIAS_ALERTA_CONTRATO, garantiaEfetiva, situacaoContrato } from '../../utils/contratos.ts';
 import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts';
 import { LembreteGarantia } from '../assets/LembreteGarantia.tsx';
+import { IndicadoresAtendimento } from './IndicadoresAtendimento.tsx';
 import {
   Laptop,
   LifeBuoy,
@@ -28,6 +29,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     faturas,
     setSelectedAssetIdFor360,
     setSelectedTicketIdForDetail,
+    currentRole,
   } = useApp();
 
   const totalAssets = assets.length;
@@ -237,6 +239,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       )}
 
       {/* Grid Principal: Fila de Atendimento Recente & Resumo de Estoque */}
+      {/* Fase 10 C1: prazos, médias e rankings do atendimento (só a T.I.) */}
+      {(currentRole === 'ti_admin' || currentRole === 'ti_suporte') && <IndicadoresAtendimento />}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tabela de Chamados Recentes */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
