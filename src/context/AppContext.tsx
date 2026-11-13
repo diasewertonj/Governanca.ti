@@ -207,6 +207,7 @@ interface AppContextType {
 
   // Ações de Colaboradores
   addEmployee: (employee: Omit<Employee, 'id'>) => Employee;
+  cadastrarColaborador: (employee: Omit<Employee, 'id'>) => Promise<{ colaborador?: Employee; erro?: string }>;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
   updateEmployeeRole: (employeeId: string, role: UserRole) => void;
   deleteEmployee: (id: string) => { success: boolean; message?: string };
@@ -916,6 +917,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Não foi possível cadastrar ${novo.nome}`
     );
     return novo;
+  };
+
+  /** Ajustes da admissão: cadastra e espera o banco confirmar (para usar o id logo em seguida) */
+  const cadastrarColaborador = async (data: Omit<Employee, 'id'>): Promise<{ colaborador?: Employee; erro?: string }> => {
+    const novo: Employee = { ...data, email: data.email.trim().toLowerCase(), id: novoId('emp') };
+    try {
+      if (isProduction) await insertEmployeeDb(novo);
+      setEmployees((prev) => [novo, ...prev]);
+      return { colaborador: novo };
+    } catch (err) {
+      console.error('Cadastrar colaborador', err);
+      return { erro: mensagemDeErro(err) };
+    }
   };
 
   const updateEmployee = (id: string, updates: Partial<Employee>, contexto = 'Não foi possível salvar o colaborador') => {
@@ -2311,6 +2325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         terms,
         settings,
         addEmployee,
+        cadastrarColaborador,
         updateEmployee,
         updateEmployeeRole,
         deleteEmployee,

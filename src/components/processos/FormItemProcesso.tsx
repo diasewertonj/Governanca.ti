@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Copy, KeyRound, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { DadosRegistroItem } from '../../services/supabaseDb.ts';
+import { assentosLivres, licencaDaConta } from '../../utils/admissao.ts';
 import type { CondicaoItem, DestinoRecurso, ProcessoItem, Ticket } from '../../types/index.ts';
 import {
   DOC_DEVOLUCAO_PADRAO,
@@ -54,7 +55,8 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     processoItens,
     registrarItemProcesso,
     acessoNexus,
-    addEmployee,
+    cadastrarColaborador,
+    allocateLicense,
     createTerm,
     setSelectedTermForPrint,
   } = useApp();
@@ -103,15 +105,22 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const licencasLivres = licenses.filter((l) => l.assentosAlocados < l.assentosTotais || l.id === item.licencaId);
   const pessoas = employees.filter((e) => e.status !== 'desligado' && e.id !== colabId);
 
-  const registrar = async (status: 'feito' | 'nao_se_aplica', observacaoExtra?: string) => {
+  // Ajustes da admissão: conta de um software com licença cadastrada já atribui a licença
+  const licencaConta = item.tipo === 'conta' ? licencaDaConta(item.titulo, licenses) : undefined;
+  const jaTemLicenca = !!(licencaConta && colabId && licencaConta.colaboradoresIds.includes(colabId));
+  const livresConta = licencaConta ? assentosLivres(licencaConta) : 0;
+  const [atribuirLicenca, setAtribuirLicenca] = useState(true);
+
+  const registrar = async (status: 'feito' | 'nao_se_aplica', observacaoExtra?: string, colaboradorDoCadastro?: string) => {
     setErro(null);
     const observacao = [obs.trim(), observacaoExtra].filter(Boolean).join(' — ') || undefined;
     if (status === 'nao_se_aplica' && !obs.trim()) return setErro('Escreva o motivo para marcar como "não se aplica".');
     const dados: DadosRegistroItem = {};
     if (status === 'feito') {
       if (item.tipo === 'cadastro') {
-        if (!colaboradorId) return setErro('Escolha o colaborador cadastrado.');
-        dados.colaborador_id = colaboradorId;
+        const escolhido = colaboradorDoCadastro || colaboradorId;
+        if (!escolhido) return setErro('Escolha o colaborador cadastrado.');
+        dados.colaborador_id = escolhido;
       }
       if ((item.tipo === 'conta' || item.tipo === 'grupo_email') && !ident.trim())
         return setErro('Informe o login, e-mail ou nome do grupo criado.');
@@ -142,13 +151,19 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     const falha = await registrarItemProcesso(item.id, status, observacao, dados);
     setGravando(false);
     if (falha) return setErro(falha);
+    // Conta criada: ocupa o assento da licença correspondente (função atômica do banco)
+    if (status === 'feito' && licencaConta && colabId && atribuirLicenca && !jaTemLicenca && livresConta > 0) {
+      allocateLicense(licencaConta.id, colabId);
+    }
     if (!senha) onFechar();
   };
 
-  // Cadastro a partir do pedido do RH (mesma regra de papel da Fase 3)
-  const cadastrarDoRh = () => {
+  // Cadastro a partir do pedido do RH (mesma regra de papel da Fase 3): cria e já conclui o passo
+  const cadastrarDoRh = async () => {
     if (!ob) return;
-    const novo = addEmployee({
+    setErro(null);
+    setGravando(true);
+    const { colaborador: novo, erro: falha } = await cadastrarColaborador({
       matricula: `NX-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
       nome: ob.nomeColaborador,
       email: ob.emailColaborador,
@@ -159,8 +174,11 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       dataAdmissao: ob.dataAdmissao,
       role: currentRole === 'ti_admin' ? ob.papelAcessoSugerido || 'colaborador' : 'colaborador',
     });
+    setGravando(false);
+    if (!novo) return setErro(falha || 'Não foi possível cadastrar.');
     setColaboradorId(novo.id);
-    setAviso(`Cadastro de ${novo.nome} criado (matrícula ${novo.matricula}). Confira e clique em "Marcar como feito".`);
+    setAviso(`Cadastro de ${novo.nome} criado (matrícula ${novo.matricula}).`);
+    await registrar('feito', `Cadastro criado com os dados do RH (matrícula ${novo.matricula})`, novo.id);
   };
 
   const gerarAcesso = async (acao: 'criar' | 'redefinir') => {
@@ -254,14 +272,52 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                 ))}
             </select>
           </div>
+          {/* Ajustes da admissão: um clique cadastra (ou liga) e já conclui o passo */}
           {ob && !colabPorEmail && !colaboradorId && (
             <button
               type="button"
+              disabled={gravando}
               onClick={cadastrarDoRh}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
-              <UserPlus className="w-3.5 h-3.5" /> Cadastrar {ob.nomeColaborador} com os dados do RH
+              <UserPlus className="w-3.5 h-3.5" /> Cadastrar {ob.nomeColaborador} com os dados do RH e concluir
             </button>
+          )}
+          {ob && colabPorEmail && (
+            <button
+              type="button"
+              disabled={gravando}
+              onClick={() => registrar('feito', 'Pessoa já cadastrada com o e-mail informado pelo RH', colabPorEmail.id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              <UserPlus className="w-3.5 h-3.5" /> {colabPorEmail.nome} já está cadastrada: ligar e concluir
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Ajustes da admissão: a conta de um software com licença cadastrada já ocupa o assento */}
+      {item.tipo === 'conta' && licencaConta && (
+        <div className="rounded-md border border-purple-200 bg-purple-50/60 p-2.5 text-xs">
+          {jaTemLicenca ? (
+            <p className="text-purple-900">{colab?.nome} já tem a licença {licencaConta.nome}.</p>
+          ) : !colabId ? (
+            <p className="text-purple-900">
+              Licença {licencaConta.nome}: será possível atribuir depois do passo "Cadastrar colaborador".
+            </p>
+          ) : livresConta === 0 ? (
+            <p className="text-amber-800">
+              {licencaConta.nome} está sem assento livre ({licencaConta.assentosAlocados} de {licencaConta.assentosTotais} em uso). A conta
+              será registrada; atribua a licença depois, na ficha do software.
+            </p>
+          ) : (
+            <label className="flex items-start gap-2 cursor-pointer text-purple-900">
+              <input type="checkbox" checked={atribuirLicenca} onChange={(e) => setAtribuirLicenca(e.target.checked)} className="mt-0.5" />
+              <span>
+                Atribuir a licença <strong>{licencaConta.nome}</strong> a {colab?.nome.split(' ')[0]} ({licencaConta.assentosAlocados} de{' '}
+                {licencaConta.assentosTotais} em uso)
+              </span>
+            </label>
           )}
         </div>
       )}

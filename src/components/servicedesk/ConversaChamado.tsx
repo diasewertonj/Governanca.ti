@@ -7,16 +7,18 @@ import { HistoricoChamado } from './AtendimentoChamado.tsx';
 
 interface ProblemaRelatadoProps {
   ticket: Ticket;
+  /** Padrão: "Problema relatado" */
+  titulo?: string;
   ativo?: Asset;
   onAbrirAnexo: (caminhoOuUrl: string) => void;
   erroArquivo: string | null;
 }
 
 /** Fase 10: o problema relatado em destaque, logo abaixo do título */
-export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, ativo, onAbrirAnexo, erroArquivo }) => (
+export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titulo, ativo, onAbrirAnexo, erroArquivo }) => (
   <section aria-labelledby={`problema-${ticket.id}`} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs">
     <h3 id={`problema-${ticket.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-      Problema relatado
+      {titulo || 'Problema relatado'}
     </h3>
     <p className="mt-2 text-[15px] leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{ticket.descricao}</p>
 

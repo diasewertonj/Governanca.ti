@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
+import { descricaoAdmissao } from '../../utils/admissao.ts';
 import type { CatalogoItem } from '../../types/index.ts';
 import {
   UserPlus,
@@ -54,7 +55,8 @@ export const RhProcessesView: React.FC = () => {
   const [onbDataInicio, setOnbDataInicio] = useState(() =>
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
-  const [onbTipoComputador, setOnbTipoComputador] = useState('Notebook Padrão (16GB RAM / Core i5)');
+  // Observação livre sobre o equipamento (o RH não escolhe modelo)
+  const [onbTipoComputador, setOnbTipoComputador] = useState('');
   // Fase 6: kit e acessos vêm do catálogo da T.I. Os sugeridos já vêm marcados;
   // o RH marca/desmarca e a T.I. decide o pacote final no checklist.
   const [kitEscolha, setKitEscolha] = useState<Record<string, boolean>>({});
@@ -150,23 +152,14 @@ export const RhProcessesView: React.FC = () => {
       categoria: 'Onboarding de Colaborador',
       prioridade: 'alta',
       status: 'aberto',
-      descricao: `Nova admissão programada para início em ${formatDate(
-        onbDataInicio
-      )}. Setor: ${setor?.nome || 'TI'}. Gestor Imediato: ${
-        gestor?.nome || 'A definir'
-      }. Perfil de Acesso ao Sistema solicitado: ${
-        onbPapelAcesso === 'ti_admin'
-          ? 'Administrador de T.I.'
-          : onbPapelAcesso === 'ti_suporte'
-          ? 'Técnico de Suporte T.I.'
-          : onbPapelAcesso === 'rh'
-          ? 'Recursos Humanos (RH)'
-          : 'Colaborador Padrão (Solicitante)'
-      }. Perfil de máquina sugerido: ${onbTipoComputador} (A T.I. selecionará o ativo físico no estoque). Periféricos (${onbPerifericos.join(
-        ', '
-      )}), contas (${onbAcessos.join(', ')})${
-        separarLista(onbGruposEmail).length ? ` e grupos de e-mail (${separarLista(onbGruposEmail).join(', ')})` : ''
-      }. ${onbObservacoes}`,
+      // Ajuste da admissão: descrição curta; acessos e periféricos já ficam organizados no pedido
+      descricao: descricaoAdmissao({
+        nome: onbNome,
+        cargo: onbCargo,
+        setor: setor?.nome,
+        gestor: gestor?.nome,
+        inicio: formatDate(onbDataInicio),
+      }),
       anexos: [],
       onboarding: {
         nomeColaborador: onbNome,
@@ -176,7 +169,7 @@ export const RhProcessesView: React.FC = () => {
         gestorId: onbGestorId || undefined,
         dataAdmissao: onbDataInicio,
         papelAcessoSugerido: onbPapelAcesso,
-        tipoComputador: onbTipoComputador,
+        tipoComputador: onbTipoComputador.trim(),
         perifericos: onbPerifericos,
         acessosSoftwares: onbAcessos,
         gruposEmail: separarLista(onbGruposEmail),
@@ -632,28 +625,20 @@ export const RhProcessesView: React.FC = () => {
 
             <div className="space-y-3 pt-3 border-t border-slate-100">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipamento</h4>
+              {/* Ajuste da admissão: o RH não escolhe modelo; no máximo descreve uma necessidade */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Perfil de Equipamento Sugerido
+                <label htmlFor="onb-obs-equipamento" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Observação sobre o equipamento <span className="font-normal text-slate-500">(opcional)</span>
                 </label>
-                <select
+                <input
+                  id="onb-obs-equipamento"
+                  type="text"
                   value={onbTipoComputador}
                   onChange={(e) => setOnbTipoComputador(e.target.value)}
+                  placeholder="Ex.: precisa de dois monitores; trabalha com edição de vídeo"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
-                >
-                  <option value="Notebook Padrão (16GB RAM / Core i5)">
-                    Notebook Padrão Corporativo (16GB RAM / Core i5)
-                  </option>
-                  <option value="Notebook Alta Performance (32GB RAM / Core i7)">
-                    Notebook Alta Performance / Dev (32GB RAM / Core i7)
-                  </option>
-                  <option value="MacBook Pro Apple Silicon (Design/Eng)">
-                    MacBook Pro Apple Silicon (Design / Engenharia)
-                  </option>
-                </select>
-                <span className="text-xs text-slate-500 mt-0.5 block">
-                  A T.I. selecionará o patrimônio físico (#PAT) do estoque
-                </span>
+                />
+                <span className="text-xs text-slate-500 mt-0.5 block">A T.I. escolhe o equipamento no estoque.</span>
               </div>
 
             {/* Fase 6: kit sugerido (catálogo da T.I.) */}
