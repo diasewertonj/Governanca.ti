@@ -209,6 +209,7 @@ interface AppContextType {
 
   // Ações de Colaboradores
   addEmployee: (employee: Omit<Employee, 'id'>) => Employee;
+  cadastrarColaborador: (employee: Omit<Employee, 'id'>) => Promise<{ colaborador?: Employee; erro?: string }>;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
   updateEmployeeRole: (employeeId: string, role: UserRole) => void;
   deleteEmployee: (id: string) => { success: boolean; message?: string };
@@ -371,13 +372,14 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   USER: 'nexus_user_id',
-  EMPLOYEES: 'nexus_employees_v1',
-  DEPARTMENTS: 'nexus_departments_v1',
-  ASSETS: 'nexus_assets_v1',
-  LICENSES: 'nexus_licenses_v1',
-  TICKETS: 'nexus_tickets_v1',
-  TERMS: 'nexus_terms_v1',
-  SETTINGS: 'nexus_settings_v1',
+  // v2: dados de exemplo ampliados (mais softwares e atribuições); o demo recomeça limpo
+  EMPLOYEES: 'nexus_employees_v2',
+  DEPARTMENTS: 'nexus_departments_v2',
+  ASSETS: 'nexus_assets_v2',
+  LICENSES: 'nexus_licenses_v2',
+  TICKETS: 'nexus_tickets_v2',
+  TERMS: 'nexus_terms_v2',
+  SETTINGS: 'nexus_settings_v2',
 };
 
 // Fase 1: com Supabase (produção), dados de negócio NÃO ficam no navegador.
@@ -921,6 +923,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Não foi possível cadastrar ${novo.nome}`
     );
     return novo;
+  };
+
+  /** Ajustes da admissão: cadastra e espera o banco confirmar (para usar o id logo em seguida) */
+  const cadastrarColaborador = async (data: Omit<Employee, 'id'>): Promise<{ colaborador?: Employee; erro?: string }> => {
+    const novo: Employee = { ...data, email: data.email.trim().toLowerCase(), id: novoId('emp') };
+    try {
+      if (isProduction) await insertEmployeeDb(novo);
+      setEmployees((prev) => [novo, ...prev]);
+      return { colaborador: novo };
+    } catch (err) {
+      console.error('Cadastrar colaborador', err);
+      return { erro: mensagemDeErro(err) };
+    }
   };
 
   const updateEmployee = (id: string, updates: Partial<Employee>, contexto = 'Não foi possível salvar o colaborador') => {
@@ -2344,6 +2359,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         terms,
         settings,
         addEmployee,
+        cadastrarColaborador,
         updateEmployee,
         updateEmployeeRole,
         deleteEmployee,

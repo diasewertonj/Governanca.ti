@@ -31,7 +31,7 @@ interface VinculosChamadoProps {
  * altera os vínculos como rascunho, gravado no "Salvar alterações" do chamado.
  */
 export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascunho, onMudar }) => {
-  const { assets, licenses, employees, fornecedores, contratos, currentRole, currentUser, abrirFicha } = useApp();
+  const { assets, licenses, employees, fornecedores, contratos, currentRole, currentUser, abrirFicha, processoItens } = useApp();
   const id = useId();
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   const [editando, setEditando] = useState(false);
@@ -75,14 +75,30 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
   const podeMandarParaManutencao =
     isTI && !!ativo && ativo.id === ticket.ativoId && rascunho.ativoId === null && podeEnviarParaManutencao(ativo);
 
-  const vazio = !ativo && !nomeSoftware && !colaborador && manutencoes.length === 0;
+  // Admissão/desligamento: equipamento e licenças vêm do checklist (só leitura aqui)
+  const entregues = processo ? processoItens.filter((i) => i.chamadoId === ticket.id && i.status === 'feito') : [];
+  const ativosEntregues = [...new Set(entregues.flatMap((i) => (i.ativoId ? [i.ativoId] : [])))]
+    .map((id) => assets.find((a) => a.id === id))
+    .filter((a): a is NonNullable<typeof a> => !!a);
+  const licencasEntregues = [...new Set(entregues.flatMap((i) => (i.licencaId ? [i.licencaId] : [])))]
+    .map((id) => licenses.find((l) => l.id === id))
+    .filter((l): l is NonNullable<typeof l> => !!l);
+  const podeAlterar = isTI && !processo;
+  const nomeCurto = (id?: string) => employees.find((e) => e.id === id)?.nome.split(' ')[0];
+  const rotuloOpcaoAtivo = (a: (typeof assets)[number]) =>
+    `${a.tag} · ${a.nome}${a.custodianteId && a.custodianteId !== pessoaRef ? ` (com ${nomeCurto(a.custodianteId) || 'outra pessoa'})` : ''}`;
+  const demaisEstoque = opcoesAtivo.demais.filter((a) => !a.custodianteId);
+  const demaisComOutros = opcoesAtivo.demais.filter((a) => a.custodianteId);
+
+  const vazio =
+    !ativo && !nomeSoftware && !colaborador && manutencoes.length === 0 && !ativosEntregues.length && !licencasEntregues.length;
   if (vazio && !isTI) return null;
 
   return (
     <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs uppercase font-bold text-slate-500 tracking-wide">Vínculos</span>
-        {isTI && (
+        {podeAlterar && (
           <button
             type="button"
             onClick={() => setEditando((v) => !v)}
@@ -94,7 +110,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
         )}
       </div>
 
-      {isTI && (editando || mexeu) && (
+      {podeAlterar && (editando || mexeu) && (
         <div className="space-y-2.5 p-3 rounded-md bg-slate-50 border border-slate-200">
           {!processo && (
             <div>
@@ -131,13 +147,24 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
                   ))}
                 </optgroup>
               )}
-              <optgroup label="Demais equipamentos">
-                {opcoesAtivo.demais.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.tag} · {a.nome}
-                  </option>
-                ))}
-              </optgroup>
+              {demaisEstoque.length > 0 && (
+                <optgroup label="Em estoque">
+                  {demaisEstoque.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {rotuloOpcaoAtivo(a)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {demaisComOutros.length > 0 && (
+                <optgroup label="Com outras pessoas">
+                  {demaisComOutros.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {rotuloOpcaoAtivo(a)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
           <div>
@@ -173,7 +200,45 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
         </div>
       )}
 
-      {vazio && <p className="text-xs text-slate-500">Nenhum equipamento, software ou colaborador ligado.</p>}
+      {vazio && (
+        <p className="text-xs text-slate-500">
+          {processo
+            ? 'O equipamento e as licenças aparecem aqui quando o checklist os entregar.'
+            : 'Nenhum equipamento, software ou colaborador ligado.'}
+        </p>
+      )}
+
+      {(ativosEntregues.length > 0 || licencasEntregues.length > 0) && (
+        <div className="space-y-1.5">
+          <span className="text-xs text-slate-500 block">Entregue pelo checklist</span>
+          {ativosEntregues.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 text-xs">
+              <Laptop className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+              {pode('ativo', { custodianteId: a.custodianteId }) ? (
+                <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: a.id })} className={LINK}>
+                  <span className="font-mono">{a.tag}</span> · {a.nome}
+                  <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                </button>
+              ) : (
+                <span className="font-semibold text-slate-900">{a.tag} · {a.nome}</span>
+              )}
+            </div>
+          ))}
+          {licencasEntregues.map((l) => (
+            <div key={l.id} className="flex items-center gap-2 text-xs">
+              <Key className="w-4 h-4 text-purple-600 shrink-0" aria-hidden="true" />
+              {pode('software') ? (
+                <button type="button" onClick={() => abrirFicha({ tipo: 'software', id: l.id })} className={LINK}>
+                  {l.nome}
+                  <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                </button>
+              ) : (
+                <span className="font-semibold text-slate-900">{l.nome}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {colaborador && (
         <div className="flex items-start gap-2">
