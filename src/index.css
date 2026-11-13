@@ -120,6 +120,30 @@ body:has(.modal-tela) {
     display: none !important;
   }
 
+  /* Janelas (termo A4, etiqueta): na impressão deixam de ser janela, sem rolagem nem altura máxima */
+  html,
+  body,
+  body:has(.modal-tela) {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .modal-tela,
+  .modal-tela *,
+  .fixed:has(.print-label-sticker),
+  .fixed:has(.print-label-sticker) * {
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .modal-tela,
+  .fixed:has(.print-label-sticker) {
+    background: white !important;
+    padding: 0 !important;
+  }
+
   .print-only {
     display: block !important;
   }
