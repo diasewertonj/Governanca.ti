@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   descreverEvento,
   erroCancelamento,
-  passosQueImpedemCancelar,
+  passosAReverter,
   erroResolucao,
   formatarTempo,
   podeAvaliar,
@@ -37,7 +37,7 @@ describe('cancelar, reabrir e avaliar', () => {
     expect(erroCancelamento('outro', ' ')).toMatch(/descreva/);
     expect(erroCancelamento('engano', '')).toBeNull();
   });
-  it('processo: só a T.I. cancela, com descrição, e sem passo que mexeu no inventário', () => {
+  it('processo: só a T.I. cancela, com descrição; passos feitos entram na lista a reverter', () => {
     const adm = { ...t, tipo: 'onboarding' as const };
     expect(podeCancelar(adm, 'rh', 'emp-1')).toBe(false);
     expect(podeCancelar(adm, 'ti_suporte', 'emp-9')).toBe(true);
@@ -48,7 +48,7 @@ describe('cancelar, reabrir e avaliar', () => {
       { tipo: 'conta', status: 'feito', titulo: 'M365' },
       { tipo: 'equipamento', status: 'pendente', titulo: 'Notebook' },
     ];
-    expect(passosQueImpedemCancelar(itens).map((i) => i.titulo)).toEqual(['M365']);
+    expect(passosAReverter(itens).map((i) => i.titulo)).toEqual(['Cadastrar', 'M365']);
   });
   it('reabrir: suporte encerrado, por quem abriu ou T.I.', () => {
     const fechado = { ...t, status: 'resolvido' as const };

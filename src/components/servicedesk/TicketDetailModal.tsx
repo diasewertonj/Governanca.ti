@@ -381,7 +381,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       </button>
                     ) : (
                       <p className="text-xs text-amber-800">
-                        Este chamado foi aberto antes da automação e não identifica o colaborador: conclua o checklist manualmente.
+                        Este chamado foi aberto antes da automação e não identifica o colaborador. Ligue a pessoa em
+                        "Vínculos" para poder concluir o desligamento.
                       </p>
                     )
                   )}
@@ -398,7 +399,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                         Pedido do RH
                       </h4>
                     </div>
-                    {isColaboradorJaCadastrado ? (
+                    {isColaboradorJaCadastrado && colaboradorDoEmail?.status !== 'ativo' ? (
+                      // Lote 1 (1.13): admissão só se liga a pessoa ativa (mesma regra do banco)
+                      <span className="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                        E-mail de pessoa {colaboradorDoEmail?.status === 'desligado' ? 'desligada' : 'de férias'}
+                      </span>
+                    ) : isColaboradorJaCadastrado ? (
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" />

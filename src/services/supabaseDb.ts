@@ -153,6 +153,9 @@ const MENSAGEM_DA_REGRA: Record<string, string> = {
   uq_baixa_vigente: 'O ativo já está baixado',
   chk_baixa_venda: 'O valor de venda só vale quando o destino é venda',
   ativo_baixas_valor_venda_check: 'O valor de venda não pode ser negativo',
+  // Lote 1
+  uq_desligamento_aberto: 'Já existe um desligamento em andamento para esta pessoa',
+  chk_licenca_status: 'Situação da licença inválida',
 };
 
 // Exclusão recusada por vínculo (23503), conforme a tabela de onde se tentou excluir
@@ -160,6 +163,7 @@ const MENSAGEM_DO_VINCULO: Record<string, string> = {
   fornecedores:
     'O fornecedor está vinculado a contratos, ativos, licenças ou manutenções e não pode ser excluído; desative-o',
   contratos: 'O contrato está vinculado a faturas ou manutenções e não pode ser excluído',
+  licencas_software: 'A licença tem histórico (assentos, faturas ou contratos) e não pode ser excluída; inative-a',
 };
 
 /** Mensagem curta para o usuário a partir de um erro do banco */
@@ -1171,6 +1175,14 @@ export async function resolverChamadoDb(chamadoId: string, d: DadosResolucao) {
 export async function cancelarChamadoDb(chamadoId: string, motivo: MotivoCancelamento, detalhe?: string) {
   if (!supabase) return;
   await checar(supabase.rpc('cancelar_chamado', { p_chamado: chamadoId, p_motivo: motivo, p_detalhe: detalhe || undefined }));
+}
+
+/** Lote 1: admissão/desligamento; com passos feitos, exige a ciência (o banco cria o lembrete) */
+export async function cancelarProcessoDb(chamadoId: string, motivo: MotivoCancelamento, detalhe: string, ciente: boolean) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('cancelar_processo', { p_chamado: chamadoId, p_motivo: motivo, p_detalhe: detalhe, p_ciente: ciente })
+  );
 }
 
 export async function reabrirChamadoDb(chamadoId: string, motivo: string) {

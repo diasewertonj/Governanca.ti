@@ -110,7 +110,12 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !marca.trim() || !serialNumber.trim() || salvando) return;
-    const duplicado = erroDuplicadoAtivo(assets, tag, serialNumber, ativo?.id);
+    const duplicado = erroDuplicadoAtivo(
+      assets,
+      !ativo || tag.trim() !== ativo.tag ? tag : '',
+      !ativo || serialNumber.trim() !== ativo.serialNumber ? serialNumber : '',
+      ativo?.id
+    );
     if (duplicado) return setErroSalvar(duplicado);
     setErroSalvar(null);
 

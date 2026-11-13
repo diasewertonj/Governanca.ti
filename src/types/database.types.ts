@@ -1484,6 +1484,10 @@ export type Database = {
         Returns: undefined
       }
       cancelar_chamado: { Args: { p_chamado: string; p_detalhe?: string; p_motivo: string }; Returns: undefined }
+      cancelar_processo: {
+        Args: { p_chamado: string; p_motivo: string; p_detalhe: string; p_ciente?: boolean }
+        Returns: undefined
+      }
       cancelar_termo: { Args: { p_termo: string; p_motivo: string; p_substituto?: string }; Returns: undefined }
       limpar_base: { Args: { p_confirmacao: string; p_manter_email?: string }; Returns: undefined }
       reabrir_chamado: { Args: { p_chamado: string; p_motivo: string }; Returns: undefined }

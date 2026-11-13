@@ -79,6 +79,7 @@ import {
   updateTicketDb,
   resolverChamadoDb,
   cancelarChamadoDb,
+  cancelarProcessoDb,
   reabrirChamadoDb,
   avaliarChamadoDb,
   fetchChamadoDb,
@@ -146,7 +147,7 @@ import {
 } from '../utils/fichas.ts';
 import { notaDaManutencao } from '../utils/vinculos.ts';
 import type { AguardandoMotivo, AtribuicaoLicenca, DadosResolucao, EventoChamado, MotivoCancelamento } from '../types/index.ts';
-import { ehProcesso, erroCancelamento, erroResolucao, passosQueImpedemCancelar, podeCancelar } from '../utils/atendimento.ts';
+import { ehProcesso, erroCancelamento, erroResolucao, passosAReverter, podeCancelar } from '../utils/atendimento.ts';
 import { prazosEfetivos, type PrazosSla } from '../utils/sla.ts';
 import { isoLocal } from '../utils/formatters.ts';
 import { contratoQuePagaLicenca, resumoVinculos, temVinculos, vinculosDoFornecedor } from '../utils/contratos.ts';
@@ -278,7 +279,7 @@ interface AppContextType {
   salvarAlteracoesChamado: (ticketId: string, mudancas: AlteracoesChamado) => void;
   // Fase 10: atendimento documentado (devolvem o erro em texto ou null)
   resolverChamado: (ticketId: string, dados: DadosResolucao) => Promise<string | null>;
-  cancelarChamado: (ticketId: string, motivo: MotivoCancelamento, detalhe?: string) => Promise<string | null>;
+  cancelarChamado: (ticketId: string, motivo: MotivoCancelamento, detalhe?: string, ciente?: boolean) => Promise<string | null>;
   reabrirChamado: (ticketId: string, motivo: string) => Promise<string | null>;
   avaliarChamado: (ticketId: string, nota: number, comentario?: string) => Promise<string | null>;
   carregarEventosChamado: (ticketId: string) => Promise<EventoChamado[]>;
@@ -546,6 +547,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLicenses([]);
     setTickets([]);
     setTerms([]);
+    setAtribuicoesLicenca([]);
     setProcessoItens([]);
     setRecursos([]);
     setLembretes([]);
@@ -1368,6 +1370,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: `Não é possível excluir. Existem ${found.colaboradoresIds.length} colaborador(es) com assento ativo nesta licença. Libere os assentos primeiro.`,
       };
     }
+    // Lote 1: quem já teve assento fica no histórico — licença se inativa, não se exclui
+    if (atribuicoesLicenca.some((a) => a.licencaId === id)) {
+      return {
+        success: false,
+        message: 'Não é possível excluir. A licença tem histórico de assentos; use "Inativar" na ficha da licença.',
+      };
+    }
     // Fase 8: faturas e contratos guardam o histórico de custo da licença
     if (faturas.some((f) => f.licencaId === id) || contratos.some((c) => c.itens.some((i) => i.licencaId === id))) {
       return {
@@ -1397,15 +1406,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const registrarAtribuicaoLocal = (licencaId: string, colaboradorId: string, entrou: boolean) => {
     const agora = new Date().toISOString();
-    setAtribuicoesLicenca((prev) =>
-      entrou
-        ? [{ id: novoId('atr'), licencaId, colaboradorId, inicio: agora, atribuidoPor: currentUser?.id }, ...prev]
-        : prev.map((a) =>
-            a.licencaId === licencaId && a.colaboradorId === colaboradorId && !a.fim
-              ? { ...a, fim: agora, removidoPor: currentUser?.id }
-              : a
-          )
-    );
+    setAtribuicoesLicenca((prev) => {
+      if (entrou) {
+        return [{ id: novoId('atr'), licencaId, colaboradorId, inicio: agora, atribuidoPor: currentUser?.id }, ...prev];
+      }
+      const aberta = prev.some((a) => a.licencaId === licencaId && a.colaboradorId === colaboradorId && !a.fim);
+      // Assento que já existia antes do histórico (dados iniciais): registra a saída com início desconhecido
+      if (!aberta) {
+        return [{ id: novoId('atr'), licencaId, colaboradorId, fim: agora, removidoPor: currentUser?.id }, ...prev];
+      }
+      return prev.map((a) =>
+        a.licencaId === licencaId && a.colaboradorId === colaboradorId && !a.fim
+          ? { ...a, fim: agora, removidoPor: currentUser?.id }
+          : a
+      );
+    });
   };
 
   const allocateLicense = (licenseId: string, employeeId: string) => {
@@ -1596,7 +1611,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const antes = assets.find((a) => a.id === id);
     if (!antes) return 'Ativo não encontrado.';
     const depois: Asset = { ...antes, ...updates };
-    const duplicado = erroDuplicadoAtivo(assets, depois.tag, depois.serialNumber, id);
+    // Confere duplicados só do que mudou (dado antigo repetido não trava a edição de outros campos)
+    const duplicado = erroDuplicadoAtivo(
+      assets,
+      depois.tag !== antes.tag ? depois.tag : '',
+      depois.serialNumber !== antes.serialNumber ? depois.serialNumber : '',
+      id
+    );
     if (duplicado) return duplicado;
     const erro = await confirmarNoBanco(() => updateAssetDb(antes, depois), 'Salvar ativo');
     if (erro) return erro;
@@ -1638,7 +1659,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!antes) return 'Licença não encontrada.';
     if (ativa) {
       if (currentRole !== 'ti_admin') return 'Só o administrador da T.I. reativa uma licença.';
-      return editarLicenca(id, { status: 'ativa' });
+      // A próxima inativação pede motivo novo (o banco também limpa)
+      return editarLicenca(id, { status: 'ativa', inativacaoMotivo: undefined, inativadaEm: undefined, inativadaPor: undefined });
     }
     if ((motivo || '').trim().length < 5) return 'Informe o motivo da inativação.';
     if (antes.colaboradoresIds.length > 0) {
@@ -1823,7 +1845,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               dataAtualizacao: now,
               mensagens: [...tkt.mensagens, newMessage],
               // Fase 10 C1: resposta pública da T.I. conta como 1ª resposta
-              primeiraRespostaEm: tkt.primeiraRespostaEm || (ehTI && !ehNotaInterna ? now : undefined),
+              // (Lote 1: a mensagem de quem abriu o chamado não conta, mesmo sendo da T.I.)
+              primeiraRespostaEm:
+                tkt.primeiraRespostaEm ||
+                (ehTI && !ehNotaInterna && tkt.solicitanteId !== currentUser.id ? now : undefined),
             }
           : tkt
       )
@@ -2006,25 +2031,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const cancelarChamado = async (ticketId: string, motivo: MotivoCancelamento, detalhe?: string) => {
+  const cancelarChamado = async (ticketId: string, motivo: MotivoCancelamento, detalhe?: string, ciente = false) => {
     const chamado = tickets.find((t) => t.id === ticketId);
     const problema = erroCancelamento(motivo, detalhe || '', chamado?.tipo);
     if (problema) return problema;
     if (chamado && !podeCancelar(chamado, currentRole, currentUser?.id)) return 'Não é possível cancelar este chamado.';
+    const local = (t: Ticket): Ticket => ({
+      ...t,
+      status: 'cancelado',
+      cancelamento: { motivo, detalhe: detalhe?.trim() || undefined, canceladoPor: currentUser?.id },
+    });
     if (chamado && ehProcesso(chamado)) {
-      const feitos = passosQueImpedemCancelar(processoItens.filter((i) => i.chamadoId === ticketId));
-      if (feitos.length) {
-        return `Não dá para cancelar: estes passos já mexeram no inventário e precisam ser desfeitos antes: ${feitos
-          .map((i) => i.titulo)
-          .join('; ')}.`;
+      // Lote 1: passos já feitos precisam da ciência; o banco cria o lembrete do que reverter
+      const feitos = passosAReverter(processoItens.filter((i) => i.chamadoId === ticketId));
+      if (feitos.length && !ciente) {
+        return `Estes passos já foram feitos e precisam ser revertidos: ${feitos.map((i) => i.titulo).join('; ')}. Confirme que vai revertê-los para cancelar.`;
       }
+      const erro = await acaoNoChamado(
+        ticketId,
+        () => cancelarProcessoDb(ticketId, motivo, (detalhe || '').trim(), ciente),
+        local,
+        'Cancelar processo'
+      );
+      if (!erro && feitos.length) {
+        if (isProduction) {
+          const lidos = await fetchLembretesFromDb();
+          if (lidos) setLembretes(lidos);
+        } else {
+          setLembretes((prev) => [
+            {
+              id: novoId('lem'),
+              titulo: `Reverter passos do processo cancelado — ${chamado.codigo}`,
+              descricao: `Processo cancelado com passos já feitos. Reverter: ${feitos.map((i) => i.titulo).join('; ')}. Motivo: ${(detalhe || '').trim()}`,
+              venceEm: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+              status: 'aberto',
+              chamadoId: ticketId,
+              colaboradorId: chamado.colaboradorId,
+              criadoPor: currentUser?.id,
+              criadoEm: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+        }
+      }
+      return erro;
     }
-    return acaoNoChamado(
-      ticketId,
-      () => cancelarChamadoDb(ticketId, motivo, detalhe?.trim()),
-      (t) => ({ ...t, status: 'cancelado', cancelamento: { motivo, detalhe: detalhe?.trim() || undefined, canceladoPor: currentUser?.id } }),
-      'Cancelar chamado'
-    );
+    return acaoNoChamado(ticketId, () => cancelarChamadoDb(ticketId, motivo, detalhe?.trim()), local, 'Cancelar chamado');
   };
 
   const reabrirChamado = async (ticketId: string, motivo: string) => {

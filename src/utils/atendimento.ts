@@ -78,12 +78,16 @@ export function erroCancelamento(
   return null;
 }
 
-/** Passos que já mexeram no inventário: impedem cancelar o processo (mesma lista do banco) */
-const TIPOS_COM_INVENTARIO = new Set([
-  'conta', 'grupo_email', 'equipamento', 'acessorio', 'licenca', 'encerrar_recurso', 'devolver_equipamento', 'liberar_licenca',
+/**
+ * Passos já feitos que mudaram cadastro, acesso ou inventário: para cancelar o
+ * processo, a T.I. declara que vai revertê-los (vira lembrete). Mesma lista do banco.
+ */
+const TIPOS_A_REVERTER = new Set([
+  'cadastro', 'conta', 'grupo_email', 'equipamento', 'acessorio', 'licenca', 'acesso_nexus',
+  'encerrar_recurso', 'devolver_equipamento', 'liberar_licenca',
 ]);
-export const passosQueImpedemCancelar = <T extends { tipo: string; status: string; titulo: string }>(itens: T[]) =>
-  itens.filter((i) => i.status === 'feito' && TIPOS_COM_INVENTARIO.has(i.tipo));
+export const passosAReverter = <T extends { tipo: string; status: string; titulo: string }>(itens: T[]) =>
+  itens.filter((i) => i.status === 'feito' && TIPOS_A_REVERTER.has(i.tipo));
 
 const ehTI = (papel: UserRole) => papel === 'ti_admin' || papel === 'ti_suporte';
 

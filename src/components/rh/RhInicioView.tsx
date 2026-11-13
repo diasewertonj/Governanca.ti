@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeftRight, FileText, UserMinus, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
+import { termoAberto } from '../../utils/termos.ts';
 import { progresso } from '../../utils/processos.ts';
 
 /**
@@ -17,7 +18,7 @@ export const RhInicioView: React.FC<{ onNavigate: (view: string) => void }> = ({
     .sort((a, b) => a.dataCriacao.localeCompare(b.dataCriacao));
   const admissoes = emAndamento.filter((t) => t.tipo === 'onboarding');
   const desligamentos = emAndamento.filter((t) => t.tipo === 'offboarding');
-  const termosPendentes = terms.filter((t) => t.formaAssinatura === 'pendente');
+  const termosPendentes = terms.filter((t) => termoAberto(t));
 
   const pessoa = (t: (typeof emAndamento)[number]) =>
     t.onboarding?.nomeColaborador ||

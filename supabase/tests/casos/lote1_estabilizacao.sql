@@ -28,12 +28,25 @@ select harness.rodar('lote1', 'P7 processo cancelado não reabre pelo seletor',
     perform public.cancelar_chamado('tkt-3', 'engano', 'Candidato desistiu');
     update public.chamados set status = 'aberto' where id = 'tkt-3';
   end $x$$q$);
-select harness.rodar('lote1', 'P8 não cancela processo com passo que mexeu no inventário',
-  'erro: Não dá para cancelar: estes passos já mexeram no inventário e precisam ser desfeitos antes: Conta Microsoft 365.', :'sup', 'authenticated',
+select harness.rodar('lote1', 'P8 passo feito: sem ciência, recusa e lista o que reverter',
+  'erro: Estes passos já foram feitos e precisam ser revertidos: Conta Microsoft 365. Confirme que vai revertê-los para cancelar.', :'sup', 'authenticated',
   $q$do $x$ begin
     insert into public.processo_itens (chamado_id, tipo, titulo, status) values ('tkt-3', 'conta', 'Conta Microsoft 365', 'feito');
     perform public.cancelar_chamado('tkt-3', 'engano', 'Candidato desistiu');
   end $x$$q$);
+select harness.rodar('lote1', 'P8b com ciência cancela e cria lembrete do que reverter', 'ok', :'sup', 'authenticated',
+  $q$do $x$ begin
+    insert into public.processo_itens (chamado_id, tipo, titulo, status) values ('tkt-3', 'conta', 'Conta Microsoft 365', 'feito');
+    perform public.cancelar_processo('tkt-3', 'engano', 'Candidato desistiu', true);
+    perform harness.espera($s$select 1 from public.chamados where id = 'tkt-3' and status = 'cancelado'$s$, 1);
+    perform harness.espera($s$select 1 from public.lembretes where chamado_id = 'tkt-3' and status = 'aberto'
+      and descricao like 'Processo cancelado com passos já feitos. Reverter: Conta Microsoft 365%'$s$, 1);
+  end $x$$q$);
+select harness.rodar('lote1', 'P8c RH não usa cancelar_processo', 'bloqueado', :'rh', 'authenticated',
+  $q$select public.cancelar_processo('tkt-3', 'engano', 'Candidato desistiu', true)$q$);
+select harness.rodar('lote1', 'P8d processo não vira chamado de suporte',
+  'erro: O tipo de uma admissão ou de um desligamento não pode ser alterado.', :'sup', 'authenticated',
+  $q$update public.chamados set tipo = 'suporte' where id = 'tkt-3'$q$);
 select harness.rodar('lote1', 'P9 concluir pelo checklist continua funcionando', 'ok', :'sup', 'authenticated',
   $q$do $x$ begin
     insert into public.processo_itens (chamado_id, tipo, titulo, status, observacao)
@@ -161,10 +174,26 @@ select harness.rodar('lote1', 'L7 suporte não reativa licença', 'bloqueado', :
     update public.licencas_software set status = 'inativa', inativacao_motivo = 'Contrato encerrado' where id = 'lic-1';
     update public.licencas_software set status = 'ativa' where id = 'lic-1';
   end $x$$q$);
-select harness.rodar('lote1', 'L8 admin reativa licença', 'ok', :'admin', 'authenticated',
+select harness.rodar('lote1', 'L8 admin reativa licença (o motivo antigo não serve para a próxima inativação)',
+  'erro: Informe o motivo da inativação.', :'admin', 'authenticated',
   $q$do $x$ begin
     update public.licencas_software set status = 'inativa', inativacao_motivo = 'Contrato encerrado' where id = 'lic-1';
     update public.licencas_software set status = 'ativa' where id = 'lic-1';
+    perform harness.espera($s$select 1 from public.licencas_software where id = 'lic-1' and status = 'ativa' and inativacao_motivo is null$s$, 1);
+    update public.licencas_software set status = 'inativa' where id = 'lic-1';
+  end $x$$q$);
+select harness.rodar('lote1', 'L9 licença com histórico de assentos não é excluída', 'bloqueado', :'admin', 'authenticated',
+  $q$do $x$ begin
+    update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+    perform public.alocar_licenca('lic-1', 'emp-colab');
+    perform public.revogar_licenca('lic-1', 'emp-colab');
+    delete from public.licencas_software where id = 'lic-1';
+  exception when foreign_key_violation then raise exception 'fk' using errcode = '42501';
+  end $x$$q$);
+select harness.rodar('lote1', 'T6 excluir quem cancelou um termo não esbarra na proteção do termo', 'ok', :'admin', 'authenticated',
+  $q$do $x$ begin
+    perform public.cancelar_termo('tr-2', 'Termo de teste errado');
+    update public.termos_responsabilidade set cancelado_por = null where id = 'tr-2';
   end $x$$q$);
 
 -- Fatura x contrato de licenciamento ---------------------------------------------------------

@@ -25,7 +25,11 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.tipo in ('onboarding', 'offboarding')
+  -- Processo não vira outro tipo (escaparia destas regras e do índice de desligamento)
+  if old.tipo in ('onboarding', 'offboarding') and new.tipo is distinct from old.tipo and auth.uid() is not null then
+    raise exception 'O tipo de uma admissão ou de um desligamento não pode ser alterado.' using errcode = 'check_violation';
+  end if;
+  if old.tipo in ('onboarding', 'offboarding')
      and auth.uid() is not null
      and new.status is distinct from old.status
      and coalesce(current_setting('app.via_funcao', true), '') <> '1' then
@@ -215,9 +219,70 @@ end;
 $$;
 
 -- 2. Cancelar -----------------------------------------------------------------------
+-- Admissão/desligamento: só a T.I., com a descrição do motivo. Se algum passo já
+-- mudou o inventário ou o acesso (cadastro, conta, equipamento, licença, login...),
+-- a T.I. precisa declarar que vai reverter (p_ciente) e o banco cria um lembrete
+-- com a lista do que reverter. Sem a ciência, recusa e lista os passos.
+create or replace function public.cancelar_processo(
+  p_chamado text,
+  p_motivo text,
+  p_detalhe text,
+  p_ciente boolean default false
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_eu     text := public.meu_colaborador_id();
+  v_c      public.chamados%rowtype;
+  v_feitos text;
+begin
+  if v_eu is null or coalesce(public.meu_papel(), '') not in ('ti_admin', 'ti_suporte') then
+    raise exception 'Apenas a T.I. cancela uma admissão ou um desligamento.' using errcode = 'insufficient_privilege';
+  end if;
+  select * into v_c from public.chamados where id = p_chamado for update;
+  if not found or v_c.tipo not in ('onboarding', 'offboarding') or v_c.status in ('resolvido', 'cancelado') then
+    raise exception 'Não é possível cancelar este processo.' using errcode = 'insufficient_privilege';
+  end if;
+  if coalesce(btrim(p_detalhe), '') = '' then
+    raise exception 'Para cancelar uma admissão ou um desligamento, descreva o motivo.' using errcode = 'check_violation';
+  end if;
+
+  select string_agg(i.titulo, '; ' order by i.ordem) into v_feitos
+    from public.processo_itens i
+   where i.chamado_id = p_chamado and i.status = 'feito'
+     and i.tipo in ('cadastro', 'conta', 'grupo_email', 'equipamento', 'acessorio', 'licenca', 'acesso_nexus',
+                    'encerrar_recurso', 'devolver_equipamento', 'liberar_licenca');
+  if v_feitos is not null and not coalesce(p_ciente, false) then
+    raise exception 'Estes passos já foram feitos e precisam ser revertidos: %. Confirme que vai revertê-los para cancelar.', v_feitos
+      using errcode = 'check_violation';
+  end if;
+
+  perform set_config('app.via_funcao', '1', true);
+  update public.chamados
+     set status = 'cancelado',
+         cancelamento_motivo = p_motivo,
+         cancelamento_detalhe = btrim(p_detalhe),
+         cancelado_por = v_eu
+   where id = p_chamado;
+  perform set_config('app.via_funcao', '', true);
+
+  if v_feitos is not null then
+    insert into public.lembretes (titulo, descricao, vence_em, chamado_id, colaborador_id, criado_por)
+    values ('Reverter passos do processo cancelado — ' || v_c.codigo,
+            'Processo cancelado com passos já feitos. Reverter: ' || v_feitos || '. Motivo: ' || btrim(p_detalhe),
+            current_date + 2, p_chamado, v_c.colaborador_id, v_eu);
+  end if;
+end;
+$$;
+
+revoke all on function public.cancelar_processo(text, text, text, boolean) from public, anon;
+grant execute on function public.cancelar_processo(text, text, text, boolean) to authenticated;
+
 -- Suporte: a T.I. cancela qualquer um em aberto; quem abriu cancela o próprio
--- enquanto ninguém começou a atender. Admissão/desligamento: só a T.I., com a
--- descrição do motivo e sem passo que já mexeu no inventário.
+-- enquanto ninguém começou a atender. Processo vai para cancelar_processo (sem ciência).
 create or replace function public.cancelar_chamado(p_chamado text, p_motivo text, p_detalhe text default null)
 returns void
 language plpgsql
@@ -228,7 +293,6 @@ declare
   v_ti     boolean := coalesce(public.meu_papel(), '') in ('ti_admin', 'ti_suporte');
   v_eu     text := public.meu_colaborador_id();
   v_c      public.chamados%rowtype;
-  v_feitos text;
 begin
   if v_eu is null then
     raise exception 'Sessão sem colaborador.' using errcode = 'insufficient_privilege';
@@ -245,18 +309,8 @@ begin
   end if;
 
   if v_c.tipo in ('onboarding', 'offboarding') then
-    if coalesce(btrim(p_detalhe), '') = '' then
-      raise exception 'Para cancelar uma admissão ou um desligamento, descreva o motivo.' using errcode = 'check_violation';
-    end if;
-    select string_agg(i.titulo, '; ' order by i.ordem) into v_feitos
-      from public.processo_itens i
-     where i.chamado_id = p_chamado and i.status = 'feito'
-       and i.tipo in ('conta', 'grupo_email', 'equipamento', 'acessorio', 'licenca',
-                      'encerrar_recurso', 'devolver_equipamento', 'liberar_licenca');
-    if v_feitos is not null then
-      raise exception 'Não dá para cancelar: estes passos já mexeram no inventário e precisam ser desfeitos antes: %.', v_feitos
-        using errcode = 'check_violation';
-    end if;
+    perform public.cancelar_processo(p_chamado, p_motivo, p_detalhe, false);
+    return;
   end if;
 
   perform set_config('app.via_funcao', '1', true);
@@ -274,6 +328,22 @@ revoke all on function public.cancelar_chamado(text, text, text) from public, an
 grant execute on function public.cancelar_chamado(text, text, text) to authenticated;
 
 -- 3. Um desligamento aberto por pessoa ----------------------------------------------
+-- Se já houver duplicados, para com uma mensagem clara (nada desta migration é gravado)
+do $$
+declare
+  v_dup text;
+begin
+  select string_agg(pessoa || ' (' || n || ')', ', ') into v_dup from (
+    select coalesce(colaborador_id, offboarding ->> 'colaboradorId') as pessoa, count(*) as n
+      from public.chamados
+     where tipo = 'offboarding' and status not in ('resolvido', 'cancelado')
+     group by 1 having count(*) > 1
+  ) d;
+  if v_dup is not null then
+    raise exception 'Há desligamentos abertos em duplicidade para: %. Cancele os repetidos antes de aplicar.', v_dup;
+  end if;
+end $$;
+
 create unique index if not exists uq_desligamento_aberto
   on public.chamados ((coalesce(colaborador_id, offboarding ->> 'colaboradorId')))
   where tipo = 'offboarding' and status not in ('resolvido', 'cancelado');
@@ -402,8 +472,10 @@ begin
   if auth.uid() is null then
     return new;
   end if;
-  if (new.cancelado_em, new.cancelado_por, new.cancelamento_motivo, new.substituido_por)
-     is distinct from (old.cancelado_em, old.cancelado_por, old.cancelamento_motivo, old.substituido_por)
+  -- (cancelado_por/substituido_por indo para null é a chave estrangeira "on delete set null": permitido)
+  if ((new.cancelado_em, new.cancelamento_motivo) is distinct from (old.cancelado_em, old.cancelamento_motivo)
+      or (new.cancelado_por is not null and new.cancelado_por is distinct from old.cancelado_por)
+      or (new.substituido_por is not null and new.substituido_por is distinct from old.substituido_por))
      and coalesce(current_setting('app.via_funcao', true), '') <> '1' then
     raise exception 'Use "Cancelar/substituir termo".' using errcode = 'check_violation';
   end if;
@@ -515,6 +587,10 @@ begin
     if auth.uid() is not null and coalesce(public.meu_papel(), '') <> 'ti_admin' then
       raise exception 'Só o administrador da T.I. reativa uma licença.' using errcode = '42501';
     end if;
+    -- A próxima inativação pede um motivo novo
+    new.inativacao_motivo := null;
+    new.inativada_em := null;
+    new.inativada_por := null;
   end if;
 
   if new.status = 'inativa'
@@ -534,8 +610,9 @@ create or replace trigger trg_proteger_licenca
 -- 10. Histórico de assentos ---------------------------------------------------------------
 create table if not exists public.licenca_atribuicoes (
   id             text primary key default gen_random_uuid()::text,
-  licenca_id     text not null references public.licencas_software (id) on delete cascade,
-  colaborador_id text not null references public.colaboradores (id) on delete cascade,
+  -- Trilha de auditoria: não some com exclusões (licença com histórico se inativa, não se exclui)
+  licenca_id     text not null references public.licencas_software (id) on delete restrict,
+  colaborador_id text not null references public.colaboradores (id) on delete restrict,
   inicio         timestamptz default now(), -- null = já tinha o assento antes deste histórico
   fim            timestamptz,
   atribuido_por  text references public.colaboradores (id) on delete set null,

@@ -52,6 +52,8 @@ export const ConferenciaTermo: React.FC<Props> = ({
   };
 
   const feito = tipo === 'entrega' ? 'entregue' : 'devolvido';
+  // Devolução: a condição registrada no passo do checklist (que já mexeu no inventário) não muda aqui
+  const travada = (i: number) => tipo === 'devolucao' && !!linhasIniciais[i]?.condicao;
 
   return (
     <div className="rounded-md border border-blue-200 bg-white p-2.5 space-y-2 text-xs">
@@ -67,7 +69,9 @@ export const ConferenciaTermo: React.FC<Props> = ({
             </span>
             <select
               aria-label={`Condição de ${l.descricao}`}
-              className={campo}
+              title={travada(i) ? 'Registrada no passo de devolução' : undefined}
+              disabled={travada(i)}
+              className={`${campo} disabled:bg-slate-100`}
               value={l.condicao || ''}
               onChange={(e) => mudar(i, { condicao: (e.target.value || undefined) as CondicaoItem | undefined })}
             >
@@ -77,7 +81,8 @@ export const ConferenciaTermo: React.FC<Props> = ({
             </select>
             <select
               aria-label={`Situação de ${l.descricao}`}
-              className={campo}
+              disabled={travada(i)}
+              className={`${campo} disabled:bg-slate-100`}
               value={l.situacao}
               onChange={(e) => mudar(i, { situacao: e.target.value as ItemTermo['situacao'] })}
             >
@@ -85,7 +90,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
               <option value="pendente">Pendente</option>
               <option value="na">Não se aplica</option>
             </select>
-            {l.condicao === 'avaria' && (
+            {l.condicao === 'avaria' && !travada(i) && (
               <input
                 aria-label={`Avaria de ${l.descricao}`}
                 className={`${campo} sm:col-span-3`}

@@ -158,8 +158,8 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
     setCancelando(null);
     setAviso(
       t.chamadoId
-        ? 'Termo cancelado. Para emitir o correto, gere um novo no passo "Termo" do processo.'
-        : 'Termo cancelado. Ele continua no histórico com o motivo.'
+        ? 'Termo cancelado. Com o processo ainda aberto, gere o correto no passo "Termo"; termo de entrega também pode ser gerado pela ficha da pessoa.'
+        : 'Termo cancelado. Ele continua no histórico com o motivo. Para emitir o correto, use "Gerar termo de entrega" na ficha da pessoa.'
     );
   };
 
