@@ -68,6 +68,8 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const recurso = recursos.find((r) => r.id === item.recursoId);
   const encerraConta = item.tipo === 'encerrar_recurso' && recurso?.tipo !== 'acessorio';
   const pedeDestino = encerraConta || item.tipo === 'dados_drive' || item.tipo === 'email';
+  // Ajustes do desligamento: conta e licença só saem com a confirmação de que foram removidas na origem
+  const desvincula = encerraConta || item.tipo === 'liberar_licenca';
   const colabPorEmail = ob
     ? employees.find((e) => e.email.toLowerCase() === ob.emailColaborador.trim().toLowerCase())
     : undefined;
@@ -110,6 +112,13 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const jaTemLicenca = !!(licencaConta && colabId && licencaConta.colaboradoresIds.includes(colabId));
   const livresConta = licencaConta ? assentosLivres(licencaConta) : 0;
   const [atribuirLicenca, setAtribuirLicenca] = useState(true);
+  const [confirmouExterno, setConfirmouExterno] = useState(false);
+  const licencaDoItem =
+    item.tipo === 'liberar_licenca'
+      ? licenses.find((l) => l.id === item.licencaId)
+      : encerraConta && recurso
+        ? licencaDaConta(recurso.nome, licenses)
+        : undefined;
 
   const registrar = async (status: 'feito' | 'nao_se_aplica', observacaoExtra?: string, colaboradorDoCadastro?: string) => {
     setErro(null);
@@ -117,6 +126,13 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     if (status === 'nao_se_aplica' && !obs.trim()) return setErro('Escreva o motivo para marcar como "não se aplica".');
     const dados: DadosRegistroItem = {};
     if (status === 'feito') {
+      if (desvincula && !confirmouExterno) {
+        return setErro(
+          item.tipo === 'liberar_licenca'
+            ? 'Confirme que removeu o acesso no painel do fornecedor.'
+            : 'Confirme que desativou a conta no sistema de origem.'
+        );
+      }
       if (item.tipo === 'cadastro') {
         const escolhido = colaboradorDoCadastro || colaboradorId;
         if (!escolhido) return setErro('Escolha o colaborador cadastrado.');
@@ -363,6 +379,30 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* Ajustes do desligamento: desvincular de verdade (painel do fornecedor) e no sistema */}
+      {desvincula && (
+        <div className="rounded-md border border-rose-200 bg-rose-50/60 p-2.5 text-xs space-y-1.5">
+          <label className="flex items-start gap-2 cursor-pointer text-rose-900">
+            <input type="checkbox" checked={confirmouExterno} onChange={(e) => setConfirmouExterno(e.target.checked)} className="mt-0.5" />
+            <span>
+              {item.tipo === 'liberar_licenca'
+                ? `Removi o acesso de ${colab?.nome.split(' ')[0] || 'a pessoa'} a ${item.titulo} no painel do fornecedor`
+                : `Desativei a conta ${item.titulo}${recurso?.identificador ? ` (${recurso.identificador})` : ''} no sistema de origem`}
+            </span>
+          </label>
+          {licencaDoItem?.urlPainel && (
+            <a href={licencaDoItem.urlPainel} target="_blank" rel="noopener noreferrer" className="inline-block font-medium text-blue-700 hover:underline">
+              Abrir o painel de {licencaDoItem.nome} ↗
+            </a>
+          )}
+          <p className="text-rose-800">
+            {item.tipo === 'liberar_licenca'
+              ? 'Ao concluir, o assento também é liberado aqui no sistema.'
+              : 'Ao concluir, a conta sai do inventário da pessoa aqui no sistema.'}
+          </p>
         </div>
       )}
 

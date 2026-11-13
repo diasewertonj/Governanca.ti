@@ -11,6 +11,7 @@ import { VinculosChamado } from './VinculosChamado.tsx';
 import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
 import { BlocoCancelamento, BlocoResolucao, FormCancelamento, FormResolucao } from './AtendimentoChamado.tsx';
 import { imprimirRelatorio } from './relatorioChamado.ts';
+import { PedidoDesligamento } from './PedidoDesligamento.tsx';
 import { chamadoEncerrado, podeCancelar, rotuloSituacao, ROTULO_AGUARDANDO } from '../../utils/atendimento.ts';
 import type { AguardandoMotivo } from '../../types/index.ts';
 import { Printer } from 'lucide-react';
@@ -275,10 +276,11 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
         {/* Fase 10: o problema relatado logo abaixo do título, em destaque */}
         <div className="px-4 sm:px-6 pt-4 sm:pt-5">
           {/* Admissão: o "Pedido do RH" (painel organizado) substitui o texto montado */}
-          {ticket.tipo !== 'onboarding' && (
+          {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
+          {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
+          {ticket.tipo === 'suporte' && (
             <ProblemaRelatado
               ticket={ticket}
-              titulo={ticket.tipo === 'offboarding' ? 'Pedido do RH' : undefined}
               ativo={assets.find((a) => a.id === ticket.ativoId)}
               onAbrirAnexo={abrirAnexo}
               erroArquivo={erroArquivo}

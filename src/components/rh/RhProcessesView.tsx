@@ -103,13 +103,8 @@ export const RhProcessesView: React.FC = () => {
       categoria: 'Offboarding de Colaborador',
       prioridade: 'critica',
       status: 'aberto',
-      descricao: `Solicitação formal de desligamento para ${selectedColaborador.nome}, cargo ${
-        selectedColaborador.cargo
-      }. Último dia trabalhado: ${formatDate(
-        dataDesligamento
-      )}. Foram identificados ${colabAssets.length} equipamento(s) sob custódia e ${
-        colabLicenses.length
-      } licença(s) ativa(s). ${observacoesOff}`,
+      // Descrição curta: o restante fica organizado no pedido
+      descricao: `Desligamento de ${selectedColaborador.nome} · ${selectedColaborador.cargo}. Último dia: ${formatDate(dataDesligamento)}.`,
       anexos: [],
       offboarding: {
         colaboradorId: selectedColaborador.id, // Fase 3: usado na conclusão automática
@@ -299,7 +294,7 @@ export const RhProcessesView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Laptop className="w-4 h-4 text-blue-600" />
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                      Inventário Instantâneo sob Custódia de {selectedColaborador.nome}
+                      Equipamentos e softwares com {selectedColaborador.nome} (a T.I. recolhe e desvincula)
                     </h4>
                   </div>
                   <span className="text-xs text-slate-500 font-mono">
@@ -311,7 +306,7 @@ export const RhProcessesView: React.FC = () => {
                   {/* Equipamentos Físicos */}
                   <div className="space-y-2">
                     <span className="text-xs font-semibold text-slate-700 block">
-                      Equipamentos Físicos para Devolução (Relação 1:1)
+                      Equipamentos
                     </span>
                     {colabAssets.length > 0 ? (
                       <div className="space-y-1.5">
@@ -350,7 +345,7 @@ export const RhProcessesView: React.FC = () => {
                   {/* Licenças & Acessos */}
                   <div className="space-y-2">
                     <span className="text-xs font-semibold text-slate-700 block">
-                      Softwares e Contas Corporativas Ativas
+                      Softwares e licenças
                     </span>
                     {colabLicenses.length > 0 ? (
                       <div className="space-y-1.5">
@@ -360,8 +355,8 @@ export const RhProcessesView: React.FC = () => {
                             className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs"
                           >
                             <span className="font-medium text-slate-800">{lic.nome}</span>
-                            <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              Revogação automática
+                            <span className="text-xs text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                              A T.I. desvincula
                             </span>
                           </div>
                         ))}
