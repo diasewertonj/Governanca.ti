@@ -8,6 +8,8 @@ import { BarraAlteracoes, confirmarDescarte } from '../comum/BarraAlteracoes.tsx
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { ChecklistProcesso } from '../processos/ChecklistProcesso.tsx';
 import { VinculosChamado } from './VinculosChamado.tsx';
+import { ConversaChamado } from './ConversaChamado.tsx';
+import { ROTULO_TIPO_CHAMADO } from '../../utils/conversa.ts';
 import { RASCUNHO_VAZIO, ROTULO_VINCULO, mudancasVinculos, type RascunhoVinculos } from '../../utils/vinculos.ts';
 import {
   X,
@@ -16,7 +18,6 @@ import {
   CheckCircle2,
   ExternalLink,
   FileCheck,
-  Paperclip,
   UserPlus,
   ShieldCheck,
 } from 'lucide-react';
@@ -221,7 +222,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           <div className="order-last w-full sm:order-none sm:w-auto sm:flex-1 min-w-0">
             <h2 className="text-base sm:text-sm font-semibold text-slate-900 leading-tight">{ticket.titulo}</h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              Aberto em {formatDateTime(ticket.dataCriacao)} por {ticket.solicitanteNome}
+              Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · {ROTULO_TIPO_CHAMADO[ticket.tipo]} ·{' '}
+              {ticket.categoria}
             </p>
           </div>
           <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
@@ -245,38 +247,6 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           {/* Coluna Principal: Conversas e Linha do Tempo */}
           <div className="lg:col-span-2 p-4 sm:p-6 space-y-6 flex flex-col justify-between">
             <div className="space-y-5">
-              {/* Descrição Inicial do Chamado */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-semibold text-slate-700">Relato Inicial do Solicitante</span>
-                  <span>{formatDateTime(ticket.dataCriacao)}</span>
-                </div>
-                <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
-                  {ticket.descricao}
-                </p>
-
-                {ticket.anexos && ticket.anexos.length > 0 && (
-                  <div className="pt-2 border-t border-slate-200 mt-2 space-y-1">
-                    <span className="text-xs text-slate-500 uppercase font-semibold block">Anexos</span>
-                    {erroArquivo && <p className="text-xs text-rose-700">{erroArquivo}</p>}
-                    <div className="flex flex-wrap gap-2">
-                      {ticket.anexos.map((att) => (
-                        <button
-                          type="button"
-                          key={att.id}
-                          onClick={() => abrirAnexo(att.caminho || att.url)}
-                          className="flex items-center gap-1.5 text-xs text-blue-700 bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-blue-50 transition-colors"
-                        >
-                          <Paperclip className="w-3 h-3 text-slate-500" />
-                          <span>{att.nome}</span>
-                          <span className="text-xs text-slate-500">({att.tamanho})</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Checklist Interativo Técnico para Offboarding */}
               {usaChecklistLegado && ticket.offboarding && (
                 <div className="border border-amber-200 bg-amber-50/40 rounded-lg p-4 space-y-3">
@@ -453,57 +423,22 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 <ChecklistProcesso ticket={ticket} />
               )}
 
-              {/* Linha do Tempo de Mensagens */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Histórico de Mensagens & Comunicação
-                </h4>
-
-                <div className="space-y-3">
-                  {ticket.mensagens.map((msg) => {
-                    // Se for nota interna e o usuário for colaborador comum, NÃO mostrar!
-                    if (msg.ehNotaInterna && !isTI) return null;
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`p-3.5 rounded-lg border text-xs leading-relaxed space-y-1.5 ${
-                          msg.ehNotaInterna
-                            ? 'bg-amber-50/70 border-amber-200 text-amber-950'
-                            : msg.autorId === currentUser?.id
-                            ? 'bg-blue-50/50 border-blue-200 text-slate-900 ml-4'
-                            : 'bg-white border-slate-200 text-slate-900 mr-4'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900">{msg.autorNome}</span>
-                            {msg.ehNotaInterna ? (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-amber-200 text-amber-900 font-semibold rounded text-[9px] uppercase">
-                                <Lock className="w-2.5 h-2.5" />
-                                Nota Interna TI (Privada)
-                              </span>
-                            ) : (
-                              <span className="text-slate-500">· {msg.autorRole}</span>
-                            )}
-                          </div>
-                          <span className="text-slate-500 font-mono text-xs">
-                            {formatDateTime(msg.data)}
-                          </span>
-                        </div>
-
-                        <p className="whitespace-pre-wrap">{msg.texto}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
+              <ConversaChamado
+                ticket={ticket}
+                podeVerNotas={isTI}
+                meuId={currentUser?.id}
+                onAbrirAnexo={abrirAnexo}
+                erroArquivo={erroArquivo}
+              />
             </div>
 
             {/* Caixa de Resposta */}
             <form onSubmit={handleSendMessage} className="pt-4 border-t border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-600">Adicionar Resposta ao Chamado</span>
+                <label htmlFor={`resposta-${ticket.id}`} className="text-xs font-medium text-slate-700">
+                  Responder
+                </label>
                 {isTI && (
                   <label className="flex items-center gap-1.5 text-xs text-amber-800 cursor-pointer select-none">
                     <input
@@ -513,21 +448,18 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                     />
                     <Lock className="w-3 h-3 text-amber-700" />
-                    <span>Gravar como Nota Interna da TI (Invisível ao solicitante)</span>
+                    <span>Nota interna (só a T.I. vê)</span>
                   </label>
                 )}
               </div>
 
               <div className="relative">
                 <textarea
+                  id={`resposta-${ticket.id}`}
                   rows={3}
                   value={newMessageText}
                   onChange={(e) => setNewMessageText(e.target.value)}
-                  placeholder={
-                    isInternalNote
-                      ? 'Escreva uma anotação privada para a equipe técnica de TI...'
-                      : 'Escreva sua mensagem ou atualização para o chamado...'
-                  }
+                  placeholder={isInternalNote ? 'Escreva uma nota para a equipe de T.I.…' : 'Escreva uma resposta…'}
                   className={`w-full text-xs p-3 rounded-lg border focus:outline-hidden focus:ring-1 ${
                     isInternalNote
                       ? 'border-amber-300 bg-amber-50/40 text-amber-950 focus:ring-amber-500'
@@ -547,7 +479,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   }`}
                 >
                   <Send className="w-3.5 h-3.5" />
-                  {isInternalNote ? 'Salvar Nota Interna' : 'Enviar Resposta'}
+                  {isInternalNote ? 'Salvar nota' : 'Enviar'}
                 </button>
               </div>
             </form>
@@ -629,14 +561,6 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 <p className="text-xs text-slate-500 mt-1">{ticket.solicitanteEmail}</p>
               </div>
               <div className="pt-2 mt-1 border-t border-slate-100 space-y-0.5 text-xs">
-                <div className="flex justify-between gap-2">
-                  <span className="text-slate-500">Tipo:</span>
-                  <span className="font-medium capitalize text-slate-800">{ticket.tipo}</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-slate-500">Categoria:</span>
-                  <span className="font-medium text-slate-800 text-right">{ticket.categoria}</span>
-                </div>
                 <div className="flex justify-between gap-2">
                   <span className="text-slate-500">Última atualização:</span>
                   <span className="font-medium text-slate-800">{formatDate(ticket.dataAtualizacao)}</span>
