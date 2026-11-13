@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { chamadosDaPessoa, papelNoChamado } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
+import { NewEmployeeModal } from './NewEmployeeModal.tsx';
 import {
   X,
   User,
@@ -12,6 +13,7 @@ import {
   Key,
   ExternalLink,
   PlusCircle,
+  Pencil,
   KeyRound,
   CheckCircle2,
   AlertCircle,
@@ -45,6 +47,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   const [anonimizando, setAnonimizando] = useState(false);
   // Fase 7: senha provisória fora do onboarding (esqueceu a senha; não depende de e-mail)
   const [gerandoSenha, setGerandoSenha] = useState(false);
+  const [editandoDados, setEditandoDados] = useState(false);
   const [senhaGerada, setSenhaGerada] = useState<{ email: string; senha: string } | null>(null);
   const [erroSenha, setErroSenha] = useState<string | null>(null);
 
@@ -205,6 +208,18 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                 {anonimizando ? 'Anonimizando...' : 'Anonimizar dados (LGPD)'}
               </button>
             )}
+            {/* Editar dados: T.I. e RH (o banco confere o que cada perfil pode mudar) */}
+            {(currentRole === 'ti_admin' || currentRole === 'ti_suporte' || currentRole === 'rh') &&
+              !employee.email.endsWith('@anonimizado.invalid') && (
+                <button
+                  type="button"
+                  onClick={() => setEditandoDados(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                  Editar dados
+                </button>
+              )}
             {(currentRole === 'ti_admin' || currentRole === 'ti_suporte') && employee.status !== 'desligado' && (
               <button
                 type="button"
@@ -486,6 +501,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           )}
         </div>
       </div>
+      {editandoDados && <NewEmployeeModal colaborador={employee} onClose={() => setEditandoDados(false)} />}
     </div>
   );
 };
