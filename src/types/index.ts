@@ -636,6 +636,8 @@ export interface Lembrete {
   colaboradorId?: string;
   ativoId?: string;
   contratoId?: string;
+  licencaId?: string; // Seção 6: renovação de software
+  linhaId?: string;
   itemId?: string;
   criadoPor?: string;
   criadoEm: string;

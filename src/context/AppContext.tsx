@@ -329,7 +329,7 @@ interface AppContextType {
   ) => Promise<{ email: string; senha: string } | { erro: string }>;
   salvarCatalogo: (itens: CatalogoItem[], novosIds: string[]) => Promise<boolean>;
   criarLembrete: (
-    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId'>
+    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId' | 'licencaId'>
   ) => Promise<string | null>;
   encerrarLembrete: (id: string, status: 'feito' | 'cancelado', observacao?: string) => Promise<string | null>;
   aceitarTermo: (termoId: string) => Promise<string | null>;
@@ -2511,7 +2511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const criarLembrete = async (
-    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId'>
+    l: Pick<Lembrete, 'titulo' | 'descricao' | 'venceEm' | 'chamadoId' | 'colaboradorId' | 'ativoId' | 'contratoId' | 'licencaId'>
   ): Promise<string | null> => {
     if (isProduction) {
       try {
