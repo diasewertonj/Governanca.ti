@@ -95,9 +95,10 @@ export const RecursosProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [estoque, setEstoque] = useState<ItemEstoque[]>(demo ? DEMO_ESTOQUE : []);
   const [movimentos, setMovimentos] = useState<MovimentoEstoque[]>([]);
 
-  const recarregarRecursos = useCallback(async () => {
-    if (demo || !isTI) return;
-    const [u, a, l, al, e, m] = await Promise.all([
+  // Busca no banco (sem mexer no estado) e aplica depois: o efeito só grava ao chegar a resposta
+  const buscar = useCallback(async () => {
+    if (demo || !isTI) return null;
+    return Promise.all([
       fetchUnidadesFromDb(),
       fetchAnexosContratoFromDb(),
       fetchLinhasFromDb(),
@@ -105,18 +106,31 @@ export const RecursosProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       fetchEstoqueFromDb(),
       fetchMovimentosEstoqueFromDb(),
     ]);
+  }, [demo, isTI]);
+
+  const aplicar = (r: Awaited<ReturnType<typeof buscar>>) => {
+    if (!r) return;
+    const [u, a, l, al, e, m] = r;
     if (u) setUnidades(u);
     if (a) setAnexos(a);
     if (l) setLinhas(l);
     if (al) setAtribuicoesLinha(al);
     if (e) setEstoque(e);
     if (m) setMovimentos(m);
-  }, [demo, isTI]);
+  };
+
+  const recarregarRecursos = async () => aplicar(await buscar());
 
   useEffect(() => {
     if (!currentUser) return;
-    void recarregarRecursos();
-  }, [currentUser, recarregarRecursos]);
+    let vivo = true;
+    buscar().then((r) => {
+      if (vivo) aplicar(r);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [currentUser, buscar]);
 
   const noBanco = async (op: () => Promise<unknown>): Promise<string | null> => {
     try {

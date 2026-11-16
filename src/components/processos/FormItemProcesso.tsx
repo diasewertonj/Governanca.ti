@@ -489,7 +489,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
         <div>
           <label className={rotulo}>Sai do estoque (opcional)</label>
           <select className={campo} value={estoqueItemId} onChange={(e) => setEstoqueItemId(e.target.value)}>
-            <option value=">Não baixar do estoque</option>
+            <option value="">Não baixar do estoque</option>
             {acessoriosEmEstoque.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.nome} · {i.quantidade} em estoque
@@ -503,7 +503,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
         <div>
           <label className={rotulo}>Linha</label>
           <select className={campo} value={linhaEscolhida} onChange={(e) => setLinhaEscolhida(e.target.value)}>
-            <option value=">Escolha...</option>
+            <option value="">Escolha...</option>
             {linhasLivres.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.numero}

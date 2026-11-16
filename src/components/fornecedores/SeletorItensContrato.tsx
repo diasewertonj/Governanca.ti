@@ -14,7 +14,7 @@ const LIMITE_SUGESTOES = 8;
  * Busca por patrimônio, nome, marca, modelo, série ou fornecedor; os escolhidos
  * viram chips removíveis. Nada é gravado aqui: o formulário salva tudo junto.
  */
-/** Seção 6: com ornecedorId, sugere primeiro (e sem digitar) os equipamentos e softwares desse fornecedor */
+/** Seção 6: com fornecedorId, sugere primeiro (e sem digitar) os equipamentos e softwares desse fornecedor */
 export const SeletorItensContrato: React.FC<{ itens: ItemContrato[]; onChange: (itens: ItemContrato[]) => void; fornecedorId?: string }> = ({
   itens,
   onChange,
