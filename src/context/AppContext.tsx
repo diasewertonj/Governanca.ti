@@ -128,6 +128,9 @@ import {
   insertFaturaDb,
   updateFaturaDb,
   deleteFaturaDb,
+  situacaoContratoDb,
+  renovarContratoDb,
+  desfazerPagamentoDb,
   gravarArquivoDb,
   abrirManutencaoDb,
   registrarManutencaoFeitaDb,
@@ -362,6 +365,11 @@ interface AppContextType {
   /** Sobe o arquivo do contrato/fatura (espera o registro novo ser gravado); false se falhar */
   anexarArquivoContrato: (contratoId: string, arquivo: File) => Promise<boolean>;
   anexarArquivoFatura: (faturaId: string, arquivo: File) => Promise<boolean>;
+  // Seção 6: encerrar/reabrir/renovar contrato e desfazer pagamento (devolvem erro ou null)
+  encerrarContrato: (id: string, motivo: string, em?: string) => Promise<string | null>;
+  reabrirContrato: (id: string) => Promise<string | null>;
+  renovarContrato: (id: string, inicio: string, fim: string | undefined, valor: number, numero?: string) => Promise<Resultado<Contrato>>;
+  desfazerPagamento: (faturaId: string, motivo: string) => Promise<string | null>;
 
   erroLinkAuth: string | null;
   solicitarRecuperacaoSenha: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -1713,10 +1721,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const cadastrarFatura: AppContextType['cadastrarFatura'] = async (dados) => {
     const nova: Fatura = { ...dados, id: novoId('fat'), criadoEm: new Date().toISOString() };
-    // L2: licença paga por contrato de licenciamento vigente não recebe fatura própria (o banco também recusa)
+    // L2 + seção 6: licença paga por contrato vigente na competência → a fatura vai para o contrato
     if (nova.licencaId) {
       const contrato = contratoQuePagaLicenca(nova.licencaId, contratos, nova.competencia);
-      if (contrato) return { erro: `Esta licença é paga pelo contrato ${contrato.numero || contrato.descricao}: lance a fatura no contrato.` };
+      if (contrato) {
+        nova.contratoId = contrato.id;
+        delete nova.licencaId;
+      }
     }
     const erro = await confirmarNoBanco(() => insertFaturaDb(nova), 'Lançar fatura');
     if (erro) return { erro };
@@ -1731,6 +1742,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const erro = await confirmarNoBanco(() => updateFaturaDb(antes, depois), 'Salvar fatura');
     if (erro) return erro;
     setFaturas((prev) => trocar(prev, depois));
+    return null;
+  };
+
+  const encerrarContrato: AppContextType['encerrarContrato'] = async (id, motivo, em) => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return 'Contrato não encontrado.';
+    if (motivo.trim().length < 5) return 'Informe o motivo do encerramento (mínimo 5 caracteres).';
+    const data = em || new Date().toISOString().slice(0, 10);
+    const erro = await confirmarNoBanco(() => situacaoContratoDb(id, 'encerrado', motivo, data), 'Encerrar contrato');
+    if (erro) return erro;
+    setContratos((prev) =>
+      trocar(prev, { ...antes, status: 'encerrado', encerradoEm: data, encerramentoMotivo: motivo.trim(), encerradoPor: currentUser?.id })
+    );
+    return null;
+  };
+
+  const reabrirContrato: AppContextType['reabrirContrato'] = async (id) => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return 'Contrato não encontrado.';
+    if (currentRole !== 'ti_admin') return 'Só o administrador reabre um contrato encerrado.';
+    const erro = await confirmarNoBanco(() => situacaoContratoDb(id, 'ativo'), 'Reabrir contrato');
+    if (erro) return erro;
+    setContratos((prev) =>
+      trocar(prev, { ...antes, status: 'ativo', encerradoEm: undefined, encerramentoMotivo: undefined, encerradoPor: undefined })
+    );
+    return null;
+  };
+
+  /** Copia o contrato com datas novas (itens e linhas passam para o novo); o anterior termina na véspera */
+  const renovarContrato: AppContextType['renovarContrato'] = async (id, inicio, fim, valor, numero) => {
+    const antes = contratos.find((c) => c.id === id);
+    if (!antes) return { erro: 'Contrato não encontrado.' };
+    if (fim && fim < inicio) return { erro: 'O fim precisa ser depois do início.' };
+    let novoIdDb = '';
+    const erro = await confirmarNoBanco(async () => {
+      novoIdDb = await renovarContratoDb(id, inicio, fim, valor, numero);
+    }, 'Renovar contrato');
+    if (erro) return { erro };
+    const vespera = new Date(`${inicio}T12:00:00`);
+    vespera.setDate(vespera.getDate() - 1);
+    const fimAnterior = vespera.toISOString().slice(0, 10);
+    const novo: Contrato = {
+      ...antes,
+      id: novoIdDb || novoId('ctr'),
+      numero: numero?.trim() || antes.numero,
+      inicio,
+      fim,
+      valor,
+      renovadoDe: antes.id,
+      status: 'ativo',
+      encerradoEm: undefined,
+      encerramentoMotivo: undefined,
+      arquivoCaminho: undefined,
+      criadoEm: new Date().toISOString(),
+    };
+    setContratos((prev) => [
+      novo,
+      ...prev.map((c) => (c.id === id && (!c.fim || c.fim >= inicio) && c.inicio <= fimAnterior ? { ...c, fim: fimAnterior } : c)),
+    ]);
+    return { item: novo };
+  };
+
+  const desfazerPagamento: AppContextType['desfazerPagamento'] = async (faturaId, motivo) => {
+    const antes = faturas.find((f) => f.id === faturaId);
+    if (!antes) return 'Fatura não encontrada.';
+    if (currentRole !== 'ti_admin') return 'Só o administrador desfaz um pagamento.';
+    if (motivo.trim().length < 5) return 'Informe o motivo (mínimo 5 caracteres).';
+    const erro = await confirmarNoBanco(() => desfazerPagamentoDb(faturaId, motivo), 'Desfazer pagamento');
+    if (erro) return erro;
+    setFaturas((prev) => trocar(prev, { ...antes, status: 'a_pagar', pagoEm: undefined, estornoMotivo: motivo.trim() }));
     return null;
   };
 
@@ -2677,6 +2758,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         editarContrato,
         cadastrarFatura,
         editarFatura,
+        encerrarContrato,
+        reabrirContrato,
+        renovarContrato,
+        desfazerPagamento,
         atribuicoesLicenca,
         alterarFatura,
         excluirFatura,

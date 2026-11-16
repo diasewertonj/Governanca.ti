@@ -5,6 +5,7 @@
 
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext.tsx';
+import { RecursosProvider } from './context/RecursosContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
@@ -224,7 +225,9 @@ function MainApp() {
 export default function App() {
   return (
     <AppProvider>
-      <MainApp />
+      <RecursosProvider>
+        <MainApp />
+      </RecursosProvider>
     </AppProvider>
   );
 }
