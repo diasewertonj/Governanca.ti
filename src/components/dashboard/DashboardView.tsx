@@ -3,6 +3,8 @@ import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
 import { DIAS_ALERTA_CONTRATO, garantiaEfetiva, situacaoContrato } from '../../utils/contratos.ts';
 import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts';
+import { brl, despesasRecorrentes, listarVencimentos } from '../../utils/financeiro.ts';
+import { useRecursos } from '../../context/RecursosContext.tsx';
 import { LembreteGarantia } from '../assets/LembreteGarantia.tsx';
 import { IndicadoresAtendimento } from './IndicadoresAtendimento.tsx';
 import {
@@ -31,6 +33,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     setSelectedTicketIdForDetail,
     currentRole,
   } = useApp();
+  const { linhas, estoque } = useRecursos();
 
   const totalAssets = assets.length;
   const assetsInUse = assets.filter((a) => a.status === 'em_uso').length;
@@ -55,6 +58,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   // Fase 8: contratos que vencem em 60 dias e faturas a pagar vencidas ou vencendo em 7 dias
   const contratosVencendo = contratos.filter((c) => situacaoContrato(c).situacao === 'vencendo').length;
   const faturasAPagar = resumoFaturasAPagar(faturas);
+  // Seção 6: custo recorrente (fonte única) e renovações/prazos de cancelamento em 30 dias
+  const custoMensal = despesasRecorrentes({ licencas: licenses, contratos, linhas }).reduce((s, i) => s + i.mensal, 0);
+  const renovacoes30 = listarVencimentos(
+    { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees },
+    30
+  ).filter((v) => v.tipo === 'contrato' || v.tipo === 'licenca' || v.tipo === 'cancelamento' || v.tipo === 'sem_contrato').length;
   const emManutencao = assets.filter((a) => a.status === 'manutencao').length;
   const mostrarQuadro =
     garantiasProximas.length > 0 ||
@@ -176,7 +185,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => onNavigate('fornecedores')}
+                  onClick={() => onNavigate('vencimentos')}
                   className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1"
                 >
                   <div className="text-xl font-bold text-amber-900">{contratosVencendo}</div>
@@ -184,14 +193,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                     {contratosVencendo === 1 ? 'contrato vence' : 'contratos vencem'} em {DIAS_ALERTA_CONTRATO} dias
                   </div>
                 </button>
-                <div>
+                <button type="button" onClick={() => onNavigate('despesas')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                  <div className="text-xl font-bold text-amber-900 font-mono">{brl(custoMensal)}</div>
+                  <div className="text-xs text-amber-800 underline-offset-2 hover:underline">custo mensal recorrente</div>
+                </button>
+                <button type="button" onClick={() => onNavigate('vencimentos')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                  <div className="text-xl font-bold text-amber-900">{renovacoes30}</div>
+                  <div className="text-xs text-amber-800 underline-offset-2 hover:underline">renovações e prazos de cancelamento em 30 dias</div>
+                </button>
+                <button type="button" onClick={() => onNavigate('contas_pagar')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
                   <div className="text-xl font-bold text-amber-900">
                     <span className={faturasAPagar.vencidas > 0 ? 'text-red-700' : ''}>{faturasAPagar.vencidas}</span>
                     <span className="text-amber-700 font-normal"> · </span>
                     {faturasAPagar.vencemEmBreve}
                   </div>
-                  <div className="text-xs text-amber-800">faturas vencidas · vencem em {DIAS_ALERTA_FATURA} dias</div>
-                </div>
+                  <div className="text-xs text-amber-800 underline-offset-2 hover:underline">faturas vencidas · vencem em {DIAS_ALERTA_FATURA} dias</div>
+                </button>
                 <button
                   type="button"
                   onClick={() => onNavigate('assets')}

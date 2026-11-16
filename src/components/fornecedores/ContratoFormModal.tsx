@@ -446,7 +446,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                             <option key={u.id} value={u.id}>{u.nome}{u.cidade ? ` · ${u.cidade}` : ''}</option>
                           ))}
                         </select>
-                        <p className="text-xs text-slate-500 mt-1">Unidades são cadastradas em Configurações.</p>
+                        <p className="text-xs text-slate-500 mt-1">Unidades são cadastradas em Contratos › Unidades.</p>
                       </div>
                     )}
                     {(CAMPOS_DETALHES[tipo] || []).map((c) => (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Building2, FileSignature, Phone, Plus, Search } from 'lucide-react';
+import { Building2, FileSignature, MapPin, Phone, Plus, Search } from 'lucide-react';
+import { UnidadesLista } from './UnidadesLista.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { LinhasLista } from './LinhasLista.tsx';
 import { useApp } from '../../context/AppContext.tsx';
@@ -17,7 +18,7 @@ import {
 import { ContratoFormModal } from './ContratoFormModal.tsx';
 import { FornecedorFormModal } from './FornecedorFormModal.tsx';
 
-type Aba = 'contratos' | 'fornecedores' | 'linhas';
+type Aba = 'contratos' | 'fornecedores' | 'linhas' | 'unidades';
 type FiltroContrato = 'vigentes' | 'vencendo' | 'encerrados' | 'todos';
 type FiltroFornecedor = 'todos' | 'ativos' | 'inativos';
 
@@ -125,6 +126,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               : ([
                   { id: 'contratos', rotulo: `Contratos (${contratos.length})`, Icone: FileSignature },
                   { id: 'linhas', rotulo: `Linhas telefônicas (${linhas.filter((l) => l.status !== 'cancelada').length})`, Icone: Phone },
+                  { id: 'unidades', rotulo: 'Unidades', Icone: MapPin },
                 ] as const)
           ).map(({ id, rotulo, Icone }) => (
             <button
@@ -186,7 +188,9 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
         </div>
       </div>
 
-      {aba === 'linhas' ? (
+      {aba === 'unidades' ? (
+        <UnidadesLista />
+      ) : aba === 'linhas' ? (
         <LinhasLista busca={termo} />
       ) : aba === 'contratos' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
