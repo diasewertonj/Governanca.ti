@@ -55,23 +55,30 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Identidade Corporativa */}
-        <div className="text-center">
-          <div className="inline-flex w-12 h-12 rounded-xl bg-blue-600 text-white items-center justify-center font-bold text-xl shadow-md mb-3">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10 sm:px-8">
+      <div className="w-full max-w-5xl grid gap-10 lg:grid-cols-2 lg:items-center">
+        {/* Apresentação: nome da empresa e o que o sistema faz (sem dados internos) */}
+        <div className="text-center lg:text-left">
+          <div className="inline-flex w-12 h-12 rounded-xl bg-blue-600 text-white items-center justify-center font-bold text-xl shadow-md mb-4">
             N
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Nexus IT & HR
-          </h1>
-          <p className="mt-1 text-xs text-slate-500 max-w-xs mx-auto">
-            {settings.razaoSocial} · Portal Interno de Governança de TI, Ativos e RH
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+            {settings.nomeFantasia || settings.razaoSocial}
           </p>
+          <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Governança de T.I. e RH em um só lugar
+          </h1>
+          <p className="mt-3 text-sm text-slate-600 max-w-md mx-auto lg:mx-0">
+            Equipamentos, acessos, chamados e admissões organizados, com histórico de cada decisão.
+          </p>
+          <ul className="mt-5 hidden sm:block space-y-2 text-sm text-slate-700 max-w-md mx-auto lg:mx-0">
+            <li>✓ Saber com quem está cada equipamento e licença</li>
+            <li>✓ Abrir e acompanhar chamados de suporte</li>
+            <li>✓ Acompanhar admissões e desligamentos</li>
+          </ul>
         </div>
-      </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="w-full max-w-md mx-auto">
         <div className="bg-white py-8 px-6 shadow-sm border border-slate-200/90 rounded-2xl sm:px-10 space-y-6">
           {/* BOTÃO DE LOGIN REAL COM GOOGLE (SUPABASE AUTH) */}
           <div>
@@ -218,6 +225,7 @@ export const LoginView: React.FC = () => {
             Aviso de privacidade
           </button>
         </p>
+      </div>
       </div>
       {mostrarPolitica && <PoliticaPrivacidadeModal settings={settings} onClose={() => setMostrarPolitica(false)} />}
     </div>
