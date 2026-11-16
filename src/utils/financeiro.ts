@@ -187,6 +187,24 @@ export function nomesParecidos<T extends { id: string; nome: string }>(nome: str
   });
 }
 
+/** Cadastros com fornecedor antigo em texto e sem vínculo com o cadastro (tela Conciliar fornecedores) */
+export interface PendenciaConciliacao {
+  tipo: 'licenca' | 'ativo';
+  id: string;
+  nome: string;
+  textoFornecedor: string;
+}
+export function pendenciasConciliacao(licencas: SoftwareLicense[], ativos: Asset[]): PendenciaConciliacao[] {
+  return [
+    ...licencas
+      .filter((l) => !l.fornecedorId && (l.fornecedor || '').trim())
+      .map((l) => ({ tipo: 'licenca' as const, id: l.id, nome: l.nome, textoFornecedor: l.fornecedor.trim() })),
+    ...ativos
+      .filter((a) => !a.fornecedorId && (a.fiscal?.fornecedor || '').trim() && a.status !== 'descartado')
+      .map((a) => ({ tipo: 'ativo' as const, id: a.id, nome: `${a.tag} · ${a.nome}`, textoFornecedor: (a.fiscal?.fornecedor || '').trim() })),
+  ];
+}
+
 /** CNPJ só com números (para comparar) */
 export const soDigitos = (s?: string) => (s || '').replace(/\D/g, '');
 

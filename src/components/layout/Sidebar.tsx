@@ -3,6 +3,12 @@ import { useApp } from '../../context/AppContext.tsx';
 import {
   ArrowLeftRight,
   Bell,
+  CalendarClock,
+  FileSignature,
+  GitMerge,
+  KeyRound,
+  PieChart,
+  Wallet,
   Briefcase,
   FileText,
   Handshake,
@@ -18,6 +24,8 @@ import {
 } from 'lucide-react';
 import { menuDoPapel, type Contador, type Icone } from '../../utils/navegacao.ts';
 import { termoAberto } from '../../utils/termos.ts';
+import { useRecursos } from '../../context/RecursosContext.tsx';
+import { listarVencimentos, pendenciasConciliacao } from '../../utils/financeiro.ts';
 
 const ICONES: Record<Icone, LucideIcon> = {
   inicio: House,
@@ -28,6 +36,12 @@ const ICONES: Record<Icone, LucideIcon> = {
   termos: FileText,
   ativos: Laptop,
   fornecedores: Handshake,
+  softwares: KeyRound,
+  contratos: FileSignature,
+  vencimentos: CalendarClock,
+  contas_pagar: Wallet,
+  despesas: PieChart,
+  conciliar: GitMerge,
   meus_equipamentos: Briefcase,
   meus_chamados: Ticket,
   configuracoes: Settings,
@@ -47,7 +61,14 @@ interface SidebarProps {
  * à esquerda; abaixo de 1024px vira gaveta aberta pelo botão do cabeçalho.
  */
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpenNewTicketModal, aberto, onFechar }) => {
-  const { currentRole, tickets, currentUser, lembretes, terms } = useApp();
+  const { currentRole, tickets, currentUser, lembretes, terms, assets, contratos, licenses, faturas, employees } = useApp();
+  const { estoque, linhas } = useRecursos();
+  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  // Seção 6: o que vence em 30 dias (e pendências sem data), só para a T.I.
+  const qtdVencimentos = isTI
+    ? listarVencimentos({ ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees }, 30).length
+    : 0;
+  const qtdConciliar = currentRole === 'ti_admin' ? pendenciasConciliacao(licenses, assets).length : 0;
 
   // Fecha a gaveta com Esc
   useEffect(() => {
@@ -68,18 +89,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     termos_para_assinar: terms.filter(
       (t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm
     ).length,
+    vencimentos: qtdVencimentos,
+    conciliar: qtdConciliar,
   };
   const corContador: Record<Contador, string> = {
     chamados: 'bg-slate-100 text-slate-700',
     meus_chamados: 'bg-slate-100 text-slate-700',
     lembretes: 'bg-red-100 text-red-800',
     termos_para_assinar: 'bg-amber-100 text-amber-900',
+    vencimentos: 'bg-amber-100 text-amber-900',
+    conciliar: 'bg-amber-100 text-amber-900',
   };
   const dicaContador: Record<Contador, string> = {
     chamados: 'chamados em aberto',
     meus_chamados: 'chamados seus em aberto',
     lembretes: 'lembretes vencidos ou para hoje',
     termos_para_assinar: 'termos para você assinar',
+    vencimentos: 'vencimentos nos próximos 30 dias ou pendências',
+    conciliar: 'cadastros com fornecedor antigo em texto',
   };
 
   const ir = (vista: string) => {

@@ -8,7 +8,13 @@ import type { UserRole } from '../types/index.ts';
 export type Vista =
   | 'dashboard'
   | 'assets'
+  | 'softwares'
   | 'fornecedores'
+  | 'contratos'
+  | 'vencimentos'
+  | 'contas_pagar'
+  | 'despesas'
+  | 'conciliar'
   | 'collaborators'
   | 'servicedesk'
   | 'rh_processes'
@@ -21,8 +27,14 @@ export type Vista =
 /** Título da tela (cabeçalho e aba do navegador) */
 export const TITULO_VISTA: Record<Vista, string> = {
   dashboard: 'Início',
-  assets: 'Ativos e licenças',
-  fornecedores: 'Fornecedores e contratos',
+  assets: 'Hardware',
+  softwares: 'Softwares e licenças',
+  fornecedores: 'Fornecedores',
+  contratos: 'Contratos',
+  vencimentos: 'Vencimentos',
+  contas_pagar: 'Contas a pagar',
+  despesas: 'Despesas',
+  conciliar: 'Conciliar fornecedores',
   collaborators: 'Colaboradores',
   servicedesk: 'Chamados',
   rh_processes: 'Admissões e desligamentos',
@@ -33,7 +45,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   my_tickets: 'Meus chamados',
 };
 
-export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar';
+export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar';
 
 export type Icone =
   | 'inicio'
@@ -44,6 +56,12 @@ export type Icone =
   | 'termos'
   | 'ativos'
   | 'fornecedores'
+  | 'softwares'
+  | 'contratos'
+  | 'vencimentos'
+  | 'contas_pagar'
+  | 'despesas'
+  | 'conciliar'
   | 'meus_equipamentos'
   | 'meus_chamados'
   | 'configuracoes';
@@ -98,10 +116,20 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
       titulo: 'Pessoas',
       itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes'), item('terms', 'termos')],
     },
-    { titulo: 'Patrimônio', itens: [item('assets', 'ativos'), item('fornecedores', 'fornecedores')] },
+    // Seção 6: inventário separado de fornecedores/contratos; Financeiro centraliza as despesas
+    { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares')] },
+    {
+      titulo: 'Fornecedores e contratos',
+      itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos'), item('vencimentos', 'vencimentos', 'vencimentos')],
+    },
+    { titulo: 'Financeiro', itens: [item('contas_pagar', 'contas_pagar'), item('despesas', 'despesas')] },
     MINHA_AREA,
   ];
-  if (papel === 'ti_admin') grupos.push({ titulo: 'Administração', itens: [item('settings', 'configuracoes')] });
+  if (papel === 'ti_admin')
+    grupos.push({
+      titulo: 'Administração',
+      itens: [item('settings', 'configuracoes'), item('conciliar', 'conciliar', 'conciliar')],
+    });
   return grupos;
 }
 

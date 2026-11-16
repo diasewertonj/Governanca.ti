@@ -8,6 +8,7 @@ import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { normalizar } from '../../utils/processos.ts';
 import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../../utils/contratos.ts';
+import { nomesParecidos, soDigitos } from '../../utils/financeiro.ts';
 
 interface FornecedorFormModalProps {
   /** Quando informado, edita este fornecedor */
@@ -15,10 +16,12 @@ interface FornecedorFormModalProps {
   onClose: () => void;
   /** Chamado depois de salvar (ex.: o formulário de contrato seleciona o fornecedor novo) */
   onSalvo?: (f: Fornecedor) => void;
+  /** Seção 6: nome já sugerido (ex.: fabricante, texto antigo na conciliação) */
+  nomeInicial?: string;
 }
 
 /** Fase 8: cadastro de fornecedor (só a T.I.). Excluir só para ti_admin e sem vínculos. */
-export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornecedor, onClose, onSalvo }) => {
+export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornecedor, onClose, onSalvo, nomeInicial }) => {
   const {
     fornecedores,
     contratos,
@@ -31,7 +34,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
     excluirFornecedor,
   } = useApp();
 
-  const [nome, setNome] = useState(fornecedor?.nome ?? '');
+  const [nome, setNome] = useState(fornecedor?.nome ?? nomeInicial ?? '');
   const [cnpj, setCnpj] = useState(fornecedor?.cnpj ?? '');
   const [contato, setContato] = useState(fornecedor?.contato ?? '');
   const [telefone, setTelefone] = useState(fornecedor?.telefone ?? '');
@@ -67,6 +70,9 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
     // Mesma regra do banco (uq_fornecedores_nome): nome único, sem diferenciar maiúsculas
     const repetido = fornecedores.some((f) => f.id !== fornecedor?.id && normalizar(f.nome) === normalizar(nome));
     if (repetido) return setErro('Já existe um fornecedor com esse nome.');
+    // Seção 6: CNPJ repetido (só números) também é duplicidade
+    const cnpjRepetido = soDigitos(cnpj) && fornecedores.find((f) => f.id !== fornecedor?.id && soDigitos(f.cnpj) === soDigitos(cnpj));
+    if (cnpjRepetido) return setErro(`O CNPJ já está cadastrado em ${cnpjRepetido.nome}.`);
 
     const dados = {
       nome: nome.trim(),
@@ -164,6 +170,12 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
                 placeholder="Ex.: Dell Computadores do Brasil Ltda"
                 className={CLASSE_CAMPO}
               />
+              {/* Seção 6: aviso de fornecedor parecido antes de criar repetido */}
+              {!fornecedor && nomesParecidos(nome, fornecedores).length > 0 && (
+                <p className="text-xs text-amber-800 mt-1">
+                  Parecido com: {nomesParecidos(nome, fornecedores).map((f) => f.nome).join(', ')}. Confira se não é o mesmo.
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="forn-cnpj" className={CLASSE_ROTULO}>
