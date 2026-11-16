@@ -84,7 +84,7 @@ export function erroCancelamento(
  */
 const TIPOS_A_REVERTER = new Set([
   'cadastro', 'conta', 'grupo_email', 'equipamento', 'acessorio', 'licenca', 'acesso_nexus',
-  'encerrar_recurso', 'devolver_equipamento', 'liberar_licenca',
+  'encerrar_recurso', 'devolver_equipamento', 'liberar_licenca', 'entregar_linha', 'liberar_linha',
 ]);
 export const passosAReverter = <T extends { tipo: string; status: string; titulo: string }>(itens: T[]) =>
   itens.filter((i) => i.status === 'feito' && TIPOS_A_REVERTER.has(i.tipo));

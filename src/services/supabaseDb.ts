@@ -1863,7 +1863,7 @@ export async function salvarCatalogoItemDb(item: CatalogoItem, novo: boolean) {
 const mapearItem = (i: {
   id: string; chamado_id: string; tipo: string; titulo: string; detalhe: string | null; sugerido_por: string;
   status: string; observacao: string | null; catalogo_id: string | null; recurso_id: string | null;
-  ativo_id: string | null; licenca_id: string | null; identificador: string | null; destino: string | null;
+  ativo_id: string | null; licenca_id: string | null; linha_id?: string | null; identificador: string | null; destino: string | null;
   destino_colaborador_id: string | null; condicao: string | null; lembrete_em: string | null; ordem: number;
   criado_por: string | null; criado_em: string; concluido_por: string | null; concluido_em: string | null;
 }): ProcessoItem => ({
@@ -1879,6 +1879,7 @@ const mapearItem = (i: {
   recursoId: i.recurso_id || undefined,
   ativoId: i.ativo_id || undefined,
   licencaId: i.licenca_id || undefined,
+  linhaId: i.linha_id || undefined,
   identificador: i.identificador || undefined,
   destino: (i.destino || undefined) as DestinoRecurso | undefined,
   destinoColaboradorId: i.destino_colaborador_id || undefined,
@@ -1914,6 +1915,7 @@ export async function inserirProcessoItensDb(chamadoId: string, itens: ProcessoI
     recurso_id: r.recursoId || null,
     ativo_id: r.ativoId || null,
     licenca_id: r.licencaId || null,
+    linha_id: r.linhaId || null,
     identificador: r.identificador || null,
     ordem: ordemInicial + i + 1,
   }));

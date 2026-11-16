@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ClipboardList, History, MinusCircle, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
+import { useRecursos } from '../../context/RecursosContext.tsx';
 import { fetchEventosProcessoDb, mensagemDeErro } from '../../services/supabaseDb.ts';
 import type { ProcessoEvento, ProcessoItem, ProcessoItemRascunho, Ticket, TipoItemProcesso } from '../../types/index.ts';
 import { formatDateTime } from '../../utils/formatters.ts';
@@ -52,6 +53,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     registrarItemProcesso,
     concluirProcesso,
   } = useApp();
+  const { linhas } = useRecursos();
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   const emAberto = ticket.status !== 'resolvido' && ticket.status !== 'cancelado';
@@ -82,7 +84,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     setRascunho(
       ehOnb
         ? montarOnboarding(ticket, catalogo, licenses)
-        : montarOffboarding(ticket, { recursos, ativos: assets, licencas: licenses }, nomeDe)
+        : montarOffboarding(ticket, { recursos, ativos: assets, licencas: licenses, linhas }, nomeDe)
     );
 
   const salvarRascunho = async () => {

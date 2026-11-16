@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Copy, KeyRound, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
+import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { DadosRegistroItem } from '../../services/supabaseDb.ts';
 import { assentosLivres, licencaDaConta } from '../../utils/admissao.ts';
 import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
@@ -73,7 +74,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const encerraConta = item.tipo === 'encerrar_recurso' && recurso?.tipo !== 'acessorio';
   const pedeDestino = encerraConta || item.tipo === 'dados_drive' || item.tipo === 'email';
   // Ajustes do desligamento: conta e licença só saem com a confirmação de que foram removidas na origem
-  const desvincula = encerraConta || item.tipo === 'liberar_licenca';
+  const desvincula = encerraConta || item.tipo === 'liberar_licenca' || item.tipo === 'liberar_linha';
   const colabPorEmail = ob
     ? employees.find((e) => e.email.toLowerCase() === ob.emailColaborador.trim().toLowerCase())
     : undefined;
@@ -117,7 +118,20 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const pessoas = employees.filter((e) => e.status !== 'desligado' && e.id !== colabId);
 
   // Ajustes da admissão: conta de um software com licença cadastrada já atribui a licença
-  const licencaConta = item.tipo === 'conta' ? licencaDaConta(item.titulo, licenses.filter(licencaAtiva)) : undefined;
+  // Seção 6: o item guarda qual licença (licencaId); o nome só é usado em itens antigos
+  const licencaConta =
+    item.tipo === 'conta'
+      ? (item.licencaId ? licenses.find((l) => l.id === item.licencaId && licencaAtiva(l)) : undefined) ||
+        licencaDaConta(item.titulo, licenses.filter(licencaAtiva))
+      : undefined;
+  // Seção 6: linhas e acessórios por quantidade
+  const { linhas, estoque, salvarLinha, movimentarEstoque } = useRecursos();
+  const linhaDoItem = item.tipo === 'liberar_linha' ? linhas.find((l) => l.id === item.linhaId) : undefined;
+  const [destinoLinha, setDestinoLinha] = useState<'estoque' | 'cancelar' | 'transferir'>('estoque');
+  const [linhaEscolhida, setLinhaEscolhida] = useState(item.linhaId || '');
+  const linhasLivres = linhas.filter((l) => l.status === 'ativa' && !l.colaboradorId);
+  const [estoqueItemId, setEstoqueItemId] = useState('');
+  const acessoriosEmEstoque = estoque.filter((i) => i.ativo && i.quantidade > 0);
   const jaTemLicenca = !!(licencaConta && colabId && licencaConta.colaboradoresIds.includes(colabId));
   const livresConta = licencaConta ? assentosLivres(licencaConta) : 0;
   const [atribuirLicenca, setAtribuirLicenca] = useState(true);
@@ -177,6 +191,8 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
         dados.destino = destino;
         if (destino === 'transferir') dados.destino_colaborador_id = destinoColab;
       }
+      if (item.tipo === 'entregar_linha' && !linhaEscolhida) return setErro('Escolha a linha entregue.');
+      if (item.tipo === 'liberar_linha' && destinoLinha === 'transferir' && !destinoColab) return setErro('Escolha quem fica com a linha.');
       if (item.tipo === 'devolver_equipamento') {
         if (!condicao) return setErro('Informe a condição: bom ou avaria.');
         if (condicao === 'avaria' && !obs.trim()) return setErro('Descreva a avaria encontrada.');
@@ -191,6 +207,26 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
     // Conta criada: ocupa o assento da licença correspondente (função atômica do banco)
     if (status === 'feito' && licencaConta && colabId && atribuirLicenca && !jaTemLicenca && livresConta > 0) {
       allocateLicense(licencaConta.id, colabId);
+    }
+    // Seção 6: linha entregue / devolvida e acessório que sai do estoque
+    if (status === 'feito' && item.tipo === 'entregar_linha' && colabId) {
+      const l = linhas.find((x) => x.id === linhaEscolhida);
+      if (l) {
+        const r = await salvarLinha({ ...l, colaboradorId: colabId });
+        if (r.erro) return setErro(`Passo registrado, mas a linha não foi ligada à pessoa: ${r.erro}`);
+      }
+    }
+    if (status === 'feito' && item.tipo === 'liberar_linha' && linhaDoItem) {
+      const r = await salvarLinha({
+        ...linhaDoItem,
+        colaboradorId: destinoLinha === 'transferir' ? destinoColab : undefined,
+        status: destinoLinha === 'cancelar' ? 'cancelada' : linhaDoItem.status,
+      });
+      if (r.erro) return setErro(`Passo registrado, mas a linha não foi atualizada: ${r.erro}`);
+    }
+    if (status === 'feito' && item.tipo === 'acessorio' && estoqueItemId && colabId) {
+      const falhaEst = await movimentarEstoque({ itemId: estoqueItemId, tipo: 'saida', quantidade: 1, colaboradorId: colabId, chamadoId: ticket.id, motivo: item.titulo });
+      if (falhaEst) return setErro(`Passo registrado, mas o estoque não baixou: ${falhaEst}`);
     }
     if (!senha) onFechar();
   };
@@ -449,6 +485,60 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
         </div>
       )}
 
+      {item.tipo === 'acessorio' && acessoriosEmEstoque.length > 0 && (
+        <div>
+          <label className={rotulo}>Sai do estoque (opcional)</label>
+          <select className={campo} value={estoqueItemId} onChange={(e) => setEstoqueItemId(e.target.value)}>
+            <option value=">Não baixar do estoque</option>
+            {acessoriosEmEstoque.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nome} · {i.quantidade} em estoque
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {item.tipo === 'entregar_linha' && (
+        <div>
+          <label className={rotulo}>Linha</label>
+          <select className={campo} value={linhaEscolhida} onChange={(e) => setLinhaEscolhida(e.target.value)}>
+            <option value=">Escolha...</option>
+            {linhasLivres.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.numero}
+                {l.plano ? ` · ${l.plano}` : ''}
+              </option>
+            ))}
+          </select>
+          {linhasLivres.length === 0 && <p className="text-xs text-amber-700 mt-1">Nenhuma linha livre. Cadastre em Contratos › Linhas telefônicas.</p>}
+        </div>
+      )}
+
+      {item.tipo === 'liberar_linha' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label className={rotulo}>O que fazer com a linha {linhaDoItem?.numero}</label>
+            <select className={campo} value={destinoLinha} onChange={(e) => setDestinoLinha(e.target.value as typeof destinoLinha)}>
+              <option value="estoque">Devolver ao estoque (sem pessoa)</option>
+              <option value="transferir">Passar para outra pessoa</option>
+              <option value="cancelar">Cancelar a linha</option>
+            </select>
+          </div>
+          {destinoLinha === 'transferir' && (
+            <div>
+              <label className={rotulo}>Quem fica com a linha</label>
+              <select className={campo} value={destinoColab} onChange={(e) => setDestinoColab(e.target.value)}>
+                <option value="">Escolha...</option>
+                {pessoas.map((p) => (
+                  <option key={p.id} value={p.id}>{p.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
       {item.tipo === 'licenca' && (
         <div>
           <label className={rotulo}>Licença</label>
@@ -469,7 +559,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
           <label className="flex items-start gap-2 cursor-pointer text-rose-900">
             <input type="checkbox" checked={confirmouExterno} onChange={(e) => setConfirmouExterno(e.target.checked)} className="mt-0.5" />
             <span>
-              {item.tipo === 'liberar_licenca'
+              {item.tipo === 'liberar_linha'
+                ? `Pedi à operadora o que foi escolhido para a linha ${linhaDoItem?.numero || item.titulo}`
+                : item.tipo === 'liberar_licenca'
                 ? `Removi o acesso de ${colab?.nome.split(' ')[0] || 'a pessoa'} a ${item.titulo} no painel do fornecedor`
                 : `Desativei a conta ${item.titulo}${recurso?.identificador ? ` (${recurso.identificador})` : ''} no sistema de origem`}
             </span>

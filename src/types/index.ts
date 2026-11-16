@@ -568,6 +568,8 @@ export type TipoItemProcesso =
   | 'encerrar_recurso'
   | 'devolver_equipamento'
   | 'liberar_licenca'
+  | 'entregar_linha'
+  | 'liberar_linha'
   | 'dados_drive'
   | 'email'
   | 'tarefa';
@@ -589,6 +591,7 @@ export interface ProcessoItem {
   recursoId?: string;
   ativoId?: string;
   licencaId?: string;
+  linhaId?: string; // Seção 6: entregar/liberar linha
   identificador?: string;
   destino?: DestinoRecurso;
   destinoColaboradorId?: string;
@@ -604,7 +607,7 @@ export interface ProcessoItem {
 /** Item ainda em montagem (antes de "Salvar checklist") */
 export type ProcessoItemRascunho = Pick<
   ProcessoItem,
-  'tipo' | 'titulo' | 'detalhe' | 'sugeridoPor' | 'catalogoId' | 'recursoId' | 'ativoId' | 'licencaId' | 'identificador'
+  'tipo' | 'titulo' | 'detalhe' | 'sugeridoPor' | 'catalogoId' | 'recursoId' | 'ativoId' | 'licencaId' | 'linhaId' | 'identificador'
 > & { chave: string };
 
 export type StatusRecurso = 'ativo' | 'suspenso' | 'excluido' | 'mantido' | 'transferido' | 'devolvido';

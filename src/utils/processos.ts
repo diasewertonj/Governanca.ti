@@ -49,6 +49,8 @@ export const ACAO_DO_TIPO: Record<TipoItemProcesso, string> = {
   encerrar_recurso: 'Encerrar acesso',
   devolver_equipamento: 'Recolher equipamento',
   liberar_licenca: 'Liberar licença',
+  entregar_linha: 'Entregar linha',
+  liberar_linha: 'Devolver ou cancelar linha',
   dados_drive: 'Dados do Drive',
   email: 'Caixa de e-mail',
   tarefa: 'Tarefa',
@@ -70,6 +72,8 @@ export function etapaDoItem(
     case 'licenca':
     case 'liberar_licenca':
     case 'acesso_nexus':
+    case 'entregar_linha':
+    case 'liberar_linha':
       return 'Contas e acessos';
     case 'equipamento':
     case 'acessorio':
@@ -199,6 +203,8 @@ export function montarOffboarding(
     recursos: ColaboradorRecurso[];
     ativos: Pick<Asset, 'id' | 'nome' | 'tag' | 'custodianteId'>[];
     licencas: Pick<SoftwareLicense, 'id' | 'nome' | 'colaboradoresIds'>[];
+    /** Seção 6: linhas da pessoa viram o passo Devolver ou cancelar linha */
+    linhas?: { id: string; numero: string; colaboradorId?: string; status: string }[];
   },
   nomeDe: (id?: string) => string | undefined = () => undefined
 ): ProcessoItemRascunho[] {
@@ -213,6 +219,9 @@ export function montarOffboarding(
   }
   for (const l of inventario.licencas.filter((x) => x.colaboradoresIds.includes(colab))) {
     itens.push(item('liberar_licenca', l.nome, { licencaId: l.id }));
+  }
+  for (const ln of (inventario.linhas || []).filter((x) => x.colaboradorId === colab && x.status !== 'cancelada')) {
+    itens.push(item('liberar_linha', `Linha ${ln.numero}`, { linhaId: ln.id, identificador: ln.numero }));
   }
 
   const driveDestino = off?.transferirDrive ? nomeDe(off.transferirDriveParaId) : undefined;
