@@ -14,9 +14,11 @@ const LIMITE_SUGESTOES = 8;
  * Busca por patrimônio, nome, marca, modelo, série ou fornecedor; os escolhidos
  * viram chips removíveis. Nada é gravado aqui: o formulário salva tudo junto.
  */
-export const SeletorItensContrato: React.FC<{ itens: ItemContrato[]; onChange: (itens: ItemContrato[]) => void }> = ({
+/** Seção 6: com ornecedorId, sugere primeiro (e sem digitar) os equipamentos e softwares desse fornecedor */
+export const SeletorItensContrato: React.FC<{ itens: ItemContrato[]; onChange: (itens: ItemContrato[]) => void; fornecedorId?: string }> = ({
   itens,
   onChange,
+  fornecedorId,
 }) => {
   const { assets, licenses } = useApp();
   const [busca, setBusca] = useState('');
@@ -32,15 +34,19 @@ export const SeletorItensContrato: React.FC<{ itens: ItemContrato[]; onChange: (
   const termo = normalizar(busca);
   const ativosEscolhidos = new Set(itens.flatMap((i) => (i.ativoId ? [i.ativoId] : [])));
   const licencasEscolhidas = new Set(itens.flatMap((i) => (i.licencaId ? [i.licencaId] : [])));
-  const sugestoes: { item: ItemContrato; texto: string; detalhe: string }[] = termo
+  const doFornecedor = (x: { fornecedorId?: string }) => !!fornecedorId && x.fornecedorId === fornecedorId;
+  const primeiroDoFornecedor = <T extends { fornecedorId?: string }>(a: T, b: T) => Number(doFornecedor(b)) - Number(doFornecedor(a));
+  const sugestoes: { item: ItemContrato; texto: string; detalhe: string }[] = termo || fornecedorId
     ? [
-        ...assets
+        ...[...assets]
+          .sort(primeiroDoFornecedor)
           .filter((a) => a.status !== 'descartado' && !ativosEscolhidos.has(a.id))
-          .filter((a) => normalizar(`${a.tag} ${a.nome} ${a.marca} ${a.modelo} ${a.serialNumber}`).includes(termo))
+          .filter((a) => (termo ? normalizar(`${a.tag} ${a.nome} ${a.marca} ${a.modelo} ${a.serialNumber}`).includes(termo) : doFornecedor(a)))
           .map((a) => ({ item: { ativoId: a.id }, texto: `${a.tag} · ${a.nome}`, detalhe: `${a.marca} ${a.modelo}`.trim() })),
-        ...licenses
-          .filter((l) => !licencasEscolhidas.has(l.id))
-          .filter((l) => normalizar(`${l.nome} ${l.fornecedor}`).includes(termo))
+        ...[...licenses]
+          .sort(primeiroDoFornecedor)
+          .filter((l) => !licencasEscolhidas.has(l.id) && l.status !== 'inativa')
+          .filter((l) => (termo ? normalizar(`${l.nome} ${l.fornecedor}`).includes(termo) : doFornecedor(l)))
           .map((l) => ({ item: { licencaId: l.id }, texto: l.nome, detalhe: `Licença · ${l.fornecedor}` })),
       ].slice(0, LIMITE_SUGESTOES)
     : [];
