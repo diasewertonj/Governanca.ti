@@ -27,6 +27,21 @@ import {
   ItemContrato,
   Lembrete,
   PeriodicidadeContrato,
+  DadosPagamento,
+  Moeda,
+  FormaPagamento,
+  FormaCobranca,
+  CategoriaDespesa,
+  Unidade,
+  AnexoContrato,
+  TipoAnexoContrato,
+  LinhaTelefonica,
+  AtribuicaoLinha,
+  ItemEstoque,
+  TipoAcessorio,
+  MovimentoEstoque,
+  TipoMovimentoEstoque,
+  EventoCadastro,
   StatusFatura,
   TipoContrato,
   ProcessoEvento,
@@ -263,14 +278,56 @@ const linhaLicenca = (l: SoftwareLicense): TablesInsert<'licencas_software'> => 
   colaboradores_ids: l.colaboradoresIds || [],
   valor_mensal: l.valorMensal,
   tipo_cobranca: l.tipoCobranca || 'mensal',
-  data_renovacao: l.dataRenovacao,
   url_painel: l.urlPainel || null,
   observacoes: l.observacoes || null,
   fornecedor_id: l.fornecedorId || null,
   // Lote 1 (L3): quem/quando da inativação é carimbado pelo banco
   status: l.status || 'ativa',
   inativacao_motivo: l.inativacaoMotivo || null,
+  // Seção 6: renovação só é obrigatória na cobrança própria
+  data_renovacao: l.dataRenovacao || null,
+  forma_cobranca: l.formaCobranca || 'propria',
+  fabricante: l.fabricante?.trim() || null,
+  comprado_direto: !!l.compradoDireto,
+  ...colunasPagamento(l.pagamento),
+  renovacao_automatica: l.pagamento?.renovacaoAutomatica ?? true,
+  centro_custo: l.centroCusto?.trim() || null,
+  categoria_despesa: l.categoriaDespesa || 'software',
+  responsavel_id: l.responsavelId || null,
 });
+
+/** Seção 6: bloco de pagamento comum a licença e contrato */
+function colunasPagamento(pg?: DadosPagamento) {
+  return {
+    moeda: pg?.moeda || 'BRL',
+    valor_moeda: pg?.moeda && pg.moeda !== 'BRL' && pg.valorMoeda != null ? pg.valorMoeda : null,
+    forma_pagamento: pg?.formaPagamento || null,
+    cartao_final: pg?.formaPagamento === 'cartao' ? pg.cartaoFinal?.trim() || null : null,
+    pagamento_titular: pg?.titular?.trim() || null,
+    aviso_cancelamento_dias: pg?.avisoCancelamentoDias ?? null,
+  };
+}
+
+type LinhaPagamento = {
+  moeda?: string | null;
+  valor_moeda?: number | null;
+  forma_pagamento?: string | null;
+  cartao_final?: string | null;
+  pagamento_titular?: string | null;
+  renovacao_automatica?: boolean | null;
+  aviso_cancelamento_dias?: number | null;
+};
+function pagamentoDeLinha(l: LinhaPagamento): DadosPagamento {
+  return {
+    moeda: (l.moeda || 'BRL') as Moeda,
+    valorMoeda: l.valor_moeda != null ? Number(l.valor_moeda) : undefined,
+    formaPagamento: (l.forma_pagamento || undefined) as FormaPagamento | undefined,
+    cartaoFinal: l.cartao_final || undefined,
+    titular: l.pagamento_titular || undefined,
+    renovacaoAutomatica: l.renovacao_automatica ?? undefined,
+    avisoCancelamentoDias: l.aviso_cancelamento_dias ?? undefined,
+  };
+}
 
 const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
   id: t.id,
@@ -756,7 +813,7 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     colaboradoresIds: (l.colaboradores_ids || []) as string[],
     valorMensal: Number(l.valor_mensal) || 0,
     tipoCobranca: (l.tipo_cobranca || 'mensal') as 'mensal' | 'anual',
-    dataRenovacao: l.data_renovacao,
+    dataRenovacao: l.data_renovacao || '',
     urlPainel: l.url_painel || undefined,
     observacoes: l.observacoes || undefined,
     fornecedorId: l.fornecedor_id || undefined,
@@ -764,6 +821,13 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     inativadaEm: l.inativada_em || undefined,
     inativadaPor: l.inativada_por || undefined,
     inativacaoMotivo: l.inativacao_motivo || undefined,
+    formaCobranca: (l.forma_cobranca || 'propria') as FormaCobranca,
+    fabricante: l.fabricante || undefined,
+    compradoDireto: !!l.comprado_direto,
+    pagamento: pagamentoDeLinha(l),
+    centroCusto: l.centro_custo || undefined,
+    categoriaDespesa: (l.categoria_despesa || 'software') as CategoriaDespesa,
+    responsavelId: l.responsavel_id || undefined,
   })) : [];
 }
 
@@ -901,6 +965,16 @@ const linhaContrato = (c: Contrato): TablesInsert<'contratos'> => ({
   sla: c.sla?.trim() || null,
   contato_suporte: c.contatoSuporte?.trim() || null,
   observacoes: c.observacoes?.trim() || null,
+  detalhes: json(c.detalhes || {}),
+  unidade_id: c.unidadeId || null,
+  ...colunasPagamento(c.pagamento),
+  renovacao_automatica: !!c.pagamento?.renovacaoAutomatica,
+  reajuste_indice: c.reajusteIndice?.trim() || null,
+  reajuste_mes: c.reajusteMes ?? null,
+  multa_cancelamento: c.multaCancelamento?.trim() || null,
+  responsavel_id: c.responsavelId || null,
+  centro_custo: c.centroCusto?.trim() || null,
+  categoria_despesa: c.categoriaDespesa || null,
 });
 
 export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
@@ -932,7 +1006,35 @@ export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
     itens: itensPorContrato[l.id] || [],
     criadoPor: l.criado_por || undefined,
     criadoEm: l.criado_em,
+    status: (l.status === 'encerrado' ? 'encerrado' : 'ativo') as 'ativo' | 'encerrado',
+    encerradoEm: l.encerrado_em || undefined,
+    encerradoPor: l.encerrado_por || undefined,
+    encerramentoMotivo: l.encerramento_motivo || undefined,
+    renovadoDe: l.renovado_de || undefined,
+    detalhes: (l.detalhes && typeof l.detalhes === 'object' ? l.detalhes : {}) as Record<string, string>,
+    unidadeId: l.unidade_id || undefined,
+    pagamento: pagamentoDeLinha(l),
+    reajusteIndice: l.reajuste_indice || undefined,
+    reajusteMes: l.reajuste_mes ?? undefined,
+    multaCancelamento: l.multa_cancelamento || undefined,
+    responsavelId: l.responsavel_id || undefined,
+    centroCusto: l.centro_custo || undefined,
+    categoriaDespesa: (l.categoria_despesa || undefined) as CategoriaDespesa | undefined,
   }));
+}
+
+/** Seção 6: encerrar e reabrir (reabrir só o admin; o banco confere) */
+export async function situacaoContratoDb(id: string, status: 'ativo' | 'encerrado', motivo?: string, em?: string) {
+  await atualizar('contratos', id, status === 'encerrado'
+    ? { status, encerrado_em: em || new Date().toISOString().slice(0, 10), encerramento_motivo: motivo?.trim() || null }
+    : { status });
+}
+
+export async function renovarContratoDb(id: string, inicio: string, fim: string | undefined, valor: number, numero?: string): Promise<string> {
+  if (!supabase) return '';
+  return (await checar(
+    supabase.rpc('renovar_contrato', { p_contrato: id, p_inicio: inicio, p_fim: fim || null, p_valor: valor, p_numero: numero || null })
+  )) as string;
 }
 
 /**
@@ -971,6 +1073,9 @@ const linhaFatura = (f: Fatura): TablesInsert<'faturas'> => ({
   status: f.status,
   numero_documento: f.numeroDocumento?.trim() || null,
   observacoes: f.observacoes?.trim() || null,
+  moeda: f.moeda || 'BRL',
+  valor_moeda: f.moeda && f.moeda !== 'BRL' ? f.valorMoeda ?? null : null,
+  forma_pagamento: f.formaPagamento || null,
 });
 
 export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
@@ -991,7 +1096,254 @@ export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
     observacoes: l.observacoes || undefined,
     criadoPor: l.criado_por || undefined,
     criadoEm: l.criado_em,
+    moeda: (l.moeda || 'BRL') as Moeda,
+    valorMoeda: l.valor_moeda != null ? Number(l.valor_moeda) : undefined,
+    formaPagamento: (l.forma_pagamento || undefined) as FormaPagamento | undefined,
+    estornoMotivo: l.estorno_motivo || undefined,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Seção 6 · Unidades, anexos de contrato, linhas, estoque e histórico.
+// Antes da migration as tabelas não existem: leitura devolve lista vazia.
+// ---------------------------------------------------------------------------
+const linhaUnidade = (u: Unidade): TablesInsert<'unidades'> => ({
+  id: u.id,
+  nome: u.nome.trim(),
+  endereco: u.endereco?.trim() || null,
+  cidade: u.cidade?.trim() || null,
+  uf: u.uf?.trim() || null,
+  cep: u.cep?.trim() || null,
+  observacoes: u.observacoes?.trim() || null,
+  ativo: u.ativo,
+});
+
+export async function fetchUnidadesFromDb(): Promise<Unidade[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('unidades').select('*').order('nome');
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: l.id,
+    nome: l.nome,
+    endereco: l.endereco || undefined,
+    cidade: l.cidade || undefined,
+    uf: l.uf || undefined,
+    cep: l.cep || undefined,
+    observacoes: l.observacoes || undefined,
+    ativo: l.ativo,
+  }));
+}
+export async function insertUnidadeDb(u: Unidade) {
+  if (!supabase) return;
+  await checar(supabase.from('unidades').insert(linhaUnidade(u)));
+}
+export async function updateUnidadeDb(antes: Unidade, depois: Unidade) {
+  await atualizar('unidades', depois.id, camposAlterados(linhaUnidade(antes), linhaUnidade(depois)));
+}
+
+export async function fetchAnexosContratoFromDb(): Promise<AnexoContrato[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('contrato_anexos').select('*').order('criado_em', { ascending: false });
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: l.id,
+    contratoId: l.contrato_id,
+    tipo: l.tipo as TipoAnexoContrato,
+    descricao: l.descricao || undefined,
+    arquivoCaminho: l.arquivo_caminho,
+    criadoEm: l.criado_em,
+  }));
+}
+
+/** Sobe o arquivo para contratos/<id>/ e registra o anexo */
+export async function enviarAnexoContratoDb(
+  contratoId: string,
+  arquivo: File,
+  tipo: TipoAnexoContrato,
+  descricao?: string
+): Promise<AnexoContrato | null> {
+  if (!supabase) return null;
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new Error(erro);
+  const caminho = `contratos/${contratoId}/${Date.now()}-${arquivo.name.replace(/[^\w.-]+/g, '_')}`;
+  const { error: errUp } = await supabase.storage.from('documentos').upload(caminho, arquivo);
+  if (errUp) throw errUp;
+  const linha = { contrato_id: contratoId, tipo, descricao: descricao?.trim() || null, arquivo_caminho: caminho };
+  const { data, error } = await supabase.from('contrato_anexos').insert(linha).select('*').single();
+  if (error) {
+    await removerArquivosDb([caminho]).catch(() => undefined);
+    throw error;
+  }
+  return { id: data.id, contratoId, tipo, descricao: data.descricao || undefined, arquivoCaminho: caminho, criadoEm: data.criado_em };
+}
+
+export async function removerAnexoContratoDb(a: AnexoContrato) {
+  await excluir('contrato_anexos', a.id);
+  await removerArquivosDb([a.arquivoCaminho]).catch(() => undefined);
+}
+
+const linhaLinha = (l: LinhaTelefonica): TablesInsert<'linhas_telefonicas'> => ({
+  id: l.id,
+  numero: l.numero.trim(),
+  tipo: l.tipo,
+  contrato_id: l.contratoId || null,
+  plano: l.plano?.trim() || null,
+  franquia: l.franquia?.trim() || null,
+  chip: l.chip?.trim() || null,
+  ativo_id: l.ativoId || null,
+  colaborador_id: l.colaboradorId || null,
+  status: l.status,
+  valor_mensal: l.valorMensal ?? null,
+  centro_custo: l.centroCusto?.trim() || null,
+  observacoes: l.observacoes?.trim() || null,
+});
+
+export async function fetchLinhasFromDb(): Promise<LinhaTelefonica[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('linhas_telefonicas').select('*').order('numero');
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: l.id,
+    numero: l.numero,
+    tipo: (l.tipo === 'fixa' ? 'fixa' : 'movel') as 'movel' | 'fixa',
+    contratoId: l.contrato_id || undefined,
+    plano: l.plano || undefined,
+    franquia: l.franquia || undefined,
+    chip: l.chip || undefined,
+    ativoId: l.ativo_id || undefined,
+    colaboradorId: l.colaborador_id || undefined,
+    status: l.status as LinhaTelefonica['status'],
+    valorMensal: l.valor_mensal != null ? Number(l.valor_mensal) : undefined,
+    centroCusto: l.centro_custo || undefined,
+    observacoes: l.observacoes || undefined,
+    criadoEm: l.criado_em,
+  }));
+}
+export async function insertLinhaDb(l: LinhaTelefonica) {
+  if (!supabase) return;
+  await checar(supabase.from('linhas_telefonicas').insert(linhaLinha(l)));
+}
+export async function updateLinhaDb(antes: LinhaTelefonica, depois: LinhaTelefonica) {
+  await atualizar('linhas_telefonicas', depois.id, camposAlterados(linhaLinha(antes), linhaLinha(depois)));
+}
+export async function deleteLinhaDb(id: string) {
+  await excluir('linhas_telefonicas', id);
+}
+
+export async function fetchAtribuicoesLinhaFromDb(): Promise<AtribuicaoLinha[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('linha_atribuicoes').select('*').order('inicio', { ascending: false });
+  if (error) return [];
+  return (data || []).map((a) => ({
+    id: a.id,
+    linhaId: a.linha_id,
+    colaboradorId: a.colaborador_id,
+    inicio: a.inicio || undefined,
+    fim: a.fim || undefined,
+  }));
+}
+
+const linhaEstoque = (i: ItemEstoque): TablesInsert<'estoque_itens'> => ({
+  id: i.id,
+  nome: i.nome.trim(),
+  tipo: i.tipo,
+  marca: i.marca?.trim() || null,
+  modelo: i.modelo?.trim() || null,
+  minimo: i.minimo,
+  localizacao: i.localizacao?.trim() || null,
+  fornecedor_id: i.fornecedorId || null,
+  valor_unitario: i.valorUnitario ?? null,
+  observacoes: i.observacoes?.trim() || null,
+  ativo: i.ativo,
+});
+
+export async function fetchEstoqueFromDb(): Promise<ItemEstoque[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('estoque_itens').select('*').order('nome');
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: l.id,
+    nome: l.nome,
+    tipo: l.tipo as TipoAcessorio,
+    marca: l.marca || undefined,
+    modelo: l.modelo || undefined,
+    quantidade: l.quantidade,
+    minimo: l.minimo,
+    localizacao: l.localizacao || undefined,
+    fornecedorId: l.fornecedor_id || undefined,
+    valorUnitario: l.valor_unitario != null ? Number(l.valor_unitario) : undefined,
+    observacoes: l.observacoes || undefined,
+    ativo: l.ativo,
+  }));
+}
+/** A quantidade não vai aqui: só muda por movimento */
+export async function insertItemEstoqueDb(i: ItemEstoque) {
+  if (!supabase) return;
+  await checar(supabase.from('estoque_itens').insert(linhaEstoque(i)));
+}
+export async function updateItemEstoqueDb(antes: ItemEstoque, depois: ItemEstoque) {
+  await atualizar('estoque_itens', depois.id, camposAlterados(linhaEstoque(antes), linhaEstoque(depois)));
+}
+export async function deleteItemEstoqueDb(id: string) {
+  await excluir('estoque_itens', id);
+}
+
+export async function fetchMovimentosEstoqueFromDb(): Promise<MovimentoEstoque[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('estoque_movimentos').select('*').order('criado_em', { ascending: false }).limit(2000);
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: l.id,
+    itemId: l.item_id,
+    tipo: l.tipo as TipoMovimentoEstoque,
+    quantidade: l.quantidade,
+    colaboradorId: l.colaborador_id || undefined,
+    chamadoId: l.chamado_id || undefined,
+    motivo: l.motivo || undefined,
+    criadoPor: l.criado_por || undefined,
+    criadoEm: l.criado_em,
+  }));
+}
+export async function insertMovimentoEstoqueDb(m: MovimentoEstoque) {
+  if (!supabase) return;
+  await checar(supabase.from('estoque_movimentos').insert({
+    id: m.id,
+    item_id: m.itemId,
+    tipo: m.tipo,
+    quantidade: m.quantidade,
+    colaborador_id: m.colaboradorId || null,
+    chamado_id: m.chamadoId || null,
+    motivo: m.motivo?.trim() || null,
+  }));
+}
+
+/** Histórico de alterações de um registro (gatilho no banco; só a T.I. lê) */
+export async function fetchEventosCadastroDb(entidade: string, registro: string): Promise<EventoCadastro[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('cadastro_eventos')
+    .select('*')
+    .eq('entidade', entidade)
+    .eq('registro', registro)
+    .order('em', { ascending: false })
+    .limit(200);
+  if (error) return [];
+  return (data || []).map((l) => ({
+    id: String(l.id),
+    entidade: l.entidade,
+    registro: l.registro,
+    acao: l.acao as EventoCadastro['acao'],
+    antes: (l.antes || undefined) as Record<string, unknown> | undefined,
+    depois: (l.depois || undefined) as Record<string, unknown> | undefined,
+    por: l.por || undefined,
+    em: l.em,
+  }));
+}
+
+/** Seção 6: só o admin desfaz um pagamento (com motivo) */
+export async function desfazerPagamentoDb(id: string, motivo: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('desfazer_pagamento', { p_fatura: id, p_motivo: motivo }));
 }
 
 export async function insertFaturaDb(f: Fatura) {
