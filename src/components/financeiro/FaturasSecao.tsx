@@ -300,7 +300,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                             <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Desfazer pagamento
                           </button>
                         )}
-                        {f.status !== 'cancelada' && (
+                        {f.status === 'a_pagar' && (
                           <button
                             type="button"
                             onClick={() => cancelar(f)}
