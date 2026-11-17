@@ -123,7 +123,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
       itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],
     },
     { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar')] },
-    MINHA_AREA,
+    // T.I./admin: sem Minha área — Meus equipamentos fica no menu da conta; os próprios chamados, em Chamados
   ];
   if (papel === 'ti_admin')
     grupos.push({
@@ -135,5 +135,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
 
 /** Telas que o perfil pode abrir (as que aparecem no menu dele) */
 export function vistasDoPapel(papel: UserRole): Vista[] {
-  return menuDoPapel(papel).flatMap((g) => g.itens.map((i) => i.vista));
+  const doMenu = menuDoPapel(papel).flatMap((g) => g.itens.map((i) => i.vista));
+  // Meus equipamentos abre pelo menu da conta (cabeçalho) para quem não tem Minha área no menu
+  return doMenu.includes('my_assets') ? doMenu : [...doMenu, 'my_assets'];
 }

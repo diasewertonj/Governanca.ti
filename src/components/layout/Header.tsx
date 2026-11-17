@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { MeusDadosModal } from '../lgpd/MeusDadosModal.tsx';
-import { Shield, LogOut, ChevronDown, Menu } from 'lucide-react';
+import { Shield, LogOut, ChevronDown, Menu, Briefcase } from 'lucide-react';
+import { termoAberto } from '../../utils/termos.ts';
 import { TITULO_VISTA, type Vista } from '../../utils/navegacao.ts';
 
 interface HeaderProps {
@@ -9,6 +10,8 @@ interface HeaderProps {
   /** Fase 7: abre o menu (gaveta) no celular/tablet */
   onAbrirMenu: () => void;
   menuAberto: boolean;
+  /** Seção 7: abre Meus equipamentos pelo menu da conta (T.I./admin) */
+  onNavigate?: (view: string) => void;
 }
 
 const ROTULO_PAPEL: Record<string, { label: string; badgeClass: string }> = {
@@ -48,8 +51,11 @@ export const LogoEmpresa: React.FC<{ tamanho?: string }> = ({ tamanho = 'w-8 h-8
   );
 };
 
-export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAberto }) => {
-  const { currentUser, currentRole, supabaseUser, logout, podeDescartarPendencias, settings } = useApp();
+export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAberto, onNavigate }) => {
+  const { currentUser, currentRole, supabaseUser, logout, podeDescartarPendencias, settings, terms } = useApp();
+  // T.I./admin não têm Minha área no menu: Meus equipamentos fica aqui, com o aviso de termo a assinar
+  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const termosParaAssinar = terms.filter((t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm).length;
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showMeusDados, setShowMeusDados] = useState(false);
 
@@ -112,6 +118,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
             </p>
             <span className="text-xs text-slate-600 leading-none mt-1 block">{papel.label}</span>
           </div>
+          {isTI && termosParaAssinar > 0 && (
+            <span className="text-xs font-semibold rounded-full px-1.5 bg-amber-100 text-amber-900" title={`${termosParaAssinar} termo(s) para você assinar`}>
+              {termosParaAssinar}
+            </span>
+          )}
           <ChevronDown className="w-4 h-4 text-slate-500" aria-hidden="true" />
           <span className="sr-only">Abrir menu da conta</span>
         </button>
@@ -129,6 +140,23 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
               </span>
             </div>
             <div className="pt-1 px-1">
+              {isTI && onNavigate && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowSwitchMenu(false);
+                    onNavigate('my_assets');
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <Briefcase className="w-4 h-4 text-slate-500" aria-hidden="true" />
+                  <span className="flex-1">Meus equipamentos</span>
+                  {termosParaAssinar > 0 && (
+                    <span className="text-xs font-semibold rounded-full px-2 py-0.5 bg-amber-100 text-amber-900">{termosParaAssinar} a assinar</span>
+                  )}
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"

@@ -105,7 +105,7 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Barra Superior Corporativa (Zone Contract) */}
-      <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} />
+      <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} onNavigate={navegar} />
 
       {/* Fase 2 (CRIT-04): falha de gravação no banco nunca mais passa em silêncio */}
       {dbErro && (

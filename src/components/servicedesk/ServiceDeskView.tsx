@@ -39,6 +39,16 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
   const [typeFilter, setTypeFilter] = useState<string>('todos');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [priorityFilter, setPriorityFilter] = useState<string>('todos');
+  // Seção 7: os chamados da própria T.I. ficam aqui (sem Meus chamados no menu), destacados e filtráveis
+  const [origemFiltro, setOrigemFiltro] = useState<'todos' | 'meus' | 'ti'>('todos');
+  const papelDoSolicitante = (t: Ticket) => employees.find((e) => e.id === t.solicitanteId)?.role;
+  const abertoPelaTI = (t: Ticket) => papelDoSolicitante(t) === 'ti_admin' || papelDoSolicitante(t) === 'ti_suporte';
+  const seloOrigem = (t: Ticket) =>
+    t.solicitanteId === currentUser?.id
+      ? { r: 'Aberto por você', c: 'text-indigo-800 bg-indigo-50 border-indigo-200' }
+      : abertoPelaTI(t)
+        ? { r: papelDoSolicitante(t) === 'ti_admin' ? 'Aberto pelo admin' : 'Aberto pela T.I.', c: 'text-slate-700 bg-slate-100 border-slate-200' }
+        : null;
 
   // Admissões e desligamentos ficam na tela própria (com histórico); aqui só chamados de suporte.
   // RH: só os chamados que ele mesmo abriu.
@@ -58,6 +68,8 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     const matchesType = typeFilter === 'todos' || tkt.tipo === typeFilter;
     const matchesStatus = statusFilter === 'todos' || tkt.status === statusFilter;
     const matchesPriority = priorityFilter === 'todos' || tkt.prioridade === priorityFilter;
+    const matchesOrigem =
+      origemFiltro === 'todos' || (origemFiltro === 'meus' ? tkt.solicitanteId === currentUser?.id : abertoPelaTI(tkt));
     // A busca também acha pelo equipamento, software, causa e solução registrada
     const termo = searchTerm.trim().toLowerCase();
     const textoBusca = [
@@ -75,7 +87,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
       .toLowerCase();
     const matchesSearch = !termo || textoBusca.includes(termo);
 
-    return naFila(tkt) && matchesType && matchesStatus && matchesPriority && matchesSearch;
+    return naFila(tkt) && matchesType && matchesStatus && matchesPriority && matchesOrigem && matchesSearch;
   });
   // Fase 10 C1: na fila de atendimento, o que vence primeiro vem antes
   if (fila === 'atendimento') {
@@ -217,6 +229,19 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
               <option value="alta">Alta</option>
               <option value="critica">Urgente</option>
             </select>
+
+            {!isRH && (
+              <select
+                value={origemFiltro}
+                onChange={(e) => setOrigemFiltro(e.target.value as typeof origemFiltro)}
+                aria-label="Quem abriu"
+                className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700"
+              >
+                <option value="todos">Todos os solicitantes</option>
+                <option value="meus">Abertos por mim</option>
+                <option value="ti">Abertos pela T.I. / admin</option>
+              </select>
+            )}
           </div>
         </div>
       </div>
@@ -257,6 +282,9 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                   <span className="block text-sm font-semibold text-slate-900">{tkt.titulo}</span>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-slate-600">
                     <span>{tkt.solicitanteNome}</span>
+                    {seloOrigem(tkt) && (
+                      <span className={`px-1.5 rounded border ${seloOrigem(tkt)!.c}`}>{seloOrigem(tkt)!.r}</span>
+                    )}
                     <span aria-hidden="true">·</span>
                     <span className={priorityInfo.cls}>{priorityInfo.label}</span>
                     <span aria-hidden="true">·</span>
@@ -340,6 +368,9 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                           <span>{tkt.solicitanteNome}</span>
                         </button>
                         <span className="text-xs text-slate-500 block">{tkt.solicitanteSetorNome}</span>
+                        {seloOrigem(tkt) && (
+                          <span className={`inline-block mt-0.5 px-1.5 rounded border text-xs ${seloOrigem(tkt)!.c}`}>{seloOrigem(tkt)!.r}</span>
+                        )}
                         {tkt.tipo === 'suporte' && tkt.colaboradorId && tkt.colaboradorId !== tkt.solicitanteId && (
                           <button
                             type="button"
