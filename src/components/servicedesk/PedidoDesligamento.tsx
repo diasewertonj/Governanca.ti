@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Key, Laptop, UserMinus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Ticket } from '../../types/index.ts';
@@ -39,41 +39,64 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
         {off.observacoes?.trim() && linha('Observações', <span className="whitespace-pre-wrap">{off.observacoes}</span>)}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-        <div>
-          <p className="font-semibold text-slate-700 mb-1">Equipamentos com a pessoa ({equipamentos.length})</p>
-          {equipamentos.length === 0 ? (
-            <p className="text-slate-500">Nenhum.</p>
-          ) : (
-            <ul className="space-y-1">
-              {equipamentos.map((a) => (
-                <li key={a.id} className="flex items-center gap-1.5">
-                  <Laptop className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
-                  <button type="button" onClick={() => setSelectedAssetIdFor360(a.id)} className="text-left text-blue-700 hover:underline">
-                    {a.tag} · {a.nome}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <p className="font-semibold text-slate-700 mb-1">Softwares com a pessoa ({softwares.length})</p>
-          {softwares.length === 0 ? (
-            <p className="text-slate-500">Nenhum.</p>
-          ) : (
-            <ul className="space-y-1">
-              {softwares.map((l) => (
-                <li key={l.id} className="flex items-center gap-1.5 text-slate-800">
-                  <Key className="w-3.5 h-3.5 text-purple-600 shrink-0" aria-hidden="true" />
-                  {l.nome}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-      <p className="text-slate-500">A T.I. recolhe os equipamentos e desvincula contas e softwares pelo checklist.</p>
+      {/* Equipamentos e softwares como etiquetas que quebram linha; listas longas mostram as 12 primeiras */}
+      <div className="space-y-2 pt-2 border-t border-slate-100">
+        <ListaEtiquetas
+          titulo={`Equipamentos com a pessoa (${equipamentos.length})`}
+          itens={equipamentos.map((a) => ({ id: a.id, texto: `${a.tag} · ${a.nome}`, onClick: () => setSelectedAssetIdFor360(a.id) }))}
+          icone={<Laptop className="w-3 h-3 text-slate-500 shrink-0" aria-hidden="true" />}
+        />
+        <ListaEtiquetas
+          titulo={`Softwares com a pessoa (${softwares.length})`}
+          itens={softwares.map((l) => ({ id: l.id, texto: l.nome }))}
+          icone={<Key className="w-3 h-3 text-purple-600 shrink-0" aria-hidden="true" />}
+        />
+      </div>      <p className="text-slate-500">A T.I. recolhe os equipamentos e desvincula contas e softwares pelo checklist.</p>
     </section>
+  );
+};
+
+const LIMITE_ETIQUETAS = 12;
+
+/** Etiquetas lado a lado (quebram linha); acima de 12, "mostrar todas" */
+const ListaEtiquetas: React.FC<{
+  titulo: string;
+  itens: { id: string; texto: string; onClick?: () => void }[];
+  icone: React.ReactNode;
+}> = ({ titulo, itens, icone }) => {
+  const [todas, setTodas] = useState(false);
+  const visiveis = todas ? itens : itens.slice(0, LIMITE_ETIQUETAS);
+  return (
+    <div>
+      <p className="font-semibold text-slate-700 mb-1">{titulo}</p>
+      {itens.length === 0 ? (
+        <p className="text-slate-500">Nenhum.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {visiveis.map((i) => {
+            const conteudo = (
+              <>
+                {icone}
+                <span className="truncate max-w-[16rem]">{i.texto}</span>
+              </>
+            );
+            return i.onClick ? (
+              <button key={i.id} type="button" onClick={i.onClick} title={i.texto} className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100">
+                {conteudo}
+              </button>
+            ) : (
+              <span key={i.id} title={i.texto} className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-800">
+                {conteudo}
+              </span>
+            );
+          })}
+          {itens.length > LIMITE_ETIQUETAS && (
+            <button type="button" onClick={() => setTodas(!todas)} className="px-2 py-0.5 text-blue-700 hover:underline">
+              {todas ? 'mostrar menos' : `mostrar todas (+${itens.length - LIMITE_ETIQUETAS})`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 };

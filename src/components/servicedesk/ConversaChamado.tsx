@@ -80,14 +80,16 @@ interface ConversaChamadoProps {
   /** T.I. vê as notas internas (em aba própria) */
   podeVerNotas: boolean;
   meuId?: string;
+  /** A T.I. abre direto nas anotações do atendimento */
+  abaInicial?: 'conversa' | 'notas';
 }
 
 /**
  * Atendimento: a conversa com quem abriu e, para a T.I., as notas internas em
  * aba separada. A descrição não se repete aqui (fica em "Problema relatado").
  */
-export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVerNotas, meuId }) => {
-  const [aba, setAba] = useState<'conversa' | 'notas' | 'historico'>('conversa');
+export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVerNotas, meuId, abaInicial }) => {
+  const [aba, setAba] = useState<'conversa' | 'notas' | 'historico'>(podeVerNotas && abaInicial === 'notas' ? 'notas' : 'conversa');
   const todas = mensagensDaConversa(ticket, podeVerNotas);
   const conversa = todas.filter((m) => !m.ehNotaInterna);
   const notas = todas.filter((m) => m.ehNotaInterna);

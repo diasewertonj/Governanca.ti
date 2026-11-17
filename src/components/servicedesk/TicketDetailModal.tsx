@@ -55,7 +55,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   } = useApp();
 
   const [newMessageText, setNewMessageText] = useState('');
-  const [isInternalNote, setIsInternalNote] = useState(false);
+  // T.I.: a caixa ao lado é, por padrão, o caderno de anotações do atendimento (nota interna)
+  const [isInternalNote, setIsInternalNote] = useState(currentRole === 'ti_admin' || currentRole === 'ti_suporte');
   const [erroArquivo, setErroArquivo] = useState<string | null>(null);
   const [concluindoOffboarding, setConcluindoOffboarding] = useState(false);
   const [resumoOffboarding, setResumoOffboarding] = useState<string | null>(null);
@@ -386,8 +387,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           />
         </div>
 
-        {/* Padrão único: esquerda o pedido (problema, pedido do RH, checklist); direita o atendimento */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 mt-3 border-t border-slate-200">
+        {/* Padrão único: o pedido, o checklist e a solução ocupam 2/3; anotações e conversa ficam ao lado (1/3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 mt-3 border-t border-slate-200">
           <div className="p-4 sm:p-5 space-y-4 min-w-0">
         {/* Fase 10: o problema relatado logo abaixo do título, em destaque */}
         <div>
@@ -635,7 +636,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           <div className="p-4 sm:p-5 flex flex-col gap-4 min-w-0">
             <div className="flex-1">
               {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
-              <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} />
+              <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} abaInicial={isTI ? 'notas' : 'conversa'} />
             </div>
 
             {/* Caixa de Resposta */}
