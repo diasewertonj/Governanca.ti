@@ -5,6 +5,7 @@
 
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext.tsx';
+import { RecursosProvider } from './context/RecursosContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
@@ -15,6 +16,10 @@ import { DefinirSenhaView } from './components/auth/DefinirSenhaView.tsx';
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.tsx').then((m) => ({ default: m.DashboardView })));
 const AssetsView = lazy(() => import('./components/assets/AssetsView.tsx').then((m) => ({ default: m.AssetsView })));
 const FornecedoresView = lazy(() => import('./components/fornecedores/FornecedoresView.tsx').then((m) => ({ default: m.FornecedoresView })));
+const VencimentosView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.VencimentosView })));
+const ContasPagarView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.ContasPagarView })));
+const DespesasView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.DespesasView })));
+const ConciliarView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.ConciliarView })));
 const CollaboratorsView = lazy(() => import('./components/collaborators/CollaboratorsView.tsx').then((m) => ({ default: m.CollaboratorsView })));
 const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
 const RhProcessesView = lazy(() => import('./components/rh/RhProcessesView.tsx').then((m) => ({ default: m.RhProcessesView })));
@@ -137,8 +142,14 @@ function MainApp() {
           <Suspense fallback={<Carregando />}>
           {currentView === 'dashboard' &&
             (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} />)}
-          {currentView === 'assets' && <AssetsView />}
-          {currentView === 'fornecedores' && <FornecedoresView />}
+          {currentView === 'assets' && <AssetsView key="hardware" modo="hardware" />}
+          {currentView === 'softwares' && <AssetsView key="softwares" modo="softwares" />}
+          {currentView === 'fornecedores' && <FornecedoresView key="fornecedores" modo="fornecedores" />}
+          {currentView === 'contratos' && <FornecedoresView key="contratos" modo="contratos" />}
+          {currentView === 'vencimentos' && <VencimentosView />}
+          {currentView === 'contas_pagar' && <ContasPagarView />}
+          {currentView === 'despesas' && <DespesasView />}
+          {currentView === 'conciliar' && <ConciliarView />}
           {currentView === 'collaborators' && <CollaboratorsView />}
           {currentView === 'servicedesk' && (
             <ServiceDeskView onOpenNewTicketModal={() => setShowNewTicketModal(true)} />
@@ -224,7 +235,9 @@ function MainApp() {
 export default function App() {
   return (
     <AppProvider>
-      <MainApp />
+      <RecursosProvider>
+        <MainApp />
+      </RecursosProvider>
     </AppProvider>
   );
 }

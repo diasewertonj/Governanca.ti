@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Paperclip, Plus, Receipt, Trash2, Upload, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Paperclip, Pencil, Plus, Receipt, RotateCcw, Trash2, Upload, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
@@ -21,14 +21,18 @@ import {
 } from '../../utils/faturas.ts';
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
+import { nomeContrato } from '../../utils/contratos.ts';
+import { formaCobrancaDe, ROTULO_FORMA_PAGAMENTO } from '../../utils/financeiro.ts';
 
 interface FaturasSecaoProps {
-  /** Licença OU contrato dono das faturas */
-  alvo: AlvoFatura;
+  /** Licença OU contrato dono das faturas. Sem alvo = Contas a pagar (todas, com filtros) */
+  alvo?: AlvoFatura;
   /** Cobrança anual sugere a competência do ano seguinte */
-  periodicidade: PeriodicidadeContrato;
+  periodicidade?: PeriodicidadeContrato;
   /** Valor cadastrado (licença: valor mensal; contrato: valor), sugerido na fatura nova */
-  valorPadrao: number;
+  valorPadrao?: number;
+  /** Seção 6 (Contas a pagar): lista já filtrada pela tela */
+  listaGlobal?: Fatura[];
   /** Lote 1 (L2): quando informado, não deixa lançar fatura aqui e explica onde lançar */
   bloqueioLancamento?: string;
 }
@@ -48,19 +52,33 @@ const BOTAO_LINHA = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-mediu
  * próxima competência e o valor cadastrado), "Marcar como paga" e "Cancelar
  * fatura". Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
-export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade, valorPadrao, bloqueioLancamento }) => {
-  const { faturas, currentRole, alterarFatura, editarFatura, excluirFatura, anexarArquivoFatura } = useApp();
+export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal }) => {
+  const { faturas, currentRole, alterarFatura, editarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
+  const [editando, setEditando] = useState<Fatura | null>(null);
   const [lancando, setLancando] = useState(false);
   const [pagando, setPagando] = useState<{ id: string; data: string } | null>(null);
   // Arquivo de uma fatura já lançada sem arquivo: escolhe e só sobe ao clicar em "Enviar"
   const [anexando, setAnexando] = useState<{ id: string; arquivo: File | null; enviando: boolean } | null>(null);
   const [erro, setErro] = useState('');
-  useRegistrarPendencias(`fatura-arquivo:${alvo.licencaId || alvo.contratoId}`, anexando?.arquivo ? ['Arquivo da fatura não enviado'] : []);
+  useRegistrarPendencias(`fatura-arquivo:${alvo ? alvo.licencaId || alvo.contratoId : 'todas'}`, anexando?.arquivo ? ['Arquivo da fatura não enviado'] : []);
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   if (!isTI) return null;
 
-  const lista = faturasDoAlvo(faturas, alvo);
+  const lista = alvo ? faturasDoAlvo(faturas, alvo) : listaGlobal || faturas;
+  const origem = (f: Fatura) => {
+    if (f.contratoId) {
+      const c = contratos.find((x) => x.id === f.contratoId);
+      return c ? nomeContrato(c) : 'Contrato';
+    }
+    return licenses.find((l) => l.id === f.licencaId)?.nome || 'Licença';
+  };
+  const desfazer = async (f: Fatura) => {
+    const motivo = window.prompt(`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?\n\nInforme o motivo:`);
+    if (motivo === null) return;
+    const falha = await desfazerPagamento(f.id, motivo);
+    setErro(falha ? `Não foi possível desfazer: ${falha}` : '');
+  };
   const agora = new Date();
   const ano = agora.getFullYear();
 
@@ -119,6 +137,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
         <table className="tabela-cartoes w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
+              {!alvo && <th className="py-2 px-3">Origem</th>}
               <th className="py-2 px-3">Competência</th>
               <th className="py-2 px-3">Valor</th>
               <th className="py-2 px-3">Vencimento</th>
@@ -133,11 +152,22 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
               const status = statusExibido(f, agora);
               return (
                 <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
+                  {!alvo && (
+                    <td data-label="Origem" className="py-2 px-3 font-medium text-slate-900">
+                      {origem(f)}
+                    </td>
+                  )}
                   <td data-label="Competência" className="py-2 px-3 font-semibold text-slate-900">
                     {rotuloCompetencia(f.competencia)}
                   </td>
                   <td data-label="Valor" className="py-2 px-3 font-mono text-slate-800">
                     {formatCurrency(f.valor)}
+                    {f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null && (
+                      <span className="block text-slate-500">
+                        {f.moeda} {f.valorMoeda.toFixed(2)}
+                      </span>
+                    )}
+                    {f.formaPagamento && <span className="block text-slate-500">{ROTULO_FORMA_PAGAMENTO[f.formaPagamento]}</span>}
                   </td>
                   <td data-label="Vencimento" className="py-2 px-3">
                     {formatDate(f.vencimento)}
@@ -249,7 +279,28 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
                             <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Marcar como paga
                           </button>
                         )}
-                        {f.status !== 'cancelada' && (
+                        {f.status === 'a_pagar' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditando(f);
+                              setLancando(false);
+                            }}
+                            className={`${BOTAO_LINHA} text-slate-700 bg-white border-slate-200 hover:bg-slate-50`}
+                          >
+                            <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Editar
+                          </button>
+                        )}
+                        {f.status === 'paga' && currentRole === 'ti_admin' && (
+                          <button
+                            type="button"
+                            onClick={() => desfazer(f)}
+                            className={`${BOTAO_LINHA} text-amber-800 bg-white border-amber-200 hover:bg-amber-50`}
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Desfazer pagamento
+                          </button>
+                        )}
+                        {f.status === 'a_pagar' && (
                           <button
                             type="button"
                             onClick={() => cancelar(f)}
@@ -284,7 +335,17 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
         </p>
       )}
 
-      {bloqueioLancamento ? (
+      {editando ? (
+        <FormFatura
+          key={editando.id}
+          alvo={editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string }}
+          periodicidade={periodicidade}
+          valorPadrao={editando.valor}
+          doMesmoAlvo={faturasDoAlvo(faturas, editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string })}
+          editando={editando}
+          onFechar={() => setEditando(null)}
+        />
+      ) : bloqueioLancamento ? (
         <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5">{bloqueioLancamento}</p>
       ) : lancando ? (
         <FormFatura
@@ -309,27 +370,41 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade,
 
 /** Formulário de fatura nova, já preenchido com a próxima competência, o valor e o vencimento no dia 10 */
 const FormFatura: React.FC<{
-  alvo: AlvoFatura;
+  alvo?: AlvoFatura; // sem alvo: Contas a pagar escolhe licença ou contrato
   periodicidade: PeriodicidadeContrato;
   valorPadrao: number;
   doMesmoAlvo: Fatura[];
+  editando?: Fatura;
   onFechar: () => void;
-}> = ({ alvo, periodicidade, valorPadrao, doMesmoAlvo, onFechar }) => {
-  const { cadastrarFatura, anexarArquivoFatura } = useApp();
+}> = ({ alvo: alvoFixo, periodicidade, valorPadrao, doMesmoAlvo: doMesmoAlvoFixo, editando, onFechar }) => {
+  const { cadastrarFatura, editarFatura, anexarArquivoFatura, faturas, contratos, licenses } = useApp();
   const [salvando, setSalvando] = useState(false);
-  const [sugerida] = useState(() => proximaCompetencia(doMesmoAlvo, periodicidade));
+  // Seção 6: em Contas a pagar a pessoa escolhe de quem é a fatura (licença paga por contrato vai para o contrato)
+  const [alvoEscolhido, setAlvoEscolhido] = useState('');
+  const alvo: AlvoFatura | undefined =
+    alvoFixo ||
+    (alvoEscolhido.startsWith('c:')
+      ? { contratoId: alvoEscolhido.slice(2) }
+      : alvoEscolhido.startsWith('l:')
+        ? { licencaId: alvoEscolhido.slice(2) }
+        : undefined);
+  const doMesmoAlvo = alvoFixo ? doMesmoAlvoFixo : alvo ? faturasDoAlvo(faturas, alvo) : [];
+  const [sugerida] = useState(() => editando?.competencia || proximaCompetencia(doMesmoAlvo, periodicidade));
   const [competencia, setCompetencia] = useState(sugerida);
-  const [valor, setValor] = useState(String(valorPadrao));
-  const [vencimento, setVencimento] = useState(() => vencimentoSugerido(sugerida));
-  const [vencimentoEditado, setVencimentoEditado] = useState(false);
+  const [valor, setValor] = useState(String(editando?.valor ?? valorPadrao));
+  const [vencimento, setVencimento] = useState(() => editando?.vencimento || vencimentoSugerido(sugerida));
+  const [vencimentoEditado, setVencimentoEditado] = useState(!!editando);
   const [status, setStatus] = useState<Exclude<StatusFatura, 'cancelada'>>('a_pagar');
   const [pagoEm, setPagoEm] = useState('');
-  const [numeroDocumento, setNumeroDocumento] = useState('');
-  const [observacoes, setObservacoes] = useState('');
+  const [numeroDocumento, setNumeroDocumento] = useState(editando?.numeroDocumento || '');
+  const [observacoes, setObservacoes] = useState(editando?.observacoes || '');
+  const [moeda, setMoeda] = useState(editando?.moeda || 'BRL');
+  const [valorMoeda, setValorMoeda] = useState(editando?.valorMoeda != null ? String(editando.valorMoeda) : '');
+  const [formaPagamento, setFormaPagamento] = useState(editando?.formaPagamento || '');
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [erro, setErro] = useState('');
 
-  const chave = alvo.licencaId ? `licenca:${alvo.licencaId}` : `contrato:${alvo.contratoId}`;
+  const chave = editando ? `editar:${editando.id}` : alvo?.licencaId ? `licenca:${alvo.licencaId}` : alvo?.contratoId ? `contrato:${alvo.contratoId}` : 'nova';
   const valores = JSON.stringify([competencia, valor, vencimento, status, pagoEm, numeroDocumento, observacoes]);
   const [valoresIniciais] = useState(valores);
   const pendenciasFatura = valores !== valoresIniciais || arquivo ? ['Fatura nova não lançada'] : [];
@@ -355,8 +430,12 @@ const FormFatura: React.FC<{
   const lancar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (salvando) return;
+    if (!alvo) return setErro('Escolha de quem é a fatura (contrato ou licença).');
     const dados = {
       ...alvo,
+      moeda: moeda as Fatura['moeda'],
+      valorMoeda: moeda !== 'BRL' && valorMoeda !== '' ? Number(valorMoeda) : undefined,
+      formaPagamento: (formaPagamento || undefined) as Fatura['formaPagamento'],
       competencia,
       valor: valor === '' ? Number.NaN : Number(valor),
       vencimento,
@@ -365,10 +444,25 @@ const FormFatura: React.FC<{
       numeroDocumento: numeroDocumento.trim() || undefined,
       observacoes: observacoes.trim() || undefined,
     };
-    const problema = validarFatura({ id: '', ...dados }, doMesmoAlvo);
+    const problema = validarFatura({ id: editando?.id || '', ...dados }, doMesmoAlvo.filter((f) => f.id !== editando?.id));
     if (problema) return setErro(problema);
     setErro('');
     setSalvando(true);
+    if (editando) {
+      const falhaEd = await editarFatura(editando.id, {
+        competencia: dados.competencia,
+        valor: dados.valor,
+        vencimento: dados.vencimento,
+        numeroDocumento: dados.numeroDocumento,
+        observacoes: dados.observacoes,
+        moeda: dados.moeda,
+        valorMoeda: dados.valorMoeda,
+        formaPagamento: dados.formaPagamento,
+      });
+      setSalvando(false);
+      if (falhaEd) return setErro(`Não foi possível salvar: ${falhaEd}`);
+      return onFechar();
+    }
     const { item: nova, erro: falha } = await cadastrarFatura(dados);
     setSalvando(false);
     if (!nova) return setErro(`Não foi possível lançar: ${falha || 'erro desconhecido'}`);
@@ -380,8 +474,47 @@ const FormFatura: React.FC<{
 
   return (
     <form onSubmit={lancar} className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-3">
-      <h4 className="text-xs font-bold text-blue-900">Lançar fatura</h4>
+      <h4 className="text-xs font-bold text-blue-900">{editando ? 'Editar fatura' : 'Lançar fatura'}</h4>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {!alvoFixo && (
+          <div className="md:col-span-3">
+            <label htmlFor={id('alvo')} className={CLASSE_ROTULO}>
+              De quem é a fatura *
+            </label>
+            <select
+              id={id('alvo')}
+              value={alvoEscolhido}
+              onChange={(e) => {
+                setAlvoEscolhido(e.target.value);
+                const c = contratos.find((x) => 'c:' + x.id === e.target.value);
+                const l = licenses.find((x) => 'l:' + x.id === e.target.value);
+                if (c) setValor(String(c.valor));
+                if (l) setValor(String(l.valorMensal));
+              }}
+              className={CLASSE_CAMPO}
+            >
+              <option value="">Escolha…</option>
+              <optgroup label="Contratos">
+                {contratos
+                  .filter((c) => c.status !== 'encerrado')
+                  .map((c) => (
+                    <option key={c.id} value={`c:${c.id}`}>
+                      {nomeContrato(c)}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="Softwares com cobrança própria">
+                {licenses
+                  .filter((l) => l.status !== 'inativa' && formaCobrancaDe(l, contratos) === 'propria')
+                  .map((l) => (
+                    <option key={l.id} value={`l:${l.id}`}>
+                      {l.nome}
+                    </option>
+                  ))}
+              </optgroup>
+            </select>
+          </div>
+        )}
         <div>
           <label htmlFor={id('comp')} className={CLASSE_ROTULO}>
             Competência *
@@ -472,6 +605,46 @@ const FormFatura: React.FC<{
             className={`${CLASSE_CAMPO} font-mono`}
           />
         </div>
+        <div>
+          <label htmlFor={id('moeda')} className={CLASSE_ROTULO}>
+            Moeda da cobrança
+          </label>
+          <select id={id('moeda')} value={moeda} onChange={(e) => setMoeda(e.target.value as 'BRL')} className={CLASSE_CAMPO}>
+            <option value="BRL">Real (R$)</option>
+            <option value="USD">Dólar (US$)</option>
+            <option value="EUR">Euro (€)</option>
+          </select>
+        </div>
+        {moeda !== 'BRL' && (
+          <div>
+            <label htmlFor={id('vmoeda')} className={CLASSE_ROTULO}>
+              Valor em {moeda}
+            </label>
+            <input
+              id={id('vmoeda')}
+              type="number"
+              min={0}
+              step="0.01"
+              value={valorMoeda}
+              onChange={(e) => setValorMoeda(e.target.value)}
+              className={`${CLASSE_CAMPO} font-mono`}
+            />
+            <p className="text-xs text-slate-500 mt-1">O campo Valor (R$) é o que saiu da conta, já com IOF.</p>
+          </div>
+        )}
+        <div>
+          <label htmlFor={id('pgto')} className={CLASSE_ROTULO}>
+            Forma de pagamento
+          </label>
+          <select id={id('pgto')} value={formaPagamento} onChange={(e) => setFormaPagamento(e.target.value)} className={CLASSE_CAMPO}>
+            <option value="">—</option>
+            {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="md:col-span-3">
           <label htmlFor={id('arq')} className={CLASSE_ROTULO}>
             Arquivo (PDF ou imagem)
@@ -517,7 +690,7 @@ const FormFatura: React.FC<{
           disabled={salvando}
           className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
         >
-          <Plus className="w-3.5 h-3.5" /> {salvando ? 'Lançando…' : 'Lançar fatura'}
+          <Plus className="w-3.5 h-3.5" /> {salvando ? 'Salvando…' : editando ? 'Salvar fatura' : 'Lançar fatura'}
         </button>
       </div>
     </form>

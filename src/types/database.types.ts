@@ -14,6 +14,279 @@ export type Database = {
   }
   public: {
     Tables: {
+      unidades: {
+        Row: {
+          id: string
+          nome: string
+          endereco: string | null
+          cidade: string | null
+          uf: string | null
+          cep: string | null
+          observacoes: string | null
+          ativo: boolean
+          criado_por: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          endereco?: string | null
+          cidade?: string | null
+          uf?: string | null
+          cep?: string | null
+          observacoes?: string | null
+          ativo?: boolean
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          endereco?: string | null
+          cidade?: string | null
+          uf?: string | null
+          cep?: string | null
+          observacoes?: string | null
+          ativo?: boolean
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      contrato_anexos: {
+        Row: {
+          id: string
+          contrato_id: string
+          tipo: string
+          descricao: string | null
+          arquivo_caminho: string
+          criado_por: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          contrato_id: string
+          tipo?: string
+          descricao?: string | null
+          arquivo_caminho: string
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          contrato_id?: string
+          tipo?: string
+          descricao?: string | null
+          arquivo_caminho?: string
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      linhas_telefonicas: {
+        Row: {
+          id: string
+          numero: string
+          tipo: string
+          contrato_id: string | null
+          plano: string | null
+          franquia: string | null
+          chip: string | null
+          ativo_id: string | null
+          colaborador_id: string | null
+          status: string
+          valor_mensal: number | null
+          centro_custo: string | null
+          observacoes: string | null
+          criado_por: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          numero: string
+          tipo?: string
+          contrato_id?: string | null
+          plano?: string | null
+          franquia?: string | null
+          chip?: string | null
+          ativo_id?: string | null
+          colaborador_id?: string | null
+          status?: string
+          valor_mensal?: number | null
+          centro_custo?: string | null
+          observacoes?: string | null
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          numero?: string
+          tipo?: string
+          contrato_id?: string | null
+          plano?: string | null
+          franquia?: string | null
+          chip?: string | null
+          ativo_id?: string | null
+          colaborador_id?: string | null
+          status?: string
+          valor_mensal?: number | null
+          centro_custo?: string | null
+          observacoes?: string | null
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      linha_atribuicoes: {
+        Row: {
+          id: string
+          linha_id: string
+          colaborador_id: string
+          inicio: string | null
+          fim: string | null
+          atribuido_por: string | null
+          removido_por: string | null
+        }
+        Insert: {
+          id?: string
+          linha_id: string
+          colaborador_id: string
+          inicio?: string | null
+          fim?: string | null
+          atribuido_por?: string | null
+          removido_por?: string | null
+        }
+        Update: {
+          id?: string
+          linha_id?: string
+          colaborador_id?: string
+          inicio?: string | null
+          fim?: string | null
+          atribuido_por?: string | null
+          removido_por?: string | null
+        }
+        Relationships: []
+      }
+      estoque_itens: {
+        Row: {
+          id: string
+          nome: string
+          tipo: string
+          marca: string | null
+          modelo: string | null
+          quantidade: number
+          minimo: number
+          localizacao: string | null
+          fornecedor_id: string | null
+          valor_unitario: number | null
+          observacoes: string | null
+          ativo: boolean
+          criado_por: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          tipo?: string
+          marca?: string | null
+          modelo?: string | null
+          quantidade?: number
+          minimo?: number
+          localizacao?: string | null
+          fornecedor_id?: string | null
+          valor_unitario?: number | null
+          observacoes?: string | null
+          ativo?: boolean
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          tipo?: string
+          marca?: string | null
+          modelo?: string | null
+          quantidade?: number
+          minimo?: number
+          localizacao?: string | null
+          fornecedor_id?: string | null
+          valor_unitario?: number | null
+          observacoes?: string | null
+          ativo?: boolean
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      estoque_movimentos: {
+        Row: {
+          id: string
+          item_id: string
+          tipo: string
+          quantidade: number
+          colaborador_id: string | null
+          chamado_id: string | null
+          motivo: string | null
+          criado_por: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          tipo: string
+          quantidade: number
+          colaborador_id?: string | null
+          chamado_id?: string | null
+          motivo?: string | null
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          tipo?: string
+          quantidade?: number
+          colaborador_id?: string | null
+          chamado_id?: string | null
+          motivo?: string | null
+          criado_por?: string | null
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      cadastro_eventos: {
+        Row: {
+          id: number
+          entidade: string
+          registro: string
+          acao: string
+          antes: Json | null
+          depois: Json | null
+          por: string | null
+          em: string
+        }
+        Insert: {
+          id?: number
+          entidade: string
+          registro: string
+          acao: string
+          antes?: Json | null
+          depois?: Json | null
+          por?: string | null
+          em?: string
+        }
+        Update: {
+          id?: number
+          entidade?: string
+          registro?: string
+          acao?: string
+          antes?: Json | null
+          depois?: Json | null
+          por?: string | null
+          em?: string
+        }
+        Relationships: []
+      }
       ativo_anexos: {
         Row: {
           ativo_id: string
@@ -616,6 +889,26 @@ export type Database = {
       }
       contratos: {
         Row: {
+          status: string
+          encerrado_em: string | null
+          encerrado_por: string | null
+          encerramento_motivo: string | null
+          renovado_de: string | null
+          detalhes: Json
+          unidade_id: string | null
+          moeda: string
+          valor_moeda: number | null
+          forma_pagamento: string | null
+          cartao_final: string | null
+          pagamento_titular: string | null
+          renovacao_automatica: boolean
+          aviso_cancelamento_dias: number | null
+          reajuste_indice: string | null
+          reajuste_mes: number | null
+          multa_cancelamento: string | null
+          responsavel_id: string | null
+          centro_custo: string | null
+          categoria_despesa: string | null
           arquivo_caminho: string | null
           contato_suporte: string | null
           criado_em: string
@@ -633,6 +926,26 @@ export type Database = {
           valor: number
         }
         Insert: {
+          status?: string
+          encerrado_em?: string | null
+          encerrado_por?: string | null
+          encerramento_motivo?: string | null
+          renovado_de?: string | null
+          detalhes?: Json
+          unidade_id?: string | null
+          moeda?: string
+          valor_moeda?: number | null
+          forma_pagamento?: string | null
+          cartao_final?: string | null
+          pagamento_titular?: string | null
+          renovacao_automatica?: boolean
+          aviso_cancelamento_dias?: number | null
+          reajuste_indice?: string | null
+          reajuste_mes?: number | null
+          multa_cancelamento?: string | null
+          responsavel_id?: string | null
+          centro_custo?: string | null
+          categoria_despesa?: string | null
           arquivo_caminho?: string | null
           contato_suporte?: string | null
           criado_em?: string
@@ -650,6 +963,26 @@ export type Database = {
           valor?: number
         }
         Update: {
+          status?: string
+          encerrado_em?: string | null
+          encerrado_por?: string | null
+          encerramento_motivo?: string | null
+          renovado_de?: string | null
+          detalhes?: Json
+          unidade_id?: string | null
+          moeda?: string
+          valor_moeda?: number | null
+          forma_pagamento?: string | null
+          cartao_final?: string | null
+          pagamento_titular?: string | null
+          renovacao_automatica?: boolean
+          aviso_cancelamento_dias?: number | null
+          reajuste_indice?: string | null
+          reajuste_mes?: number | null
+          multa_cancelamento?: string | null
+          responsavel_id?: string | null
+          centro_custo?: string | null
+          categoria_despesa?: string | null
           arquivo_caminho?: string | null
           contato_suporte?: string | null
           criado_em?: string
@@ -715,6 +1048,10 @@ export type Database = {
       }
       faturas: {
         Row: {
+          moeda: string
+          valor_moeda: number | null
+          forma_pagamento: string | null
+          estorno_motivo: string | null
           arquivo_caminho: string | null
           competencia: string
           contrato_id: string | null
@@ -730,6 +1067,10 @@ export type Database = {
           vencimento: string
         }
         Insert: {
+          moeda?: string
+          valor_moeda?: number | null
+          forma_pagamento?: string | null
+          estorno_motivo?: string | null
           arquivo_caminho?: string | null
           competencia: string
           contrato_id?: string | null
@@ -745,6 +1086,10 @@ export type Database = {
           vencimento: string
         }
         Update: {
+          moeda?: string
+          valor_moeda?: number | null
+          forma_pagamento?: string | null
+          estorno_motivo?: string | null
           arquivo_caminho?: string | null
           competencia?: string
           contrato_id?: string | null
@@ -915,10 +1260,23 @@ export type Database = {
       }
       licencas_software: {
         Row: {
+          forma_cobranca: string
+          fabricante: string | null
+          comprado_direto: boolean
+          moeda: string
+          valor_moeda: number | null
+          forma_pagamento: string | null
+          cartao_final: string | null
+          pagamento_titular: string | null
+          renovacao_automatica: boolean
+          aviso_cancelamento_dias: number | null
+          centro_custo: string | null
+          categoria_despesa: string
+          responsavel_id: string | null
           assentos_totais: number
           colaboradores_ids: Json | null
           created_at: string
-          data_renovacao: string
+          data_renovacao: string | null
           fornecedor: string
           fornecedor_id: string | null
           id: string
@@ -933,10 +1291,23 @@ export type Database = {
           inativacao_motivo: string | null
         }
         Insert: {
+          forma_cobranca?: string
+          fabricante?: string | null
+          comprado_direto?: boolean
+          moeda?: string
+          valor_moeda?: number | null
+          forma_pagamento?: string | null
+          cartao_final?: string | null
+          pagamento_titular?: string | null
+          renovacao_automatica?: boolean
+          aviso_cancelamento_dias?: number | null
+          centro_custo?: string | null
+          categoria_despesa?: string
+          responsavel_id?: string | null
           assentos_totais?: number
           colaboradores_ids?: Json | null
           created_at?: string
-          data_renovacao: string
+          data_renovacao: string | null
           fornecedor: string
           fornecedor_id?: string | null
           id: string
@@ -951,10 +1322,23 @@ export type Database = {
           inativacao_motivo?: string | null
         }
         Update: {
+          forma_cobranca?: string
+          fabricante?: string | null
+          comprado_direto?: boolean
+          moeda?: string
+          valor_moeda?: number | null
+          forma_pagamento?: string | null
+          cartao_final?: string | null
+          pagamento_titular?: string | null
+          renovacao_automatica?: boolean
+          aviso_cancelamento_dias?: number | null
+          centro_custo?: string | null
+          categoria_despesa?: string
+          responsavel_id?: string | null
           assentos_totais?: number
           colaboradores_ids?: Json | null
           created_at?: string
-          data_renovacao?: string
+          data_renovacao?: string | null
           fornecedor?: string
           fornecedor_id?: string | null
           id?: string
@@ -1317,6 +1701,8 @@ export type Database = {
       }
       lembretes: {
         Row: {
+          licenca_id: string | null
+          linha_id: string | null
           ativo_id: string | null
           chamado_id: string | null
           colaborador_id: string | null
@@ -1334,6 +1720,8 @@ export type Database = {
           vence_em: string
         }
         Insert: {
+          licenca_id?: string | null
+          linha_id?: string | null
           ativo_id?: string | null
           chamado_id?: string | null
           colaborador_id?: string | null
@@ -1351,6 +1739,8 @@ export type Database = {
           vence_em: string
         }
         Update: {
+          licenca_id?: string | null
+          linha_id?: string | null
           ativo_id?: string | null
           chamado_id?: string | null
           colaborador_id?: string | null
@@ -1401,6 +1791,8 @@ export type Database = {
       }
       processo_itens: {
         Row: {
+          linha_id: string | null
+          estoque_item_id: string | null
           ativo_id: string | null
           catalogo_id: string | null
           chamado_id: string
@@ -1425,6 +1817,8 @@ export type Database = {
           titulo: string
         }
         Insert: {
+          linha_id?: string | null
+          estoque_item_id?: string | null
           ativo_id?: string | null
           catalogo_id?: string | null
           chamado_id: string
@@ -1449,6 +1843,8 @@ export type Database = {
           titulo: string
         }
         Update: {
+          linha_id?: string | null
+          estoque_item_id?: string | null
           ativo_id?: string | null
           catalogo_id?: string | null
           chamado_id?: string
@@ -1479,6 +1875,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      renovar_contrato: {
+        Args: { p_contrato: string; p_inicio: string; p_fim: string | null; p_valor: number | null; p_numero?: string | null }
+        Returns: string
+      }
+      desfazer_pagamento: {
+        Args: { p_fatura: string; p_motivo: string }
+        Returns: undefined
+      }
       resolver_chamado: {
         Args: { p_causa: string; p_chamado: string; p_proximo_passo?: string; p_solucao: string; p_tempo_min?: number; p_tipo: string }
         Returns: undefined

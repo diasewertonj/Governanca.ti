@@ -13,16 +13,18 @@ export interface DadosLicencaForm {
   /** Na edição, a data antiga pode já ter passado: só valida se mudou */
   renovacaoMudou: boolean;
   pagaPorContrato: boolean;
+  /** Seção 6: sem custo dispensa fornecedor e renovação */
+  semCusto?: boolean;
 }
 
 export function erroLicenca(d: DadosLicencaForm, hoje: string): string | null {
   if (!d.nome.trim()) return 'Informe o nome do software.';
-  if (!d.fornecedorId) return 'Escolha o fornecedor (ou cadastre um novo).';
+  if (!d.fornecedorId && !d.semCusto) return 'Escolha o fornecedor (ou cadastre um novo).';
   if (!Number.isFinite(d.assentosTotais) || d.assentosTotais < 1) return 'A quantidade de assentos deve ser no mínimo 1.';
   if (d.assentosTotais < d.emUso) {
     return `O total de assentos (${d.assentosTotais}) não pode ser menor que os ${d.emUso} em uso.`;
   }
-  if (!d.pagaPorContrato) {
+  if (!d.pagaPorContrato && !d.semCusto) {
     if (!d.dataRenovacao) return 'Informe a data de renovação.';
     if (d.renovacaoMudou && d.dataRenovacao < hoje) return 'A data de renovação precisa ser hoje ou depois.';
   }

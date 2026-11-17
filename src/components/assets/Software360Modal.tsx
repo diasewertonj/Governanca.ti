@@ -20,6 +20,10 @@ import { chamadosDoSoftware } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
 import { History, Ban } from 'lucide-react';
 import { contratoQuePagaLicenca, nomeContrato } from '../../utils/contratos.ts';
+import { ROTULO_FORMA_COBRANCA, ROTULO_FORMA_PAGAMENTO, dataLimiteCancelamento, fonteCustoLicenca } from '../../utils/financeiro.ts';
+import { HistoricoAlteracoes } from '../comum/HistoricoAlteracoes.tsx';
+import { LembreteLicenca } from './LembreteLicenca.tsx';
+import { ContratoPorId } from '../financeiro/FinanceiroViews.tsx';
 import { historicoAssentos, licencaAtiva } from '../../utils/licencas.ts';
 
 interface Software360ModalProps {
@@ -45,8 +49,11 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     contratos,
     atribuicoesLicenca,
     mudarSituacaoLicenca,
+    faturas,
   } = useApp();
   const [motivoInativar, setMotivoInativar] = useState<string | null>(null);
+  // Seção 6: contrato aberto por cima da ficha (renovar, ver faturas)
+  const [contratoAberto, setContratoAberto] = useState<string | null>(null);
 
   const [selectedColabToAssign, setSelectedColabToAssign] = useState('');
   const [colabFilterSearch, setColabFilterSearch] = useState('');
@@ -63,6 +70,14 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   const ativa = licencaAtiva(license);
   const contratoPagador = contratoQuePagaLicenca(license.id, contratos);
   const historico = historicoAssentos(atribuicoesLicenca, { licencaId: license.id });
+  // Último contrato que cobriu a licença (para renovar quando nenhum está vigente)
+  const ultimoContrato = contratos
+    .filter((c) => c.itens.some((i) => i.licencaId === license.id))
+    .sort((a, b) => (b.fim || '9999').localeCompare(a.fim || '9999'))[0];
+  const onEditar = () => {
+    setSoftwareToEdit(license);
+    setSoftwareModalOpen(true);
+  };
   const nomePessoa = (id: string) => employees.find((e) => e.id === id)?.nome || 'Pessoa removida';
 
   const inativar = async () => {
@@ -388,51 +403,114 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             </div>
           </div>
 
-          {/* Card: Contrato e custo */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-            <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
-              Contrato e custo
-            </span>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Custo Mensal</span>
-                <span className="font-semibold text-slate-900 font-mono">
-                  {formatCurrency(license.valorMensal)}
-                </span>
+          {/* Seção 6: custo e renovação vêm da fonte única (contrato, licença ou sem custo) */}
+          {(() => {
+            const fonte = fonteCustoLicenca(license, contratos);
+            const pg = fonte.forma === 'contrato' ? fonte.contrato?.pagamento : license.pagamento;
+            const limite = dataLimiteCancelamento(fonte.renovacao, pg?.avisoCancelamentoDias);
+            return (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs uppercase font-bold text-slate-500 tracking-wider">Custo e renovação</span>
+                  <span className="text-xs text-slate-600">
+                    {ROTULO_FORMA_COBRANCA[fonte.forma]}
+                    {fonte.contrato && (
+                      <>
+                        {' · '}
+                        <button type="button" onClick={() => setContratoAberto(fonte.contrato!.id)} className="text-blue-700 hover:underline">
+                          {nomeContrato(fonte.contrato)}
+                        </button>
+                      </>
+                    )}
+                  </span>
+                </div>
+                {fonte.semContratoVigente ? (
+                  <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                    <p>Este software é pago por contrato, mas nenhum contrato vigente o cobre.</p>
+                    {isTI && (
+                      <div className="flex flex-wrap gap-2">
+                        {ultimoContrato && (
+                          <button type="button" onClick={() => setContratoAberto(ultimoContrato.id)} className="px-2 py-1 font-semibold border border-red-300 rounded-md bg-white">
+                            Renovar o contrato {nomeContrato(ultimoContrato)}
+                          </button>
+                        )}
+                        <button type="button" onClick={() => onEditar()} className="px-2 py-1 font-semibold border border-red-300 rounded-md bg-white">
+                          Passar a cobrar no software
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : fonte.forma === 'sem_custo' ? (
+                  <p className="text-xs text-slate-600">Software sem custo.</p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-xs text-slate-500 uppercase font-semibold block">Valor</span>
+                      <span className="font-semibold text-slate-900 font-mono">
+                        {formatCurrency(fonte.valor)}
+                        {fonte.periodicidade === 'anual' ? '/ano' : fonte.periodicidade === 'unico' ? ' (único)' : '/mês'}
+                      </span>
+                      <span className="block text-slate-500">{fonte.origem}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500 uppercase font-semibold block">Por assento</span>
+                      <span className="font-semibold text-slate-700 font-mono">
+                        {formatCurrency(license.assentosTotais > 0 ? fonte.mensal / license.assentosTotais : 0)}/mês
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500 uppercase font-semibold block">{fonte.forma === 'contrato' ? 'Fim do contrato' : 'Renovação'}</span>
+                      <span className="text-slate-800 font-medium">{fonte.renovacao ? formatDate(fonte.renovacao) : '—'}</span>
+                      {pg?.renovacaoAutomatica && <span className="block text-slate-500">renova sozinho</span>}
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500 uppercase font-semibold block">Cancelar até</span>
+                      <span className="text-slate-800 font-medium">{limite ? formatDate(limite) : '—'}</span>
+                    </div>
+                    {pg?.formaPagamento && (
+                      <div className="col-span-2">
+                        <span className="text-xs text-slate-500 uppercase font-semibold block">Pagamento</span>
+                        <span className="text-slate-800">
+                          {ROTULO_FORMA_PAGAMENTO[pg.formaPagamento]}
+                          {pg.cartaoFinal ? ` final ${pg.cartaoFinal}` : ''}
+                          {pg.titular ? ` · ${pg.titular}` : ''}
+                          {pg.moeda && pg.moeda !== 'BRL' && pg.valorMoeda != null ? ` · ${pg.moeda} ${pg.valorMoeda.toFixed(2)}` : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Custo por Assento</span>
-                <span className="font-semibold text-slate-700 font-mono">
-                  {formatCurrency(license.assentosTotais > 0 ? license.valorMensal / license.assentosTotais : 0)}/mês
-                </span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Data de Renovação</span>
-                <span className="text-slate-800 font-medium">{formatDate(license.dataRenovacao)}</span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Tipo de Assinatura</span>
-                <span className="text-slate-800 font-medium capitalize">
-                  {license.tipoCobranca || 'Mensal Corporativa'}
-                </span>
-              </div>
-            </div>
-          </div>
+            );
+          })()}
 
-          {/* Fase 8: faturas da licença (só a T.I.) */}
-          {isTI && (
-            <FaturasSecao
-              alvo={{ licencaId: license.id }}
-              periodicidade={license.tipoCobranca || 'mensal'}
-              valorPadrao={license.valorMensal}
-              bloqueioLancamento={
-                contratoPagador
-                  ? `Custo e faturas pelo contrato ${nomeContrato(contratoPagador)}: lance a fatura no contrato. As faturas acima são anteriores ao contrato.`
-                  : undefined
-              }
-            />
-          )}
+          {/* Seção 6: faturas no lugar certo — software pago por contrato mostra (e lança) as do contrato */}
+          {isTI && (() => {
+            const fonte = fonteCustoLicenca(license, contratos);
+            if (fonte.forma === 'contrato' && fonte.contrato) {
+              return (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-600">Faturas do contrato {nomeContrato(fonte.contrato)} (que paga este software):</p>
+                  <FaturasSecao alvo={{ contratoId: fonte.contrato.id }} periodicidade={fonte.contrato.periodicidade} valorPadrao={fonte.contrato.valor} />
+                  {faturas.some((f) => f.licencaId === license.id) && (
+                    <FaturasSecao alvo={{ licencaId: license.id }} bloqueioLancamento="Faturas antigas, de quando a cobrança era no próprio software." />
+                  )}
+                </div>
+              );
+            }
+            if (fonte.forma === 'sem_custo' && !faturas.some((f) => f.licencaId === license.id)) return null;
+            return (
+              <FaturasSecao
+                alvo={{ licencaId: license.id }}
+                periodicidade={license.tipoCobranca || 'mensal'}
+                valorPadrao={license.valorMensal}
+                bloqueioLancamento={fonte.forma === 'sem_custo' ? 'Software sem custo: não recebe faturas novas.' : undefined}
+              />
+            );
+          })()}
 
+          {isTI && <LembreteLicenca licenca={license} />}
+          {isTI && <HistoricoAlteracoes entidade="licencas_software" registro={license.id} />}
           {/* Lote 1 (L4): quem teve assento, de quando a quando */}
           {isTI && (
             <div className="border border-slate-200 rounded-xl p-4 space-y-2">
@@ -622,6 +700,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
           </div>
         </div>
       </div>
+      {contratoAberto && <ContratoPorId id={contratoAberto} onClose={() => setContratoAberto(null)} />}
     </div>
   );
 };

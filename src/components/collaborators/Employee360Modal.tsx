@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
+import { useRecursos } from '../../context/RecursosContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { chamadosDaPessoa, papelNoChamado } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
@@ -48,7 +49,9 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     acessoNexus,
     settings,
     atribuicoesLicenca,
+    fornecedores,
   } = useApp();
+  const { linhas, atribuicoesLinha, movimentos, estoque } = useRecursos();
 
   const [termSuccess, setTermSuccess] = useState<string | null>(null);
   const [conferencia, setConferencia] = useState<ItemTermo[] | null>(null);
@@ -139,6 +142,11 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
 
   // Licenças de software alocadas
   const assignedLicenses = licenses.filter((lic) => lic.colaboradoresIds.includes(employee.id));
+  // Seção 6: linhas e acessórios da pessoa
+  const isTIFicha = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const minhasLinhas = linhas.filter((l) => l.colaboradorId === employee.id && l.status !== 'cancelada');
+  const historicoLinhas = atribuicoesLinha.filter((a) => a.colaboradorId === employee.id);
+  const acessoriosRecebidos = movimentos.filter((m) => m.colaboradorId === employee.id && (m.tipo === 'saida' || m.tipo === 'devolucao'));
 
   // Termos gerados para o colaborador
   const employeeTerms = terms.filter((t) => t.colaboradorId === employee.id);
@@ -443,7 +451,10 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                   <div key={lic.id} className="p-3 bg-slate-50/70 border border-slate-200 rounded-md flex items-center justify-between text-xs">
                     <div>
                       <p className="font-semibold text-slate-900">{lic.nome}</p>
-                      <p className="text-xs text-slate-500">{lic.fornecedor} · Contrato: {lic.chaveContrato}</p>
+                      <p className="text-xs text-slate-500">
+                        {fornecedores.find((f) => f.id === lic.fornecedorId)?.nome || lic.fornecedor || 'Sem fornecedor'}
+                        {isTIFicha && lic.chaveContrato ? ` · Chave: ${lic.chaveContrato}` : ''}
+                      </p>
                     </div>
                     <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                       Assento Ativo
@@ -469,6 +480,29 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               </div>
             )}
           </div>
+
+          {/* Seção 6: linhas telefônicas e acessórios recebidos (só a T.I.) */}
+          {isTIFicha && (minhasLinhas.length > 0 || historicoLinhas.length > 0 || acessoriosRecebidos.length > 0) && (
+            <div className="border border-slate-200 rounded-lg p-4 space-y-2 text-xs">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-2 border-b border-slate-100">Linhas e acessórios</h3>
+              {minhasLinhas.map((l) => (
+                <p key={l.id}>
+                  <span className="font-mono font-semibold">{l.numero}</span>
+                  {l.plano ? ` · ${l.plano}` : ''} · {l.status === 'ativa' ? 'em uso' : l.status}
+                </p>
+              ))}
+              {historicoLinhas.filter((a) => a.fim).map((a) => (
+                <p key={a.id} className="text-slate-600">
+                  Teve a linha {linhas.find((l) => l.id === a.linhaId)?.numero || '—'}: {a.inicio ? formatDate(a.inicio.slice(0, 10)) : 'antes do histórico'} até {formatDate((a.fim || '').slice(0, 10))}
+                </p>
+              ))}
+              {acessoriosRecebidos.map((m) => (
+                <p key={m.id} className="text-slate-600">
+                  {m.tipo === 'saida' ? 'Recebeu' : 'Devolveu'} {m.quantidade}× {estoque.find((i) => i.id === m.itemId)?.nome || 'acessório'} em {formatDate(m.criadoEm.slice(0, 10))}
+                </p>
+              ))}
+            </div>
+          )}
 
           {/* 3. Documentos e Termos de Responsabilidade */}
           <div className="border border-slate-200 rounded-lg p-4 space-y-3">

@@ -21,6 +21,11 @@ export const ROTULO_TIPO_CONTRATO: Record<TipoContrato, string> = {
   manutencao: 'Manutenção',
   locacao: 'Locação',
   licenciamento: 'Licenciamento',
+  internet: 'Internet / link',
+  telefonia_movel: 'Telefonia móvel',
+  telefonia_fixa: 'Telefonia fixa / PABX',
+  nuvem: 'Nuvem / consumo',
+  dominio: 'Domínio e certificado',
   outro: 'Outro',
 };
 
@@ -37,9 +42,10 @@ export type SituacaoContrato = 'vigente' | 'vencendo' | 'encerrado' | 'a_iniciar
 
 /** Situação do contrato hoje e dias até o fim (quando há fim) */
 export function situacaoContrato(
-  c: Pick<Contrato, 'inicio' | 'fim'>,
+  c: Pick<Contrato, 'inicio' | 'fim' | 'status'>,
   agora: Date = new Date()
 ): { situacao: SituacaoContrato; dias?: number } {
+  if (c.status === 'encerrado') return { situacao: 'encerrado' };
   const dias = c.fim ? diasAte(c.fim, agora) : undefined;
   if (dias !== undefined && dias < 0) return { situacao: 'encerrado', dias };
   if (dias !== undefined && dias <= DIAS_ALERTA_CONTRATO) return { situacao: 'vencendo', dias };
@@ -48,7 +54,8 @@ export function situacaoContrato(
 }
 
 /** Em vigor hoje: já começou e não terminou */
-export function contratoVigente(c: Pick<Contrato, 'inicio' | 'fim'>, agora: Date = new Date()): boolean {
+export function contratoVigente(c: Pick<Contrato, 'inicio' | 'fim' | 'status'>, agora: Date = new Date()): boolean {
+  if (c.status === 'encerrado') return false;
   const hoje = isoLocal(agora);
   return c.inicio <= hoje && (!c.fim || c.fim >= hoje);
 }

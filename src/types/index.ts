@@ -191,6 +191,31 @@ export interface SoftwareLicense {
   inativadaEm?: string;
   inativadaPor?: string;
   inativacaoMotivo?: string;
+  // Seção 6: fonte única do custo e dados de pagamento
+  formaCobranca?: FormaCobranca; // vazio = 'propria' (dados antigos)
+  fabricante?: string;
+  compradoDireto?: boolean;
+  pagamento?: DadosPagamento;
+  centroCusto?: string;
+  categoriaDespesa?: CategoriaDespesa;
+  responsavelId?: string;
+}
+
+/** Seção 6: sem custo / cobrança própria (valor na licença) / pelo contrato (valor no contrato) */
+export type FormaCobranca = 'sem_custo' | 'propria' | 'contrato';
+export type CategoriaDespesa = 'software' | 'ia' | 'telefonia' | 'internet' | 'hardware' | 'nuvem' | 'servicos' | 'outros';
+export type FormaPagamento = 'boleto' | 'cartao' | 'debito' | 'pix' | 'transferencia' | 'outro';
+export type Moeda = 'BRL' | 'USD' | 'EUR';
+
+/** Como se paga e quando avisar (licença e contrato usam o mesmo bloco) */
+export interface DadosPagamento {
+  moeda?: Moeda;
+  valorMoeda?: number; // valor na moeda estrangeira (o valor em R$ fica no campo principal)
+  formaPagamento?: FormaPagamento;
+  cartaoFinal?: string; // só os 4 últimos dígitos
+  titular?: string;
+  renovacaoAutomatica?: boolean;
+  avisoCancelamentoDias?: number;
 }
 
 /** Lote 1 (L4): quem ocupou um assento da licença, de quando a quando */
@@ -221,7 +246,9 @@ export interface Fornecedor {
   criadoEm: string;
 }
 
-export type TipoContrato = 'suporte' | 'garantia_estendida' | 'manutencao' | 'locacao' | 'licenciamento' | 'outro';
+export type TipoContrato =
+  | 'suporte' | 'garantia_estendida' | 'manutencao' | 'locacao' | 'licenciamento'
+  | 'internet' | 'telefonia_movel' | 'telefonia_fixa' | 'nuvem' | 'dominio' | 'outro';
 export type PeriodicidadeContrato = 'mensal' | 'anual' | 'unico';
 
 /** O que o contrato cobre: um ativo OU uma licença (o banco confere) */
@@ -244,6 +271,109 @@ export interface Contrato {
   itens: ItemContrato[];
   criadoPor?: string;
   criadoEm: string;
+  // Seção 6
+  status?: 'ativo' | 'encerrado';
+  encerradoEm?: string;
+  encerradoPor?: string;
+  encerramentoMotivo?: string;
+  renovadoDe?: string;
+  detalhes?: Record<string, string>; // campos próprios do tipo (velocidade, plano, domínio…)
+  unidadeId?: string;
+  pagamento?: DadosPagamento;
+  reajusteIndice?: string;
+  reajusteMes?: number;
+  multaCancelamento?: string;
+  responsavelId?: string;
+  centroCusto?: string;
+  categoriaDespesa?: CategoriaDespesa;
+}
+
+export interface Unidade {
+  id: string;
+  nome: string;
+  endereco?: string;
+  cidade?: string;
+  uf?: string;
+  cep?: string;
+  observacoes?: string;
+  ativo: boolean;
+}
+
+export type TipoAnexoContrato = 'proposta' | 'contrato' | 'aditivo' | 'nota' | 'outro';
+export interface AnexoContrato {
+  id: string;
+  contratoId: string;
+  tipo: TipoAnexoContrato;
+  descricao?: string;
+  arquivoCaminho: string;
+  criadoEm: string;
+}
+
+/** Linha de celular ou fixa: tratada como um assento (pessoa, aparelho, histórico) */
+export interface LinhaTelefonica {
+  id: string;
+  numero: string;
+  tipo: 'movel' | 'fixa';
+  contratoId?: string;
+  plano?: string;
+  franquia?: string;
+  chip?: string;
+  ativoId?: string;
+  colaboradorId?: string;
+  status: 'ativa' | 'suspensa' | 'cancelada';
+  valorMensal?: number;
+  centroCusto?: string;
+  observacoes?: string;
+  criadoEm: string;
+}
+
+export interface AtribuicaoLinha {
+  id: string;
+  linhaId: string;
+  colaboradorId: string;
+  inicio?: string;
+  fim?: string;
+}
+
+export type TipoAcessorio = 'monitor' | 'mouse' | 'teclado' | 'cabo' | 'headset' | 'adaptador' | 'carregador' | 'webcam' | 'outro';
+export interface ItemEstoque {
+  id: string;
+  nome: string;
+  tipo: TipoAcessorio;
+  marca?: string;
+  modelo?: string;
+  quantidade: number;
+  minimo: number;
+  localizacao?: string;
+  fornecedorId?: string;
+  valorUnitario?: number;
+  observacoes?: string;
+  ativo: boolean;
+}
+
+export type TipoMovimentoEstoque = 'entrada' | 'saida' | 'devolucao' | 'ajuste';
+export interface MovimentoEstoque {
+  id: string;
+  itemId: string;
+  tipo: TipoMovimentoEstoque;
+  quantidade: number; // ajuste pode ser negativo
+  colaboradorId?: string;
+  chamadoId?: string;
+  motivo?: string;
+  criadoPor?: string;
+  criadoEm: string;
+}
+
+/** Histórico de alterações de cadastro (gatilho no banco) */
+export interface EventoCadastro {
+  id: string;
+  entidade: string;
+  registro: string;
+  acao: 'criado' | 'alterado' | 'excluido';
+  antes?: Record<string, unknown>;
+  depois?: Record<string, unknown>;
+  por?: string;
+  em: string;
 }
 
 /** "Vencida" não é gravada: é calculada (a pagar com vencimento já passado) */
@@ -264,6 +394,11 @@ export interface Fatura {
   observacoes?: string;
   criadoPor?: string;
   criadoEm: string;
+  // Seção 6: moeda estrangeira e estorno
+  moeda?: Moeda;
+  valorMoeda?: number;
+  formaPagamento?: FormaPagamento;
+  estornoMotivo?: string;
 }
 
 export type TicketType = 'suporte' | 'onboarding' | 'offboarding';
@@ -433,6 +568,8 @@ export type TipoItemProcesso =
   | 'encerrar_recurso'
   | 'devolver_equipamento'
   | 'liberar_licenca'
+  | 'entregar_linha'
+  | 'liberar_linha'
   | 'dados_drive'
   | 'email'
   | 'tarefa';
@@ -454,6 +591,7 @@ export interface ProcessoItem {
   recursoId?: string;
   ativoId?: string;
   licencaId?: string;
+  linhaId?: string; // Seção 6: entregar/liberar linha
   identificador?: string;
   destino?: DestinoRecurso;
   destinoColaboradorId?: string;
@@ -469,7 +607,7 @@ export interface ProcessoItem {
 /** Item ainda em montagem (antes de "Salvar checklist") */
 export type ProcessoItemRascunho = Pick<
   ProcessoItem,
-  'tipo' | 'titulo' | 'detalhe' | 'sugeridoPor' | 'catalogoId' | 'recursoId' | 'ativoId' | 'licencaId' | 'identificador'
+  'tipo' | 'titulo' | 'detalhe' | 'sugeridoPor' | 'catalogoId' | 'recursoId' | 'ativoId' | 'licencaId' | 'linhaId' | 'identificador'
 > & { chave: string };
 
 export type StatusRecurso = 'ativo' | 'suspenso' | 'excluido' | 'mantido' | 'transferido' | 'devolvido';
@@ -501,6 +639,8 @@ export interface Lembrete {
   colaboradorId?: string;
   ativoId?: string;
   contratoId?: string;
+  licencaId?: string; // Seção 6: renovação de software
+  linhaId?: string;
   itemId?: string;
   criadoPor?: string;
   criadoEm: string;

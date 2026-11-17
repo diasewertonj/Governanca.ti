@@ -3,6 +3,9 @@ import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, formatCurrency } from '../../utils/formatters.ts';
 import { garantiaEfetiva } from '../../utils/contratos.ts';
 import { licencaAtiva } from '../../utils/licencas.ts';
+import { fonteCustoLicenca, ROTULO_FORMA_COBRANCA } from '../../utils/financeiro.ts';
+import type { Contrato, SoftwareLicense } from '../../types/index.ts';
+import { EstoqueAcessorios } from './EstoqueAcessorios.tsx';
 import {
   Search,
   Plus,
@@ -16,7 +19,13 @@ import {
 } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 
-export const AssetsView: React.FC = () => {
+/** Seção 6: Inventário › Hardware (equipamentos e acessórios) ou Softwares e licenças */
+const origemCurta = (lic: SoftwareLicense, contratos: Contrato[]) => {
+  const f = fonteCustoLicenca(lic, contratos);
+  return f.forma === 'contrato' && f.contrato ? `pelo contrato ${f.contrato.numero || f.contrato.descricao}` : ROTULO_FORMA_COBRANCA[f.forma];
+};
+
+export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo = 'hardware' }) => {
   const {
     assets,
     licenses,
@@ -34,7 +43,7 @@ export const AssetsView: React.FC = () => {
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
-  const [categoryFilter, setCategoryFilter] = useState<string>('todos');
+  const [categoryFilter, setCategoryFilter] = useState<string>(modo === 'softwares' ? 'licencas_tab' : 'todos');
   const [statusFilter, setStatusFilter] = useState<string>('ativos');
   const [garantiaFilter, setGarantiaFilter] = useState<string>('todas');
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,7 +90,9 @@ export const AssetsView: React.FC = () => {
 
         {isTI && (
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            {categoryFilter === 'licencas_tab' ? (
+            {categoryFilter === 'acessorios_tab' ? (
+        <EstoqueAcessorios />
+      ) : categoryFilter === 'licencas_tab' ? (
               <button
                 type="button"
                 onClick={() => {
@@ -125,13 +136,16 @@ export const AssetsView: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Tabs por Categoria */}
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start flex-wrap">
-            {[
-              { id: 'todos', label: 'Todos os Ativos' },
-              { id: 'hardware', label: 'Hardware' },
-              { id: 'periferico', label: 'Periféricos' },
-              { id: 'telefonia', label: 'Telefonia' },
-              { id: 'licencas_tab', label: 'Licenças / SaaS' },
-            ].map((tab) => (
+            {(modo === 'softwares'
+              ? []
+              : [
+                  { id: 'todos', label: 'Todos os equipamentos' },
+                  { id: 'hardware', label: 'Computadores e servidores' },
+                  { id: 'periferico', label: 'Periféricos com patrimônio' },
+                  { id: 'telefonia', label: 'Celulares' },
+                  { id: 'acessorios_tab', label: 'Acessórios (estoque)' },
+                ]
+            ).map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -148,7 +162,7 @@ export const AssetsView: React.FC = () => {
           </div>
 
           {/* Busca e Filtro de Status */}
-          {categoryFilter !== 'licencas_tab' && (
+          {categoryFilter !== 'licencas_tab' && categoryFilter !== 'acessorios_tab' && (
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="relative w-full sm:w-auto">
                 <input
@@ -191,7 +205,9 @@ export const AssetsView: React.FC = () => {
       </div>
 
       {/* Visualização de Licenças de Software quando a tab for 'licencas_tab' */}
-      {categoryFilter === 'licencas_tab' ? (
+      {categoryFilter === 'acessorios_tab' ? (
+        <EstoqueAcessorios />
+      ) : categoryFilter === 'licencas_tab' ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Lote 1 (L3): inativas no fim, apagadas e marcadas */}
@@ -238,8 +254,14 @@ export const AssetsView: React.FC = () => {
 
                     <div className="text-right">
                       <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-50 px-2.5 py-1 rounded border border-slate-200 block">
-                        {formatCurrency(lic.valorMensal)}/mês
+                        {(() => {
+                          const fonte = fonteCustoLicenca(lic, contratos);
+                          if (fonte.forma === 'sem_custo') return 'Sem custo';
+                          if (fonte.semContratoVigente) return 'Sem contrato vigente';
+                          return `${formatCurrency(fonte.mensal)}/mês`;
+                        })()}
                       </span>
+                      <span className="text-xs text-slate-500 block mt-0.5">{origemCurta(lic, contratos)}</span>
                       <span className="text-xs text-slate-500 mt-1 block">
                         {freeCount > 0 ? (
                           <span className="text-emerald-700 font-semibold">{freeCount} assento(s) livre(s)</span>

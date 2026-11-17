@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Building2, FileSignature, Plus, Search } from 'lucide-react';
+import { Building2, FileSignature, MapPin, Phone, Plus, Search } from 'lucide-react';
+import { UnidadesLista } from './UnidadesLista.tsx';
+import { useRecursos } from '../../context/RecursosContext.tsx';
+import { LinhasLista } from './LinhasLista.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Contrato, Fornecedor, PeriodicidadeContrato } from '../../types/index.ts';
 import { formatCurrency, formatDate } from '../../utils/formatters.ts';
@@ -15,7 +18,7 @@ import {
 import { ContratoFormModal } from './ContratoFormModal.tsx';
 import { FornecedorFormModal } from './FornecedorFormModal.tsx';
 
-type Aba = 'contratos' | 'fornecedores';
+type Aba = 'contratos' | 'fornecedores' | 'linhas' | 'unidades';
 type FiltroContrato = 'vigentes' | 'vencendo' | 'encerrados' | 'todos';
 type FiltroFornecedor = 'todos' | 'ativos' | 'inativos';
 
@@ -56,9 +59,11 @@ const SeloFim: React.FC<{ contrato: Contrato }> = ({ contrato }) => {
  * itens cobertos e valor; aba Fornecedores com contato e vínculos. As tabelas
  * viram cartões abaixo de 768px.
  */
-export const FornecedoresView: React.FC = () => {
+/** Seção 6: telas separadas no menu — Fornecedores; Contratos (com aba Linhas telefônicas) */
+export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }> = ({ modo = 'contratos' }) => {
   const { fornecedores, contratos, assets, licenses } = useApp();
-  const [aba, setAba] = useState<Aba>('contratos');
+  const { linhas } = useRecursos();
+  const [aba, setAba] = useState<Aba>(modo === 'fornecedores' ? 'fornecedores' : 'contratos');
   const [busca, setBusca] = useState('');
   const [filtroContrato, setFiltroContrato] = useState<FiltroContrato>('vigentes');
   const [filtroFornecedor, setFiltroFornecedor] = useState<FiltroFornecedor>('todos');
@@ -95,17 +100,19 @@ export const FornecedoresView: React.FC = () => {
       {/* Topo */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900">Fornecedores e contratos</h2>
+          <h2 className="text-sm font-semibold text-slate-900">{modo === 'fornecedores' ? 'Fornecedores' : 'Contratos'}</h2>
           <p className="text-xs text-slate-500">
-            Contratos, itens cobertos e faturas
+            {modo === 'fornecedores'
+              ? 'Quem cobra a empresa: revendas, fabricantes, operadoras e prestadores'
+              : 'Contratos, itens cobertos, linhas e faturas'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setContratoAberto(null)} className={botaoPrimario}>
+          <button type="button" onClick={() => setContratoAberto(null)} className={modo === 'contratos' ? botaoPrimario : botaoSecundario}>
             <Plus className="w-4 h-4" /> Contrato
           </button>
-          <button type="button" onClick={() => setFornecedorAberto(null)} className={botaoSecundario}>
-            <Plus className="w-3.5 h-3.5 text-blue-600" /> Fornecedor
+          <button type="button" onClick={() => setFornecedorAberto(null)} className={modo === 'fornecedores' ? botaoPrimario : botaoSecundario}>
+            <Plus className="w-3.5 h-3.5" /> Fornecedor
           </button>
         </div>
       </div>
@@ -114,10 +121,13 @@ export const FornecedoresView: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div role="tablist" aria-label="Fornecedores e contratos" className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start flex-wrap">
           {(
-            [
-              { id: 'contratos', rotulo: `Contratos (${contratos.length})`, Icone: FileSignature },
-              { id: 'fornecedores', rotulo: `Fornecedores (${fornecedores.length})`, Icone: Building2 },
-            ] as const
+            modo === 'fornecedores'
+              ? ([{ id: 'fornecedores', rotulo: `Fornecedores (${fornecedores.length})`, Icone: Building2 }] as const)
+              : ([
+                  { id: 'contratos', rotulo: `Contratos (${contratos.length})`, Icone: FileSignature },
+                  { id: 'linhas', rotulo: `Linhas telefônicas (${linhas.filter((l) => l.status !== 'cancelada').length})`, Icone: Phone },
+                  { id: 'unidades', rotulo: 'Unidades', Icone: MapPin },
+                ] as const)
           ).map(({ id, rotulo, Icone }) => (
             <button
               key={id}
@@ -178,7 +188,11 @@ export const FornecedoresView: React.FC = () => {
         </div>
       </div>
 
-      {aba === 'contratos' ? (
+      {aba === 'unidades' ? (
+        <UnidadesLista />
+      ) : aba === 'linhas' ? (
+        <LinhasLista busca={termo} />
+      ) : aba === 'contratos' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
           <table className="tabela-cartoes w-full text-left text-xs border-collapse">
             <thead>
