@@ -40,15 +40,9 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [priorityFilter, setPriorityFilter] = useState<string>('todos');
 
-  // Regra Estrita: RH só visualiza Onboarding, Offboarding e chamados onde ele mesmo é o solicitante
-  const baseTickets = isRH
-    ? tickets.filter(
-        (t) =>
-          t.tipo === 'onboarding' ||
-          t.tipo === 'offboarding' ||
-          t.solicitanteId === currentUser?.id
-      )
-    : tickets;
+  // Admissões e desligamentos ficam na tela própria (com histórico); aqui só chamados de suporte.
+  // RH: só os chamados que ele mesmo abriu.
+  const baseTickets = tickets.filter((t) => t.tipo === 'suporte' && (!isRH || t.solicitanteId === currentUser?.id));
 
   // Fase 10: duas filas — o trabalho em andamento e o histórico de encerrados
   const [fila, setFila] = useState<'atendimento' | 'encerrados'>('atendimento');
@@ -108,19 +102,8 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     critica: { label: 'Urgente', cls: 'text-rose-700 font-bold' },
   };
 
-  const tabsToDisplay = isRH
-    ? [
-        { id: 'todos', label: 'Todas as Requisições' },
-        { id: 'onboarding', label: 'Onboarding (Admissões)' },
-        { id: 'offboarding', label: 'Offboarding (Desligamentos)' },
-        { id: 'suporte', label: 'Meus Chamados Técnicos' },
-      ]
-    : [
-        { id: 'todos', label: 'Todos os Chamados' },
-        { id: 'suporte', label: 'Suporte Técnico' },
-        { id: 'onboarding', label: 'Admissões' },
-        { id: 'offboarding', label: 'Desligamentos' },
-      ];
+  // Só há um tipo aqui: sem abas de tipo
+  const tabsToDisplay: { id: string; label: string }[] = [];
 
   return (
     <div className="space-y-6">

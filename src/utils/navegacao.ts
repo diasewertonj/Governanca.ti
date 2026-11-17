@@ -47,7 +47,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   my_tickets: 'Meus chamados',
 };
 
-export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar';
+export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar' | 'processos';
 
 export type Icone =
   | 'inicio'
@@ -102,11 +102,11 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
   if (papel === 'rh') {
     return [
       { itens: [item('dashboard', 'inicio')] },
+      // Os chamados do RH ficam em Minha área › Meus chamados; processos têm tela própria
       {
         titulo: 'Pessoas',
-        itens: [item('rh_processes', 'admissoes'), item('collaborators', 'colaboradores')],
+        itens: [item('rh_processes', 'admissoes', 'processos'), item('collaborators', 'colaboradores')],
       },
-      { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados', 'Chamados do RH')] },
       MINHA_AREA,
     ];
   }
@@ -115,7 +115,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
     // Início traz o Precisa de atenção (vencimentos, termos a assinar): o contador fica aqui
     { itens: [item('dashboard', 'inicio', 'vencimentos')] },
     { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados'), item('lembretes', 'lembretes', 'lembretes')] },
-    { titulo: 'Pessoas', itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes')] },
+    { titulo: 'Pessoas', itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes', 'processos')] },
     // Seção 6: inventário separado de fornecedores/contratos; Financeiro centraliza as despesas
     { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares')] },
     {

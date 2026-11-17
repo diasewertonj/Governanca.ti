@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { HistoricoProcessos } from './HistoricoProcessos.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { descricaoAdmissao } from '../../utils/admissao.ts';
@@ -30,7 +31,8 @@ export const RhProcessesView: React.FC = () => {
     setSelectedAssetIdFor360,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'offboarding' | 'onboarding'>('offboarding');
+  // Abre no histórico; os formulários só aparecem em Nova admissão / Novo desligamento
+  const [activeTab, setActiveTab] = useState<'lista' | 'offboarding' | 'onboarding'>('lista');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Estados do Offboarding
@@ -193,6 +195,7 @@ export const RhProcessesView: React.FC = () => {
     setOnbOutrosAcessos('');
     setTimeout(() => {
       setSuccessMessage(null);
+      setActiveTab('lista');
       setSelectedTicketIdForDetail(ticket.id);
     }, 1500);
   };
@@ -202,35 +205,45 @@ export const RhProcessesView: React.FC = () => {
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Admissões e desligamentos</h2>
+          <h2 className="text-sm font-semibold text-slate-900">
+            {activeTab === 'lista' ? 'Admissões e desligamentos' : activeTab === 'onboarding' ? 'Nova admissão' : 'Novo desligamento'}
+          </h2>
+          <p className="text-xs text-slate-500">
+            {activeTab === 'lista' ? 'Histórico e andamento de todos os processos' : 'Preencha o pedido; a T.I. recebe e monta o checklist'}
+          </p>
         </div>
 
-        {/* Tabs de Seleção */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+        {/* Ações: novo processo ou voltar ao histórico */}
+        <div className="flex flex-wrap items-center gap-2">
+          {activeTab !== 'lista' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('lista')}
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+            >
+              Voltar ao histórico
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setActiveTab('offboarding')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'offboarding'
-                ? 'bg-white text-rose-700 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+              activeTab === 'offboarding' ? 'bg-rose-50 text-rose-800 border-rose-300' : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
             }`}
           >
             <UserMinus className="w-3.5 h-3.5 text-rose-600" />
-            <span>Offboarding Inteligente</span>
+            <span>Novo desligamento</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('onboarding')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'onboarding'
-                ? 'bg-white text-blue-700 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+              activeTab === 'onboarding' ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
             }`}
           >
-            <UserPlus className="w-3.5 h-3.5 text-blue-600" />
-            <span>Solicitar Onboarding</span>
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Nova admissão</span>
           </button>
         </div>
       </div>
@@ -241,6 +254,8 @@ export const RhProcessesView: React.FC = () => {
           <span>{successMessage}</span>
         </div>
       )}
+
+      {activeTab === 'lista' && <HistoricoProcessos />}
 
       {/* MÓDULO 1: OFFBOARDING INTELIGENTE & CONDICIONAL */}
       {activeTab === 'offboarding' && (

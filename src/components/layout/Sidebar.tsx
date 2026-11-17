@@ -83,7 +83,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
   const emAberto = (s: string) => s === 'aberto' || s === 'em_andamento' || s === 'aguardando_terceiro';
   const contadores: Record<Contador, number> = {
     // A RLS já limita o que cada perfil enxerga (RH: os próprios e os de admissão/desligamento)
-    chamados: tickets.filter((t) => emAberto(t.status)).length,
+    chamados: tickets.filter((t) => t.tipo === 'suporte' && emAberto(t.status)).length,
+    processos: tickets.filter((t) => t.tipo !== 'suporte' && emAberto(t.status)).length,
     lembretes: lembretes.filter((l) => l.status === 'aberto' && l.venceEm <= hoje).length,
     meus_chamados: tickets.filter((t) => t.solicitanteId === currentUser?.id && emAberto(t.status)).length,
     // Lote 1: termo cancelado/substituído não conta (mesma regra de "Meus termos")
@@ -100,6 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     termos_para_assinar: 'bg-amber-100 text-amber-900',
     vencimentos: 'bg-amber-100 text-amber-900',
     conciliar: 'bg-amber-100 text-amber-900',
+    processos: 'bg-slate-100 text-slate-700',
   };
   const dicaContador: Record<Contador, string> = {
     chamados: 'chamados em aberto',
@@ -108,6 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     termos_para_assinar: 'termos para você assinar',
     vencimentos: 'vencimentos nos próximos 30 dias ou pendências',
     conciliar: 'cadastros com fornecedor antigo em texto',
+    processos: 'admissões e desligamentos em andamento',
   };
 
   // Grupos recolhidos ficam guardados neste navegador (só conveniência)
