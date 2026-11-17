@@ -276,11 +276,121 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · Técnico:{' '}
             {ticket.tecnicoResponsavelNome || 'não atribuído'}
           </p>
+          {/* Padrão único: ações do atendimento numa faixa do cabeçalho (antes um quadro lateral) */}
+          {isTI && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              {encerrado ? (
+                <span className="text-slate-600">
+                  {ticket.tipo === 'suporte'
+                    ? `Chamado ${ticket.status === 'cancelado' ? 'cancelado' : 'encerrado com solução registrada'}. Para continuar, reabra o chamado.`
+                    : `Processo ${ticket.status === 'cancelado' ? 'cancelado' : 'concluído'}. Se faltou algo, abra um chamado novo.`}
+                </span>
+              ) : (
+                <>
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-slate-600">Situação</span>
+                    <select
+                      value={statusExibido}
+                      onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
+                      className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-900"
+                    >
+                      <option value="aberto">Aberto (na fila)</option>
+                      <option value="em_andamento">Em atendimento</option>
+                      <option value="aguardando_terceiro">Aguardando…</option>
+                    </select>
+                  </label>
+                  {statusExibido === 'aguardando_terceiro' && (
+                    <select
+                      aria-label="Aguardando o quê"
+                      value={rascAguardando ?? (ticket.aguardandoMotivo || '')}
+                      onChange={(e) => setRascAguardando(e.target.value as AguardandoMotivo | '')}
+                      className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-900"
+                    >
+                      <option value="">Aguardando o quê?</option>
+                      <option value="peca">Peça</option>
+                      <option value="fornecedor">Fornecedor</option>
+                      <option value="solicitante">Resposta do solicitante</option>
+                    </select>
+                  )}
+                </>
+              )}
+              <label className="flex items-center gap-1.5">
+                <span className="text-slate-600">Técnico</span>
+                <select
+                  value={tecnicoExibido}
+                  onChange={(e) => handleTechnicianChange(e.target.value)}
+                  className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 max-w-56"
+                >
+                  <option value="">Não atribuído...</option>
+                  {tecnicosTI.map((tech) => (
+                    <option key={tech.id} value={tech.id}>
+                      {tech.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!encerrado && (
+                <span className="flex flex-wrap gap-2 sm:ml-auto">
+                  {ticket.tipo === 'suporte' && (
+                    <button
+                      type="button"
+                      onClick={() => setResolvendo(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      Registrar solução
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCancelando(true)}
+                    className="px-3 py-1.5 font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
+                  >
+                    {ticket.tipo === 'suporte' ? 'Cancelar' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="sm:max-h-[85vh] sm:overflow-y-auto">
+        {/* Padrão único: solicitante, prazos e vínculos numa faixa acima do conteúdo */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 px-4 sm:px-5 pt-3 text-xs">
+          <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-0.5">
+            <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">Solicitante</span>
+            {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
+              <span className="font-bold text-slate-900 block">{ticket.solicitanteNome}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)}
+                className="font-bold text-slate-900 hover:text-blue-700 flex items-center gap-1"
+              >
+                {ticket.solicitanteNome}
+                <ExternalLink className="w-3 h-3 text-slate-500" />
+              </button>
+            )}
+            <p className="text-slate-600">
+              {[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).join(' · ')}
+            </p>
+            <p className="text-slate-500 break-all">{ticket.solicitanteEmail}</p>
+            <p className="text-slate-500">Atualizado em {formatDate(ticket.dataAtualizacao)}</p>
+          </div>
+          <PrazosChamado tkt={ticket} />
+          <VinculosChamado
+            key={salvamentos}
+            ticket={ticket}
+            rascunho={rascVinculos}
+            onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
+          />
+        </div>
+
+        {/* Padrão único: esquerda o pedido (problema, pedido do RH, checklist); direita o atendimento */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 mt-3 border-t border-slate-200">
+          <div className="p-4 sm:p-5 space-y-4 min-w-0">
         {/* Fase 10: o problema relatado logo abaixo do título, em destaque */}
-        <div className="px-4 sm:px-6 pt-3">
+        <div>
           {/* Admissão: o "Pedido do RH" (painel organizado) substitui o texto montado */}
           {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
           {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
@@ -312,11 +422,6 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           )}
         </div>
 
-        {/* Corpo do Chamado em 2 Colunas */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
-          {/* Coluna Principal: Conversas e Linha do Tempo */}
-          <div className="lg:col-span-2 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
-            <div className="space-y-5">
               {/* Checklist Interativo Técnico para Offboarding */}
               {usaChecklistLegado && ticket.offboarding && (
                 <div className="border border-amber-200 bg-amber-50/40 rounded-lg p-4 space-y-3">
@@ -391,11 +496,11 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
               {/* Painel Estruturado de Onboarding (Kit de Entrada Solicitado pelo RH) */}
               {ticket.tipo === 'onboarding' && ticket.onboarding && (
-                <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between pb-2 border-b border-blue-200">
+                <section aria-label="Pedido do RH" className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-2xs space-y-2 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <UserPlus className="w-4 h-4 text-blue-700" />
-                      <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wide">
+                      <UserPlus className="w-4 h-4 text-slate-500" />
+                      <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                         Pedido do RH
                       </h4>
                     </div>
@@ -439,7 +544,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-white p-2.5 rounded border border-blue-200/80">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div>
                       <span className="text-xs uppercase font-bold text-slate-500 block">Novo Colaborador</span>
                       <span className="font-semibold text-slate-900 block">{ticket.onboarding.nomeColaborador}</span>
@@ -475,14 +580,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
                     {/* Só o que o RH escreveu (chamados antigos: o perfil escolhido vira observação) */}
                     {ticket.onboarding.tipoComputador?.trim() && (
-                      <div className="bg-white p-2.5 rounded border border-slate-200">
+                      <div className="pt-2 border-t border-slate-100">
                         <span className="font-semibold text-slate-800 block text-xs">Observação sobre o equipamento:</span>
                         <span className="text-slate-800">{ticket.onboarding.tipoComputador}</span>
                       </div>
                     )}
 
                     {ticket.onboarding.perifericos.length > 0 && (
-                      <div className="bg-white p-2.5 rounded border border-slate-200">
+                      <div className="pt-2 border-t border-slate-100">
                         <span className="font-semibold text-slate-800 block text-xs mb-1">
                           Periféricos Solicitados:
                         </span>
@@ -497,7 +602,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     )}
 
                     {ticket.onboarding.acessosSoftwares.length > 0 && (
-                      <div className="bg-white p-2.5 rounded border border-slate-200">
+                      <div className="pt-2 border-t border-slate-100">
                         <span className="font-semibold text-slate-800 block text-xs mb-1">
                           Acessos e Licenças Requeridos:
                         </span>
@@ -513,12 +618,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   </div>
 
                   {ticket.onboarding.observacoes?.trim() && (
-                    <div className="bg-white p-2.5 rounded border border-slate-200 text-xs">
+                    <div className="pt-2 border-t border-slate-100 text-xs">
                       <span className="font-semibold text-slate-800 block">Observações do RH:</span>
                       <p className="text-slate-800 whitespace-pre-wrap break-words">{ticket.onboarding.observacoes}</p>
                     </div>
                   )}
-                </div>
+                </section>
               )}
 
               {/* Fase 6: checklist guiado (admissão e desligamento) */}
@@ -526,6 +631,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 <ChecklistProcesso ticket={ticket} />
               )}
 
+          </div>
+          <div className="p-4 sm:p-5 flex flex-col gap-4 min-w-0">
+            <div className="flex-1">
               {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
               <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} />
             </div>
@@ -589,135 +697,6 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             )}
           </div>
 
-          {/* Coluna Lateral: Dados Relacionais e Controles */}
-          <div className="order-first lg:order-none p-6 space-y-6 bg-slate-50/50 text-xs">
-            {/* Controles de Status (para TI) */}
-            {isTI && (
-              <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
-                <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
-                  Gerenciamento de Atendimento
-                </span>
-
-                {encerrado ? (
-                  <p className="text-xs text-slate-600">
-                    {ticket.tipo === 'suporte'
-                      ? `Chamado ${ticket.status === 'cancelado' ? 'cancelado' : 'encerrado com solução registrada'}. Para continuar o atendimento, reabra o chamado.`
-                      : `Processo ${ticket.status === 'cancelado' ? 'cancelado' : 'concluído'}. Processo encerrado não é reaberto; se faltou algo, abra um chamado novo.`}
-                  </p>
-                ) : (
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Situação</label>
-                  <select
-                    value={statusExibido}
-                    onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
-                  >
-                    <option value="aberto">Aberto (na fila)</option>
-                    <option value="em_andamento">Em atendimento</option>
-                    <option value="aguardando_terceiro">Aguardando…</option>
-                    {/* Encerrar: suporte por "Registrar solução"; processos por "Concluir" no checklist; ambos por "Cancelar" */}
-                  </select>
-                  {statusExibido === 'aguardando_terceiro' && (
-                    <select
-                      aria-label="Aguardando o quê"
-                      value={rascAguardando ?? (ticket.aguardandoMotivo || '')}
-                      onChange={(e) => setRascAguardando(e.target.value as AguardandoMotivo | '')}
-                      className="mt-2 w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
-                    >
-                      <option value="">Aguardando o quê?</option>
-                      <option value="peca">Peça</option>
-                      <option value="fornecedor">Fornecedor</option>
-                      <option value="solicitante">Resposta do solicitante</option>
-                    </select>
-                  )}
-                </div>
-                )}
-
-                {/* Fase 10: encerrar é registrar a solução; cancelar pede motivo */}
-                {!encerrado && (
-                  <div className="flex flex-wrap gap-2">
-                    {ticket.tipo === 'suporte' && (
-                      <button
-                        type="button"
-                        onClick={() => setResolvendo(true)}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                        Registrar solução
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setCancelando(true)}
-                      className="px-3 py-2 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
-                    >
-                      {ticket.tipo === 'suporte' ? 'Cancelar' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
-                    </button>
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Técnico Responsável</label>
-                  <select
-                    value={tecnicoExibido}
-                    onChange={(e) => handleTechnicianChange(e.target.value)}
-                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
-                  >
-                    <option value="">Não atribuído...</option>
-                    {tecnicosTI
-                      .map((tech) => (
-                        <option key={tech.id} value={tech.id}>
-                          {tech.nome} ({tech.cargo})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* Fase 10 C1: prazos de 1ª resposta e de solução */}
-            <PrazosChamado tkt={ticket} />
-
-            {/* Fase 9: equipamento, software e colaborador relacionado (abrem a ficha por cima) */}
-            <VinculosChamado
-              key={salvamentos}
-              ticket={ticket}
-              rascunho={rascVinculos}
-              onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
-            />
-
-            {/* Solicitante do Chamado */}
-            <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
-                Solicitante
-              </span>
-              <div>
-                {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
-                  <span className="font-bold text-slate-900 block">
-                    {ticket.solicitanteNome}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)}
-                    className="font-bold text-slate-900 hover:text-blue-700 flex items-center gap-1"
-                  >
-                    {ticket.solicitanteNome}
-                    <ExternalLink className="w-3 h-3 text-slate-500" />
-                  </button>
-                )}
-                <p className="text-xs text-slate-600 mt-0.5">{ticket.solicitanteCargo}</p>
-                <p className="text-xs text-slate-500">{ticket.solicitanteSetorNome}</p>
-                <p className="text-xs text-slate-500 mt-1">{ticket.solicitanteEmail}</p>
-              </div>
-              <div className="pt-2 mt-1 border-t border-slate-100 space-y-0.5 text-xs">
-                <div className="flex justify-between gap-2">
-                  <span className="text-slate-500">Última atualização:</span>
-                  <span className="font-medium text-slate-800">{formatDate(ticket.dataAtualizacao)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
         </div>
         <BarraAlteracoes itens={itensPendentes} onCancelar={descartarRascunho} onSalvar={salvarRascunho} />
