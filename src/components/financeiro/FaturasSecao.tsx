@@ -57,10 +57,11 @@ const SELO_STATUS: Record<StatusExibidoFatura, string> = {
  * Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
 export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal }) => {
-  const { faturas, currentRole, alterarFatura, editarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
+  const { faturas, currentRole, alterarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
   const [editando, setEditando] = useState<Fatura | null>(null);
   const [lancando, setLancando] = useState(false);
-  const [pagando, setPagando] = useState<{ id: string; data: string } | null>(null);
+  // Pagamento: janela própria (data, forma, valor pago, comprovante), nunca só a data
+  const [pagando, setPagando] = useState<Fatura | null>(null);
   // Arquivo de uma fatura já lançada sem arquivo: escolhe e só sobe ao clicar em "Enviar"
   const [anexando, setAnexando] = useState<{ id: string; arquivo: File | null; enviando: boolean } | null>(null);
   const [erro, setErro] = useState('');
@@ -95,15 +96,9 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   const agora = new Date();
   const ano = agora.getFullYear();
 
-  // Lote 1: o campo de pagamento só fecha depois do banco confirmar
-  const confirmarPagamento = async () => {
-    if (!pagando) return;
-    if (!pagando.data) return setErro('Fatura paga precisa da data de pagamento.');
-    const falha = await editarFatura(pagando.id, { status: 'paga', pagoEm: pagando.data });
-    if (falha) return setErro(`Não foi possível marcar como paga: ${falha}`);
-    setPagando(null);
-    setErro('');
-  };
+  // Forma de pagamento já cadastrada no contrato ou no software (sugestão na janela)
+  const formaCadastrada = (f: Fatura) =>
+    (f.contratoId ? contratos.find((c) => c.id === f.contratoId)?.pagamento : licenses.find((l) => l.id === f.licencaId)?.pagamento) || undefined;
 
   const cancelar = async (f: Fatura) => {
     const ok = await confirmar({
@@ -280,38 +275,12 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                       )}
                     </td>
                     <td data-label="Ações" className="text-right">
-                      {pagando?.id === f.id ? (
-                        <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                          <label htmlFor={`pago-em-${f.id}`} className="text-xs text-slate-700">
-                            Pago em
-                          </label>
-                          <input
-                            id={`pago-em-${f.id}`}
-                            type="date"
-                            value={pagando.data}
-                            onChange={(e) => setPagando({ ...pagando, data: e.target.value })}
-                            className="campo campo-sm w-auto"
-                          />
-                          <button type="button" onClick={confirmarPagamento} className="btn btn-sm btn-primario">
-                            Confirmar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPagando(null);
-                              setErro('');
-                            }}
-                            className="btn btn-sm btn-secundario"
-                          >
-                            Voltar
-                          </button>
-                        </span>
-                      ) : (
+                      {(
                         <span className="acoes-linha">
                           {f.status === 'a_pagar' && (
                             <button
                               type="button"
-                              onClick={() => setPagando({ id: f.id, data: isoLocal(new Date()) })}
+                              onClick={() => setPagando(f)}
                               aria-label={`Pagar a fatura de ${rotuloCompetencia(f.competencia)}`}
                               className="btn btn-sm btn-secundario mr-1"
                             >
@@ -403,7 +372,174 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
               document.body
             )
           : null}
+      {pagando &&
+        createPortal(
+          <JanelaPagamento
+            fatura={pagando}
+            origem={origem(pagando)}
+            formaSugerida={pagando.formaPagamento || formaCadastrada(pagando)?.formaPagamento}
+            cartaoFinal={formaCadastrada(pagando)?.cartaoFinal}
+            onFechar={() => setPagando(null)}
+            onPago={() => {
+              setPagando(null);
+              setErro('');
+            }}
+          />,
+          document.body
+        )}
     </div>
+  );
+};
+
+/**
+ * Registrar pagamento (janela pequena): data, forma de pagamento, valor efetivamente pago
+ * (juros/multa/desconto/IOF pedem motivo), nº do comprovante e arquivo. Antes era só a data,
+ * direto na linha.
+ */
+const JanelaPagamento: React.FC<{
+  fatura: Fatura;
+  origem: string;
+  formaSugerida?: Fatura['formaPagamento'];
+  cartaoFinal?: string;
+  onFechar: () => void;
+  onPago: () => void;
+}> = ({ fatura, origem, formaSugerida, cartaoFinal, onFechar, onPago }) => {
+  const { editarFatura, anexarArquivoFatura } = useApp();
+  const [data, setData] = useState(() => isoLocal(new Date()));
+  const [forma, setForma] = useState<string>(formaSugerida || '');
+  const [valor, setValor] = useState<number | undefined>(fatura.valor);
+  const [motivoValor, setMotivoValor] = useState('');
+  const [documento, setDocumento] = useState(fatura.numeroDocumento || '');
+  const [observacao, setObservacao] = useState('');
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const valorMudou = valor !== undefined && Math.abs(valor - fatura.valor) >= 0.005;
+  const estrangeira = !!fatura.moeda && fatura.moeda !== 'BRL';
+  const id = `pagamento-${fatura.id}`;
+
+  const escolherArquivo = (f: File | undefined) => {
+    if (!f) return;
+    const msg = validarArquivo(f);
+    setErro(msg || '');
+    setArquivo(msg ? null : f);
+  };
+
+  const registrar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (salvando) return;
+    if (!data) return setErro('Informe a data do pagamento.');
+    if (data > isoLocal(new Date())) return setErro('A data do pagamento não pode ser no futuro.');
+    if (!forma) return setErro('Informe a forma de pagamento.');
+    if (valor === undefined || !Number.isFinite(valor) || valor < 0) return setErro('Informe o valor pago.');
+    if (valorMudou && motivoValor.trim().length < 3) return setErro('O valor pago é diferente do valor da fatura: informe o motivo (juros, multa, desconto…).');
+    const notas = [
+      fatura.observacoes,
+      valorMudou ? `Pago ${formatCurrency(valor)} em vez de ${formatCurrency(fatura.valor)}: ${motivoValor.trim()}` : '',
+      observacao.trim(),
+    ]
+      .filter(Boolean)
+      .join('\n');
+    setErro('');
+    setSalvando(true);
+    const falha = await editarFatura(fatura.id, {
+      status: 'paga',
+      pagoEm: data,
+      formaPagamento: forma as Fatura['formaPagamento'],
+      valor,
+      numeroDocumento: documento.trim() || undefined,
+      observacoes: notas || undefined,
+    });
+    setSalvando(false);
+    if (falha) return setErro(`Não foi possível registrar o pagamento: ${falha}`);
+    if (arquivo) void anexarArquivoFatura(fatura.id, arquivo);
+    onPago();
+  };
+
+  return (
+    <Janela
+      tamanho="p"
+      titulo="Registrar pagamento"
+      subtitulo={`${origem} · ${rotuloCompetencia(fatura.competencia)} · vence ${formatDate(fatura.vencimento)}`}
+      icone={<CheckCircle2 className="h-4 w-4" />}
+      onFechar={onFechar}
+      rodape={
+        <>
+          <span />
+          <span className="flex gap-2">
+            <button type="button" onClick={onFechar} className="btn btn-secundario">
+              Cancelar
+            </button>
+            <button type="submit" form={id} disabled={salvando} className="btn btn-primario">
+              {salvando ? 'Registrando…' : 'Registrar pagamento'}
+            </button>
+          </span>
+        </>
+      }
+    >
+      <form id={id} onSubmit={registrar} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor={`${id}-data`} className={CLASSE_ROTULO}>
+            Data do pagamento *
+          </label>
+          <input id={`${id}-data`} type="date" required max={isoLocal(new Date())} value={data} onChange={(e) => setData(e.target.value)} className={CLASSE_CAMPO} />
+        </div>
+        <div>
+          <label htmlFor={`${id}-forma`} className={CLASSE_ROTULO}>
+            Forma de pagamento *
+          </label>
+          <select id={`${id}-forma`} required value={forma} onChange={(e) => setForma(e.target.value)} className={CLASSE_CAMPO}>
+            <option value="">Escolha…</option>
+            {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          {forma === 'cartao' && cartaoFinal && <p className="ajuda">Cartão cadastrado: final {cartaoFinal}</p>}
+        </div>
+        <div>
+          <label htmlFor={`${id}-valor`} className={CLASSE_ROTULO}>
+            {estrangeira ? 'Valor pago em R$ (com IOF) *' : 'Valor pago *'}
+          </label>
+          <CampoMoeda id={`${id}-valor`} valor={valor} onMudar={setValor} />
+          <p className="ajuda">Valor da fatura: {formatCurrency(fatura.valor)}</p>
+        </div>
+        <div>
+          <label htmlFor={`${id}-doc`} className={CLASSE_ROTULO}>
+            Nº do documento / comprovante
+          </label>
+          <input id={`${id}-doc`} value={documento} onChange={(e) => setDocumento(e.target.value)} className={`${CLASSE_CAMPO} font-mono`} placeholder="Boleto, NF, autenticação…" />
+        </div>
+        {valorMudou && (
+          <div className="sm:col-span-2">
+            <label htmlFor={`${id}-motivo`} className={CLASSE_ROTULO}>
+              Por que o valor é diferente? *
+            </label>
+            <input id={`${id}-motivo`} value={motivoValor} onChange={(e) => setMotivoValor(e.target.value)} className={CLASSE_CAMPO} placeholder="Ex.: juros por atraso, desconto, IOF" />
+          </div>
+        )}
+        {!fatura.arquivoCaminho && (
+          <div className="sm:col-span-2">
+            <label htmlFor={`${id}-arq`} className={CLASSE_ROTULO}>
+              Comprovante (PDF ou imagem)
+            </label>
+            <input id={`${id}-arq`} type="file" accept={TIPOS_ARQUIVO_ACEITOS.join(',')} onChange={(e) => escolherArquivo(e.target.files?.[0])} className={CLASSE_ARQUIVO} />
+          </div>
+        )}
+        <div className="sm:col-span-2">
+          <label htmlFor={`${id}-obs`} className={CLASSE_ROTULO}>
+            Observação
+          </label>
+          <textarea id={`${id}-obs`} rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} className={CLASSE_CAMPO} />
+        </div>
+        {erro && (
+          <p className="erro sm:col-span-2" role="alert">
+            {erro}
+          </p>
+        )}
+      </form>
+    </Janela>
   );
 };
 
@@ -494,6 +630,9 @@ const FormFatura: React.FC<{
       numeroDocumento: numeroDocumento.trim() || undefined,
       observacoes: observacoes.trim() || undefined,
     };
+    // Fatura lançada já paga: mesmo cuidado do "Registrar pagamento" (data e forma)
+    if (!editando && status === 'paga' && !formaPagamento) return setErro('Fatura já paga: informe a forma de pagamento.');
+    if (!editando && status === 'paga' && pagoEm && pagoEm > isoLocal(new Date())) return setErro('A data do pagamento não pode ser no futuro.');
     const problema = validarFatura({ id: editando?.id || '', ...dados }, doMesmoAlvo.filter((f) => f.id !== editando?.id));
     if (problema) return setErro(problema);
     setErro('');
