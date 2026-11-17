@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { CheckCircle2, Circle, ClipboardList, History, MinusCircle, Plus, RotateCcw, Trash2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, ClipboardList, Copy, History, KeyRound, Plus, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
+import { isSupabaseConfigured } from '../../services/supabase.ts';
 import { fetchEventosProcessoDb, mensagemDeErro } from '../../services/supabaseDb.ts';
-import type { ProcessoEvento, ProcessoItem, ProcessoItemRascunho, Ticket, TipoItemProcesso } from '../../types/index.ts';
+import type { ProcessoEvento, ProcessoItemRascunho, Ticket, TipoItemProcesso } from '../../types/index.ts';
 import { formatDateTime } from '../../utils/formatters.ts';
 import {
   ACAO_DO_TIPO,
@@ -11,13 +12,13 @@ import {
   etapaDoItem,
   montarOffboarding,
   montarOnboarding,
-  podeReabrir,
   progresso,
 } from '../../utils/processos.ts';
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
-import { FormItemProcesso } from './FormItemProcesso.tsx';
+import { PassoProcesso, avisoDoLogin } from './PassoProcesso.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
+import { Janela } from '../ui/Janela.tsx';
 
 const TIPOS_LIVRES_ONB: TipoItemProcesso[] = ['conta', 'grupo_email', 'licenca', 'equipamento', 'acessorio', 'tarefa'];
 const TIPOS_LIVRES_OFF: TipoItemProcesso[] = ['tarefa', 'dados_drive', 'email'];
@@ -36,8 +37,8 @@ const ROTULO_EVENTO: Record<string, string> = {
 const novaChave = () => crypto.randomUUID();
 
 /**
- * Fase 6: checklist guiado de admissão/desligamento dentro do chamado.
- * - T.I.: monta a sugestão (rascunho, salva com a barra), registra cada passo e conclui.
+ * Fase 6 / seção 9.2: checklist guiado de admissão/desligamento (protagonista da tela do processo).
+ * - T.I.: monta a sugestão (rascunho, salva com a barra), registra cada passo na própria linha e conclui.
  * - RH: acompanha o andamento (somente leitura) e conversa pelas mensagens.
  */
 export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
@@ -50,8 +51,6 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     licenses,
     employees,
     salvarChecklist,
-    removerItemProcesso,
-    registrarItemProcesso,
     concluirProcesso,
   } = useApp();
   const { linhas } = useRecursos();
@@ -75,6 +74,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   const [abertoId, setAbertoId] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<{ ok: boolean; texto: string } | null>(null);
   const [concluindo, setConcluindo] = useState(false);
+  const [senha, setSenha] = useState<{ email: string; senha: string } | null>(null);
 
   useRegistrarPendencias(
     `checklist-${ticket.id}`,
@@ -96,23 +96,13 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     if (ok) setRascunho(null);
   };
 
-  const remover = async (item: ProcessoItem) => {
-    if (!(await confirmar(`Remover o passo "${item.titulo}" do checklist?`))) return;
-    await removerItemProcesso(item.id);
-  };
-
-  const reabrir = async (item: ProcessoItem) => {
-    const erro = await registrarItemProcesso(item.id, 'pendente', undefined, {});
-    if (erro) setMensagem({ ok: false, texto: erro });
-  };
-
   const concluir = async () => {
     const acao = ehOnb ? 'a admissão' : `o desligamento${colab ? ` de ${colab.nome}` : ''}`;
     const efeitos = ehOnb ? '' : '\nO colaborador será marcado como desligado.';
     const termo = prog.termoPendente
       ? '\n\nO termo ainda não foi assinado: será criado um lembrete para coletar a assinatura.'
       : '';
-    if (!(await confirmar(`Concluir ${acao}? O chamado será encerrado.${efeitos}${termo}`))) return;
+    if (!(await confirmar(`Concluir ${acao}?\n\nO processo é encerrado e não volta a ficar aberto (as anotações continuam editáveis).${efeitos}${termo}`))) return;
     setConcluindo(true);
     const erro = await concluirProcesso(ticket.id);
     setConcluindo(false);
@@ -180,28 +170,35 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
         )
       )}
 
-      {/* Etapas empilhadas: o checklist fica na coluna do pedido, ao lado do atendimento */}
+      {/* Etapas empilhadas; cada passo com a ação na própria linha */}
       <div className="grid grid-cols-1 gap-y-3">
-      {grupos.map((g) => (
-        <div key={g.etapa} className="space-y-1.5">
-          <h4 className="secao-titulo">{g.etapa}</h4>
-          {g.itens.map((item) => (
-            <LinhaItem
-              key={item.id}
-              item={item}
-              ticket={ticket}
-              podeEditar={podeEditar}
-              aberto={abertoId === item.id}
-              onAbrir={() => setAbertoId(item.id)}
-              onFechar={() => setAbertoId(null)}
-              onRemover={() => remover(item)}
-              onReabrir={() => reabrir(item)}
-              nomeDe={nomeDe}
-            />
-          ))}
-        </div>
-      ))}
+        {grupos.map((g) => (
+          <div key={g.etapa} className="space-y-1.5">
+            <h4 className="secao-titulo">
+              {g.etapa}{' '}
+              <span className="font-normal normal-case tracking-normal text-slate-500">
+                · {g.itens.filter((i) => i.status !== 'pendente').length}/{g.itens.length}
+              </span>
+            </h4>
+            {g.itens.map((item) => (
+              <PassoProcesso
+                key={item.id}
+                item={item}
+                ticket={ticket}
+                podeEditar={podeEditar}
+                aberto={abertoId === item.id}
+                onAbrir={() => setAbertoId(item.id)}
+                onFechar={() => setAbertoId(null)}
+                onLogin={(r) => {
+                  if ('senha' in r) setSenha(r);
+                  else void avisoDoLogin(r);
+                }}
+              />
+            ))}
+          </div>
+        ))}
       </div>
+      {senha && <JanelaSenha email={senha.email} senha={senha.senha} onFechar={() => setSenha(null)} />}
 
       {rascunho && (
         <Montagem rascunho={rascunho} setRascunho={setRascunho} ehOnb={ehOnb} existentes={itens.length} />
@@ -238,106 +235,49 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
           )}
         </div>
       )}
-
-      {itens.length > 0 && <TrilhaAuditoria chamadoId={ticket.id} nomeDe={nomeDe} />}
     </section>
   );
 };
 
 // -----------------------------------------------------------------------------
-const LinhaItem: React.FC<{
-  item: ProcessoItem;
-  ticket: Ticket;
-  podeEditar: boolean;
-  aberto: boolean;
-  onAbrir: () => void;
-  onFechar: () => void;
-  onRemover: () => void;
-  onReabrir: () => void;
-  nomeDe: (id?: string) => string | undefined;
-}> = ({ item, ticket, podeEditar, aberto, onAbrir, onFechar, onRemover, onReabrir, nomeDe }) => {
-  const { employees } = useApp();
-  const cadastrada = item.tipo === 'cadastro' ? employees.find((e) => e.id === ticket.colaboradorId) : undefined;
-  const icone =
-    item.status === 'feito' ? (
-      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-    ) : item.status === 'nao_se_aplica' ? (
-      <MinusCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-    ) : (
-      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-    );
-  const registro = [
-    item.identificador,
-    item.destino ? `destino: ${item.destino}` : undefined,
-    item.destinoColaboradorId ? `para ${nomeDe(item.destinoColaboradorId) || '—'}` : undefined,
-    item.condicao ? `condição: ${item.condicao}` : undefined,
-    item.lembreteEm ? `lembrete ${item.lembreteEm.split('-').reverse().join('/')}` : undefined,
-  ].filter(Boolean);
-  const pendenteEditavel = podeEditar && item.status === 'pendente' && !aberto;
-
+/** Senha provisória do login criado no cadastro (aparece uma vez, para copiar) */
+const JanelaSenha: React.FC<{ email: string; senha: string; onFechar: () => void }> = ({ email, senha, onFechar }) => {
+  const [copiada, setCopiada] = useState(false);
   return (
-    <div className="rounded-lg border border-slate-200 bg-white text-xs">
-      <div className="flex items-start gap-2 p-2.5">
-        {icone}
-        <div className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold text-slate-500">{ACAO_DO_TIPO[item.tipo]}</span>
-            {item.sugeridoPor === 'rh' && <span className="selo selo-info">pedido do RH</span>}
-          </span>
-          <span className={`block font-medium ${item.status === 'nao_se_aplica' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
-            {item.titulo}
-          </span>
-          {/* Cadastro concluído: mostra a pessoa como foi cadastrada (o pedido do RH pode ter sido corrigido) */}
-          {item.tipo === 'cadastro' && item.status === 'feito' && cadastrada ? (
-            <span className="block text-slate-500">
-              {cadastrada.nome} · {cadastrada.email}
-            </span>
-          ) : (
-            item.detalhe && <span className="block text-slate-500">{item.detalhe}</span>
-          )}
-          {item.status !== 'pendente' && (
-            <span className="mt-0.5 block text-slate-500">
-              {registro.length > 0 && <>{registro.join(' · ')} · </>}
-              {item.observacao && <>“{item.observacao}” · </>}
-              {nomeDe(item.concluidoPor) || 'T.I.'}
-              {item.concluidoEm ? ` em ${formatDateTime(item.concluidoEm)}` : ''}
-            </span>
-          )}
+    <Janela
+      tamanho="p"
+      icone={<KeyRound className="h-4 w-4" />}
+      titulo="Login criado"
+      subtitulo="O passo Acesso ao Nexus foi concluído"
+      onFechar={onFechar}
+      idTitulo="janela-senha"
+      rodape={
+        <button type="button" onClick={onFechar} className="btn btn-primario ml-auto">
+          Pronto
+        </button>
+      }
+    >
+      <div className="space-y-2 text-xs">
+        <p className="text-slate-700">
+          Login: <span className="font-mono">{email}</span>
+        </p>
+        <p className="text-slate-700">Senha provisória (aparece só agora):</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <code className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-mono text-sm tracking-wider select-all">{senha}</code>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(senha);
+              setCopiada(true);
+            }}
+            className="btn btn-sm btn-secundario"
+          >
+            {copiada ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />} {copiada ? 'Copiada' : 'Copiar'}
+          </button>
         </div>
-        {(pendenteEditavel || (podeEditar && podeReabrir(item))) && (
-          <span className="acoes-linha shrink-0">
-            {pendenteEditavel && (
-              <>
-                <button type="button" onClick={onAbrir} aria-expanded={aberto} className="btn btn-sm btn-secundario">
-                  Registrar
-                </button>
-                <button
-                  type="button"
-                  onClick={onRemover}
-                  title="Remover passo"
-                  aria-label={`Remover o passo ${item.titulo}`}
-                  className="btn-icone btn-icone-perigo"
-                >
-                  <Trash2 />
-                </button>
-              </>
-            )}
-            {podeEditar && podeReabrir(item) && (
-              <button
-                type="button"
-                onClick={onReabrir}
-                title="Voltar para pendente"
-                aria-label={`Voltar o passo ${item.titulo} para pendente`}
-                className="btn-icone"
-              >
-                <RotateCcw />
-              </button>
-            )}
-          </span>
-        )}
+        <p className="ajuda">Entregue por um canal seguro (pessoalmente ou mensagem direta). No primeiro login o sistema pede uma senha nova.</p>
       </div>
-      {aberto && <FormItemProcesso item={item} ticket={ticket} onFechar={onFechar} />}
-    </div>
+    </Janela>
   );
 };
 // -----------------------------------------------------------------------------
@@ -462,43 +402,38 @@ const Montagem: React.FC<{
 };
 
 // -----------------------------------------------------------------------------
-const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string) => string | undefined }> = ({
+/** Trilha do checklist (quem fez cada passo e quando); carrega ao abrir a aba Histórico */
+export const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string) => string | undefined; atualizar?: number }> = ({
   chamadoId,
   nomeDe,
+  atualizar = 0,
 }) => {
   const [eventos, setEventos] = useState<ProcessoEvento[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  const carregar = async () => {
-    try {
-      setErro(null);
-      setEventos(await fetchEventosProcessoDb(chamadoId));
-    } catch (err) {
-      setErro(mensagemDeErro(err));
-    }
-  };
+  useEffect(() => {
+    let vivo = true;
+    fetchEventosProcessoDb(chamadoId)
+      .then((e) => vivo && setEventos(e))
+      .catch((err) => vivo && setErro(mensagemDeErro(err)));
+    return () => {
+      vivo = false;
+    };
+  }, [chamadoId, atualizar]);
 
-  if (!eventos) {
-    return (
-      <button
-        type="button"
-        onClick={carregar}
-        className="btn btn-sm btn-discreto"
-      >
-        <History aria-hidden="true" /> Ver histórico
-        {erro && <span className="erro"> · {erro}</span>}
-      </button>
-    );
-  }
+  if (erro) return <p className="erro">{erro}</p>;
+  if (!eventos) return <p className="text-xs text-slate-500">Carregando…</p>;
   return (
     <div className="space-y-1">
       <p className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-        <History className="h-3.5 w-3.5" aria-hidden="true" /> Histórico
+        <History className="h-3.5 w-3.5" aria-hidden="true" /> Passos do checklist
       </p>
       {eventos.length === 0 ? (
-        <p className="text-xs text-slate-500">Sem eventos registrados (no modo demonstração a trilha fica no banco).</p>
+        <p className="text-xs text-slate-500">
+          {isSupabaseConfigured ? 'Nenhum passo registrado ainda.' : 'Na demonstração a trilha dos passos fica no banco; aqui aparecem só os registros do checklist acima.'}
+        </p>
       ) : (
-        <ul className="max-h-40 overflow-y-auto text-xs text-slate-600 space-y-0.5">
+        <ul className="max-h-72 space-y-0.5 overflow-y-auto text-xs text-slate-600">
           {eventos.map((e) => (
             <li key={e.id}>
               {formatDateTime(e.em)} · {nomeDe(e.por) || 'Sistema'} {ROTULO_EVENTO[e.acao] || e.acao}

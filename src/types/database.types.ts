@@ -581,6 +581,7 @@ export type Database = {
           avaliacao_comentario: string | null
           aguardando_motivo: string | null
           primeira_resposta_em: string | null
+          anotacoes_processo?: string | null
           anexos: Json | null
           ativo_id: string | null
           categoria: string
@@ -622,6 +623,7 @@ export type Database = {
           avaliacao_comentario?: string | null
           aguardando_motivo?: string | null
           primeira_resposta_em?: string | null
+          anotacoes_processo?: string | null
           anexos?: Json | null
           ativo_id?: string | null
           categoria: string
@@ -663,6 +665,7 @@ export type Database = {
           avaliacao_comentario?: string | null
           aguardando_motivo?: string | null
           primeira_resposta_em?: string | null
+          anotacoes_processo?: string | null
           anexos?: Json | null
           ativo_id?: string | null
           categoria?: string
@@ -790,6 +793,7 @@ export type Database = {
           sla: Json | null
           doc_devolucao: Json
           doc_entrega: Json
+          termo_exige?: Json | null
           campos_personalizados: Json | null
           cep: string
           cidade_uf: string
@@ -809,6 +813,7 @@ export type Database = {
           sla?: Json | null
           doc_devolucao?: Json
           doc_entrega?: Json
+          termo_exige?: Json | null
           campos_personalizados?: Json | null
           cep: string
           cidade_uf: string
@@ -828,6 +833,7 @@ export type Database = {
           sla?: Json | null
           doc_devolucao?: Json
           doc_entrega?: Json
+          termo_exige?: Json | null
           campos_personalizados?: Json | null
           cep?: string
           cidade_uf?: string
@@ -1678,6 +1684,7 @@ export type Database = {
           fim: string | null
           atribuido_por: string | null
           removido_por: string | null
+          motivo_remocao?: string | null
         }
         Insert: {
           id?: string
@@ -1687,6 +1694,7 @@ export type Database = {
           fim?: string | null
           atribuido_por?: string | null
           removido_por?: string | null
+          motivo_remocao?: string | null
         }
         Update: {
           id?: string
@@ -1696,6 +1704,7 @@ export type Database = {
           fim?: string | null
           atribuido_por?: string | null
           removido_por?: string | null
+          motivo_remocao?: string | null
         }
         Relationships: []
       }
@@ -1917,6 +1926,10 @@ export type Database = {
       concluir_offboarding: { Args: { p_chamado: string }; Returns: Json }
       meu_colaborador_id: { Args: never; Returns: string }
       meu_papel: { Args: never; Returns: string }
+      liberar_assento: {
+        Args: { p_colaborador: string; p_licenca: string; p_motivo: string }
+        Returns: Json
+      }
       revogar_licenca: {
         Args: { p_colaborador: string; p_licenca: string }
         Returns: Json

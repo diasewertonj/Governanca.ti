@@ -4,10 +4,13 @@ import { formatDate, formatCurrency } from '../../utils/formatters.ts';
 import { garantiaEfetiva } from '../../utils/contratos.ts';
 import { licencaAtiva } from '../../utils/licencas.ts';
 import { fonteCustoLicenca, ROTULO_FORMA_COBRANCA } from '../../utils/financeiro.ts';
-import type { Contrato, SoftwareLicense } from '../../types/index.ts';
+import type { Asset, Contrato, SoftwareLicense } from '../../types/index.ts';
 import { EstoqueAcessorios } from './EstoqueAcessorios.tsx';
-import { ExternalLink, Key, Plus, QrCode, ShieldAlert, ShieldCheck, User, Users } from 'lucide-react';
+import { Copy, ExternalLink, Key, Plus, QrCode, ShieldAlert, ShieldCheck, User, Users } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
+import { MenuAcoes } from '../ui/MenuAcoes.tsx';
+import { CHAVE } from '../../utils/especificacoes.ts';
+import { soDigitos } from '../../utils/mascaras.ts';
 import { Abas } from '../ui/Abas.tsx';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
@@ -58,11 +61,13 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
   const [garantiaFilter, setGarantiaFilter] = useState<string>('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewAssetModal, setShowNewAssetModal] = useState(false);
+  const [duplicarDe, setDuplicarDe] = useState<Asset | null>(null);
   const [novoAcessorio, setNovoAcessorio] = useState(false);
   const [mostrarDesativados, setMostrarDesativados] = useState(false);
 
   const acessorios = !softwares && categoryFilter === 'acessorios_tab';
   const termo = searchTerm.toLowerCase();
+  const termoDigitos = soDigitos(searchTerm);
 
   // Filtro de ativos
   const filteredAssets = assets.filter((asset) => {
@@ -70,11 +75,16 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
     const matchesStatus = statusFilter === 'ativos' ? asset.status !== 'descartado' : asset.status === statusFilter;
     // Fase 8: garantia efetiva (fábrica ou contrato de suporte/garantia estendida, a maior)
     const matchesGarantia = garantiaFilter === 'todas' || garantiaEfetiva(asset, contratos).status === garantiaFilter;
+    // Seção 9.3: Service Tag e IMEI (com ou sem traços) também entram na busca
+    const serviceTag = (asset.customFields?.[CHAVE.serviceTag] || '').toLowerCase();
+    const imei = soDigitos(asset.customFields?.[CHAVE.imei]);
     const matchesSearch =
       asset.nome.toLowerCase().includes(termo) ||
       asset.tag.toLowerCase().includes(termo) ||
       asset.marca.toLowerCase().includes(termo) ||
       asset.serialNumber.toLowerCase().includes(termo) ||
+      (serviceTag !== '' && serviceTag.includes(termo)) ||
+      (imei !== '' && termoDigitos.length >= 4 && imei.includes(termoDigitos)) ||
       (asset.fiscal?.numeroNF && asset.fiscal.numeroNF.includes(searchTerm));
 
     return matchesCategory && matchesStatus && matchesGarantia && matchesSearch;
@@ -133,7 +143,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
             </>
           ) : (
             <>
-              <Busca id="inventario-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar patrimônio, modelo, serial ou NF..." />
+              <Busca id="inventario-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar patrimônio, modelo, série, Service Tag, IMEI ou NF..." />
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filtrar por status" className="campo campo-sm">
                 <option value="ativos">Todos (exceto baixados)</option>
                 <option value="em_uso">Em uso (alocado)</option>
@@ -360,6 +370,17 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                           >
                             <QrCode />
                           </button>
+                          <MenuAcoes
+                            rotulo={`Mais ações de ${asset.tag}`}
+                            acoes={[
+                              {
+                                rotulo: 'Duplicar (mesmo lote)',
+                                icone: <Copy />,
+                                onClick: () => setDuplicarDe(asset),
+                                oculto: !isTI || asset.status === 'descartado',
+                              },
+                            ]}
+                          />
                         </span>
                       </td>
                     </tr>
@@ -378,6 +399,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
       )}
 
       {showNewAssetModal && <NewAssetModal onClose={() => setShowNewAssetModal(false)} />}
+      {duplicarDe && <NewAssetModal duplicarDe={duplicarDe} onClose={() => setDuplicarDe(null)} />}
     </div>
   );
 };

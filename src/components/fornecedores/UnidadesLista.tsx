@@ -6,6 +6,8 @@ import { CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { Vazio } from '../ui/Tela.tsx';
+import { CampoCep } from '../ui/Campos.tsx';
+import type { DadosCep } from '../../services/consultas.ts';
 
 const VAZIA = { nome: '', endereco: '', cidade: '', uf: '', cep: '', observacoes: '', ativo: true };
 
@@ -129,7 +131,16 @@ const FormUnidade: React.FC<{
     if (falha) setErro(falha);
   };
 
-  const campo = (k: 'nome' | 'endereco' | 'cidade' | 'uf' | 'cep' | 'observacoes', rotulo: string, extra: Partial<React.InputHTMLAttributes<HTMLInputElement>> = {}, classe = '') => (
+  // 9.3: CEP achado preenche endereço, cidade e UF que estiverem vazios
+  const preencherDoCep = (c: DadosCep) =>
+    setD((p) => ({
+      ...p,
+      endereco: p.endereco.trim() ? p.endereco : [c.endereco, c.bairro].filter(Boolean).join(' - '),
+      cidade: p.cidade.trim() ? p.cidade : c.cidade || '',
+      uf: p.uf.trim() ? p.uf : c.uf || '',
+    }));
+
+  const campo = (k: 'nome' | 'endereco' | 'cidade' | 'uf' | 'observacoes', rotulo: string, extra: Partial<React.InputHTMLAttributes<HTMLInputElement>> = {}, classe = '') => (
     <div className={classe}>
       <label htmlFor={`uni-${k}`} className={CLASSE_ROTULO}>
         {rotulo}
@@ -159,12 +170,18 @@ const FormUnidade: React.FC<{
       <form id="form-unidade" onSubmit={salvar} className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {campo('nome', 'Nome *', { required: true, placeholder: 'Ex.: Matriz, Filial Campinas' }, 'sm:col-span-2')}
+          <div className="sm:col-span-2">
+            <label htmlFor="uni-cep" className={CLASSE_ROTULO}>
+              CEP
+            </label>
+            <div className="sm:max-w-[16rem]">
+              <CampoCep id="uni-cep" value={d.cep} onChange={(v) => setD((p) => ({ ...p, cep: v }))} onAchado={preencherDoCep} className={CLASSE_CAMPO} />
+            </div>
+            <p className="ajuda">Ao completar o CEP, o endereço é buscado e preenche os campos vazios.</p>
+          </div>
           {campo('endereco', 'Endereço', {}, 'sm:col-span-2')}
           {campo('cidade', 'Cidade')}
-          <div className="grid grid-cols-2 gap-3">
-            {campo('uf', 'UF', { maxLength: 2 })}
-            {campo('cep', 'CEP', { inputMode: 'numeric' })}
-          </div>
+          {campo('uf', 'UF', { maxLength: 2 })}
           {campo('observacoes', 'Observações', {}, 'sm:col-span-2')}
           {unidade && (
             <div className="sm:col-span-2">

@@ -7,8 +7,9 @@ import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
 import { NewEmployeeModal } from './NewEmployeeModal.tsx';
 import { ConferenciaTermo } from '../terms/ConferenciaTermo.tsx';
 import type { EmployeeStatus, ItemTermo, Ticket } from '../../types/index.ts';
-import { DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
+import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
 import { situacaoTermo, type TomSituacao } from '../../utils/termos.ts';
+import { pendenciaTermo, resumoPendenciaTermo, termoVigente } from '../../utils/inventario.ts';
 import { historicoAssentos } from '../../utils/licencas.ts';
 import { FileText, FilePlus, Pencil, KeyRound, CheckCircle2, AlertCircle, Copy, ShieldOff } from 'lucide-react';
 import { avisar, confirmar } from '../ui/dialogo.tsx';
@@ -58,7 +59,9 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     setSelectedEmployeeIdFor360,
     setSelectedSoftwareIdFor360,
     setSelectedTermForPrint,
+    setSelectedTicketIdForDetail,
     createTerm,
+    cancelarTermo,
     currentUser,
     currentRole,
     anonimizarColaborador,
@@ -72,6 +75,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   const [aba, setAba] = useState<AbaPessoa>('resumo');
   const [termSuccess, setTermSuccess] = useState<string | null>(null);
   const [conferencia, setConferencia] = useState<ItemTermo[] | null>(null);
+  const [conferenciaDev, setConferenciaDev] = useState<ItemTermo[] | null>(null);
   const [gerandoTermo, setGerandoTermo] = useState(false);
   const [anonimizando, setAnonimizando] = useState(false);
   // Fase 7: senha provisória fora do onboarding (esqueceu a senha; não depende de e-mail)
@@ -176,6 +180,31 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     setSelectedAssetIdFor360(assetId);
   };
 
+  // Seção 9.5: termo desatualizado (item ligado ou devolvido fora de um processo)
+  const vigente = termoVigente(employee.id, terms);
+  const pendencia = isTIFicha ? pendenciaTermo(employee, { ativos: assets, termos: terms, chamados: tickets, cfg: settings.termoExige }) : null;
+  const abrirReciboDevolucao = () => {
+    if (!pendencia?.devolvidos.length) return;
+    setAba('termos');
+    setConferencia(null);
+    setConferenciaDev(
+      pendencia.devolvidos.map((d) => {
+        const a = assets.find((x) => x.id === d.ativoId);
+        return {
+          descricao: a?.nome || d.descricao,
+          patrimonio: a ? [a.tag, a.serialNumber].filter(Boolean).join(' / ') : undefined,
+          marcaModelo: a ? [a.marca, a.modelo].filter(Boolean).join(' ') || undefined : undefined,
+          situacao: 'devolvido',
+          ativoId: d.ativoId,
+        };
+      })
+    );
+  };
+  // Processos da pessoa com anotações fixas (seção 9.2)
+  const anotacoesProcessos = tickets.filter(
+    (t) => (t.tipo === 'onboarding' || t.tipo === 'offboarding') && (t.colaboradorId || t.offboarding?.colaboradorId) === employee.id && t.anotacoesProcesso
+  );
+
   // Lote 1 (1.12): antes de gerar, a T.I. confere item a item (nada vem marcado "Bom")
   const abrirConferencia = () => {
     if (currentAssets.length === 0) {
@@ -183,6 +212,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
       return;
     }
     setAba('termos');
+    setConferenciaDev(null);
     setConferencia(
       currentAssets.map((a) => ({
         descricao: a.nome,
@@ -194,11 +224,15 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     );
   };
 
-  const handleGenerateTerm = async (itens: ItemTermo[]): Promise<string | null> => {
-    const doc = settings.docEntrega || DOC_ENTREGA_PADRAO;
+  /**
+   * Seção 9.5: gera o termo (entrega com o que está com a pessoa hoje, ou recibo de
+   * devolução dos itens que saíram). O termo vigente é substituído e fica no histórico.
+   */
+  const handleGenerateTerm = async (itens: ItemTermo[], motivoSubstituicao = '', tipo: 'entrega' | 'devolucao' = 'entrega'): Promise<string | null> => {
+    const doc = tipo === 'entrega' ? settings.docEntrega || DOC_ENTREGA_PADRAO : settings.docDevolucao || DOC_DEVOLUCAO_PADRAO;
     setGerandoTermo(true);
     const newTerm = await createTerm({
-      tipo: 'entrega',
+      tipo,
       colaboradorId: employee.id,
       colaboradorNome: employee.nome,
       colaboradorMatricula: employee.matricula,
@@ -214,14 +248,27 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
       docVersao: doc.versao,
       docReferencia: doc.referencia,
       docTitulo: doc.titulo,
-      textoClausula: settings.textoTermoEntrega,
+      textoClausula: tipo === 'entrega' ? settings.textoTermoEntrega : settings.textoTermoDevolucao,
       formaAssinatura: 'pendente',
     });
+    if (!newTerm) {
+      setGerandoTermo(false);
+      return 'O termo não foi gerado. Os itens conferidos continuam aqui; tente de novo.';
+    }
+    // Entrega nova substitui a vigente; recibo que devolve tudo encerra a vigente
+    const devolveuTudo = tipo === 'devolucao' && currentAssets.length === 0;
+    if (vigente && (tipo === 'entrega' || devolveuTudo)) {
+      const falha = await cancelarTermo(
+        vigente.id,
+        tipo === 'entrega' ? motivoSubstituicao || 'Termo atualizado: itens entregues ou devolvidos' : `Itens devolvidos (recibo ${newTerm.codigo})`,
+        newTerm.id
+      );
+      if (falha) setTermSuccess(`Termo ${newTerm.codigo} gerado, mas o anterior (${vigente.codigo}) não foi substituído: ${falha}. Cancele-o na tela do termo.`);
+    }
     setGerandoTermo(false);
-    if (!newTerm) return 'O termo não foi gerado. Os itens conferidos continuam aqui; tente de novo.';
-
     setConferencia(null);
-    setTermSuccess(`Termo ${newTerm.codigo} gerado com sucesso!`);
+    setConferenciaDev(null);
+    setTermSuccess(`${tipo === 'entrega' ? 'Termo' : 'Recibo'} ${newTerm.codigo} gerado com sucesso!`);
     setTimeout(() => setTermSuccess(null), 3000);
     setSelectedTermForPrint(newTerm);
     return null;
@@ -242,6 +289,34 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     { id: 'chamados', rotulo: 'Chamados e processos', contador: chamados.length },
   ];
   const painel = (id: AbaPessoa) => (aba === id ? 'space-y-4' : 'hidden');
+
+  // Seção 9.5: aviso que não bloqueia nada; o termo anterior fica no histórico
+  const avisoTermo = pendencia && podeGerarTermo && (
+    <div role="status" className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <div className="min-w-0 space-y-0.5">
+        <p className="font-semibold">Termo desatualizado</p>
+        <p>
+          {resumoPendenciaTermo(pendencia)}
+          {vigente ? ` (termo vigente ${vigente.codigo})` : ' (a pessoa ainda não tem termo de entrega)'}.
+        </p>
+        {pendencia.semTermo.length > 0 && <p>Sem termo: {pendencia.semTermo.map((a) => `${a.tag} · ${a.nome}`).join(', ')}.</p>}
+        {pendencia.devolvidos.length > 0 && <p>Já devolvidos: {pendencia.devolvidos.map((d) => d.descricao).join(', ')}.</p>}
+        <p className="text-amber-800">Não bloqueia nada: o termo novo substitui o anterior, que fica no histórico.</p>
+      </div>
+      <span className="flex flex-wrap gap-2">
+        {currentAssets.length > 0 && (
+          <button type="button" onClick={abrirConferencia} className="btn btn-sm btn-secundario">
+            <FilePlus aria-hidden="true" /> Gerar termo atualizado
+          </button>
+        )}
+        {pendencia.devolvidos.length > 0 && (
+          <button type="button" onClick={abrirReciboDevolucao} className="btn btn-sm btn-secundario">
+            <FileText aria-hidden="true" /> Gerar recibo de devolução
+          </button>
+        )}
+      </span>
+    </div>
+  );
 
   return (
     <>
@@ -273,13 +348,13 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             {podeGerarTermo && (
               <button
                 type="button"
-                title="Gerar termo de entrega"
-                aria-label="Gerar termo de entrega"
+                title={vigente ? 'Gerar termo atualizado (substitui o vigente)' : 'Gerar termo de entrega'}
+                aria-label={vigente ? 'Gerar termo atualizado' : 'Gerar termo de entrega'}
                 onClick={abrirConferencia}
                 className="btn btn-sm btn-secundario"
               >
                 <FilePlus />
-                <Rotulo texto="Gerar termo de entrega" />
+                <Rotulo texto={vigente ? 'Gerar termo atualizado' : 'Gerar termo de entrega'} />
               </button>
             )}
             {podeAnonimizar && (
@@ -308,6 +383,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
 
         {/* ---------------- Resumo ---------------- */}
         <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
+          {avisoTermo}
           <section className="cartao space-y-3 p-4">
             <h3 className="secao-titulo">Dados da pessoa</h3>
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -649,15 +725,29 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
 
         {/* ---------------- Termos ---------------- */}
         <div role="tabpanel" aria-label="Termos" className={painel('termos')}>
+          {!conferencia && !conferenciaDev && avisoTermo}
           {conferencia && (
             <section className="cartao p-4">
               <ConferenciaTermo
                 tipo="entrega"
                 linhasIniciais={conferencia}
                 nomePessoa={employee.nome.split(' ')[0]}
+                termoAnterior={vigente}
                 gravando={gerandoTermo}
-                onConfirmar={(itens) => handleGenerateTerm(itens)}
+                onConfirmar={(itens, motivo) => handleGenerateTerm(itens, motivo, 'entrega')}
                 onVoltar={() => setConferencia(null)}
+              />
+            </section>
+          )}
+          {conferenciaDev && (
+            <section className="cartao p-4">
+              <ConferenciaTermo
+                tipo="devolucao"
+                linhasIniciais={conferenciaDev}
+                nomePessoa={employee.nome.split(' ')[0]}
+                gravando={gerandoTermo}
+                onConfirmar={(itens) => handleGenerateTerm(itens, '', 'devolucao')}
+                onVoltar={() => setConferenciaDev(null)}
               />
             </section>
           )}
@@ -715,6 +805,25 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         {/* ---------------- Chamados e processos ---------------- */}
         <div role="tabpanel" aria-label="Chamados e processos" className={painel('chamados')}>
           {/* Fase 9: chamados que a pessoa abriu ou em que é o colaborador relacionado (inclui admissão/desligamento) */}
+          {/* Seção 9.2: anotações fixas dos processos, visíveis também depois de concluir */}
+          {anotacoesProcessos.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="secao-titulo">Anotações dos processos</h3>
+              {anotacoesProcessos.map((t) => (
+                <div key={t.id} className="cartao space-y-1 p-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">
+                      {ROTULO_PROCESSO[t.tipo]} · <span className="font-mono">{t.codigo}</span>
+                    </span>
+                    <button type="button" onClick={() => setSelectedTicketIdForDetail(t.id)} className="btn btn-sm btn-secundario">
+                      Abrir processo
+                    </button>
+                  </div>
+                  <p className="whitespace-pre-wrap text-slate-700">{t.anotacoesProcesso}</p>
+                </div>
+              ))}
+            </section>
+          )}
           <ChamadosVinculados
             chamados={chamados}
             etiqueta={(t) => [ROTULO_PROCESSO[t.tipo], papelNoChamado(t, employee.id)].filter(Boolean).join(' · ')}

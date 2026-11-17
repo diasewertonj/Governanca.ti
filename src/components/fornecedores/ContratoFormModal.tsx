@@ -22,6 +22,7 @@ import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts'
 import { FornecedorFormModal } from './FornecedorFormModal.tsx';
 import { SeletorItensContrato } from './SeletorItensContrato.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
+import { CampoMoeda } from '../ui/Campos.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
 
@@ -63,7 +64,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
   const [descricao, setDescricao] = useState(base.descricao ?? '');
   const [inicio, setInicio] = useState(() => base.inicio ?? isoLocal(new Date()));
   const [fim, setFim] = useState(base.fim ?? '');
-  const [valor, setValor] = useState(base.valor !== undefined ? String(base.valor) : '');
+  const [valor, setValor] = useState<number | undefined>(base.valor);
   const [periodicidade, setPeriodicidade] = useState<PeriodicidadeContrato>(base.periodicidade ?? 'mensal');
   const [sla, setSla] = useState(base.sla ?? '');
   const [contatoSuporte, setContatoSuporte] = useState(base.contatoSuporte ?? '');
@@ -123,7 +124,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
 
   /** Primeiro problema do formulário e a etapa em que ele está */
   const validar = (): { etapa: Etapa; msg: string } | null => {
-    const valorNumero = valor === '' ? 0 : Number(valor);
+    const valorNumero = valor ?? 0;
     if (!fornecedorId) return { etapa: 'dados', msg: 'Escolha o fornecedor.' };
     if (!descricao.trim()) return { etapa: 'dados', msg: 'Informe a descrição do contrato.' };
     if (!inicio) return { etapa: 'dados', msg: 'Informe o início do contrato.' };
@@ -150,7 +151,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
       setEtapa(falhaValidacao.etapa);
       return;
     }
-    const valorNumero = valor === '' ? 0 : Number(valor);
+    const valorNumero = valor ?? 0;
     // Seção 6: avisos de duplicidade e de fornecedor divergente (a pessoa decide)
     const mesmoNumero =
       numero.trim() &&
@@ -267,7 +268,14 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
       setErro(`O contrato tem ${qtdFaturas} fatura(s) lançada(s) e não pode ser excluído. As faturas guardam o histórico de custo.`);
       return;
     }
-    if (!(await confirmar(`Excluir o contrato ${nomeContrato(contrato)}?\n\nEsta ação não pode ser desfeita.`))) return;
+    const ok = await confirmar({
+      titulo: `Excluir o contrato ${nomeContrato(contrato)}?`,
+      mensagem: `Ele é apagado${contrato.arquivoCaminho ? ', junto com o arquivo do contrato,' : ''} e deixa de cobrir os itens. Não dá para desfazer: cadastre de novo se precisar. Para só parar de valer e manter o histórico, use Encerrar na ficha do contrato.`,
+      confirmar: 'Excluir',
+      cancelar: 'Voltar',
+      perigo: true,
+    });
+    if (!ok) return;
     const r = excluirContrato(contrato.id);
     if (r.success) onClose();
     else setErro(r.message || 'Não foi possível excluir o contrato.');
@@ -415,17 +423,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                     <label htmlFor="ctr-valor" className={CLASSE_ROTULO}>
                       Valor (R$)
                     </label>
-                    <input
-                      id="ctr-valor"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      inputMode="decimal"
-                      value={valor}
-                      onChange={(e) => setValor(e.target.value)}
-                      placeholder="0,00"
-                      className={`${CLASSE_CAMPO} font-mono`}
-                    />
+                    <CampoMoeda id="ctr-valor" valor={valor} onMudar={setValor} className={CLASSE_CAMPO} />
                   </div>
                   <div>
                     <label htmlFor="ctr-periodicidade" className={CLASSE_ROTULO}>

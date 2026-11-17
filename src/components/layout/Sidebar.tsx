@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import {
   ArrowLeftRight,
@@ -28,6 +28,7 @@ import { menuDoPapel, type Contador, type Icone } from '../../utils/navegacao.ts
 import { termoAberto } from '../../utils/termos.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { listarVencimentos, pendenciasConciliacao } from '../../utils/financeiro.ts';
+import { pendenciasTermo } from '../../utils/inventario.ts';
 
 const ICONES: Record<Icone, LucideIcon> = {
   inicio: House,
@@ -64,13 +65,19 @@ interface SidebarProps {
  * à esquerda; abaixo de 1024px vira gaveta aberta pelo botão do cabeçalho.
  */
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpenNewTicketModal, aberto, onFechar }) => {
-  const { currentRole, tickets, currentUser, lembretes, terms, assets, contratos, licenses, faturas, employees } = useApp();
+  const { currentRole, tickets, currentUser, lembretes, terms, assets, contratos, licenses, faturas, employees, processoItens, settings } = useApp();
   const { estoque, linhas } = useRecursos();
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
-  // Seção 6: o que vence em 30 dias (e pendências sem data), só para a T.I.
-  const qtdVencimentos = isTI
-    ? listarVencimentos({ ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees }, 30).length
-    : 0;
+  // Seção 6: o que vence em 30 dias (e pendências sem data), só para a T.I. — os mesmos
+  // dados do "Precisa de atenção" (inclui passos agendados e termos desatualizados)
+  const qtdVencimentos = useMemo(() => {
+    if (!isTI) return 0;
+    const termosDesatualizados = pendenciasTermo(employees, { ativos: assets, termos: terms, chamados: tickets, cfg: settings.termoExige });
+    return listarVencimentos(
+      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados },
+      30
+    ).length;
+  }, [isTI, assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige]);
   const qtdConciliar = currentRole === 'ti_admin' ? pendenciasConciliacao(licenses, assets).length : 0;
 
   // Fecha a gaveta com Esc

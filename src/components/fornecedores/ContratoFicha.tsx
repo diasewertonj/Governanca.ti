@@ -23,6 +23,7 @@ import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
 import { ContratoFormModal } from './ContratoFormModal.tsx';
 import { LembreteContrato } from './LembreteContrato.tsx';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
+import { CampoMoeda } from '../ui/Campos.tsx';
 import { Dado, Janela } from '../ui/Janela.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
 import { Vazio } from '../ui/Tela.tsx';
@@ -66,7 +67,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
   const [idAtual, setIdAtual] = useState(contratoId);
   const [aba, setAba] = useState<AbaFicha>('resumo');
   const [editando, setEditando] = useState(false);
-  const [renovacao, setRenovacao] = useState<{ inicio: string; fim: string; valor: string; numero: string } | null>(null);
+  const [renovacao, setRenovacao] = useState<{ inicio: string; fim: string; valor: number | undefined; numero: string } | null>(null);
   const [renovando, setRenovando] = useState(false);
   const [erroRenovacao, setErroRenovacao] = useState('');
   const [erro, setErro] = useState('');
@@ -137,7 +138,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
     novoFim.setFullYear(novoFim.getFullYear() + 1);
     novoFim.setDate(novoFim.getDate() - 1);
     setErroRenovacao('');
-    setRenovacao({ inicio: isoLocal(d), fim: isoLocal(novoFim), valor: String(contrato.valor), numero: '' });
+    setRenovacao({ inicio: isoLocal(d), fim: isoLocal(novoFim), valor: contrato.valor, numero: '' });
   };
 
   const renovar = async (e: React.FormEvent) => {
@@ -145,7 +146,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
     if (!renovacao || renovando) return;
     if (!renovacao.inicio) return setErroRenovacao('Informe o novo início.');
     if (renovacao.fim && renovacao.fim < renovacao.inicio) return setErroRenovacao('O novo fim é anterior ao novo início.');
-    const valor = renovacao.valor === '' ? 0 : Number(renovacao.valor);
+    const valor = renovacao.valor ?? 0;
     if (!Number.isFinite(valor) || valor < 0) return setErroRenovacao('O valor não pode ser negativo.');
     setRenovando(true);
     const r = await renovarContrato(contrato.id, renovacao.inicio, renovacao.fim || undefined, valor, renovacao.numero.trim() || undefined);
@@ -158,7 +159,8 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
   const encerrar = async () => {
     const motivo = await pedirTexto({
       titulo: `Encerrar o contrato ${nomeContrato(contrato)}?`,
-      mensagem: 'Ele deixa de valer hoje e de cobrir os itens. As faturas e o histórico continuam; só o administrador reabre.',
+      mensagem:
+        'Ele deixa de valer hoje: para de cobrir os itens e de contar no custo recorrente. As faturas e o histórico continuam. Dá para desfazer: o administrador pode reabrir.',
       rotulo: 'Motivo do encerramento',
       minimo: 5,
       confirmar: 'Encerrar',
@@ -192,7 +194,14 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
   };
 
   const removerAnexo = async (id: string, nome: string) => {
-    if (!(await confirmar(`Remover o anexo ${nome}?\n\nO arquivo deixa de aparecer no contrato.`))) return;
+    const ok = await confirmar({
+      titulo: `Remover o anexo ${nome}?`,
+      mensagem: 'O arquivo é apagado e sai do contrato. Não dá para desfazer: anexe de novo se precisar.',
+      confirmar: 'Remover',
+      cancelar: 'Voltar',
+      perigo: true,
+    });
+    if (!ok) return;
     setErroAnexo((await removerAnexoContrato(id)) || '');
   };
 
@@ -683,16 +692,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                 <label htmlFor="ren-valor" className={CLASSE_ROTULO}>
                   Valor (R$)
                 </label>
-                <input
-                  id="ren-valor"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={renovacao.valor}
-                  onChange={(e) => setRenovacao({ ...renovacao, valor: e.target.value })}
-                  className={`${CLASSE_CAMPO} font-mono`}
-                />
+                <CampoMoeda id="ren-valor" valor={renovacao.valor} onMudar={(v) => setRenovacao({ ...renovacao, valor: v })} className={CLASSE_CAMPO} />
               </div>
               <div>
                 <label htmlFor="ren-num" className={CLASSE_ROTULO}>

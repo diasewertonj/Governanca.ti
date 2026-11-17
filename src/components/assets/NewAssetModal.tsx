@@ -1,20 +1,48 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { Asset, AssetCategory } from '../../types/index.ts';
-import { Package, Plus } from 'lucide-react';
+import type { Asset, AssetCategory } from '../../types/index.ts';
+import { Copy, Package, Plus } from 'lucide-react';
 import { Janela } from '../ui/Janela.tsx';
 import { Abas } from '../ui/Abas.tsx';
+import { CampoMascara, CampoMoeda, CampoSugestoes } from '../ui/Campos.tsx';
+import { confirmarMovimento } from '../ui/dialogo.tsx';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
 import { isoLocal } from '../../utils/formatters.ts';
 import { erroDuplicadoAtivo, proximaTag } from '../../utils/patrimonio.ts';
+import { MASCARAS, aplicarMascara, soDigitos } from '../../utils/mascaras.ts';
+import {
+  CHAVE,
+  CHAVES_ESTRUTURADAS,
+  CPU_FABRICANTES,
+  CPU_LINHAS,
+  DICA_CPU_MODELO,
+  DISCO_CAPACIDADES,
+  DISCO_TIPOS,
+  MEMORIA_TAMANHOS,
+  MEMORIA_TIPOS,
+  SISTEMAS_OPERACIONAIS,
+  TIPOS_EQUIPAMENTO,
+  fabricantesDaCategoria,
+  gravarEspecificacoes,
+  lerEspecificacoes,
+  nomeSugerido,
+  type Especificacoes,
+} from '../../utils/especificacoes.ts';
+import { avisoSegundoAtivo, classeDoAtivo, exigeTermo } from '../../utils/inventario.ts';
 import { FornecedorFormModal } from '../fornecedores/FornecedorFormModal.tsx';
 
 interface NewAssetModalProps {
   onClose: () => void;
   /** Fase 8: quando informado, o formulário edita este ativo (a custódia muda só por "Transferir") */
   ativo?: Asset;
+  /** Seção 9: pré-preenche um cadastro novo (ex.: cadastro rápido no checklist) */
+  inicial?: Partial<Asset>;
+  /** Seção 9.3: "Duplicar" — mesmo lote; limpa o que é único (patrimônio, série, Service Tag, IMEI, MAC, BitLocker, custódia) */
+  duplicarDe?: Asset;
+  /** Se vier, é chamado com o ativo criado no lugar de abrir a ficha */
+  onCriado?: (a: Asset) => void;
 }
 
 const CATEGORIA_LABEL: Record<string, string> = {
@@ -24,6 +52,9 @@ const CATEGORIA_LABEL: Record<string, string> = {
   telefonia: 'Telefonia',
 };
 
+const LOCAL_PADRAO = 'Almoxarifado T.I. - Armário B3';
+const SO_PADRAO = 'Windows 11 Pro 64-bit';
+
 type AbaAtivo = 'ident' | 'tecnico' | 'custodia' | 'fiscal';
 const ABAS_ATIVO: [AbaAtivo, string][] = [
   ['ident', 'Identificação'],
@@ -32,7 +63,30 @@ const ABAS_ATIVO: [AbaAtivo, string][] = [
   ['fiscal', 'Fiscal e garantia'],
 ];
 
-export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) => {
+/** Duplicar: mantém o que é do lote e limpa o que é único de cada aparelho */
+function copiaDoLote(a: Asset): Partial<Asset> {
+  const cf = { ...(a.customFields || {}) };
+  for (const k of [CHAVE.serviceTag, CHAVE.imei, CHAVE.mac]) delete cf[k];
+  return {
+    nome: a.nome,
+    categoria: a.categoria,
+    marca: a.marca,
+    modelo: a.modelo,
+    customFields: cf,
+    sistemaOperacional: a.sistemaOperacional,
+    fornecedorId: a.fornecedorId,
+    fiscal: a.fiscal ? { ...a.fiscal } : undefined,
+    setorId: a.setorId,
+    // Em uso, a localização é "Em posse de…": não serve para o novo, que entra no estoque
+    localizacaoFisica: a.custodianteId ? undefined : a.localizacaoFisica,
+    observacoes: a.observacoes,
+  };
+}
+
+/** Opções do select com o valor atual (lido de dado antigo) quando ele não está na lista */
+const comAtual = (lista: string[], atual?: string) => (atual && !lista.includes(atual) ? [atual, ...lista] : lista);
+
+export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo, inicial, duplicarDe, onCriado }) => {
   const {
     assets,
     departments,
@@ -45,30 +99,62 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     setSelectedAssetIdFor360,
   } = useApp();
 
-  // Lote 1: próxima tag = maior número já usado + 1 (não repete tag existente)
-  const defaultTag = proximaTag(assets);
+  // De onde vêm os valores iniciais: o ativo em edição, a cópia do lote ou o pré-preenchimento
+  const [origem] = useState<Partial<Asset>>(() => ativo ?? (duplicarDe ? copiaDoLote(duplicarDe) : inicial ?? {}));
+  const fiscalAtual = origem.fiscal;
+  const cfOrigem = origem.customFields || {};
+
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [aba, setAba] = useState<AbaAtivo>('ident');
   const [abasComErro, setAbasComErro] = useState<AbaAtivo[]>([]);
-  const fiscalAtual = ativo?.fiscal;
 
-  const [tag, setTag] = useState(ativo?.tag ?? defaultTag);
-  const [nome, setNome] = useState(ativo?.nome ?? '');
-  const [categoria, setCategoria] = useState<AssetCategory>(ativo?.categoria ?? 'hardware');
-  const [marca, setMarca] = useState(ativo?.marca ?? '');
-  const [modelo, setModelo] = useState(ativo?.modelo ?? '');
-  const [serialNumber, setSerialNumber] = useState(ativo?.serialNumber ?? '');
-  const [localizacaoFisica, setLocalizacaoFisica] = useState(ativo?.localizacaoFisica ?? 'Almoxarifado T.I. - Armário B3');
-  const [setorId, setSetorId] = useState(ativo?.setorId ?? 'dep-1');
-  const [custodianteId, setCustodianteId] = useState(ativo?.custodianteId ?? '');
+  // Lote 1: próxima tag = maior número já usado + 1 (não repete tag existente)
+  const [tag, setTag] = useState(() => origem.tag ?? proximaTag(assets));
+  const [categoria, setCategoria] = useState<AssetCategory>(origem.categoria ?? 'hardware');
+  const [marca, setMarca] = useState(origem.marca ?? '');
+  const [modelo, setModelo] = useState(origem.modelo ?? '');
+  const [serialNumber, setSerialNumber] = useState(origem.serialNumber ?? '');
+  // Seção 9.3: Service Tag, IMEI e MAC ficam em customFields
+  const [serviceTag, setServiceTag] = useState(cfOrigem[CHAVE.serviceTag] ?? '');
+  const [imei, setImei] = useState(() => aplicarMascara('imei', cfOrigem[CHAVE.imei] ?? ''));
+  const [mac, setMac] = useState(() => aplicarMascara('mac', cfOrigem[CHAVE.mac] ?? ''));
+  const [localizacaoFisica, setLocalizacaoFisica] = useState(origem.localizacaoFisica ?? LOCAL_PADRAO);
+  const [setorId, setSetorId] = useState(origem.setorId ?? 'dep-1');
+  const [custodianteId, setCustodianteId] = useState(origem.custodianteId ?? '');
 
-  // Dados Fiscais
+  // Especificações estruturadas (as partes ficam em customFields)
+  const [especInicial] = useState<Especificacoes>(() => lerEspecificacoes(cfOrigem));
+  const [espec, setEspec] = useState<Especificacoes>(especInicial);
+  const mudarEspec = (k: keyof Especificacoes, v: string) => setEspec((e) => ({ ...e, [k]: v || undefined }));
+  const mudarCpuFabricante = (v: string) =>
+    setEspec((e) => {
+      const linhas = CPU_LINHAS[v];
+      const manterLinha = !linhas || !e.cpuLinha || linhas.includes(e.cpuLinha);
+      return { ...e, cpuFabricante: v || undefined, cpuLinha: manterLinha ? e.cpuLinha : undefined };
+    });
+
+  // Nome sugerido: acompanha tipo, marca, modelo e especificações enquanto a pessoa não editar
+  const sugestao = nomeSugerido({ tipo: espec.tipo, marca, modelo, espec: categoria === 'hardware' ? espec : undefined });
+  const [nomeManual, setNomeManual] = useState(origem.nome ?? '');
+  const [nomeEditado, setNomeEditado] = useState(() => {
+    const n = (origem.nome ?? '').trim();
+    const sugerido = nomeSugerido({
+      tipo: especInicial.tipo,
+      marca: origem.marca,
+      modelo: origem.modelo,
+      espec: (origem.categoria ?? 'hardware') === 'hardware' ? especInicial : undefined,
+    });
+    return n !== '' && n !== sugerido;
+  });
+  const nome = nomeEditado ? nomeManual : sugestao;
+
+  // Dados fiscais
   const [numeroNF, setNumeroNF] = useState(fiscalAtual?.numeroNF ?? '');
-  const [chaveAcesso44, setChaveAcesso44] = useState(fiscalAtual?.chaveAcesso44 ?? '');
-  const [valorCompra, setValorCompra] = useState<number>(fiscalAtual?.valorCompra ?? 0);
+  const [chaveNfe, setChaveNfe] = useState(() => aplicarMascara('chave_nfe', fiscalAtual?.chaveAcesso44 ?? ''));
+  const [valorCompra, setValorCompra] = useState<number | undefined>(fiscalAtual?.valorCompra || undefined);
   // Fase 8: fornecedor do cadastro; o texto antigo fica (e aparece) enquanto não houver vínculo
-  const [fornecedorId, setFornecedorId] = useState(ativo?.fornecedorId ?? '');
+  const [fornecedorId, setFornecedorId] = useState(origem.fornecedorId ?? '');
   const [fornecedor] = useState(fiscalAtual?.fornecedor ?? '');
   const [novoFornecedor, setNovoFornecedor] = useState(false);
   const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
@@ -78,28 +164,30 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
 
   // Segurança e SO (Hardware)
   const [sistemaOperacional, setSistemaOperacional] = useState(
-    ativo ? ativo.sistemaOperacional ?? '' : 'Windows 11 Pro 64-bit'
+    ativo ? ativo.sistemaOperacional ?? '' : origem.sistemaOperacional ?? SO_PADRAO
   );
-  const [bitlockerKey, setBitlockerKey] = useState(ativo?.bitlockerKey ?? '');
+  const [bitlockerKey, setBitlockerKey] = useState(origem.bitlockerKey ?? '');
 
-  // Campos Customizados
-  const [customFields, setCustomFields] = useState<Record<string, string>>(
-    ativo?.customFields ?? { processador: '', memoriaRam: '', armazenamento: '' }
-  );
+  // Campos personalizados (os estruturados acima não aparecem de novo aqui)
+  const [customFields, setCustomFields] = useState<Record<string, string>>(() => ({ ...cfOrigem }));
 
   // Fase 8: observações e nota fiscal (o arquivo só sobe ao salvar)
-  const [observacoes, setObservacoes] = useState(ativo?.observacoes ?? '');
+  const [observacoes, setObservacoes] = useState(origem.observacoes ?? '');
   const [notaFiscal, setNotaFiscal] = useState<File | null>(null);
   const [erroArquivo, setErroArquivo] = useState('');
 
   const availableCustomFields = settings.camposPersonalizados.filter(
-    (cf) => cf.categoria === categoria
+    (cf) => cf.categoria === categoria && !CHAVES_ESTRUTURADAS.has(cf.key)
   );
+  const temImei = categoria === 'telefonia';
+  const temMac = categoria === 'hardware' || categoria === 'telefonia';
+  const tipos = TIPOS_EQUIPAMENTO[categoria] || [];
+  const linhasCpu = CPU_LINHAS[espec.cpuFabricante || ''] || Object.values(CPU_LINHAS).flat();
 
   // Aviso ao fechar com alterações não salvas
-  const valores = JSON.stringify([tag, nome, categoria, marca, modelo, serialNumber, localizacaoFisica, setorId,
-    custodianteId, numeroNF, chaveAcesso44, valorCompra, fornecedorId, fornecedor, dataAquisicao, dataGarantia,
-    suporteContato, sistemaOperacional, bitlockerKey, customFields, observacoes]);
+  const valores = JSON.stringify([tag, nome, categoria, marca, modelo, serialNumber, serviceTag, imei, mac, espec,
+    localizacaoFisica, setorId, custodianteId, numeroNF, chaveNfe, valorCompra, fornecedorId, fornecedor, dataAquisicao,
+    dataGarantia, suporteContato, sistemaOperacional, bitlockerKey, customFields, observacoes]);
   const [valoresIniciais] = useState(valores);
   const itensPendentes =
     valores !== valoresIniciais || notaFiscal
@@ -116,6 +204,26 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     const erro = validarArquivo(arquivo);
     setErroArquivo(erro || '');
     setNotaFiscal(erro ? null : arquivo);
+  };
+
+  /** customFields final: campos genéricos + Service Tag/IMEI/MAC + especificações */
+  const montarCustomFields = (): Record<string, string> => {
+    let cf: Record<string, string> = { ...customFields };
+    const por = (chave: string, valor: string) => {
+      if (valor.trim()) cf[chave] = valor.trim();
+      else delete cf[chave];
+    };
+    por(CHAVE.serviceTag, serviceTag);
+    // IMEI: só os dígitos quando a máscara entendeu; texto diferente fica como foi digitado
+    if (temImei) por(CHAVE.imei, MASCARAS.imei.aceita.test(imei) ? soDigitos(imei) : imei);
+    if (temMac) por(CHAVE.mac, mac);
+    if (categoria === 'hardware') {
+      // Sem mexer nas especificações, o texto antigo (ex.: "Intel Core i7 (10 cores…)") fica como estava
+      if (JSON.stringify(espec) !== JSON.stringify(especInicial)) cf = gravarEspecificacoes(cf, espec);
+    } else {
+      por(CHAVE.tipo, espec.tipo || '');
+    }
+    return Object.fromEntries(Object.entries(cf).filter(([, v]) => v && v.trim()));
   };
 
   // Lote 1: só fecha depois do banco confirmar; se recusar, o erro aparece aqui e nada se perde
@@ -145,11 +253,13 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     setErroSalvar(null);
     setAbasComErro([]);
 
+    const cfFinal = montarCustomFields();
     const fiscal = {
       ...(fiscalAtual || {}),
       numeroNF: numeroNF.trim(),
-      chaveAcesso44: chaveAcesso44.replace(/\s+/g, '').trim(),
-      valorCompra: Number(valorCompra) || 0,
+      // Seção 9.3: a chave da NF-e é gravada só com os dígitos
+      chaveAcesso44: soDigitos(chaveNfe),
+      valorCompra: valorCompra ?? 0,
       // Com vínculo, o texto passa a ser o nome do cadastro; sem vínculo, fica o legado
       fornecedor: fornecedores.find((f) => f.id === fornecedorId)?.nome || fornecedor.trim(),
       dataAquisicao,
@@ -168,10 +278,10 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
         serialNumber: serialNumber.trim(),
         localizacaoFisica: ativo.custodianteId ? ativo.localizacaoFisica : localizacaoFisica.trim(),
         setorId,
-        sistemaOperacional: categoria === 'hardware' ? sistemaOperacional || undefined : undefined,
+        sistemaOperacional: categoria === 'hardware' ? sistemaOperacional.trim() || undefined : undefined,
         bitlockerKey: categoria === 'hardware' && bitlockerKey.trim() ? bitlockerKey.trim() : undefined,
         fiscal,
-        customFields,
+        customFields: cfFinal,
         observacoes: observacoes.trim() || undefined,
         fornecedorId: fornecedorId || undefined,
       });
@@ -183,8 +293,39 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     }
 
     const today = isoLocal(new Date());
-    const isEmUso = Boolean(custodianteId);
-    const custodian = employees.find((e) => e.id === custodianteId);
+    const custodian = employees.find((emp) => emp.id === custodianteId);
+    const isEmUso = Boolean(custodian);
+
+    // Seção 9.1/9.6: entregar já no cadastro passa pela confirmação do movimento
+    let observacaoEntrega = 'Alocação inicial no cadastro do ativo';
+    if (custodian) {
+      const provisorio = { id: '', tag: tag.trim(), categoria, nome: nome.trim(), customFields: cfFinal };
+      const aviso = avisoSegundoAtivo(provisorio, custodian.id, assets);
+      const classe = classeDoAtivo(provisorio);
+      const resposta = await confirmarMovimento({
+        titulo: 'Cadastrar e entregar o equipamento',
+        item: `${tag.trim()} · ${nome.trim()}`,
+        de: 'Estoque (cadastro novo)',
+        para: custodian.nome,
+        efeitos: [
+          'O equipamento é cadastrado com a situação "Em uso".',
+          `A entrega para ${custodian.nome} fica registrada hoje no histórico de custódia.`,
+        ],
+        foraDoNexus: [
+          `Entregar o equipamento a ${custodian.nome}.`,
+          ...(classe === 'computador' ? ['Criar o usuário da pessoa no computador e incluir no MDM, se for o caso.'] : []),
+          ...(classe === 'celular' ? ['Configurar a conta da pessoa no aparelho e incluir no MDM, se for o caso.'] : []),
+        ],
+        termo: exigeTermo(provisorio, settings.termoExige)
+          ? `O termo de ${custodian.nome} ficará desatualizado até gerar o termo atualizado na ficha da pessoa (não bloqueia).`
+          : 'Este item não exige termo.',
+        justificativa: aviso ? { aviso } : undefined,
+        desfazer: 'Dá para desfazer pela ficha do equipamento (Transferir custódia → devolver ao estoque).',
+        confirmar: 'Cadastrar e entregar',
+      });
+      if (!resposta) return;
+      if (resposta.justificativa) observacaoEntrega = `Alocação inicial no cadastro do ativo — justificativa: ${resposta.justificativa}`;
+    }
 
     setSalvando(true);
     const { item: created, erro: falhaCadastro } = await cadastrarAtivo({
@@ -194,27 +335,25 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
       marca: marca.trim(),
       modelo: modelo.trim(),
       serialNumber: serialNumber.trim(),
-      localizacaoFisica: isEmUso
-        ? `Home Office / Em posse de ${custodian?.nome || 'Colaborador'}`
-        : localizacaoFisica.trim(),
+      localizacaoFisica: custodian ? `Home Office / Em posse de ${custodian.nome}` : localizacaoFisica.trim(),
       setorId,
-      custodianteId: custodianteId || undefined,
+      custodianteId: custodian?.id,
       status: isEmUso ? 'em_uso' : 'disponivel',
       dataEntregaAtual: isEmUso ? today : undefined,
-      sistemaOperacional: categoria === 'hardware' ? sistemaOperacional : undefined,
+      sistemaOperacional: categoria === 'hardware' ? sistemaOperacional.trim() || undefined : undefined,
       bitlockerKey: categoria === 'hardware' && bitlockerKey.trim() ? bitlockerKey.trim() : undefined,
       fiscal,
-      customFields,
+      customFields: cfFinal,
       observacoes: observacoes.trim() || undefined,
       fornecedorId: fornecedorId || undefined,
-      historicoCustodia: isEmUso && custodian
+      historicoCustodia: custodian
         ? [
             {
               id: `cust-${Date.now()}`,
               colaboradorId: custodian.id,
               colaboradorNome: custodian.nome,
               dataEntrega: today,
-              observacoes: 'Alocação inicial no cadastro do ativo',
+              observacoes: observacaoEntrega,
             },
           ]
         : [],
@@ -225,22 +364,27 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     if (notaFiscal) void anexarArquivoAtivo(created.id, notaFiscal, 'nota_fiscal');
 
     onClose();
-    setSelectedAssetIdFor360(created.id);
+    if (onCriado) onCriado(created);
+    else setSelectedAssetIdFor360(created.id);
   };
 
   const painel = (id: AbaAtivo) => (aba === id ? 'space-y-4' : 'hidden');
-  const grade = 'grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4';
+  const grade = 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4';
+  const gradeTecnica = 'grid grid-cols-2 gap-4 md:grid-cols-4';
+  const nfOriginal = duplicarDe?.anexos?.some((a) => a.categoria === 'nota_fiscal');
 
   return (
     <>
       <Janela
         tamanho="g"
-        icone={<Package className="h-4 w-4" />}
-        titulo={ativo ? `Editar ativo ${ativo.tag}` : 'Novo ativo patrimonial de T.I.'}
+        icone={duplicarDe ? <Copy className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+        titulo={ativo ? `Editar ativo ${ativo.tag}` : duplicarDe ? `Duplicar ativo ${duplicarDe.tag} (mesmo lote)` : 'Novo ativo patrimonial de T.I.'}
         subtitulo={
           ativo
             ? 'Corrija os dados do ativo. A custódia muda pelo botão "Transferir" da ficha.'
-            : 'Controle de patrimônio, gestão fiscal e rastreabilidade 1:1'
+            : duplicarDe
+              ? 'Mesmo modelo, especificações e compra. Preencha o que é único: série, Service Tag, IMEI.'
+              : 'Controle de patrimônio, gestão fiscal e rastreabilidade 1:1'
         }
         onFechar={fechar}
         faixa={
@@ -277,42 +421,87 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
           <div className={painel('ident')}>
             <div className="cartao space-y-3 p-4">
               <h3 className="secao-titulo">Identificação</h3>
+              {duplicarDe && (
+                <p className="ajuda">
+                  Copiado de {duplicarDe.tag}. O patrimônio sugerido é o próximo livre; número de série, Service Tag, IMEI, MAC, BitLocker e quem está
+                  com ele ficam em branco.
+                </p>
+              )}
               <div className={grade}>
-                <div className="md:col-span-2 xl:col-span-2">
-                  <label htmlFor="ativo-nome" className="rotulo">Nome / descrição *</label>
-                  <input id="ativo-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Notebook Dell Latitude 5430" className="campo" />
-                </div>
-                <div>
-                  <label htmlFor="ativo-tag" className="rotulo">Tag de patrimônio (Asset Tag) *</label>
-                  <input id="ativo-tag" type="text" required value={tag} onChange={(e) => setTag(e.target.value)} className="campo font-mono font-bold" />
-                </div>
                 <div>
                   <label htmlFor="ativo-categoria" className="rotulo">Categoria</label>
                   <select id="ativo-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value as AssetCategory)} className="campo">
-                    <option value="hardware">Hardware (Notebooks, Workstations, Servidores)</option>
-                    <option value="periferico">Periféricos (Monitores, Teclados, Mouses, Docks)</option>
-                    <option value="telefonia">Telefonia & Redes (Smartphones, Roteadores)</option>
-                    <option value="software">Software / Licença Contratada</option>
+                    <option value="hardware">Hardware (notebooks, desktops, servidores)</option>
+                    <option value="periferico">Periféricos (monitores, docks, impressoras)</option>
+                    <option value="telefonia">Telefonia e redes (celulares, roteadores)</option>
+                    <option value="software">Software / licença contratada</option>
                   </select>
                 </div>
+                {tipos.length > 0 && (
+                  <div>
+                    <label htmlFor="ativo-tipo" className="rotulo">Tipo</label>
+                    <CampoSugestoes id="ativo-tipo" value={espec.tipo || ''} onChange={(v) => mudarEspec('tipo', v)} sugestoes={tipos} placeholder={`Ex.: ${tipos[0]}`} />
+                  </div>
+                )}
                 <div>
                   <label htmlFor="ativo-marca" className="rotulo">Marca / fabricante *</label>
-                  <input id="ativo-marca" type="text" required value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ex: Dell, Lenovo, Apple" className="campo" />
+                  <CampoSugestoes id="ativo-marca" value={marca} onChange={setMarca} sugestoes={fabricantesDaCategoria(categoria)} placeholder="Ex.: Dell, Lenovo, Apple" />
                 </div>
                 <div>
-                  <label htmlFor="ativo-modelo" className="rotulo">Modelo específico</label>
-                  <input id="ativo-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ex: Latitude 5430 Core i7" className="campo" />
+                  <label htmlFor="ativo-modelo" className="rotulo">Modelo</label>
+                  <input id="ativo-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ex.: Latitude 5430" className="campo" />
+                </div>
+                <div className="sm:col-span-2 xl:col-span-3">
+                  <label htmlFor="ativo-nome" className="rotulo">Nome / descrição *</label>
+                  <input
+                    id="ativo-nome"
+                    type="text"
+                    value={nome}
+                    onChange={(e) => {
+                      setNomeManual(e.target.value);
+                      setNomeEditado(true);
+                    }}
+                    placeholder="Preenchido sozinho com tipo, marca, modelo e especificações"
+                    className="campo"
+                  />
+                  {nomeEditado && sugestao && sugestao !== nomeManual.trim() ? (
+                    <button type="button" onClick={() => setNomeEditado(false)} className="link mt-1 block text-left text-xs break-words">
+                      Usar sugestão: {sugestao}
+                    </button>
+                  ) : (
+                    !nomeEditado && <p className="ajuda">Sugerido automaticamente; edite se quiser.</p>
+                  )}
                 </div>
                 <div>
-                  <label htmlFor="ativo-serie" className="rotulo">Número de série / Service Tag *</label>
-                  <input id="ativo-serie" type="text" required value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Ex: CN084920M12" className="campo font-mono" />
+                  <label htmlFor="ativo-tag" className="rotulo">Patrimônio (tag) *</label>
+                  <input id="ativo-tag" type="text" value={tag} onChange={(e) => setTag(e.target.value)} className="campo font-mono font-bold" />
                 </div>
+                <div>
+                  <label htmlFor="ativo-serie" className="rotulo">Número de série *</label>
+                  <input id="ativo-serie" type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Ex.: CN084920M12" className="campo font-mono" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-service-tag" className="rotulo">Service Tag / código expresso (opcional)</label>
+                  <input id="ativo-service-tag" type="text" value={serviceTag} onChange={(e) => setServiceTag(e.target.value.toUpperCase())} placeholder="Ex.: 7HQK2M3" className="campo font-mono" />
+                </div>
+                {temImei && (
+                  <div>
+                    <label htmlFor="ativo-imei" className="rotulo">IMEI</label>
+                    <CampoMascara id="ativo-imei" tipo="imei" value={imei} onChange={setImei} />
+                  </div>
+                )}
+                {temMac && (
+                  <div>
+                    <label htmlFor="ativo-mac" className="rotulo">Endereço MAC</label>
+                    <CampoMascara id="ativo-mac" tipo="mac" value={mac} onChange={setMac} />
+                  </div>
+                )}
                 {/* Fase 8: observações visíveis a quem vê o ativo */}
-                <div className="md:col-span-3 xl:col-span-4">
+                <div className="sm:col-span-2 xl:col-span-4">
                   <label htmlFor="ativo-observacoes" className="rotulo">Observações</label>
                   <textarea
                     id="ativo-observacoes"
-                    rows={3}
+                    rows={2}
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}
                     placeholder="Ex.: tecla Enter com folga; acompanha carregador original."
@@ -328,13 +517,81 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
           <div className={painel('tecnico')}>
             <div className="cartao space-y-3 p-4">
               <h3 className="secao-titulo">Especificações técnicas ({CATEGORIA_LABEL[categoria] ?? categoria})</h3>
+              {categoria === 'hardware' && (
+                <>
+                  <div className={gradeTecnica}>
+                    <div>
+                      <label htmlFor="ativo-mem" className="rotulo">Memória (GB)</label>
+                      <CampoSugestoes
+                        id="ativo-mem"
+                        inputMode="numeric"
+                        value={espec.memoriaGb || ''}
+                        onChange={(v) => mudarEspec('memoriaGb', v.replace(/[^\d.,]/g, ''))}
+                        sugestoes={MEMORIA_TAMANHOS}
+                        placeholder="Ex.: 16"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="ativo-mem-tipo" className="rotulo">Tipo de memória</label>
+                      <select id="ativo-mem-tipo" value={espec.memoriaTipo || ''} onChange={(e) => mudarEspec('memoriaTipo', e.target.value)} className="campo">
+                        <option value="">Não informado</option>
+                        {comAtual(MEMORIA_TIPOS, espec.memoriaTipo).map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="ativo-disco-tipo" className="rotulo">Armazenamento</label>
+                      <select id="ativo-disco-tipo" value={espec.discoTipo || ''} onChange={(e) => mudarEspec('discoTipo', e.target.value)} className="campo">
+                        <option value="">Não informado</option>
+                        {comAtual(DISCO_TIPOS, espec.discoTipo).map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="ativo-disco-cap" className="rotulo">Capacidade</label>
+                      <CampoSugestoes id="ativo-disco-cap" value={espec.discoCapacidade || ''} onChange={(v) => mudarEspec('discoCapacidade', v)} sugestoes={DISCO_CAPACIDADES} placeholder="Ex.: 512 GB" />
+                    </div>
+                    <div>
+                      <label htmlFor="ativo-cpu-fab" className="rotulo">Processador</label>
+                      <CampoSugestoes id="ativo-cpu-fab" value={espec.cpuFabricante || ''} onChange={mudarCpuFabricante} sugestoes={CPU_FABRICANTES} placeholder="Ex.: Intel" />
+                    </div>
+                    <div>
+                      <label htmlFor="ativo-cpu-linha" className="rotulo">Linha</label>
+                      <CampoSugestoes id="ativo-cpu-linha" value={espec.cpuLinha || ''} onChange={(v) => mudarEspec('cpuLinha', v)} sugestoes={linhasCpu} placeholder={`Ex.: ${linhasCpu[0] || 'Core i7'}`} />
+                    </div>
+                    <div className="col-span-2 md:col-span-1">
+                      <label htmlFor="ativo-cpu-modelo" className="rotulo">Modelo / geração</label>
+                      <input
+                        id="ativo-cpu-modelo"
+                        type="text"
+                        value={espec.cpuModelo || ''}
+                        onChange={(e) => mudarEspec('cpuModelo', e.target.value)}
+                        placeholder={DICA_CPU_MODELO[espec.cpuFabricante || ''] || 'Ex.: 1265U'}
+                        className="campo"
+                      />
+                    </div>
+                    <div className="col-span-2 md:col-span-1">
+                      <label htmlFor="ativo-so" className="rotulo">Sistema operacional</label>
+                      <CampoSugestoes id="ativo-so" value={sistemaOperacional} onChange={setSistemaOperacional} sugestoes={SISTEMAS_OPERACIONAIS} placeholder="Ex.: Windows 11 Pro 64-bit" />
+                    </div>
+                    <div className="col-span-2">
+                      <label htmlFor="ativo-bitlocker" className="rotulo">Chave BitLocker / FileVault (opcional)</label>
+                      <input id="ativo-bitlocker" type="text" value={bitlockerKey} onChange={(e) => setBitlockerKey(e.target.value)} placeholder="Ex.: 419204-183029-482019-582019-..." className="campo font-mono" />
+                      <p className="ajuda">Para desbloquear o disco criptografado numa emergência.</p>
+                    </div>
+                  </div>
+                  <p className="ajuda">Sugestões ao digitar; qualquer outro valor é aceito. O nome do equipamento acompanha estes dados enquanto não for editado.</p>
+                </>
+              )}
               {availableCustomFields.length === 0 && categoria !== 'hardware' && (
                 <p className="text-xs text-slate-500">Esta categoria não tem especificações técnicas para preencher.</p>
               )}
               {availableCustomFields.length > 0 && (
-                <div className={grade}>
+                <div className={`${gradeTecnica} ${categoria === 'hardware' ? 'border-t border-slate-100 pt-3' : ''}`}>
                   {availableCustomFields.map((cf) => (
-                    <div key={cf.id}>
+                    <div key={cf.id} className="col-span-2 md:col-span-1">
                       <label htmlFor={`ativo-cf-${cf.id}`} className="rotulo">{cf.label}</label>
                       <input
                         id={`ativo-cf-${cf.id}`}
@@ -348,27 +605,6 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   ))}
                 </div>
               )}
-              {categoria === 'hardware' && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div>
-                    <label htmlFor="ativo-so" className="rotulo">Sistema operacional da máquina</label>
-                    <select id="ativo-so" value={sistemaOperacional} onChange={(e) => setSistemaOperacional(e.target.value)} className="campo">
-                      <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
-                      <option value="Windows 11 Home">Windows 11 Home</option>
-                      <option value="Windows 10 Pro 64-bit">Windows 10 Pro (64-bit)</option>
-                      <option value="macOS Sequoia 15.x">macOS Sequoia (Apple Silicon / Intel)</option>
-                      <option value="macOS Sonoma 14.x">macOS Sonoma (Apple Silicon)</option>
-                      <option value="Ubuntu Linux 24.04 LTS">Ubuntu Linux 24.04 LTS</option>
-                      <option value="Outro Sistema">Outro Sistema Operacional</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-2 xl:col-span-2">
-                    <label htmlFor="ativo-bitlocker" className="rotulo">Chave de recuperação BitLocker / FileVault (opcional)</label>
-                    <input id="ativo-bitlocker" type="text" value={bitlockerKey} onChange={(e) => setBitlockerKey(e.target.value)} placeholder="Ex: 419204-183029-482019-582019-..." className="campo font-mono" />
-                    <p className="ajuda">Chave numérica/alfanumérica para desbloqueio emergencial de disco criptografado</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -378,13 +614,13 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               <h3 className="secao-titulo">Custódia e alocação</h3>
               <div className={grade}>
                 {!ativo && (
-                  <div className="md:col-span-2 xl:col-span-2">
+                  <div className="sm:col-span-2">
                     <label htmlFor="ativo-alocacao" className="rotulo">Alocação inicial (1:1)</label>
                     <select id="ativo-alocacao" value={custodianteId} onChange={(e) => setCustodianteId(e.target.value)} className="campo">
-                      <option value="">Manter Disponível no Almoxarifado / Estoque de T.I.</option>
-                      <optgroup label="Entregar Imediatamente a um Colaborador">
+                      <option value="">Manter disponível no estoque de T.I.</option>
+                      <optgroup label="Entregar a um colaborador">
                         {employees
-                          .filter((e) => e.status === 'ativo')
+                          .filter((emp) => emp.status === 'ativo')
                           .map((emp) => (
                             <option key={emp.id} value={emp.id}>
                               {emp.nome} ({emp.cargo})
@@ -392,13 +628,14 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                           ))}
                       </optgroup>
                     </select>
+                    {custodianteId && <p className="ajuda">Ao cadastrar, você confirma a entrega (de → para, termo e o que falta fazer).</p>}
                   </div>
                 )}
                 <div>
-                  <label htmlFor="ativo-setor" className="rotulo">Setor / centro de custo vinculado</label>
+                  <label htmlFor="ativo-setor" className="rotulo">Setor / centro de custo</label>
                   <select id="ativo-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} className="campo">
                     {departments
-                      .filter((d) => d.ativo)
+                      .filter((d) => d.ativo || d.id === setorId)
                       .map((dep) => (
                         <option key={dep.id} value={dep.id}>
                           {dep.nome} ({dep.codigo})
@@ -408,9 +645,9 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                 </div>
                 {/* Fase 4: o campo existia no estado, mas não havia como preenchê-lo */}
                 {!custodianteId && (
-                  <div className="md:col-span-2 xl:col-span-2">
+                  <div className="sm:col-span-2">
                     <label htmlFor="ativo-localizacao" className="rotulo">Localização física no estoque *</label>
-                    <input id="ativo-localizacao" type="text" required value={localizacaoFisica} onChange={(e) => setLocalizacaoFisica(e.target.value)} placeholder="Ex.: Almoxarifado T.I. - Armário B3" className="campo" />
+                    <input id="ativo-localizacao" type="text" value={localizacaoFisica} onChange={(e) => setLocalizacaoFisica(e.target.value)} placeholder="Ex.: Almoxarifado T.I. - Armário B3" className="campo" />
                   </div>
                 )}
               </div>
@@ -424,13 +661,13 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               <div className={grade}>
                 <div>
                   <label htmlFor="ativo-nf" className="rotulo">Número da nota fiscal (NF-e)</label>
-                  <input id="ativo-nf" type="text" value={numeroNF} onChange={(e) => setNumeroNF(e.target.value)} placeholder="Ex: 004821" className="campo" />
+                  <input id="ativo-nf" type="text" value={numeroNF} onChange={(e) => setNumeroNF(e.target.value)} placeholder="Ex.: 004821" className="campo" />
                 </div>
                 <div>
-                  <label htmlFor="ativo-valor" className="rotulo">Valor de compra (R$)</label>
-                  <input id="ativo-valor" type="number" step="0.01" value={valorCompra || ''} onChange={(e) => setValorCompra(parseFloat(e.target.value))} placeholder="6850.00" className="campo font-mono" />
+                  <label htmlFor="ativo-valor" className="rotulo">Valor de compra</label>
+                  <CampoMoeda id="ativo-valor" valor={valorCompra} onMudar={setValorCompra} />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label htmlFor="ativo-fornecedor" className="rotulo">Fornecedor</label>
                   {/* Lote 1 (L1): fornecedor só do cadastro, com "+ Novo" na hora */}
                   <div className="flex gap-2">
@@ -461,16 +698,16 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   <label htmlFor="ativo-garantia" className="rotulo">Fim da garantia</label>
                   <input id="ativo-garantia" type="date" value={dataGarantia} onChange={(e) => setDataGarantia(e.target.value)} className="campo" />
                 </div>
-                <div className="md:col-span-2 xl:col-span-2">
+                <div className="sm:col-span-2">
                   <label htmlFor="ativo-suporte" className="rotulo">Contato de suporte / contrato do fabricante</label>
-                  <input id="ativo-suporte" type="text" value={suporteContato} onChange={(e) => setSuporteContato(e.target.value)} placeholder="Ex: 0800 970 3355 (Dell ProSupport 24x7)" className="campo" />
+                  <input id="ativo-suporte" type="text" value={suporteContato} onChange={(e) => setSuporteContato(e.target.value)} placeholder="Ex.: 0800 970 3355 (Dell ProSupport 24x7)" className="campo" />
                 </div>
-                <div className="md:col-span-3 xl:col-span-4">
+                <div className="sm:col-span-2 xl:col-span-4">
                   <label htmlFor="ativo-chave-nfe" className="rotulo">Chave de acesso NF-e (44 dígitos)</label>
-                  <input id="ativo-chave-nfe" type="text" maxLength={54} value={chaveAcesso44} onChange={(e) => setChaveAcesso44(e.target.value)} placeholder="35240112345678000190550010000048211002938475" className="campo font-mono" />
+                  <CampoMascara id="ativo-chave-nfe" tipo="chave_nfe" value={chaveNfe} onChange={setChaveNfe} />
                 </div>
                 {/* Fase 8: arquivo da NF (PDF ou foto), enviado só ao salvar */}
-                <div className="md:col-span-3 xl:col-span-4">
+                <div className="sm:col-span-2 xl:col-span-4">
                   <label htmlFor="ativo-nf-arquivo" className="rotulo">Arquivo da nota fiscal (PDF ou foto)</label>
                   <input id="ativo-nf-arquivo" type="file" accept={TIPOS_ARQUIVO_ACEITOS.join(',')} onChange={(e) => escolherNotaFiscal(e.target.files?.[0])} className="campo" />
                   {erroArquivo ? (
@@ -479,7 +716,9 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                     <p className="ajuda">
                       {ativo?.anexos?.some((a) => a.categoria === 'nota_fiscal')
                         ? 'Este ativo já tem nota fiscal anexada; um novo arquivo fica junto dos anteriores.'
-                        : 'Até 10 MB. O arquivo fica no armazenamento privado e só a T.I. abre.'}
+                        : nfOriginal
+                          ? `O arquivo da nota de ${duplicarDe?.tag} não é copiado; anexe aqui se quiser a nota também neste ativo.`
+                          : 'Até 10 MB. O arquivo fica no armazenamento privado e só a T.I. abre.'}
                     </p>
                   )}
                 </div>

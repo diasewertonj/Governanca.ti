@@ -17,6 +17,8 @@ import {
   nomesParecidos,
 } from '../../utils/financeiro.ts';
 import { confirmar } from '../ui/dialogo.tsx';
+import { CampoMoeda, CampoSugestoes } from '../ui/Campos.tsx';
+import { FABRICANTES } from '../../utils/especificacoes.ts';
 
 interface SoftwareFormModalProps {
   onClose: () => void;
@@ -72,13 +74,14 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
   const [contratoId, setContratoId] = useState(contratoAtual?.id || '');
 
   const [assentosTotais, setAssentosTotais] = useState<number>(softwareToEdit?.assentosTotais || 1);
-  const [valorMensal, setValorMensal] = useState<number>(softwareToEdit?.valorMensal ?? 0);
+  // Vazio (undefined) = ainda não informado; no cadastro novo começa vazio
+  const [valorMensal, setValorMensal] = useState<number | undefined>(softwareToEdit ? (softwareToEdit.valorMensal ?? 0) : undefined);
   const [tipoCobranca, setTipoCobranca] = useState<'mensal' | 'anual'>(softwareToEdit?.tipoCobranca || 'mensal');
   const renovacaoInicial = softwareToEdit?.dataRenovacao || '';
   const [dataRenovacao, setDataRenovacao] = useState(renovacaoInicial);
   const pg = softwareToEdit?.pagamento;
   const [moeda, setMoeda] = useState<Moeda>(pg?.moeda || 'BRL');
-  const [valorMoeda, setValorMoeda] = useState(pg?.valorMoeda != null ? String(pg.valorMoeda) : '');
+  const [valorMoeda, setValorMoeda] = useState<number | undefined>(pg?.valorMoeda ?? undefined);
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento | ''>(pg?.formaPagamento || '');
   const [cartaoFinal, setCartaoFinal] = useState(pg?.cartaoFinal || '');
   const [titular, setTitular] = useState(pg?.titular || '');
@@ -138,7 +141,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
     if (escolha === 'contrato' && !contratoId) return falha('Escolha o contrato que paga este software (ou "Criar contrato agora").', 'pagto');
     if (formaPagamento === 'cartao' && cartaoFinal && !/^\d{4}$/.test(cartaoFinal)) return falha('Do cartão, informe só os 4 últimos dígitos.', 'pagto');
     if (urlPainel.trim() && !/^https?:\/\/\S+$/i.test(urlPainel.trim())) return falha('O endereço do painel deve começar com http:// ou https://.', 'assentos');
-    if ((propria || escolha === 'novo_contrato') && (!Number.isFinite(Number(valorMensal)) || Number(valorMensal) < 0)) return falha('Informe o valor (R$).', 'pagto');
+    if ((propria || escolha === 'novo_contrato') && (valorMensal === undefined || valorMensal < 0)) return falha('Informe o valor (R$).', 'pagto');
     // Fornecedor da licença diferente do fornecedor do contrato escolhido
     const contratoEscolhido = contratos.find((c) => c.id === contratoId);
     if (escolha === 'contrato' && contratoEscolhido && fornecedorId && contratoEscolhido.fornecedorId !== fornecedorId) {
@@ -151,7 +154,17 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
       escolha !== 'contrato' && escolha !== 'novo_contrato' && softwareToEdit
         ? contratos.filter((c) => contratoVigente(c) && c.tipo === 'licenciamento' && c.itens.some((i) => i.licencaId === softwareToEdit.id))
         : [];
-    if (sairDeContratos.length && !(await confirmar(`O software sai do contrato ${sairDeContratos.map(nomeContrato).join(', ')}. As faturas já lançadas continuam lá. Continuar?`))) return;
+    if (
+      sairDeContratos.length &&
+      !(await confirmar({
+        titulo: `Tirar o software do contrato ${sairDeContratos.map(nomeContrato).join(', ')}?`,
+        mensagem:
+          'Ao salvar, ele deixa de constar nos itens do contrato; as faturas já lançadas continuam lá.\n\nDá para desfazer: edite o software de novo e escolha "Por um contrato existente".',
+        confirmar: 'Tirar do contrato',
+        cancelar: 'Voltar',
+      }))
+    )
+      return;
     setErrorMsg(null);
     setAbasComErro([]);
 
@@ -172,7 +185,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
       pagamento: propria
         ? {
             moeda,
-            valorMoeda: moeda !== 'BRL' && valorMoeda !== '' ? Number(valorMoeda) : undefined,
+            valorMoeda: moeda !== 'BRL' ? valorMoeda : undefined,
             formaPagamento: formaPagamento || undefined,
             cartaoFinal: formaPagamento === 'cartao' ? cartaoFinal || undefined : undefined,
             titular: titular.trim() || undefined,
@@ -331,7 +344,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                 </div>
                 <div>
                   <label htmlFor="licenca-fabricante" className={ROTULO}>Fabricante</label>
-                  <input id="licenca-fabricante" value={fabricante} onChange={(e) => setFabricante(e.target.value)} placeholder="Ex.: Microsoft, Google" className={CAMPO} />
+                  <CampoSugestoes id="licenca-fabricante" value={fabricante} onChange={setFabricante} sugestoes={FABRICANTES.software} placeholder="Ex.: Microsoft, Google" className={CAMPO} />
                 </div>
                 <div className="md:col-span-2 xl:col-span-2">
                   <label htmlFor="licenca-chave" className={ROTULO}>Chave / ID da assinatura</label>
@@ -415,7 +428,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
                   <div>
                     <label htmlFor="licenca-valor" className={ROTULO}>Valor (R$) *</label>
-                    <input id="licenca-valor" type="number" step="0.01" min={0} required value={valorMensal} onChange={(e) => setValorMensal(Number(e.target.value))} className={`${CAMPO} font-mono`} />
+                    <CampoMoeda id="licenca-valor" required valor={valorMensal} onMudar={setValorMensal} className={CAMPO} />
                   </div>
                   <div>
                     <label htmlFor="licenca-cobranca" className={ROTULO}>Periodicidade</label>
@@ -444,7 +457,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                   {moeda !== 'BRL' && (
                     <div>
                       <label htmlFor="licenca-vmoeda" className={ROTULO}>Valor em {moeda}</label>
-                      <input id="licenca-vmoeda" type="number" step="0.01" min={0} value={valorMoeda} onChange={(e) => setValorMoeda(e.target.value)} className={`${CAMPO} font-mono`} />
+                      <CampoMoeda id="licenca-vmoeda" simbolo={moeda === 'USD' ? 'US$' : moeda === 'EUR' ? '€' : 'R$'} valor={valorMoeda} onMudar={setValorMoeda} className={CAMPO} />
                     </div>
                   )}
                   <div>

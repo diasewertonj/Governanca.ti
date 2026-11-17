@@ -6,9 +6,12 @@ import { MenuAcoes } from '../ui/MenuAcoes.tsx';
 import type { ItemEstoque, TipoAcessorio, TipoMovimentoEstoque } from '../../types/index.ts';
 import { CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { formatDate } from '../../utils/formatters.ts';
-import { confirmar } from '../ui/dialogo.tsx';
+import { confirmar, confirmarMovimento } from '../ui/dialogo.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { Vazio } from '../ui/Tela.tsx';
+import { CampoMoeda, CampoSugestoes } from '../ui/Campos.tsx';
+import { FABRICANTES } from '../../utils/especificacoes.ts';
+import { acessoriosDaPessoa, avisoSegundoAcessorio } from '../../utils/inventario.ts';
 
 const ROTULO_TIPO: Record<TipoAcessorio, string> = {
   monitor: 'Monitor',
@@ -173,7 +176,12 @@ export const EstoqueAcessorios: React.FC<{
                                 perigo: true,
                                 oculto: currentRole !== 'ti_admin',
                                 onClick: async () => {
-                                  if (!(await confirmar(`Excluir ${i.nome}?\n\nEsta ação não pode ser desfeita.`))) return;
+                                  // Com movimentos o banco não deixa excluir: avisa antes de pedir confirmação
+                                  if (movimentos.some((m) => m.itemId === i.id)) {
+                                    setErro(`${i.nome} tem movimentos no histórico: em vez de excluir, edite e desmarque "Ativo".`);
+                                    return;
+                                  }
+                                  if (!(await confirmar(`Excluir ${i.nome}?\n\nO cadastro sai das listas. Não dá para desfazer.`))) return;
                                   setErro((await excluirItemEstoque(i.id)) || '');
                                 },
                               },
@@ -230,7 +238,7 @@ const FormItem: React.FC<{
     minimo: String(item?.minimo ?? 0),
     localizacao: item?.localizacao || '',
     fornecedorId: item?.fornecedorId || '',
-    valorUnitario: item?.valorUnitario != null ? String(item.valorUnitario) : '',
+    valorUnitario: item?.valorUnitario ?? undefined,
     observacoes: item?.observacoes || '',
     ativo: item?.ativo ?? true,
     quantidadeInicial: '',
@@ -251,7 +259,7 @@ const FormItem: React.FC<{
       minimo: Math.max(0, Number(d.minimo) || 0),
       localizacao: d.localizacao || undefined,
       fornecedorId: d.fornecedorId || undefined,
-      valorUnitario: d.valorUnitario === '' ? undefined : Number(d.valorUnitario),
+      valorUnitario: d.valorUnitario,
       observacoes: d.observacoes || undefined,
       ativo: d.ativo,
       quantidadeInicial: item ? undefined : Number(d.quantidadeInicial) || 0,
@@ -293,7 +301,7 @@ const FormItem: React.FC<{
         </div>
         <div>
           <label htmlFor="est-marca" className={CLASSE_ROTULO}>Marca</label>
-          <input id="est-marca" value={d.marca} onChange={(e) => set('marca', e.target.value)} className={CLASSE_CAMPO} />
+          <CampoSugestoes id="est-marca" value={d.marca} onChange={(v) => set('marca', v)} sugestoes={FABRICANTES.acessorio} className={CLASSE_CAMPO} />
         </div>
         <div>
           <label htmlFor="est-modelo" className={CLASSE_ROTULO}>Modelo</label>
@@ -315,7 +323,7 @@ const FormItem: React.FC<{
         </div>
         <div>
           <label htmlFor="est-valor" className={CLASSE_ROTULO}>Valor unitário (R$)</label>
-          <input id="est-valor" type="number" min={0} step="0.01" value={d.valorUnitario} onChange={(e) => set('valorUnitario', e.target.value)} className={CLASSE_CAMPO} />
+          <CampoMoeda id="est-valor" valor={d.valorUnitario} onMudar={(v) => setD((p) => ({ ...p, valorUnitario: v }))} className={CLASSE_CAMPO} />
         </div>
         <div>
           <label htmlFor="est-forn" className={CLASSE_ROTULO}>Fornecedor</label>
@@ -353,11 +361,69 @@ const FormMovimento: React.FC<{
   const [pessoa, setPessoa] = useState('');
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState('');
+  const { movimentos, estoque } = useRecursos();
   const comPessoa = tipo === 'saida' || tipo === 'devolucao';
+
+  /** 9.1: entregar (para uma pessoa) e devolver passam pela confirmação "de → para". null = não grava */
+  const confirmarMovimentoPessoa = async (q: number): Promise<{ justificativa?: string } | null> => {
+    const nome = pessoas.find((p) => p.id === pessoa)?.nome || 'Pessoa';
+    const saldo = item.quantidade;
+    const termo =
+      item.tipo === 'monitor'
+        ? 'Monitor de estoque (sem patrimônio) não gera pendência de termo; para constar no termo, cadastre-o em Equipamentos.'
+        : 'Acessório não exige termo (só computador, celular e monitor).';
+    if (tipo === 'saida') {
+      const aviso = avisoSegundoAcessorio(item, pessoa, movimentos, estoque, q);
+      return confirmarMovimento({
+        titulo: 'Entregar acessório',
+        item: `${q} × ${item.nome}`,
+        de: `Estoque (${saldo} un.)`,
+        para: nome,
+        efeitos: [
+          `O saldo em estoque vai de ${saldo} para ${saldo - q}`,
+          `Aparece na ficha de ${nome} em Equipamentos e acessórios`,
+          'O movimento fica no histórico do acessório',
+        ],
+        foraDoNexus: ['Entregar em mãos e pedir para conferir'],
+        termo,
+        justificativa: aviso ? { aviso } : undefined,
+        desfazer: 'Para desfazer, registre uma devolução; o histórico guarda os dois movimentos.',
+        confirmar: 'Entregar',
+      });
+    }
+    const comEla = pessoa ? acessoriosDaPessoa(pessoa, movimentos).get(item.id) || 0 : 0;
+    return confirmarMovimento({
+      titulo: 'Devolver acessório',
+      item: `${q} × ${item.nome}`,
+      de: pessoa ? nome : 'Sem pessoa informada',
+      para: `Estoque (${saldo + q} un.)`,
+      efeitos: [
+        `O saldo em estoque vai de ${saldo} para ${saldo + q}`,
+        ...(pessoa ? [`Sai da ficha de ${nome} em Equipamentos e acessórios`] : []),
+        ...(pessoa && comEla < q ? [`Atenção: pelo histórico, ${nome} tem ${comEla} deste item. Confira a quantidade.`] : []),
+        'O movimento fica no histórico do acessório',
+      ],
+      foraDoNexus: ['Conferir o estado do item ao receber e guardar no local do estoque'],
+      termo,
+      desfazer: 'Para desfazer, registre uma nova entrega; o histórico guarda os dois movimentos.',
+      confirmar: 'Devolver',
+    });
+  };
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault();
-    const falha = await onSalvar({ quantidade: Number(quantidade), colaboradorId: pessoa || undefined, motivo: motivo || undefined });
+    const q = Number(quantidade);
+    let obs = motivo.trim();
+    if (tipo === 'devolucao' || (tipo === 'saida' && pessoa)) {
+      // Confere antes de perguntar (o mesmo que o estoque confere ao gravar)
+      if (!Number.isInteger(q) || q <= 0) return setErro('Informe uma quantidade inteira maior que zero.');
+      if (tipo === 'saida' && q > item.quantidade) return setErro(`Estoque insuficiente: há ${item.quantidade} de ${item.nome}.`);
+      setErro('');
+      const r = await confirmarMovimentoPessoa(q);
+      if (!r) return;
+      if (r.justificativa) obs = [obs, `justificativa: ${r.justificativa}`].filter(Boolean).join(' — ');
+    }
+    const falha = await onSalvar({ quantidade: q, colaboradorId: pessoa || undefined, motivo: obs || undefined });
     if (falha) setErro(falha);
   };
 

@@ -14,11 +14,15 @@ import type {
   ItemEstoque,
   LinhaTelefonica,
   Moeda,
+  ProcessoItem,
   SoftwareLicense,
+  Ticket,
   TipoContrato,
 } from '../types/index.ts';
 import { contratoQuePagaLicenca, contratoVigente, fimCoberturaEfetiva, nomeContrato } from './contratos.ts';
 import { diasAte, isoLocal } from './formatters.ts';
+import { ACAO_DO_TIPO } from './processos.ts';
+import { resumoPendenciaTermo, type PendenciaTermo } from './inventario.ts';
 
 export const ROTULO_FORMA_COBRANCA: Record<FormaCobranca, string> = {
   sem_custo: 'Sem custo',
@@ -219,7 +223,9 @@ export type TipoVencimento =
   | 'fatura'
   | 'sem_contrato'
   | 'estoque'
-  | 'desligado_com_recurso';
+  | 'desligado_com_recurso'
+  | 'passo_agendado'
+  | 'termo_desatualizado';
 
 export interface Vencimento {
   id: string;
@@ -228,7 +234,7 @@ export interface Vencimento {
   dias?: number;
   titulo: string;
   detalhe?: string;
-  alvo: { tipo: 'ativo' | 'contrato' | 'licenca' | 'fatura' | 'estoque' | 'linha'; id: string };
+  alvo: { tipo: 'ativo' | 'contrato' | 'licenca' | 'fatura' | 'estoque' | 'linha' | 'processo' | 'pessoa'; id: string };
 }
 
 export const ROTULO_VENCIMENTO: Record<TipoVencimento, string> = {
@@ -240,6 +246,8 @@ export const ROTULO_VENCIMENTO: Record<TipoVencimento, string> = {
   sem_contrato: 'Sem contrato vigente',
   estoque: 'Estoque baixo',
   desligado_com_recurso: 'Desligado com recurso',
+  passo_agendado: 'Passo agendado',
+  termo_desatualizado: 'Termo desatualizado',
 };
 
 export function listarVencimentos(
@@ -251,6 +259,11 @@ export function listarVencimentos(
     estoque: ItemEstoque[];
     linhas: LinhaTelefonica[];
     pessoas: Employee[];
+    /** Seção 9.2: passos agendados de admissões/desligamentos em andamento */
+    processoItens?: ProcessoItem[];
+    chamados?: Ticket[];
+    /** Seção 9.5: pendências de termo já calculadas (utils/inventario.ts) */
+    termosDesatualizados?: PendenciaTermo[];
   },
   horizonteDias = 90,
   agora: Date = new Date()
@@ -345,6 +358,33 @@ export function listarVencimentos(
       const nome = dados.pessoas.find((p) => p.id === ln.colaboradorId)?.nome || 'Pessoa';
       out.push({ id: `dn-${ln.id}`, tipo: 'desligado_com_recurso', titulo: `${nome} · ${ln.numero}`, detalhe: 'desligado ainda com a linha', alvo: { tipo: 'linha', id: ln.id } });
     });
+
+  // Seção 9.2: passo pendente com data marcada (atrasado continua aparecendo)
+  (dados.processoItens || [])
+    .filter((i) => i.status === 'pendente' && i.lembreteEm)
+    .forEach((i) => {
+      const ch = (dados.chamados || []).find((t) => t.id === i.chamadoId);
+      if (!ch || ch.status === 'resolvido' || ch.status === 'cancelado') return;
+      const dias = dentro(i.lembreteEm);
+      if (dias === undefined) return;
+      const pessoa =
+        dados.pessoas.find((p) => p.id === (ch.colaboradorId || ch.offboarding?.colaboradorId))?.nome || ch.onboarding?.nomeColaborador;
+      out.push({
+        id: `pa-${i.id}`,
+        tipo: 'passo_agendado',
+        data: i.lembreteEm,
+        dias,
+        titulo: `${ACAO_DO_TIPO[i.tipo]}: ${i.titulo}`,
+        detalhe: `${ch.tipo === 'onboarding' ? 'Admissão' : 'Desligamento'}${pessoa ? ` de ${pessoa}` : ''} · ${ch.codigo}`,
+        alvo: { tipo: 'processo', id: ch.id },
+      });
+    });
+
+  // Seção 9.5: termo desatualizado (pendência sem data)
+  (dados.termosDesatualizados || []).forEach((p) => {
+    const nome = dados.pessoas.find((x) => x.id === p.colaboradorId)?.nome || 'Pessoa';
+    out.push({ id: `td-${p.colaboradorId}`, tipo: 'termo_desatualizado', titulo: nome, detalhe: resumoPendenciaTermo(p), alvo: { tipo: 'pessoa', id: p.colaboradorId } });
+  });
 
   // Pendências (sem data) primeiro; depois por data
   return out.sort((a, b) => (a.data ? (b.data ? a.data.localeCompare(b.data) : 1) : b.data ? -1 : 0));
@@ -457,3 +497,64 @@ export function baixarCsv(nome: string, conteudo: string) {
 }
 
 export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+// -----------------------------------------------------------------------------
+// Seção 9.4 · Compras de equipamento e valor do patrimônio. O valor vem da
+// ficha fiscal (já digitado no cadastro): nada é lançado de novo.
+// -----------------------------------------------------------------------------
+export interface ValorPatrimonio {
+  equipamentos: number;
+  qtdEquipamentos: number;
+  semValor: number; // equipamentos ativos sem valor de compra informado
+  acessorios: number;
+  qtdAcessorios: number;
+  total: number;
+}
+
+/** Equipamentos ativos (sem baixa) pelo valor de compra + acessórios em estoque × valor unitário */
+export function valorPatrimonio(ativos: Pick<Asset, 'status' | 'fiscal'>[], estoque: Pick<ItemEstoque, 'ativo' | 'quantidade' | 'valorUnitario'>[]): ValorPatrimonio {
+  const vivos = ativos.filter((a) => a.status !== 'descartado');
+  const equipamentos = vivos.reduce((s, a) => s + (Number(a.fiscal?.valorCompra) || 0), 0);
+  const itens = estoque.filter((i) => i.ativo && i.quantidade > 0);
+  const acessorios = itens.reduce((s, i) => s + i.quantidade * (Number(i.valorUnitario) || 0), 0);
+  return {
+    equipamentos,
+    qtdEquipamentos: vivos.length,
+    semValor: vivos.filter((a) => !(Number(a.fiscal?.valorCompra) > 0)).length,
+    acessorios,
+    qtdAcessorios: itens.reduce((s, i) => s + i.quantidade, 0),
+    total: equipamentos + acessorios,
+  };
+}
+
+export interface CompraEquipamento {
+  ativoId: string;
+  data?: string; // data de aquisição
+  tag: string;
+  nome: string;
+  categoria: Asset['categoria'];
+  fornecedorId?: string;
+  fornecedorTexto?: string; // registro antigo sem vínculo
+  numeroNF?: string;
+  valor: number;
+  baixado: boolean;
+}
+
+/** Compras de equipamento (uma por ativo com valor ou data de aquisição), mais recentes primeiro */
+export function comprasDeEquipamentos(ativos: Asset[]): CompraEquipamento[] {
+  return ativos
+    .filter((a) => (Number(a.fiscal?.valorCompra) || 0) > 0 || a.fiscal?.dataAquisicao)
+    .map((a) => ({
+      ativoId: a.id,
+      data: a.fiscal?.dataAquisicao || undefined,
+      tag: a.tag,
+      nome: a.nome,
+      categoria: a.categoria,
+      fornecedorId: a.fornecedorId,
+      fornecedorTexto: a.fiscal?.fornecedor || undefined,
+      numeroNF: a.fiscal?.numeroNF || undefined,
+      valor: Number(a.fiscal?.valorCompra) || 0,
+      baixado: a.status === 'descartado',
+    }))
+    .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+}

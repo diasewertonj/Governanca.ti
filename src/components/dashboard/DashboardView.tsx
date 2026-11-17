@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
 import { DIAS_ALERTA_CONTRATO, garantiaEfetiva, situacaoContrato } from '../../utils/contratos.ts';
 import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts';
-import { brl, despesasRecorrentes, listarVencimentos } from '../../utils/financeiro.ts';
+import { brl, despesasRecorrentes, listarVencimentos, valorPatrimonio } from '../../utils/financeiro.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { VencimentosView } from '../financeiro/FinanceiroViews.tsx';
 import { termoAberto } from '../../utils/termos.ts';
@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   ArrowRight,
   AlertTriangle,
+  Landmark,
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -72,6 +73,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     30
   ).filter((v) => v.tipo === 'contrato' || v.tipo === 'licenca' || v.tipo === 'cancelamento' || v.tipo === 'sem_contrato').length;
   const emManutencao = assets.filter((a) => a.status === 'manutencao').length;
+  // Seção 9.4: valor do patrimônio (ficha fiscal + acessórios em estoque), só para a T.I.
+  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const patrimonio = isTI ? valorPatrimonio(assets, estoque) : null;
   const mostrarQuadro =
     garantiasProximas.length > 0 ||
     contratosVencendo > 0 ||
@@ -88,8 +92,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     <div className="space-y-6">
       <CabecalhoTela titulo="Início" subtitulo="Visão geral do parque de T.I., do atendimento e do que precisa de atenção" />
 
-      {/* 4 Cards de Métricas Principais (Clean, sem pills decorativas) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Cards de métricas principais (T.I.: + valor do patrimônio, 5 numa linha a partir de 1536 px) */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${patrimonio ? 'lg:grid-cols-3 2xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
         <div className="cartao p-5">
           <div className="flex items-center justify-between">
             <span className="secao-titulo">
@@ -171,6 +175,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             {licenses.filter((l) => (l.status || 'ativa') === 'ativa').length} licenças ativas
           </div>
         </div>
+
+        {patrimonio && (
+          <button
+            type="button"
+            onClick={() => onNavigate('financeiro')}
+            title="Abrir o Financeiro (Despesas e Compras)"
+            className="cartao p-5 w-full min-w-0 text-left transition-colors hover:border-blue-300 sm:col-span-2 2xl:col-span-1"
+          >
+            <div className="flex items-center justify-between">
+              <span className="secao-titulo">Valor do patrimônio</span>
+              <Landmark className="w-4 h-4 text-blue-600" aria-hidden="true" />
+            </div>
+            <div className="mt-2 text-2xl 2xl:text-xl font-bold font-mono tracking-tight text-slate-900">{brl(patrimonio.total)}</div>
+            <div className="mt-2 text-xs text-slate-500">
+              equipamentos <span className="font-mono">{brl(patrimonio.equipamentos)}</span> · acessórios em estoque{' '}
+              <span className="font-mono">{brl(patrimonio.acessorios)}</span>
+            </div>
+            {patrimonio.semValor > 0 && (
+              <div className="mt-1 text-xs text-amber-800">
+                {patrimonio.semValor} {patrimonio.semValor === 1 ? 'equipamento sem valor de compra' : 'equipamentos sem valor de compra'}
+              </div>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Quadro de garantias e contratos (se houver algo a decidir) */}

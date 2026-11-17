@@ -329,7 +329,8 @@ export function itensDoTermo(
         return {
           descricao: a?.nome || i.titulo,
           patrimonio: i.tipo === 'equipamento' ? patrimonio(a) : SEM_TOMBO,
-          marcaModelo: marcaModelo(a),
+          // Seção 9.2: acessório por quantidade mostra o item do estoque ("Mouse USB × 2")
+          marcaModelo: i.tipo === 'acessorio' ? i.identificador || undefined : marcaModelo(a),
           // Lote 1: a condição é conferida item a item antes de gerar (nada marcado de antemão)
           condicao: undefined,
           situacao: 'entregue',

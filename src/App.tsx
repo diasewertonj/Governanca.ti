@@ -37,6 +37,7 @@ const PrintableTermModal = lazy(() => import('./components/terms/PrintableTermMo
 const QrCodeLabelModal = lazy(() => import('./components/assets/QrCodeLabelModal.tsx').then((m) => ({ default: m.QrCodeLabelModal })));
 const Software360Modal = lazy(() => import('./components/assets/Software360Modal.tsx').then((m) => ({ default: m.Software360Modal })));
 const SoftwareFormModal = lazy(() => import('./components/assets/SoftwareFormModal.tsx').then((m) => ({ default: m.SoftwareFormModal })));
+const TelaProcesso = lazy(() => import('./components/processos/TelaProcesso.tsx').then((m) => ({ default: m.TelaProcesso })));
 
 const Carregando = () => (
   <div className="py-16 flex justify-center" role="status" aria-label="Carregando">
@@ -63,6 +64,8 @@ function MainApp() {
     limparDbErro,
     precisaDefinirSenha,
     podeDescartarPendencias,
+    processoAberto,
+    fecharProcesso,
   } = useApp();
 
   const [viewSolicitada, setCurrentView] = useState<string>('dashboard');
@@ -97,10 +100,17 @@ function MainApp() {
   const currentView = vistaPermitida(currentRole, viewSolicitada);
 
   // Fase 5: trocar de tela com alterações não salvas pede confirmação
+  // Seção 9.2: com a tela de um processo aberta, o menu volta para a tela escolhida
   const navegar = (view: string) => {
-    if (view === currentView) return setCurrentView(view);
-    void podeDescartarPendencias().then((ok) => ok && setCurrentView(view));
+    if (view === currentView && !processoAberto) return setCurrentView(view);
+    void podeDescartarPendencias().then((ok) => {
+      if (!ok) return;
+      fecharProcesso();
+      setCurrentView(view);
+    });
   };
+  // Processo só para quem vê processos (T.I. e RH); o colaborador nunca chega aqui
+  const mostrarProcesso = processoAberto && currentRole !== 'colaborador';
 
   if (authLoading) {
     return (
@@ -160,6 +170,10 @@ function MainApp() {
 
         <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
           <Suspense fallback={<Carregando />}>
+          {mostrarProcesso ? (
+            <TelaProcesso key={processoAberto} chamadoId={processoAberto} onVoltar={fecharProcesso} />
+          ) : (
+          <>
           {currentView === 'dashboard' &&
             (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} />)}
           {currentView === 'assets' && <AssetsView key="hardware" modo="hardware" />}
@@ -186,6 +200,8 @@ function MainApp() {
           )}
           {currentView === 'my_tickets' && (
             <MyTicketsView onOpenNewTicketModal={() => setShowNewTicketModal(true)} />
+          )}
+          </>
           )}
           </Suspense>
         </main>
