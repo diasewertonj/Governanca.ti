@@ -15,6 +15,7 @@ export type Vista =
   | 'contas_pagar'
   | 'despesas'
   | 'conciliar'
+  | 'financeiro'
   | 'collaborators'
   | 'servicedesk'
   | 'rh_processes'
@@ -35,6 +36,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   contas_pagar: 'Contas a pagar',
   despesas: 'Despesas',
   conciliar: 'Conciliar fornecedores',
+  financeiro: 'Financeiro',
   collaborators: 'Colaboradores',
   servicedesk: 'Chamados',
   rh_processes: 'Admissões e desligamentos',
@@ -102,7 +104,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
       { itens: [item('dashboard', 'inicio')] },
       {
         titulo: 'Pessoas',
-        itens: [item('rh_processes', 'admissoes'), item('collaborators', 'colaboradores'), item('terms', 'termos')],
+        itens: [item('rh_processes', 'admissoes'), item('collaborators', 'colaboradores')],
       },
       { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados', 'Chamados do RH')] },
       MINHA_AREA,
@@ -110,19 +112,17 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
   }
 
   const grupos: GrupoMenu[] = [
-    { itens: [item('dashboard', 'inicio')] },
+    // Início traz o Precisa de atenção (vencimentos, termos a assinar): o contador fica aqui
+    { itens: [item('dashboard', 'inicio', 'vencimentos')] },
     { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados'), item('lembretes', 'lembretes', 'lembretes')] },
-    {
-      titulo: 'Pessoas',
-      itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes'), item('terms', 'termos')],
-    },
+    { titulo: 'Pessoas', itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes')] },
     // Seção 6: inventário separado de fornecedores/contratos; Financeiro centraliza as despesas
     { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares')] },
     {
       titulo: 'Fornecedores e contratos',
-      itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos'), item('vencimentos', 'vencimentos', 'vencimentos')],
+      itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],
     },
-    { titulo: 'Financeiro', itens: [item('contas_pagar', 'contas_pagar'), item('despesas', 'despesas')] },
+    { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar')] },
     MINHA_AREA,
   ];
   if (papel === 'ti_admin')

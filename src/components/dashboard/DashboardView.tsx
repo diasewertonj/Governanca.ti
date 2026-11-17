@@ -5,6 +5,8 @@ import { DIAS_ALERTA_CONTRATO, garantiaEfetiva, situacaoContrato } from '../../u
 import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts';
 import { brl, despesasRecorrentes, listarVencimentos } from '../../utils/financeiro.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
+import { VencimentosView } from '../financeiro/FinanceiroViews.tsx';
+import { termoAberto } from '../../utils/termos.ts';
 import { LembreteGarantia } from '../assets/LembreteGarantia.tsx';
 import { IndicadoresAtendimento } from './IndicadoresAtendimento.tsx';
 import {
@@ -32,8 +34,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     setSelectedAssetIdFor360,
     setSelectedTicketIdForDetail,
     currentRole,
+    terms,
+    abrirFicha,
   } = useApp();
   const { linhas, estoque } = useRecursos();
+  const termosAguardando = terms.filter((t) => termoAberto(t) && (!t.formaAssinatura || t.formaAssinatura === 'pendente'));
 
   const totalAssets = assets.length;
   const assetsInUse = assets.filter((a) => a.status === 'em_uso').length;
@@ -185,7 +190,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => onNavigate('vencimentos')}
+                  onClick={() => document.getElementById('precisa-atencao')?.scrollIntoView({ behavior: 'smooth' })}
                   className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1"
                 >
                   <div className="text-xl font-bold text-amber-900">{contratosVencendo}</div>
@@ -193,15 +198,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                     {contratosVencendo === 1 ? 'contrato vence' : 'contratos vencem'} em {DIAS_ALERTA_CONTRATO} dias
                   </div>
                 </button>
-                <button type="button" onClick={() => onNavigate('despesas')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                <button type="button" onClick={() => onNavigate('financeiro')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
                   <div className="text-xl font-bold text-amber-900 font-mono">{brl(custoMensal)}</div>
                   <div className="text-xs text-amber-800 underline-offset-2 hover:underline">custo mensal recorrente</div>
                 </button>
-                <button type="button" onClick={() => onNavigate('vencimentos')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                <button type="button" onClick={() => document.getElementById('precisa-atencao')?.scrollIntoView({ behavior: 'smooth' })} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
                   <div className="text-xl font-bold text-amber-900">{renovacoes30}</div>
                   <div className="text-xs text-amber-800 underline-offset-2 hover:underline">renovações e prazos de cancelamento em 30 dias</div>
                 </button>
-                <button type="button" onClick={() => onNavigate('contas_pagar')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                <button type="button" onClick={() => onNavigate('financeiro')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
                   <div className="text-xl font-bold text-amber-900">
                     <span className={faturasAPagar.vencidas > 0 ? 'text-red-700' : ''}>{faturasAPagar.vencidas}</span>
                     <span className="text-amber-700 font-normal"> · </span>
@@ -355,6 +360,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
-    </div>
+      {/* Precisa de atenção: vencimentos (ex-menu Vencimentos) e termos aguardando assinatura */}
+      <section id="precisa-atencao" className="space-y-3 scroll-mt-20">
+        {termosAguardando.length > 0 && (
+          <div className="bg-white border border-amber-200 rounded-xl p-3 text-xs space-y-1">
+            <h3 className="font-bold uppercase tracking-wider text-amber-900">Termos aguardando assinatura ({termosAguardando.length})</h3>
+            <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1">
+              {termosAguardando.map((t) => (
+                <li key={t.id}>
+                  <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: t.colaboradorId })} className="text-blue-700 hover:underline text-left">
+                    {employees.find((e) => e.id === t.colaboradorId)?.nome || 'Pessoa'}
+                  </button>
+                  <span className="text-slate-500"> · {t.codigo || 'termo'} de {t.tipo === 'entrega' ? 'entrega' : 'devolução'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <VencimentosView noInicio />
+      </section>    </div>
   );
 };
