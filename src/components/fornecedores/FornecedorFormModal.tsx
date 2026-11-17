@@ -52,7 +52,8 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
 
   // 9.3: CNPJ achado na Receita preenche só o que ainda está vazio
   const preencherDoCnpj = (d: DadosCnpj) => {
-    setNome((v) => (v.trim() ? v : d.nomeFantasia || d.razaoSocial));
+    // Razão social: o nome fantasia às vezes é só a unidade ("DIRECAO GERAL"); a pessoa ajusta se quiser
+    setNome((v) => (v.trim() ? v : d.razaoSocial || d.nomeFantasia || ''));
     setTelefone((v) => (v.trim() ? v : d.telefone ? formatarTelefone(d.telefone) : ''));
     setEmail((v) => (v.trim() ? v : d.email || ''));
   };

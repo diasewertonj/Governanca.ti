@@ -60,7 +60,7 @@ describe('Seção 9.3 · máscaras que ajudam sem travar', () => {
 
   it('R$: milhar ao digitar, vírgula nos centavos, colar com ponto decimal', () => {
     expect(digitandoMoeda('6850')).toBe('6.850');
-    expect(digitandoMoeda('6850.')).toBe('6850,'.replace('6850', '6.850'));
+    expect(digitandoMoeda('6850.')).toBe('6.850,');
     expect(digitandoMoeda('6.850,5')).toBe('6.850,5');
     expect(digitandoMoeda('6850.00', true)).toBe('6.850,00');
     expect(valorDaMoeda('6.850,50')).toBe(6850.5);
@@ -75,6 +75,8 @@ describe('Seção 9.3 · especificações e nome sugerido', () => {
     expect(nomeSugerido({ tipo: 'Notebook', marca: 'Dell', modelo: 'Latitude 5430', espec })).toBe(
       'Notebook Dell Latitude 5430 · i7-1265U · 16 GB · SSD NVMe 512 GB'
     );
+    // Modelo digitado com a linha não duplica ("i7 i7-1265U")
+    expect(nomeSugerido({ tipo: 'Notebook', espec: { ...espec, cpuModelo: 'i7-1265U' } })).toBe('Notebook · i7-1265U · 16 GB · SSD NVMe 512 GB');
   });
 
   it('grava as partes e as chaves antigas; lê dados antigos em texto livre', () => {

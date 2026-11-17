@@ -140,13 +140,16 @@ export function montarOnboarding(
     for (const c of ativos.filter((x) => x.tipo === tipo)) {
       const pedido = pedidosNorm.has(normalizar(c.nome));
       if (pedido) atendidos.add(normalizar(c.nome));
-      if (!pedido && !(c.sugeridoOnboarding && !rhUsouCatalogo)) continue;
+      // Seção 9.2: o RH descreveu o computador ("precisa de dois monitores", "notebook 32 GB"):
+      // o equipamento sugerido entra mesmo que não tenha sido marcado no kit
+      const descreveuComputador = tipo === 'equipamento' && c.sugeridoOnboarding && !!ob?.tipoComputador?.trim();
+      if (!pedido && !descreveuComputador && !(c.sugeridoOnboarding && !rhUsouCatalogo)) continue;
       itens.push(
         item(tipoItem, c.nome, {
           catalogoId: c.id,
           sugeridoPor: pedido ? 'rh' : 'sistema',
           detalhe:
-            tipo === 'equipamento' && c.nome === 'Notebook' && ob?.tipoComputador
+            tipo === 'equipamento' && c.sugeridoOnboarding && ob?.tipoComputador
               ? `Pedido do RH: ${ob.tipoComputador}`
               : c.descricao,
         })

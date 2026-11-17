@@ -210,7 +210,7 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
       if (!r) return null;
       observacao = `Justificativa do 2º item: ${r.justificativa}`;
     }
-    return registrar(item, 'feito', { dados: { ativo_id: a.id }, observacao });
+    return registrar(item, 'feito', { dados: { ativo_id: a.id, identificador: a.tag }, observacao });
   };
 
   const entregarAcessorio = async () => {
@@ -408,7 +408,7 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
     switch (item.tipo) {
       case 'cadastro':
         if (colabPorEmail?.status === 'ativo')
-          return botao(`Ligar ${colabPorEmail.nome.split(' ')[0]} (já cadastrada)`, <UserPlus />, () =>
+          return botao(`Ligar ${colabPorEmail.nome.split(' ')[0]} (cadastro já existe)`, <UserPlus />, () =>
             executar(async () => {
               const f = await registrar(item, 'feito', { dados: { colaborador_id: colabPorEmail.id }, observacao: 'Pessoa já cadastrada com o e-mail informado pelo RH', colaboradorId: colabPorEmail.id });
               if (f) return f;

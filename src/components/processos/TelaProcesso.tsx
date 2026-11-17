@@ -60,10 +60,16 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void }>
   const [aba, setAba] = useState<'conversa' | 'historico'>('conversa');
   const [cancelando, setCancelando] = useState(false);
 
-  // Abre no topo da página (a lista podia estar rolada)
+  // Abre no topo da página (a lista podia estar rolada) e com o título do processo na aba
+  const codigo = ticket?.codigo;
   useEffect(() => {
     window.scrollTo({ top: 0 });
-  }, [chamadoId]);
+    const antes = document.title;
+    if (codigo) document.title = `${codigo} · Nexus`;
+    return () => {
+      document.title = antes;
+    };
+  }, [chamadoId, codigo]);
 
   const voltar = () => void podeDescartarPendencias().then((ok) => ok && onVoltar());
 

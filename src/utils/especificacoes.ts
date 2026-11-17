@@ -109,6 +109,11 @@ export function rotuloDaChave(chave: string, definicoes: CustomFieldDefinition[]
 /** Processador em uma linha ("Intel Core i7-1265U", "Apple M3 Pro", "AMD Ryzen 7 7840U") */
 /** Linha + modelo ("Core i7-1265U": Intel Core i3–i9 usa hífen antes do número) */
 function linhaEModelo(e: Especificacoes): string {
+  // Modelo digitado já com a linha ("i7-1265U", "Ryzen 7 7840U"): não repete a linha
+  const curto = (e.cpuLinha || '').replace(/^Core /, '').toLowerCase();
+  if (e.cpuModelo && curto && e.cpuModelo.toLowerCase().startsWith(curto)) {
+    return `${/^Core /.test(e.cpuLinha || '') && !/^core /i.test(e.cpuModelo) ? 'Core ' : ''}${e.cpuModelo}`;
+  }
   const intelCore = e.cpuFabricante === 'Intel' && /^Core (i\d|Ultra \d|\d)$/.test(e.cpuLinha || '');
   return [e.cpuLinha, e.cpuModelo].filter(Boolean).join(intelCore && e.cpuModelo && /^\d/.test(e.cpuModelo) ? '-' : ' ');
 }
