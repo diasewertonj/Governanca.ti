@@ -128,7 +128,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
   if (papel === 'ti_admin')
     grupos.push({
       titulo: 'Administração',
-      itens: [item('settings', 'configuracoes'), item('conciliar', 'conciliar', 'conciliar')],
+      itens: [item('settings', 'configuracoes')],
     });
   return grupos;
 }
