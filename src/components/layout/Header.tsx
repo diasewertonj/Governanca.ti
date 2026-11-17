@@ -15,10 +15,10 @@ interface HeaderProps {
 }
 
 const ROTULO_PAPEL: Record<string, { label: string; badgeClass: string }> = {
-  ti_admin: { label: 'Admin T.I.', badgeClass: 'text-blue-800 bg-blue-50 border-blue-200' },
-  ti_suporte: { label: 'Suporte T.I.', badgeClass: 'text-cyan-800 bg-cyan-50 border-cyan-200' },
-  rh: { label: 'Recursos Humanos', badgeClass: 'text-purple-800 bg-purple-50 border-purple-200' },
-  colaborador: { label: 'Colaborador', badgeClass: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
+  ti_admin: { label: 'Admin T.I.', badgeClass: 'selo-info' },
+  ti_suporte: { label: 'Suporte T.I.', badgeClass: 'selo-info' },
+  rh: { label: 'Recursos Humanos', badgeClass: 'selo-neutro' },
+  colaborador: { label: 'Colaborador', badgeClass: 'selo-neutro' },
 };
 
 /** Logo da empresa (Configurações › Empresa) ou as iniciais do nome fantasia */
@@ -135,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
             <div className="px-3.5 py-2.5 border-b border-slate-100">
               <p className="font-semibold text-slate-900 text-sm truncate">{currentUser?.nome || supabaseUser?.nome}</p>
               <p className="text-xs text-slate-600 truncate mt-0.5">{currentUser?.email || supabaseUser?.email}</p>
-              <span className={`inline-block mt-2 text-xs px-2 py-0.5 rounded border font-medium ${papel.badgeClass}`}>
+              <span className={`selo mt-2 ${papel.badgeClass}`}>
                 {papel.label}
               </span>
             </div>
@@ -176,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
                   setShowSwitchMenu(false);
                   void podeDescartarPendencias().then((ok) => ok && logout());
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-rose-700 hover:bg-rose-50 transition-colors text-left"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-red-700 hover:bg-red-50 transition-colors text-left"
               >
                 <LogOut className="w-4 h-4" aria-hidden="true" />
                 <span>Sair</span>

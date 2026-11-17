@@ -168,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
               onOpenNewTicketModal();
               onFechar();
             }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className="btn btn-primario w-full"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Abrir chamado</span>
