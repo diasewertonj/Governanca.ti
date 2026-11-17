@@ -255,6 +255,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
       <Janela
         tamanho="ficha"
         icone={ICONE_CATEGORIA[asset.categoria] || <Package className="h-4 w-4" />}
+        rotuloCaminho={`${asset.tag} · ${asset.nome}`}
         titulo={
           <span className="flex min-w-0 items-center gap-2">
             <span className="shrink-0 font-mono text-blue-700">{asset.tag}</span>

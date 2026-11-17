@@ -248,6 +248,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
       <Janela
         tamanho="ficha"
         icone={<span className="text-sm font-semibold">{employee.nome.charAt(0)}</span>}
+        rotuloCaminho={employee.nome}
         titulo={
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate">{employee.nome}</span>

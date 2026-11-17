@@ -313,6 +313,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
       <Janela
         tamanho="ficha"
         icone={<Key className="h-4 w-4" />}
+        rotuloCaminho={license.nome}
         titulo={
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate">{license.nome}</span>

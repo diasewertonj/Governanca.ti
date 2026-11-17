@@ -25,12 +25,12 @@ import {
   Lock,
   Send,
   CheckCircle2,
-  ExternalLink,
   FileCheck,
   UserPlus,
   ShieldCheck,
 } from 'lucide-react';
 import { confirmar } from '../ui/dialogo.tsx';
+import { BotaoVoltar, Caminho, useNivelNavegacao } from '../ui/navegacao.tsx';
 
 interface TicketDetailModalProps {
   ticketId: string;
@@ -115,8 +115,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     }
   }
   useRegistrarPendencias(`chamado:${ticketId}`, itensPendentes);
+  // Caminho (seção 8.8): o chamado é um nível como as fichas
+  const fecharChamado = () => void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
+  const nav = useNivelNavegacao(ticket ? `Chamado ${ticket.codigo}` : 'Chamado', fecharChamado);
 
   if (!ticket) return null;
+  const temAnterior = nav.noCaminho && nav.indice > 0;
 
   const encerrado = chamadoEncerrado(ticket);
   const statusExibido = rascStatus ?? ticket.status;
@@ -237,11 +241,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   );
 
   return (
-    <div className="janela-fundo modal-tela">
+    <div className={`janela-fundo modal-tela ${nav.topo ? '' : 'hidden'}`}>
       <div role="dialog" aria-modal="true" aria-labelledby={`chamado-titulo-${ticket.id}`} className="janela janela-ficha">
         {/* Cabeçalho fixo: código, tipo, situação, prioridade e título; abaixo, a faixa de ações do atendimento */}
         <div className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
+            {temAnterior && <BotaoVoltar onClick={fecharChamado} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
             <span className="font-mono text-xs font-semibold text-slate-700">{ticket.codigo}</span>
             <span className="text-xs text-slate-500">
               · {ROTULO_TIPO_CHAMADO[ticket.tipo]} · {ticket.categoria}
@@ -262,16 +267,39 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               <Printer aria-hidden="true" />
               <span className="hidden sm:inline">Relatório</span>
             </button>
-            <button type="button" onClick={fechar} aria-label="Fechar chamado" title="Fechar" className="btn-icone">
-              <X className="!h-5 !w-5" />
-            </button>
+            {temAnterior ? (
+              <button type="button" onClick={() => void nav.fecharTudo?.()} aria-label="Fechar tudo" title="Fechar tudo" className="btn-icone">
+                <X className="!h-5 !w-5" />
+              </button>
+            ) : (
+              <button type="button" onClick={fechar} aria-label="Fechar chamado" title="Fechar" className="btn-icone">
+                <X className="!h-5 !w-5" />
+              </button>
+            )}
           </div>
+          {temAnterior && (
+            <div className="mt-1">
+              <Caminho niveis={nav.niveis} indice={nav.indice} voltarAte={nav.voltarAte} />
+            </div>
+          )}
           <h2 id={`chamado-titulo-${ticket.id}`} className="tela-titulo mt-1 break-words">
             {ticket.titulo}
           </h2>
+          {/* Solicitante na linha de abertura (antes era um cartão à parte) */}
           <p className="mt-0.5 text-xs text-slate-600">
-            Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · Técnico:{' '}
-            {ticket.tecnicoResponsavelNome || 'não atribuído'}
+            Aberto por{' '}
+            {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
+              <span className="font-semibold text-slate-900">{ticket.solicitanteNome}</span>
+            ) : (
+              <button type="button" onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)} className="link" title={ticket.solicitanteEmail}>
+                {ticket.solicitanteNome}
+              </button>
+            )}
+            {[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).length > 0 && (
+              <span className="text-slate-500"> ({[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).join(' · ')})</span>
+            )}{' '}
+            em {formatDateTime(ticket.dataCriacao)}
+            {!isTI && <> · Técnico: {ticket.tecnicoResponsavelNome || 'não atribuído'}</>}
           </p>
           {/* Ações do atendimento numa faixa compacta do cabeçalho */}
           {isTI && (
@@ -344,40 +372,22 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           )}
         </div>
 
-        <div className="sm:max-h-[85vh] sm:overflow-y-auto">
-          {/* Solicitante, prazos e vínculos numa faixa acima do conteúdo */}
-          <div className="grid grid-cols-1 items-start gap-3 px-4 pt-3 sm:px-5 md:grid-cols-3">
-            <section aria-label="Solicitante" className="cartao space-y-3 p-4 text-xs">
-              <h3 className="secao-titulo">Solicitante</h3>
-              <div className="space-y-0.5">
-                {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
-                  <span className="block font-semibold text-slate-900">{ticket.solicitanteNome}</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)}
-                    className="link inline-flex items-center gap-1 text-left"
-                  >
-                    {ticket.solicitanteNome}
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  </button>
-                )}
-                <p className="text-slate-600">{[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).join(' · ')}</p>
-                <p className="break-all text-slate-500">{ticket.solicitanteEmail}</p>
-                <p className="text-slate-500">Atualizado em {formatDate(ticket.dataAtualizacao)}</p>
-              </div>
-            </section>
-            <PrazosChamado tkt={ticket} />
-            <VinculosChamado
-              key={salvamentos}
-              ticket={ticket}
-              rascunho={rascVinculos}
-              onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
-            />
+        <div className="sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
+          {/* Prazos e vínculos numa faixa fina (sem cartões) */}
+          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-2.5 sm:px-5 lg:flex-row lg:items-start lg:gap-8">
+            <PrazosChamado tkt={ticket} embutido />
+            <div className="min-w-0 flex-1">
+              <VinculosChamado
+                key={salvamentos}
+                ticket={ticket}
+                rascunho={rascVinculos}
+                onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
+                embutido
+              />
+            </div>
           </div>
-
           {/* O pedido, o checklist e a solução ocupam 2/3; anotações e conversa ficam ao lado (1/3) */}
-          <div className="mt-3 grid grid-cols-1 gap-0 divide-y divide-slate-200 border-t border-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
+          <div className="grid grid-cols-1 gap-0 divide-y divide-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
             <div className="min-w-0 space-y-3 p-4 sm:p-5">
               {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
               {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
