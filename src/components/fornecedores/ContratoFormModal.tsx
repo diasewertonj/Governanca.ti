@@ -241,7 +241,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
           role="dialog"
           aria-modal="true"
           aria-labelledby="contrato-titulo"
-          className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
+          className="relative w-full max-w-6xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
         >
           <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -275,12 +275,12 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
             </button>
           </div>
 
-          <div className="p-6 space-y-5 sm:max-h-[75vh] sm:overflow-y-auto">
+          <div className="p-6 space-y-5 sm:max-h-[85vh] sm:overflow-y-auto">
             <form id="form-contrato" onSubmit={salvar} className="space-y-5">
               {/* 1. Contrato */}
               <div className="space-y-3">
                 <h3 className={SECAO}>1. Contrato</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                   <div>
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                       <label htmlFor="ctr-fornecedor" className="text-xs font-semibold text-slate-700">
@@ -436,7 +436,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
               {(CAMPOS_DETALHES[tipo] || TIPOS_COM_UNIDADE.includes(tipo)) && (
                 <div className="space-y-3 pt-3 border-t border-slate-100">
                   <h3 className={SECAO}>Detalhes · {ROTULO_TIPO_CONTRATO[tipo]}</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                     {TIPOS_COM_UNIDADE.includes(tipo) && (
                       <div>
                         <label htmlFor="ctr-unidade" className={CLASSE_ROTULO}>Unidade / endereço</label>
@@ -468,7 +468,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
               {/* Seção 6: pagamento, renovação, reajuste e responsável */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <h3 className={SECAO}>Pagamento e renovação</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
                   <div>
                     <label htmlFor="ctr-moeda" className={CLASSE_ROTULO}>Moeda</label>
                     <select id="ctr-moeda" value={moeda} onChange={(e) => setMoeda(e.target.value as Moeda)} className={CLASSE_CAMPO}>
@@ -547,7 +547,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                       ))}
                     </select>
                   </div>
-                  <label className="inline-flex items-center gap-2 text-xs text-slate-700 md:col-span-3">
+                  <label className="inline-flex items-center gap-2 text-xs text-slate-700 md:col-span-3 xl:col-span-4">
                     <input type="checkbox" checked={renovacaoAutomatica} onChange={(e) => setRenovacaoAutomatica(e.target.checked)} /> Renova automaticamente se ninguém cancelar
                   </label>
                 </div>
@@ -556,7 +556,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
               {/* 3. Suporte */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <h3 className={SECAO}>3. Atendimento</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                   <div>
                     <label htmlFor="ctr-sla" className={CLASSE_ROTULO}>
                       SLA

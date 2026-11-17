@@ -178,7 +178,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+      <div className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
@@ -195,7 +195,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
         </div>
 
         {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
           {/* Card com preenchimento automático do Solicitante */}
           <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -261,7 +261,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           {/* Fase 9: equipamento e software afetados (opcionais; dá para informar os dois) */}
           <div>
             <label htmlFor="novo-chamado-ativo" className="block text-xs font-semibold text-slate-700 mb-1">
@@ -339,7 +339,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
               )}
             </select>
           </div>
-          <p className="md:col-span-2 -mt-1 text-xs text-slate-500">
+          <p className="md:col-span-2 xl:col-span-2 -mt-1 text-xs text-slate-500">
             Informar o equipamento e o software afetados ajuda a T.I. a saber do que se trata.
           </p>
 

@@ -227,7 +227,7 @@ const FormLinha: React.FC<{
   return (
     <form onSubmit={salvar} className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
       <h3 className="text-xs font-bold text-blue-900">{linha ? `Editar linha ${linha.numero}` : 'Nova linha'}</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
         <div>
           <label htmlFor="ln-num" className={CLASSE_ROTULO}>Número *</label>
           <input id="ln-num" required value={d.numero} onChange={(e) => set('numero', e.target.value)} className={`${CLASSE_CAMPO} font-mono`} placeholder="(11) 99999-0000" />
@@ -248,7 +248,7 @@ const FormLinha: React.FC<{
           </select>
         </div>
         {!contratoFixo && (
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 xl:col-span-2">
             <label htmlFor="ln-ctr" className={CLASSE_ROTULO}>Contrato da operadora</label>
             <select id="ln-ctr" value={d.contratoId} onChange={(e) => set('contratoId', e.target.value)} className={CLASSE_CAMPO}>
               <option value="">Sem contrato (linha avulsa)</option>
@@ -301,7 +301,7 @@ const FormLinha: React.FC<{
           <label htmlFor="ln-cc" className={CLASSE_ROTULO}>Área / centro de custo</label>
           <input id="ln-cc" value={d.centroCusto} onChange={(e) => set('centroCusto', e.target.value)} className={CLASSE_CAMPO} />
         </div>
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 xl:col-span-4">
           <label htmlFor="ln-obs" className={CLASSE_ROTULO}>Observações</label>
           <textarea id="ln-obs" rows={2} value={d.observacoes} onChange={(e) => set('observacoes', e.target.value)} className={CLASSE_CAMPO} />
         </div>

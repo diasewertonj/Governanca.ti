@@ -189,8 +189,13 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
         )
       )}
 
+      {/* Etapas lado a lado em telas largas; a etapa com um passo aberto ocupa a largura toda */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3 items-start">
       {grupos.map((g) => (
-        <div key={g.etapa} className="space-y-1.5">
+        <div
+          key={g.etapa}
+          className={`space-y-1.5 ${g.itens.some((i) => i.id === abertoId) ? 'lg:col-span-2' : ''}`}
+        >
           <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.etapa}</h5>
           {g.itens.map((item) => (
             <LinhaItem
@@ -208,6 +213,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
           ))}
         </div>
       ))}
+      </div>
 
       {rascunho && (
         <Montagem rascunho={rascunho} setRascunho={setRascunho} ehOnb={ehOnb} existentes={itens.length} />

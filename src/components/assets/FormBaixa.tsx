@@ -90,7 +90,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
         role="dialog"
         aria-modal="true"
         aria-labelledby={id('titulo')}
-        className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
+        className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
       >
         <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="min-w-0">
@@ -111,7 +111,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
           </button>
         </div>
 
-        <form onSubmit={registrar} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
+        <form onSubmit={registrar} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
           {bloqueios.length > 0 && (
             <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-md px-3 py-2 space-y-1" role="status">
               <p className="flex items-center gap-1.5 font-semibold">
@@ -134,7 +134,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
             </p>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             <div>
               <label htmlFor={id('motivo')} className={CLASSE_ROTULO}>
                 Motivo *
@@ -229,7 +229,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 />
               </div>
             )}
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 xl:col-span-2">
               <label htmlFor={id('obs')} className={CLASSE_ROTULO}>
                 Observações
               </label>
@@ -241,7 +241,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 className={CLASSE_CAMPO}
               />
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 xl:col-span-2">
               <ArquivosParaEnviar
                 id={id('evidencias')}
                 rotulo="Evidências (certificado, laudo, foto, BO)"

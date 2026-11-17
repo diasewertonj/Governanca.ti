@@ -204,7 +204,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+      <div className="relative w-full max-w-6xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
@@ -228,15 +228,15 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
         </div>
 
         {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 sm:max-h-[75vh] sm:overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 sm:max-h-[85vh] sm:overflow-y-auto">
           {/* Seção 1: Identificação */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
               1. Identificação
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="md:col-span-2 xl:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Nome / Descrição
                 </label>
@@ -330,7 +330,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               </h3>
 
               {availableCustomFields.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
                   {availableCustomFields.map((cf) => (
                     <div key={cf.id}>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -351,7 +351,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               )}
 
               {categoria === 'hardware' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Sistema Operacional da Máquina
@@ -397,7 +397,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               3. Custódia e alocação
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               {!ativo && (
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -467,7 +467,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               4. Dados fiscais e garantia
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Número da Nota Fiscal (NF-e)
@@ -570,7 +570,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                 />
               </div>
 
-              <div className="md:col-span-3">
+              <div className="md:col-span-3 xl:col-span-4">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Chave de Acesso NF-e (44 dígitos)
                 </label>
@@ -585,7 +585,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
               </div>
 
               {/* Fase 8: arquivo da NF (PDF ou foto), enviado só ao salvar */}
-              <div className="md:col-span-3">
+              <div className="md:col-span-3 xl:col-span-4">
                 <label htmlFor="ativo-nf-arquivo" className="block text-xs font-semibold text-slate-700 mb-1">
                   Arquivo da nota fiscal (PDF ou foto)
                 </label>

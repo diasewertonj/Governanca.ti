@@ -234,11 +234,11 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+      <div className="relative w-full max-w-6xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         {/* Barra Superior */}
         {/* Fase 7: no celular o cabeçalho quebra em duas linhas (etiquetas em cima, título embaixo) */}
         {/* Fase 10: o título é a manchete; código, tipo e categoria numa linha pequena acima */}
-        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-3 pb-4 border-b border-slate-200 bg-slate-50">
+        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-2 pb-2.5 border-b border-slate-200 bg-slate-50">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs font-semibold text-slate-700">{ticket.codigo}</span>
             <span className="text-xs text-slate-500">
@@ -271,16 +271,16 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               <X className="w-5 h-5" />
             </button>
           </div>
-          <h2 className="mt-1.5 text-xl sm:text-2xl font-bold text-slate-900 leading-tight break-words">{ticket.titulo}</h2>
-          <p className="text-xs text-slate-600 mt-1">
+          <h2 className="mt-1 text-lg sm:text-xl font-bold text-slate-900 leading-tight break-words">{ticket.titulo}</h2>
+          <p className="text-xs text-slate-600 mt-0.5">
             Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · Técnico:{' '}
             {ticket.tecnicoResponsavelNome || 'não atribuído'}
           </p>
         </div>
 
-        <div className="sm:max-h-[75vh] sm:overflow-y-auto">
+        <div className="sm:max-h-[85vh] sm:overflow-y-auto">
         {/* Fase 10: o problema relatado logo abaixo do título, em destaque */}
-        <div className="px-4 sm:px-6 pt-4 sm:pt-5">
+        <div className="px-4 sm:px-6 pt-3">
           {/* Admissão: o "Pedido do RH" (painel organizado) substitui o texto montado */}
           {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
           {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
@@ -315,7 +315,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
         {/* Corpo do Chamado em 2 Colunas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
           {/* Coluna Principal: Conversas e Linha do Tempo */}
-          <div className="lg:col-span-2 p-4 sm:p-6 space-y-6 flex flex-col justify-between">
+          <div className="lg:col-span-2 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-5">
               {/* Checklist Interativo Técnico para Offboarding */}
               {usaChecklistLegado && ticket.offboarding && (
@@ -391,7 +391,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
               {/* Painel Estruturado de Onboarding (Kit de Entrada Solicitado pelo RH) */}
               {ticket.tipo === 'onboarding' && ticket.onboarding && (
-                <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-4 space-y-3">
+                <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between pb-2 border-b border-blue-200">
                     <div className="flex items-center gap-1.5">
                       <UserPlus className="w-4 h-4 text-blue-700" />
@@ -439,7 +439,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-white p-3 rounded border border-blue-200/80">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-white p-2.5 rounded border border-blue-200/80">
                     <div>
                       <span className="text-xs uppercase font-bold text-slate-500 block">Novo Colaborador</span>
                       <span className="font-semibold text-slate-900 block">{ticket.onboarding.nomeColaborador}</span>
@@ -472,7 +472,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
                     {/* Só o que o RH escreveu (chamados antigos: o perfil escolhido vira observação) */}
                     {ticket.onboarding.tipoComputador?.trim() && (
                       <div className="bg-white p-2.5 rounded border border-slate-200">

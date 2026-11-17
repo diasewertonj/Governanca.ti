@@ -250,8 +250,8 @@ const FormItem: React.FC<{
   return (
     <form onSubmit={salvar} className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
       <h3 className="text-xs font-bold text-blue-900">{item ? `Editar ${item.nome}` : 'Novo acessório'}</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="md:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="md:col-span-2 xl:col-span-2">
           <label htmlFor="est-nome" className={CLASSE_ROTULO}>Nome *</label>
           <input id="est-nome" required value={d.nome} onChange={(e) => set('nome', e.target.value)} className={CLASSE_CAMPO} placeholder='Ex.: Monitor 24" Dell P2422H' />
         </div>
@@ -298,7 +298,7 @@ const FormItem: React.FC<{
             ))}
           </select>
         </div>
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 xl:col-span-4">
           <label htmlFor="est-obs" className={CLASSE_ROTULO}>Observações</label>
           <textarea id="est-obs" rows={2} value={d.observacoes} onChange={(e) => set('observacoes', e.target.value)} className={CLASSE_CAMPO} />
         </div>
@@ -343,7 +343,7 @@ const FormMovimento: React.FC<{
       <h3 className="text-xs font-bold text-blue-900">
         {ROTULO_MOV[tipo]} · {item.nome} <span className="font-normal text-slate-600">(em estoque: {item.quantidade})</span>
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
         <div>
           <label htmlFor="mov-qtd" className={CLASSE_ROTULO}>{tipo === 'ajuste' ? 'Diferença (+ ou −) *' : 'Quantidade *'}</label>
           <input id="mov-qtd" type="number" step={1} min={tipo === 'ajuste' ? undefined : 1} required value={quantidade} onChange={(e) => setQuantidade(e.target.value)} className={CLASSE_CAMPO} />
@@ -359,7 +359,7 @@ const FormMovimento: React.FC<{
             </select>
           </div>
         )}
-        <div className={comPessoa ? '' : 'md:col-span-2'}>
+        <div className={comPessoa ? '' : 'md:col-span-2 xl:col-span-2'}>
           <label htmlFor="mov-motivo" className={CLASSE_ROTULO}>{tipo === 'ajuste' ? 'Motivo *' : 'Observação'}</label>
           <input id="mov-motivo" value={motivo} required={tipo === 'ajuste'} onChange={(e) => setMotivo(e.target.value)} className={CLASSE_CAMPO} placeholder={tipo === 'ajuste' ? 'Ex.: contagem do inventário' : ''} />
         </div>

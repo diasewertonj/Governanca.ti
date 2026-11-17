@@ -475,9 +475,9 @@ const FormFatura: React.FC<{
   return (
     <form onSubmit={lancar} className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-3">
       <h4 className="text-xs font-bold text-blue-900">{editando ? 'Editar fatura' : 'Lançar fatura'}</h4>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
         {!alvoFixo && (
-          <div className="md:col-span-3">
+          <div className="md:col-span-3 xl:col-span-4">
             <label htmlFor={id('alvo')} className={CLASSE_ROTULO}>
               De quem é a fatura *
             </label>
@@ -645,7 +645,7 @@ const FormFatura: React.FC<{
             ))}
           </select>
         </div>
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 xl:col-span-4">
           <label htmlFor={id('arq')} className={CLASSE_ROTULO}>
             Arquivo (PDF ou imagem)
           </label>
@@ -657,7 +657,7 @@ const FormFatura: React.FC<{
             className={CLASSE_ARQUIVO}
           />
         </div>
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 xl:col-span-4">
           <label htmlFor={id('obs')} className={CLASSE_ROTULO}>
             Observações
           </label>

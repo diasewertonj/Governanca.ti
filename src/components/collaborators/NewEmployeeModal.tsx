@@ -118,7 +118,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
   // Em portal e acima das outras janelas: abre por cima do chamado sem ficar presa nele
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+      <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
@@ -137,11 +137,11 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
         </div>
 
         {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Identificação</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="md:col-span-2 xl:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Nome Completo
                 </label>
@@ -173,8 +173,8 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
 
           <div className="space-y-2 pt-3 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Contato</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="md:col-span-2 xl:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   E-mail Corporativo
                 </label>
@@ -220,7 +220,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
           {/* Entradas Dinâmicas Estritas (Setor & Gestor) */}
           <div className="space-y-2 pt-3 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Vínculo</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Cargo / Função
@@ -277,7 +277,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
 
           <div className="space-y-2 pt-3 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Situação</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Status

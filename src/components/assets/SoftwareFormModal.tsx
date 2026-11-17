@@ -238,7 +238,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+      <div className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center">
@@ -256,12 +256,12 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
           {/* 1. Identificação */}
           <div className="space-y-2">
             <h3 className={TITULO}>Identificação</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="md:col-span-2 xl:col-span-2">
                 <label htmlFor="licenca-nome" className={ROTULO}>Nome do software *</label>
                 <input id="licenca-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Microsoft 365 Business Standard, Figma, ChatGPT Team" className={CAMPO} />
                 {parecidos.length > 0 && (
@@ -299,7 +299,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                 <label htmlFor="licenca-fabricante" className={ROTULO}>Fabricante</label>
                 <input id="licenca-fabricante" value={fabricante} onChange={(e) => setFabricante(e.target.value)} placeholder="Ex.: Microsoft, Google" className={CAMPO} />
               </div>
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 xl:col-span-2">
                 <label htmlFor="licenca-chave" className={ROTULO}>Chave / ID da assinatura</label>
                 <input id="licenca-chave" type="text" value={chaveContrato} onChange={(e) => setChaveContrato(e.target.value)} placeholder="Opcional" className={`${CAMPO} font-mono`} />
               </div>
@@ -377,7 +377,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
             )}
 
             {(propria || escolha === 'novo_contrato') && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div>
                   <label htmlFor="licenca-valor" className={ROTULO}>Valor (R$) *</label>
                   <input id="licenca-valor" type="number" step="0.01" min={0} required value={valorMensal} onChange={(e) => setValorMensal(Number(e.target.value))} className={`${CAMPO} font-mono`} />
@@ -397,7 +397,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
             )}
 
             {propria && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div>
                   <label htmlFor="licenca-moeda" className={ROTULO}>Moeda da cobrança</label>
                   <select id="licenca-moeda" value={moeda} onChange={(e) => setMoeda(e.target.value as Moeda)} className={CAMPO}>
@@ -435,7 +435,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                   <label htmlFor="licenca-aviso" className={ROTULO}>Avisar para cancelar com (dias)</label>
                   <input id="licenca-aviso" type="number" min={0} value={avisoDias} onChange={(e) => setAvisoDias(e.target.value)} placeholder="Ex.: 30" className={CAMPO} />
                 </div>
-                <label className="inline-flex items-center gap-2 text-xs text-slate-700 md:col-span-3">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700 md:col-span-3 xl:col-span-4">
                   <input type="checkbox" checked={renovacaoAutomatica} onChange={(e) => setRenovacaoAutomatica(e.target.checked)} /> Renova sozinho (cobrança automática)
                 </label>
               </div>
@@ -445,7 +445,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           {/* 4. Assentos e responsável */}
           <div className={SECAO}>
             <h3 className={TITULO}>Assentos e responsável</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
               <div>
                 <label htmlFor="licenca-assentos" className={ROTULO}>Total de assentos *</label>
                 <input id="licenca-assentos" type="number" min={Math.max(1, emUso)} required value={assentosTotais} onChange={(e) => setAssentosTotais(Number(e.target.value))} className={`${CAMPO} font-mono font-bold`} />

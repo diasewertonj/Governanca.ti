@@ -152,7 +152,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
         role="dialog"
         aria-modal="true"
         aria-labelledby={id('titulo')}
-        className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
+        className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
       >
         <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="min-w-0">
@@ -173,7 +173,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
           </button>
         </div>
 
-        <form onSubmit={salvar} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
+        <form onSubmit={salvar} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
           <p className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
             {modo === 'abrir' && `O ativo fica "Em manutenção" até a conclusão. A custódia não muda.`}
             {modo === 'feita' && 'Lança no histórico um serviço já concluído (ex.: troca de SSD em março), sem mudar o status do ativo.'}
@@ -194,7 +194,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
           )}
 
           {!encerrando && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               <div>
                 <label htmlFor={id('tipo')} className={CLASSE_ROTULO}>
                   Tipo *
@@ -220,7 +220,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
                   ))}
                 </select>
               </div>
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 xl:col-span-2">
                 <label htmlFor={id('descricao')} className={CLASSE_ROTULO}>
                   Descrição *
                 </label>
@@ -272,7 +272,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
                 )}
               </div>
               {temChamados && (
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 xl:col-span-2">
                   <label htmlFor={id('chamado')} className={CLASSE_ROTULO}>
                     Chamado de origem
                   </label>
@@ -374,7 +374,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
           )}
 
           {modo === 'concluir' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               <div>
                 <label htmlFor={id('concluida')} className={CLASSE_ROTULO}>
                   Concluída em *

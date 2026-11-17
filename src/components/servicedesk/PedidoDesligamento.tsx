@@ -25,12 +25,12 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
   );
 
   return (
-    <section aria-label="Pedido do RH" className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-3 text-xs">
+    <section aria-label="Pedido do RH" className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-2xs space-y-2 text-xs">
       <h3 className="flex items-center gap-1.5 font-semibold uppercase tracking-wide text-slate-500">
         <UserMinus className="w-4 h-4" aria-hidden="true" />
         Pedido do RH
       </h3>
-      <div className="space-y-1.5 text-[13px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 text-[13px]">
         {linha('Quem sai', pessoa ? `${pessoa.nome} · ${pessoa.cargo}` : 'colaborador não encontrado')}
         {linha('Último dia', formatDate(off.dataDesligamento))}
         {linha('E-mail', off.redirecionarEmail ? `redirecionar/dar acesso para ${nome(off.redirecionarEmailParaId)}` : 'não redirecionar')}
@@ -39,7 +39,7 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
         {off.observacoes?.trim() && linha('Observações', <span className="whitespace-pre-wrap">{off.observacoes}</span>)}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
         <div>
           <p className="font-semibold text-slate-700 mb-1">Equipamentos com a pessoa ({equipamentos.length})</p>
           {equipamentos.length === 0 ? (

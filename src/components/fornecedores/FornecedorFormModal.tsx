@@ -129,7 +129,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
         role="dialog"
         aria-modal="true"
         aria-labelledby="fornecedor-titulo"
-        className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
+        className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
       >
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -155,9 +155,9 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
           </button>
         </div>
 
-        <form onSubmit={salvar} className="p-6 space-y-4 sm:max-h-[75vh] sm:overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="md:col-span-2">
+        <form onSubmit={salvar} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="md:col-span-2 xl:col-span-2">
               <label htmlFor="forn-nome" className={CLASSE_ROTULO}>
                 Nome *
               </label>
@@ -230,7 +230,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
                 className={CLASSE_CAMPO}
               />
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 xl:col-span-2">
               <label htmlFor="forn-site" className={CLASSE_ROTULO}>
                 Site
               </label>
@@ -243,7 +243,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
                 className={CLASSE_CAMPO}
               />
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 xl:col-span-2">
               <label htmlFor="forn-obs" className={CLASSE_ROTULO}>
                 Observações
               </label>
@@ -256,7 +256,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
                 className={CLASSE_CAMPO}
               />
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 xl:col-span-2">
               <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
                 <input
                   type="checkbox"
