@@ -34,7 +34,9 @@ export const NavegacaoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { podeDescartarPendencias } = useApp();
   const [niveis, setNiveis] = useState<Nivel[]>([]);
   const ref = useRef<Nivel[]>([]);
-  ref.current = niveis;
+  useLayoutEffect(() => {
+    ref.current = niveis;
+  }, [niveis]);
 
   const registrar = useCallback((n: Nivel) => setNiveis((l) => [...l, n]), []);
   const remover = useCallback((id: number) => setNiveis((l) => l.filter((n) => n.id !== id)), []);
