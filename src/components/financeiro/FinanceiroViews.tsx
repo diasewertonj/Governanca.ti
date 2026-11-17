@@ -192,15 +192,11 @@ export const ContasPagarView: React.FC = () => {
     );
 
   return (
-    <div className="space-y-6">
-      <Topo titulo="Contas a pagar" sub="Todas as faturas de contratos e softwares, num lugar só">
-        <span className="text-xs text-slate-600">
-          Total na lista: <span className="font-mono font-semibold text-slate-900">{brl(total)}</span>
-        </span>
-      </Topo>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-3">
+      {/* Um cartão só: filtros à esquerda, total e CSV à direita (mesmo padrão das outras telas) */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3 flex flex-wrap items-center gap-2">
         <div className="relative">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar origem ou documento..." aria-label="Buscar" className="w-full sm:w-64 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg" />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar origem ou documento..." aria-label="Buscar" className={`${CAMPO_FILTRO} pl-8 w-full sm:w-60`} />
           <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" aria-hidden="true" />
         </div>
         <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Situação" className={CAMPO_FILTRO}>
@@ -215,12 +211,14 @@ export const ContasPagarView: React.FC = () => {
             <option key={f.id} value={f.id}>{f.nome}</option>
           ))}
         </select>
-        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} aria-label="Competência" className={CAMPO_FILTRO} />
+        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} aria-label="Competência" title="Competência" className={CAMPO_FILTRO} />
+        <span className="ml-auto text-xs text-slate-600">
+          Total na lista: <span className="font-mono font-semibold text-slate-900">{brl(total)}</span>
+        </span>
         <button type="button" onClick={exportar} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">
           <Download className="w-3.5 h-3.5" /> CSV
         </button>
-      </div>
-      <FaturasSecao listaGlobal={lista} />
+      </div>      <FaturasSecao listaGlobal={lista} />
     </div>
   );
 };

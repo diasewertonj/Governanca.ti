@@ -44,7 +44,8 @@ const COR_STATUS: Record<StatusExibidoFatura, string> = {
   cancelada: 'text-slate-600 bg-slate-100 border-slate-200',
 };
 
-const BOTAO_LINHA = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border';
+/** Ações da linha: só ícone, com dica (o texto vira title/aria-label) */
+const ICONE = 'p-1.5 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900';
 
 /**
  * Fase 8: faturas de uma licença ou de um contrato (só a T.I.). Lista por
@@ -126,11 +127,38 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Faturas</h3>
           <span className="text-xs text-slate-500">({lista.length})</span>
         </div>
-        <span className="text-xs text-slate-600">
-          Pago em {ano}: <span className="font-semibold font-mono text-slate-900">{formatCurrency(totalPagoNoAno(lista, ano))}</span>
-        </span>
+        <div className="flex items-center gap-3">
+          {alvo && (
+            <span className="text-xs text-slate-600">
+              Pago em {ano}: <span className="font-semibold font-mono text-slate-900">{formatCurrency(totalPagoNoAno(lista, ano))}</span>
+            </span>
+          )}
+          {!bloqueioLancamento && !lancando && !editando && (
+            <button
+              type="button"
+              onClick={() => setLancando(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+            >
+              <Plus className="w-3.5 h-3.5" /> Lançar fatura
+            </button>
+          )}
+        </div>
       </div>
 
+      {editando ? (
+        <FormFatura
+          key={editando.id}
+          alvo={editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string }}
+          periodicidade={periodicidade}
+          valorPadrao={editando.valor}
+          doMesmoAlvo={faturasDoAlvo(faturas, editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string })}
+          editando={editando}
+          onFechar={() => setEditando(null)}
+        />
+      ) : lancando && !bloqueioLancamento ? (
+        <FormFatura alvo={alvo} periodicidade={periodicidade} valorPadrao={valorPadrao} doMesmoAlvo={lista} onFechar={() => setLancando(false)} />
+      ) : null}
+      {bloqueioLancamento && <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5">{bloqueioLancamento}</p>}
       {lista.length === 0 ? (
         <p className="text-xs text-slate-500">Nenhuma fatura lançada.</p>
       ) : (
@@ -231,9 +259,9 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                           setErro('');
                         }}
                         aria-label={`Anexar arquivo à fatura de ${rotuloCompetencia(f.competencia)}`}
-                        className={`${BOTAO_LINHA} text-blue-700 bg-white border-blue-200 hover:bg-blue-50`}
+                        className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline"
                       >
-                        <Paperclip className="w-3.5 h-3.5" aria-hidden="true" /> Anexar arquivo
+                        <Paperclip className="w-3.5 h-3.5" aria-hidden="true" /> Anexar
                       </button>
                     )}
                   </td>
@@ -269,53 +297,33 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                         </button>
                       </span>
                     ) : (
-                      <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                      <span className="inline-flex flex-nowrap items-center justify-end gap-0.5">
                         {f.status === 'a_pagar' && (
                           <button
                             type="button"
                             onClick={() => setPagando({ id: f.id, data: isoLocal(new Date()) })}
-                            className={`${BOTAO_LINHA} text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100`}
+                            className="inline-flex items-center gap-1 px-2 py-1 mr-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md whitespace-nowrap"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Marcar como paga
+                            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Pagar
                           </button>
                         )}
                         {f.status === 'a_pagar' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditando(f);
-                              setLancando(false);
-                            }}
-                            className={`${BOTAO_LINHA} text-slate-700 bg-white border-slate-200 hover:bg-slate-50`}
-                          >
-                            <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Editar
+                          <button type="button" onClick={() => { setEditando(f); setLancando(false); }} title="Editar fatura" aria-label="Editar fatura" className={ICONE}>
+                            <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                           </button>
                         )}
                         {f.status === 'paga' && currentRole === 'ti_admin' && (
-                          <button
-                            type="button"
-                            onClick={() => desfazer(f)}
-                            className={`${BOTAO_LINHA} text-amber-800 bg-white border-amber-200 hover:bg-amber-50`}
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Desfazer pagamento
+                          <button type="button" onClick={() => desfazer(f)} title="Desfazer pagamento" aria-label="Desfazer pagamento" className={ICONE}>
+                            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                           </button>
                         )}
                         {f.status === 'a_pagar' && (
-                          <button
-                            type="button"
-                            onClick={() => cancelar(f)}
-                            className={`${BOTAO_LINHA} text-slate-700 bg-white border-slate-200 hover:bg-slate-50`}
-                          >
-                            <XCircle className="w-3.5 h-3.5" aria-hidden="true" /> Cancelar fatura
+                          <button type="button" onClick={() => cancelar(f)} title="Cancelar fatura" aria-label="Cancelar fatura" className={ICONE}>
+                            <XCircle className="w-3.5 h-3.5" aria-hidden="true" />
                           </button>
                         )}
                         {currentRole === 'ti_admin' && (
-                          <button
-                            type="button"
-                            onClick={() => excluir(f)}
-                            aria-label={`Excluir a fatura de ${rotuloCompetencia(f.competencia)}`}
-                            className="p-1.5 text-red-700 hover:bg-red-50 rounded-md"
-                          >
+                          <button type="button" onClick={() => excluir(f)} title="Excluir fatura" aria-label={`Excluir a fatura de ${rotuloCompetencia(f.competencia)}`} className={`${ICONE} text-red-700 hover:bg-red-50`}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
@@ -335,35 +343,6 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
         </p>
       )}
 
-      {editando ? (
-        <FormFatura
-          key={editando.id}
-          alvo={editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string }}
-          periodicidade={periodicidade}
-          valorPadrao={editando.valor}
-          doMesmoAlvo={faturasDoAlvo(faturas, editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string })}
-          editando={editando}
-          onFechar={() => setEditando(null)}
-        />
-      ) : bloqueioLancamento ? (
-        <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5">{bloqueioLancamento}</p>
-      ) : lancando ? (
-        <FormFatura
-          alvo={alvo}
-          periodicidade={periodicidade}
-          valorPadrao={valorPadrao}
-          doMesmoAlvo={lista}
-          onFechar={() => setLancando(false)}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setLancando(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
-        >
-          <Plus className="w-3.5 h-3.5" /> Lançar fatura
-        </button>
-      )}
     </div>
   );
 };
