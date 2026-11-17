@@ -84,7 +84,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
                             setSelectedTicketIdForDetail(tkt.id);
                           }}
                           aria-label={`Abrir o chamado ${tkt.codigo}`}
-                          className="btn btn-sm btn-primario"
+                          className="btn btn-sm btn-secundario"
                         >
                           Abrir
                         </button>

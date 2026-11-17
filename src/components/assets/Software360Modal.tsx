@@ -307,22 +307,6 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     </div>
   );
 
-  const comoEPago = (
-    <>
-      {ROTULO_FORMA_COBRANCA[fonte.forma]}
-      {fonte.contrato && (
-        <>
-          {' · '}
-          {linkContrato(fonte.contrato.id, nomeContrato(fonte.contrato))}
-        </>
-      )}
-      {fonte.semContratoVigente && (
-        <span className="mt-1 block">
-          <span className="selo selo-problema">Sem contrato vigente</span>
-        </span>
-      )}
-    </>
-  );
 
   return (
     <>
@@ -408,7 +392,6 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               </Dado>
               <Dado rotulo="Fabricante">{license.fabricante || '—'}</Dado>
               <Dado rotulo="Fornecedor">{nomeFornecedor || '—'}</Dado>
-              <Dado rotulo="Como é pago">{comoEPago}</Dado>
               {isTI && (
                 <Dado rotulo="Chave / ID do contrato">
                   {license.chaveContrato ? <span className="font-mono break-all">{license.chaveContrato}</span> : '—'}
@@ -437,22 +420,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             <BarraAssentos license={license} />
           </section>
 
-          <section className="cartao space-y-3 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="secao-titulo">Custo</h3>
-              <button type="button" onClick={() => setAba('custo')} className="btn btn-sm btn-discreto">
-                Ver custo e faturas
-                <ChevronRight />
-              </button>
-            </div>
-            {fonte.semContratoVigente ? (
-              avisoSemContrato
-            ) : fonte.forma === 'sem_custo' ? (
-              <p className="text-xs text-slate-600">Software sem custo.</p>
-            ) : (
-              <ValoresCusto fonte={fonte} license={license} pg={pg} limite={limite} />
-            )}
-          </section>
+          {/* Custo e pagamento ficam só na aba própria; aqui só o alerta, se houver */}
+          {fonte.semContratoVigente && avisoSemContrato}
 
           {license.observacoes && (
             <section className="cartao space-y-2 p-4">

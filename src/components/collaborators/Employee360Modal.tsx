@@ -438,7 +438,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                         <td data-label="Em posse desde">{formatDate(asset.dataEntregaAtual)}</td>
                         <td data-label="Ações" className="text-right">
                           <span className="acoes-linha">
-                            <button type="button" onClick={() => handleOpenAsset(asset.id)} className="btn btn-sm btn-primario">
+                            <button type="button" onClick={() => handleOpenAsset(asset.id)} className="btn btn-sm btn-secundario">
                               Abrir ficha
                             </button>
                           </span>
@@ -695,7 +695,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                           </td>
                           <td data-label="Ações" className="text-right">
                             <span className="acoes-linha">
-                              <button type="button" onClick={() => setSelectedTermForPrint(term)} className="btn btn-sm btn-primario">
+                              <button type="button" onClick={() => setSelectedTermForPrint(term)} className="btn btn-sm btn-secundario">
                                 <FileText />
                                 Ver e imprimir
                               </button>

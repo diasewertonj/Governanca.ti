@@ -328,15 +328,16 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               </label>
               {!encerrado && (
                 <span className="flex flex-wrap gap-2 sm:ml-auto">
+                  {/* Padrão dos rodapés: destrutiva à esquerda, principal (azul) por último */}
+                  <button type="button" onClick={() => setCancelando(true)} className="btn btn-sm btn-perigo">
+                    {ticket.tipo === 'suporte' ? 'Cancelar chamado' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
+                  </button>
                   {ticket.tipo === 'suporte' && (
                     <button type="button" onClick={() => setResolvendo(true)} className="btn btn-sm btn-primario">
                       <CheckCircle2 aria-hidden="true" />
                       Registrar solução
                     </button>
                   )}
-                  <button type="button" onClick={() => setCancelando(true)} className="btn btn-sm btn-perigo">
-                    {ticket.tipo === 'suporte' ? 'Cancelar' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
-                  </button>
                 </span>
               )}
             </div>

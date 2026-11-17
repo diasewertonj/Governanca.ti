@@ -623,7 +623,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
           </>
         )}
 
-        {abaAtiva === 'historico' && <HistoricoAlteracoes entidade="contratos" registro={contrato.id} />}
+        {abaAtiva === 'historico' && <HistoricoAlteracoes entidade="contratos" registro={contrato.id} semBotao />}
       </Janela>
 
       {/* Janelas por cima da ficha: fora dela, para o fundo desfocado não prender a nova na rolagem */}

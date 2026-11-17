@@ -267,7 +267,7 @@ export const FormResolucao: React.FC<{ ticket: Ticket; onClose: () => void }> = 
         <>
           <span />
           <span className="flex gap-2">
-            <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+            <button type="button" onClick={onClose} className="btn btn-secundario">Cancelar</button>
             <button type="submit" form={`${id}-form`} disabled={salvando} className="btn btn-primario">
               {salvando ? 'Registrando…' : 'Registrar e encerrar'}
             </button>
@@ -440,7 +440,7 @@ const FormReabrir: React.FC<{ ticket: Ticket; onClose: () => void }> = ({ ticket
         <>
           <span />
           <span className="flex gap-2">
-            <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+            <button type="button" onClick={onClose} className="btn btn-secundario">Cancelar</button>
             <button type="submit" form={`${id}-form`} disabled={salvando} className="btn btn-primario">
               {salvando ? 'Reabrindo…' : 'Reabrir'}
             </button>

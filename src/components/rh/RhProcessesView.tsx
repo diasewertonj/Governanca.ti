@@ -231,19 +231,21 @@ export const RhProcessesView: React.FC = () => {
           ) : undefined
         }
         acoes={
-          <>
-            {activeTab !== 'lista' && (
-              <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
-                Voltar ao histórico
+          // Com um formulário aberto, só o caminho de volta (o envio fica no rodapé do formulário)
+          activeTab !== 'lista' ? (
+            <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
+              Voltar ao histórico
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={() => setActiveTab('offboarding')} className="btn btn-secundario">
+                <UserMinus /> Novo desligamento
               </button>
-            )}
-            <button type="button" onClick={() => setActiveTab('offboarding')} className="btn btn-secundario">
-              <UserMinus /> Novo desligamento
-            </button>
-            <button type="button" onClick={() => setActiveTab('onboarding')} className="btn btn-primario">
-              <UserPlus /> Nova admissão
-            </button>
-          </>
+              <button type="button" onClick={() => setActiveTab('onboarding')} className="btn btn-primario">
+                <UserPlus /> Nova admissão
+              </button>
+            </>
+          )
         }
       />
       {successMessage && (

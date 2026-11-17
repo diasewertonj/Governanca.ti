@@ -44,10 +44,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const totalAssets = assets.length;
   const assetsInUse = assets.filter((a) => a.status === 'em_uso').length;
   const assetsAvailable = assets.filter((a) => a.status === 'disponivel').length;
-  const openTickets = tickets.filter((t) => t.status === 'aberto' || t.status === 'em_andamento').length;
-  const urgentTickets = tickets.filter(
-    (t) => (t.status === 'aberto' || t.status === 'em_andamento') && t.prioridade === 'critica'
-  ).length;
+  // Mesma regra do contador do menu: só suporte (processos têm tela própria), incluindo "aguardando"
+  const emAbertoSuporte = (t: (typeof tickets)[number]) =>
+    t.tipo === 'suporte' && (t.status === 'aberto' || t.status === 'em_andamento' || t.status === 'aguardando_terceiro');
+  const openTickets = tickets.filter(emAbertoSuporte).length;
+  const urgentTickets = tickets.filter((t) => emAbertoSuporte(t) && t.prioridade === 'critica').length;
 
   // Garantias (efetivas: fábrica ou contrato de suporte/garantia estendida): vencendo
   // em 30 dias, vencidas em uso e os 5 mais próximos do prazo

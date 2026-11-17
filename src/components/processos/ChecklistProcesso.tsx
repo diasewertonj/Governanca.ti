@@ -308,7 +308,7 @@ const LinhaItem: React.FC<{
           <span className="acoes-linha shrink-0">
             {pendenteEditavel && (
               <>
-                <button type="button" onClick={onAbrir} aria-expanded={aberto} className="btn btn-sm btn-primario">
+                <button type="button" onClick={onAbrir} aria-expanded={aberto} className="btn btn-sm btn-secundario">
                   Registrar
                 </button>
                 <button

@@ -135,7 +135,7 @@ const Caixa: React.FC<{ pedido: Pedido; onFim: () => void }> = ({ pedido, onFim 
         <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
           {pedido.tipo !== 'aviso' && (
             <button type="button" onClick={() => fechar(false)} className="btn btn-secundario">
-              {op.cancelar || 'Voltar'}
+              {op.cancelar || (op.confirmar === 'Cancelar' ? 'Voltar' : 'Cancelar')}
             </button>
           )}
           <button

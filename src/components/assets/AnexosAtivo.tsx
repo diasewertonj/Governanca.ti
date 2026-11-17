@@ -97,7 +97,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
                   </td>
                   <td data-label="Ações" className="text-right">
                     <span className="acoes-linha">
-                      <button type="button" onClick={() => abrir(a.caminho)} className="btn btn-sm btn-primario">
+                      <button type="button" onClick={() => abrir(a.caminho)} className="btn btn-sm btn-secundario">
                         <ExternalLink aria-hidden="true" /> Abrir
                       </button>
                       {podeEditar && (

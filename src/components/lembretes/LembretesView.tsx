@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Plus, XCircle } from 'lucide-react';
+import { CheckCircle2, Plus, XCircle, Bell } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Lembrete } from '../../types/index.ts';
 import { formatDate, formatDateTime } from '../../utils/formatters.ts';
@@ -146,7 +146,7 @@ export const LembretesView: React.FC = () => {
                     <td data-label="Ações" className="text-right">
                       {l.status === 'aberto' && (
                         <span className="acoes-linha">
-                          <button type="button" onClick={() => setEncerrando({ id: l.id, status: 'feito', obs: '' })} className="btn btn-sm btn-primario">
+                          <button type="button" onClick={() => setEncerrando({ id: l.id, status: 'feito', obs: '' })} className="btn btn-sm btn-secundario">
                             <CheckCircle2 /> Concluir
                           </button>
                           <button
@@ -173,6 +173,8 @@ export const LembretesView: React.FC = () => {
         <Janela
           tamanho="p"
           titulo="Novo lembrete"
+          subtitulo="Aviso com data para a equipe de T.I."
+          icone={<Bell className="h-4 w-4" />}
           onFechar={() => {
             setNovo(null);
             setErro(null);
@@ -235,6 +237,7 @@ export const LembretesView: React.FC = () => {
         <Janela
           tamanho="p"
           titulo={encerrando.status === 'feito' ? 'Concluir lembrete' : 'Cancelar lembrete'}
+          icone={<Bell className="h-4 w-4" />}
           subtitulo={lembreteEncerrando?.titulo}
           onFechar={() => {
             setEncerrando(null);

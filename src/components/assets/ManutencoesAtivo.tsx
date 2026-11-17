@@ -164,7 +164,7 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
                     <button type="button" onClick={() => setForm({ modo: 'cancelar', manutencao: m })} className="btn btn-sm btn-perigo">
                       <XCircle aria-hidden="true" /> Cancelar
                     </button>
-                    <button type="button" onClick={() => setForm({ modo: 'concluir', manutencao: m })} className="btn btn-sm btn-primario">
+                    <button type="button" onClick={() => setForm({ modo: 'concluir', manutencao: m })} className="btn btn-sm btn-secundario">
                       <CheckCircle2 aria-hidden="true" /> Concluir
                     </button>
                   </div>

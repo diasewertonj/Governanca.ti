@@ -483,7 +483,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="secao-titulo">Com quem está</h3>
               {isTI && !descartado && !showTransferModal && (
-                <button type="button" onClick={() => setShowTransferModal(true)} className="btn btn-sm btn-primario">
+                <button type="button" onClick={() => setShowTransferModal(true)} className="btn btn-sm btn-secundario">
                   <ArrowRightLeft />
                   Transferir custódia
                 </button>
@@ -588,7 +588,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                         <td data-label="Ações" className="text-right">
                           {entry.termoId && (
                             <span className="acoes-linha">
-                              <button type="button" onClick={() => handleViewTerm(entry.termoId)} className="btn btn-sm btn-primario">
+                              <button type="button" onClick={() => handleViewTerm(entry.termoId)} className="btn btn-sm btn-secundario">
                                 <FileText />
                                 Ver termo
                               </button>

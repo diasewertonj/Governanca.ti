@@ -290,7 +290,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                               type="button"
                               onClick={() => setPagando({ id: f.id, data: isoLocal(new Date()) })}
                               aria-label={`Pagar a fatura de ${rotuloCompetencia(f.competencia)}`}
-                              className="btn btn-sm btn-primario mr-1"
+                              className="btn btn-sm btn-secundario mr-1"
                             >
                               <CheckCircle2 aria-hidden="true" /> Pagar
                             </button>

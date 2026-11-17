@@ -138,7 +138,7 @@ export const CollaboratorsView: React.FC = () => {
                             setSelectedEmployeeIdFor360(emp.id);
                           }}
                           aria-label={`Abrir a ficha de ${emp.nome}`}
-                          className="btn btn-sm btn-primario"
+                          className="btn btn-sm btn-secundario"
                         >
                           Ficha
                         </button>

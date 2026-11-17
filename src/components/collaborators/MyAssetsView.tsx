@@ -37,7 +37,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                 <span>
                   {t.docTitulo || (t.tipo === 'entrega' ? 'Termo de entrega' : 'Recibo de devolução')} · {t.codigo} · {formatDate(t.dataEmissao)}
                 </span>
-                <button type="button" onClick={() => setSelectedTermForPrint(t)} className="btn btn-sm btn-primario">
+                <button type="button" onClick={() => setSelectedTermForPrint(t)} className="btn btn-sm btn-secundario">
                   Ler e assinar
                 </button>
               </li>
@@ -90,7 +90,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                   <button type="button" onClick={() => onOpenNewTicketForAsset(asset.id)} className="btn btn-sm btn-secundario">
                     <LifeBuoy /> Reportar defeito
                   </button>
-                  <button type="button" onClick={() => setSelectedAssetIdFor360(asset.id)} className="btn btn-sm btn-primario">
+                  <button type="button" onClick={() => setSelectedAssetIdFor360(asset.id)} className="btn btn-sm btn-secundario">
                     Ver detalhes
                   </button>
                 </div>
@@ -161,7 +161,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                       </td>
                       <td data-label="Ações" className="text-right">
                         <span className="acoes-linha">
-                          <button type="button" onClick={() => setSelectedTermForPrint(term)} className="btn btn-sm btn-primario">
+                          <button type="button" onClick={() => setSelectedTermForPrint(term)} className="btn btn-sm btn-secundario">
                             Visualizar termo
                           </button>
                         </span>

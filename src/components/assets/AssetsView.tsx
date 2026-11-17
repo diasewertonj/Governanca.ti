@@ -261,7 +261,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                           Editar
                         </button>
                       )}
-                      <button type="button" onClick={() => setSelectedSoftwareIdFor360(lic.id)} className="btn btn-sm btn-primario">
+                      <button type="button" onClick={() => setSelectedSoftwareIdFor360(lic.id)} className="btn btn-sm btn-secundario">
                         <Users /> Assentos e ficha
                       </button>
                     </div>
@@ -348,7 +348,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                       {/* Ações */}
                       <td data-label="Ações" className="text-right">
                         <span className="acoes-linha">
-                          <button type="button" onClick={() => setSelectedAssetIdFor360(asset.id)} className="btn btn-sm btn-primario">
+                          <button type="button" onClick={() => setSelectedAssetIdFor360(asset.id)} className="btn btn-sm btn-secundario">
                             Ficha
                           </button>
                           <button

@@ -113,19 +113,8 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
             ? 'Vigência, itens cobertos, valor e faturas de cada contrato'
             : 'Quem cobra a empresa: revendas, fabricantes, operadoras e prestadores'
         }
-        acoes={
-          ehContratos ? (
-            <>
-              {novoFornecedor}
-              {novoContrato}
-            </>
-          ) : (
-            <>
-              {novoContrato}
-              {novoFornecedor}
-            </>
-          )
-        }
+        // Uma ação principal por tela (o contrato cria fornecedor pelo próprio formulário)
+        acoes={ehContratos ? novoContrato : novoFornecedor}
         filtros={
           <>
             <Busca
@@ -205,7 +194,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                             setFichaContratoId(c.id);
                           }}
                           aria-label={`Abrir a ficha do contrato ${c.numero || c.descricao}`}
-                          className="btn btn-sm btn-primario"
+                          className="btn btn-sm btn-secundario"
                         >
                           Ficha
                         </button>
@@ -276,7 +265,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                             setFichaFornecedorId(f.id);
                           }}
                           aria-label={`Abrir a ficha do fornecedor ${f.nome}`}
-                          className="btn btn-sm btn-primario"
+                          className="btn btn-sm btn-secundario"
                         >
                           Ficha
                         </button>

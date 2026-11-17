@@ -358,7 +358,7 @@ export const SettingsView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <CabecalhoTela titulo="Configurações" subtitulo="Empresa, pessoas, atendimento, inventário e conexão" />
+      <CabecalhoTela titulo="Configurações" subtitulo="Edite os campos de qualquer seção: a barra Salvar alterações aparece embaixo assim que houver mudança. Nada grava sozinho." />
 
       {successMsg && (
         <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">

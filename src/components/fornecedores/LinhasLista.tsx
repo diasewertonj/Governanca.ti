@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Pencil, Plus, Trash2 } from 'lucide-react';
+import { History, Pencil, Plus, Trash2, Phone } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { LinhaTelefonica } from '../../types/index.ts';
@@ -136,7 +136,7 @@ export const LinhasLista: React.FC<{
                       </td>
                       <td data-label="Ações" className="text-right">
                         <span className="acoes-linha">
-                          <button type="button" onClick={() => setEditando(l)} aria-label={`Editar ${l.numero}`} className="btn btn-sm btn-primario">
+                          <button type="button" onClick={() => setEditando(l)} aria-label={`Editar ${l.numero}`} className="btn btn-sm btn-secundario">
                             <Pencil /> Editar
                           </button>
                           <button
@@ -254,6 +254,8 @@ const FormLinha: React.FC<{
     <Janela
       tamanho="p"
       titulo={linha ? `Editar linha ${linha.numero}` : 'Nova linha'}
+      subtitulo="Número, plano, aparelho e pessoa"
+      icone={<Phone className="h-4 w-4" />}
       onFechar={onCancelar}
       idTitulo="janela-linha"
       rodape={

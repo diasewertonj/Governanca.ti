@@ -269,7 +269,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                             setSelectedTicketIdForDetail(tkt.id);
                           }}
                           aria-label={`Abrir o chamado ${tkt.codigo}`}
-                          className="btn btn-sm btn-primario"
+                          className="btn btn-sm btn-secundario"
                         >
                           Abrir
                         </button>

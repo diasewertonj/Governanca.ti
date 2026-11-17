@@ -120,7 +120,7 @@ export const TermsView: React.FC = () => {
                             setSelectedTermForPrint(term);
                           }}
                           aria-label={`Abrir o termo ${term.codigo}`}
-                          className="btn btn-sm btn-primario"
+                          className="btn btn-sm btn-secundario"
                         >
                           <Printer /> Abrir termo
                         </button>

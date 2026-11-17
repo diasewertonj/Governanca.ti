@@ -107,7 +107,7 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
                   <td data-label="Ação" className="text-right">
                     {v.alvo.tipo !== 'estoque' && v.alvo.tipo !== 'linha' && (
                       <span className="acoes-linha">
-                        <button type="button" onClick={() => abrir(v)} className="btn btn-sm btn-primario">
+                        <button type="button" onClick={() => abrir(v)} className="btn btn-sm btn-secundario">
                           {v.tipo === 'contrato' || v.tipo === 'cancelamento' ? 'Abrir contrato (renovar/encerrar)' : 'Abrir'}
                         </button>
                       </span>

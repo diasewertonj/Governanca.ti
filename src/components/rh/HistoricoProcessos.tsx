@@ -116,7 +116,7 @@ export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: 
                         setSelectedTicketIdForDetail(t.id);
                       }}
                       aria-label={`Abrir o processo ${t.codigo}`}
-                      className="btn btn-sm btn-primario"
+                      className="btn btn-sm btn-secundario"
                     >
                       Abrir
                     </button>

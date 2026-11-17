@@ -125,7 +125,8 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
       titulo: 'Fornecedores e contratos',
       itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],
     },
-    { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar')] },
+    // Item único: sem título de grupo repetindo o nome
+    { itens: [item('financeiro', 'contas_pagar')] },
     // T.I./admin: sem Minha área — Meus equipamentos fica no menu da conta; os próprios chamados, em Chamados
   ];
   if (papel === 'ti_admin')

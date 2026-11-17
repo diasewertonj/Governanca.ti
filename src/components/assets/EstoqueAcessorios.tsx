@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowDownToLine, ArrowUpFromLine, History, Pencil, Plus, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, History, Pencil, Plus, SlidersHorizontal, Trash2, Undo2, Package, ArrowLeftRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { MenuAcoes } from '../ui/MenuAcoes.tsx';
@@ -152,7 +152,7 @@ export const EstoqueAcessorios: React.FC<{
                       </td>
                       <td data-label="Ações" className="text-right">
                         <span className="acoes-linha">
-                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'saida' })} className="btn btn-sm btn-primario">
+                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'saida' })} className="btn btn-sm btn-secundario">
                             <ArrowUpFromLine /> Entregar
                           </button>
                           <button type="button" onClick={() => setMovendo({ item: i, tipo: 'entrada' })} title="Entrada no estoque" aria-label={`Entrada de ${i.nome}`} className="btn-icone">
@@ -264,6 +264,8 @@ const FormItem: React.FC<{
     <Janela
       tamanho="p"
       titulo={item ? `Editar ${item.nome}` : 'Novo acessório'}
+      subtitulo="Item de estoque controlado por quantidade"
+      icone={<Package className="h-4 w-4" />}
       onFechar={onCancelar}
       idTitulo="janela-acessorio"
       rodape={
@@ -364,6 +366,7 @@ const FormMovimento: React.FC<{
       tamanho="p"
       titulo={`${ROTULO_MOV[tipo]} · ${item.nome}`}
       subtitulo={`Em estoque: ${item.quantidade}`}
+      icone={<ArrowLeftRight className="h-4 w-4" />}
       onFechar={onCancelar}
       idTitulo="janela-movimento"
       rodape={
