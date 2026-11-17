@@ -65,7 +65,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
 
   const fechar = () => {
     if (enviandoChamado) return;
-    if (confirmarDescarte(itensPendentes)) onClose();
+    void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
   };
 
   if (!currentUser) return null;
@@ -177,8 +177,8 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+    <div className="janela-fundo modal-tela">
+      <div className="janela janela-g">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
@@ -188,7 +188,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
             type="button"
             onClick={fechar}
             aria-label="Fechar"
-            className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="btn-icone"
           >
             <X className="w-5 h-5" />
           </button>
@@ -221,7 +221,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
                   id="novo-chamado-solicitante"
                   value={solicitante.id}
                   onChange={(e) => trocarSolicitante(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-slate-900"
+                  className="campo campo-sm w-full"
                 >
                   {pessoasAtivas.map((e) => (
                     <option key={e.id} value={e.id}>
@@ -243,7 +243,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="Ex: Teclado falhando teclas específicas ou tela piscando na docking"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="campo w-full"
             />
           </div>
 
@@ -257,7 +257,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
               placeholder="Descreva quando o problema começou, se há mensagens de erro na tela e os passos para reproduzir a falha..."
-              className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="campo w-full"
             />
           </div>
 
@@ -289,7 +289,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
                 setAtivoSel(e.target.value);
                 if (e.target.value && !softwareSel) setCategoria('Hardware / Equipamento');
               }}
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="campo w-full"
             >
               <option value="">— nenhum —</option>
               {myCustodyAssets.map((asset) => (
@@ -316,7 +316,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
                 setSoftwareSel(e.target.value);
                 if (e.target.value && !ativoSel) setCategoria('Softwares & Licenças');
               }}
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="campo w-full"
             >
               <option value="">— nenhum —</option>
               {myLicenses.length > 0 && (
@@ -350,7 +350,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
               <select
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                className="campo w-full"
               >
                 <option value="Hardware / Equipamento">Hardware / Equipamento Físico</option>
                 <option value="Periféricos / Telas / Cabos">Periféricos / Telas / Cabos</option>
@@ -368,7 +368,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
               <select
                 value={prioridade}
                 onChange={(e) => setPrioridade(e.target.value as TicketPriority)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                className="campo w-full"
               >
                 <option value="baixa">Baixa (Dúvida ou solicitação sem impacto)</option>
                 <option value="media">Média (Impacto parcial no trabalho diário)</option>
@@ -431,14 +431,14 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
             <button
               type="button"
               onClick={fechar}
-              className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="btn btn-secundario"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={enviandoChamado || enviandoAnexo}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              className="btn btn-primario"
             >
               <Send className="w-3.5 h-3.5" />
               Enviar Chamado para T.I.

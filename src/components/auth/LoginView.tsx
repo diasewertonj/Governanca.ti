@@ -86,7 +86,7 @@ export const LoginView: React.FC = () => {
               type="button"
               disabled={googleLoading}
               onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              className="btn btn-secundario w-full"
             >
               {googleLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
@@ -133,7 +133,7 @@ export const LoginView: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nome@empresa.com.br"
-                  className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:bg-white transition-colors"
+                  className="campo w-full"
                 />
                 <Mail className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
@@ -150,7 +150,7 @@ export const LoginView: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:bg-white transition-colors"
+                  className="campo w-full"
                 />
                 <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
@@ -167,7 +167,7 @@ export const LoginView: React.FC = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              className="btn btn-primario w-full"
             >
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -206,7 +206,7 @@ export const LoginView: React.FC = () => {
                     <button
                       type="submit"
                       disabled={enviandoRecuperacao || !email.trim()}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg disabled:opacity-50"
+                      className="btn btn-secundario btn-sm"
                     >
                       {enviandoRecuperacao ? 'Enviando...' : 'Enviar link de redefinição'}
                     </button>

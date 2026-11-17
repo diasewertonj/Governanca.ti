@@ -14,6 +14,7 @@ import {
 } from '../../utils/cicloVida.ts';
 import { isoLocal } from '../../utils/formatters.ts';
 import { ArquivosParaEnviar, enviarArquivos, type ArquivoParaEnviar } from './ArquivosParaEnviar.tsx';
+import { confirmar } from '../ui/dialogo.tsx';
 
 /**
  * Fase 8: "Dar baixa" (só ti_admin) em modal-tela. Explica na tela o que
@@ -43,7 +44,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
   useRegistrarPendencias(`baixa:${asset.id}`, itensPendentes);
 
   const fechar = () => {
-    if (!salvando && confirmarDescarte(itensPendentes)) onClose();
+    if (!salvando) void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
   };
 
   const mudarMotivo = (novo: MotivoBaixa | '') => {
@@ -59,7 +60,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
       `Confirmar a baixa de ${asset.tag} (${ROTULO_MOTIVO_BAIXA[motivo]} · ${ROTULO_DESTINO_BAIXA[destino]})?\n\n` +
       'O ativo sai da lista principal e não pode mais ser editado nem transferido. Só um estorno o traz de volta.' +
       (encerraCustodia ? `\n\nA custódia de ${custodiante?.nome || 'colaborador'} será encerrada.` : '');
-    if (!window.confirm(aviso)) return;
+    if (!(await confirmar(aviso))) return;
 
     setErro('');
     setSalvando(true);
@@ -85,12 +86,12 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
   const id = (campo: string) => `baixa-${asset.id}-${campo}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
+    <div className="janela-fundo modal-tela">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={id('titulo')}
-        className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
+        className="janela janela-g"
       >
         <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="min-w-0">
@@ -105,7 +106,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
             type="button"
             aria-label="Fechar"
             onClick={fechar}
-            className="p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+            className="btn-icone"
           >
             <X className="w-5 h-5" />
           </button>
@@ -268,14 +269,14 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
               type="button"
               onClick={fechar}
               disabled={salvando}
-              className="px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+              className="btn btn-secundario"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={salvando || bloqueios.length > 0}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-perigo-cheio"
             >
               <Archive className="w-3.5 h-3.5" aria-hidden="true" />
               {salvando ? 'Registrando...' : 'Confirmar baixa'}

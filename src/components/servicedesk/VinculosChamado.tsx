@@ -16,7 +16,7 @@ import {
   type RascunhoVinculos,
 } from '../../utils/vinculos.ts';
 
-const CAMPO = 'w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900';
+const CAMPO = 'campo';
 const LINK = 'inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline text-left break-words';
 
 interface VinculosChamadoProps {
@@ -287,7 +287,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
               <button
                 type="button"
                 onClick={() => abrirFicha({ tipo: 'ativo', id: ativo.id, manutencaoDoChamado: ticket.id })}
-                className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100"
+                className="btn btn-secundario btn-sm mt-2"
               >
                 <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
                 {ativo.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}

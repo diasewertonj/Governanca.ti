@@ -14,17 +14,17 @@ import {
   formaCobrancaDe,
   nomesParecidos,
 } from '../../utils/financeiro.ts';
+import { confirmar } from '../ui/dialogo.tsx';
 
 interface SoftwareFormModalProps {
   onClose: () => void;
   softwareToEdit?: SoftwareLicense | null;
 }
 
-const CAMPO =
-  'w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500';
-const ROTULO = 'block text-xs font-semibold text-slate-700 mb-1';
+const CAMPO = 'campo';
+const ROTULO = 'rotulo';
 const SECAO = 'space-y-2 pt-3 border-t border-slate-100';
-const TITULO = 'text-xs font-bold uppercase tracking-wider text-slate-500';
+const TITULO = 'secao-titulo';
 
 type Escolha = FormaCobranca | 'novo_contrato';
 
@@ -129,7 +129,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
     // Fornecedor da licença diferente do fornecedor do contrato escolhido
     const contratoEscolhido = contratos.find((c) => c.id === contratoId);
     if (escolha === 'contrato' && contratoEscolhido && fornecedorId && contratoEscolhido.fornecedorId !== fornecedorId) {
-      const ok = window.confirm('O contrato escolhido é de outro fornecedor. Usar o fornecedor do contrato neste software?');
+      const ok = (await confirmar('O contrato escolhido é de outro fornecedor. Usar o fornecedor do contrato neste software?'));
       if (!ok) return;
       setFornecedorId(contratoEscolhido.fornecedorId);
     }
@@ -138,7 +138,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
       escolha !== 'contrato' && escolha !== 'novo_contrato' && softwareToEdit
         ? contratos.filter((c) => contratoVigente(c) && c.tipo === 'licenciamento' && c.itens.some((i) => i.licencaId === softwareToEdit.id))
         : [];
-    if (sairDeContratos.length && !window.confirm(`O software sai do contrato ${sairDeContratos.map(nomeContrato).join(', ')}. As faturas já lançadas continuam lá. Continuar?`)) return;
+    if (sairDeContratos.length && !(await confirmar(`O software sai do contrato ${sairDeContratos.map(nomeContrato).join(', ')}. As faturas já lançadas continuam lá. Continuar?`))) return;
     setErrorMsg(null);
 
     const fornecedorFinal = escolha === 'contrato' && contratoEscolhido ? contratoEscolhido.fornecedorId : fornecedorId;
@@ -237,8 +237,8 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+    <div className="janela-fundo modal-tela">
+      <div className="janela janela-g">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center">
@@ -251,7 +251,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               <p className="text-xs text-slate-500">Identificação, quem cobra, como é pago e assentos</p>
             </div>
           </div>
-          <button type="button" aria-label="Fechar" onClick={onClose} className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+          <button type="button" aria-label="Fechar" onClick={onClose} className="btn-icone">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -484,10 +484,10 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg">
+            <button type="button" onClick={onClose} className="btn btn-secundario">
               Cancelar
             </button>
-            <button type="submit" disabled={salvando} className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs disabled:opacity-50">
+            <button type="submit" disabled={salvando} className="btn btn-primario">
               <Save className="w-3.5 h-3.5" />
               <span>{salvando ? 'Salvando…' : escolha === 'novo_contrato' ? 'Salvar e criar contrato' : isEditing ? 'Salvar alterações' : 'Cadastrar'}</span>
             </button>

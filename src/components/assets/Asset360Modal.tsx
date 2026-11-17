@@ -1,3 +1,4 @@
+import { avisar } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatCurrency, formatDate, formatChaveNFe } from '../../utils/formatters.ts';
@@ -108,7 +109,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
   const handleOpenCustodian = (empId: string) => {
     // AUDITORIA RBAC: Colaborador comum não pode abrir perfis de outros colaboradores
     if (currentRole === 'colaborador' && empId !== currentUser?.id) {
-      alert('Acesso restrito: Colaboradores não têm permissão para acessar o cadastro de outros colaboradores.');
+      void avisar('Acesso restrito: Colaboradores não têm permissão para acessar o cadastro de outros colaboradores.');
       return;
     }
     // Fase 9: abre por cima; fechar a ficha da pessoa volta para este equipamento
@@ -145,8 +146,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+    <div className="janela-fundo modal-tela">
+      <div className="janela janela-m">
         {/* Cabeçalho */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-3 min-w-0">
@@ -170,7 +171,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               <button
                 type="button"
                 onClick={() => setEditando(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
+                className="btn btn-secundario btn-sm"
               >
                 <Pencil className="w-3.5 h-3.5 text-slate-600" />
                 Editar
@@ -180,7 +181,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               <button
                 type="button"
                 onClick={() => setEnviandoManutencao(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors shadow-2xs"
+                className="btn btn-secundario btn-sm"
               >
                 <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
                 {asset.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
@@ -190,7 +191,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               type="button"
               onClick={handleOpenQrCode}
               title="Gerar etiqueta física com QR Code"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
+              className="btn btn-secundario btn-sm"
             >
               <QrCode className="w-3.5 h-3.5 text-slate-600" />
               Etiqueta QR Code
@@ -200,7 +201,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               <button
                 type="button"
                 onClick={() => setShowTransferModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors shadow-2xs"
+                className="btn btn-secundario btn-sm"
               >
                 <ArrowRightLeft className="w-3.5 h-3.5" />
                 Mudar Custódia
@@ -211,7 +212,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               <button
                 type="button"
                 onClick={() => setDandoBaixa(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors shadow-2xs"
+                className="btn btn-perigo btn-sm"
               >
                 <Archive className="w-3.5 h-3.5" aria-hidden="true" />
                 Dar baixa
@@ -222,7 +223,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               type="button"
               aria-label="Fechar"
               onClick={onClose}
-              className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
+              className="btn-icone ml-1"
             >
               <X className="w-5 h-5" />
             </button>
@@ -246,7 +247,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                     value={selectedNewUser}
                     onChange={(e) => setSelectedNewUser(e.target.value)}
                     required
-                    className="w-full text-xs bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="campo campo-sm w-full"
                   >
                     <option value="">Selecione um colaborador ou estoque...</option>
                     <option value="estoque">📦 Devolver para Almoxarifado / Estoque de T.I.</option>
@@ -272,7 +273,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                     onChange={(e) => setMotivoDevolucao(e.target.value)}
                     placeholder="Ex: Substituição, upgrade ou desligamento..."
                     required
-                    className="w-full text-xs bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="campo campo-sm w-full"
                   />
                 </div>
               </div>
@@ -281,13 +282,13 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                 <button
                   type="button"
                   onClick={() => setShowTransferModal(false)}
-                  className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200/50 rounded-md"
+                  className="btn btn-secundario btn-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                  className="btn btn-primario btn-sm"
                 >
                   Confirmar Transferência
                 </button>
@@ -396,7 +397,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                       <select
                         value={tempSO}
                         onChange={(e) => setTempSO(e.target.value)}
-                        className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                        className="campo campo-sm w-full"
                       >
                         <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
                         <option value="Windows 11 Home">Windows 11 Home</option>
@@ -417,7 +418,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                         value={tempBitlocker}
                         onChange={(e) => setTempBitlocker(e.target.value)}
                         placeholder="Ex: 419204-183029-482019-582019-..."
-                        className="w-full text-xs font-mono px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                        className="campo campo-sm w-full font-mono font-mono"
                       />
                     </div>
                   </div>
@@ -426,14 +427,14 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                     <button
                       type="button"
                       onClick={() => setIsEditingSecurity(false)}
-                      className="px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 rounded"
+                      className="btn btn-secundario btn-sm"
                     >
                       Cancelar
                     </button>
                     <button
                       type="button"
                       onClick={handleSaveSecurity}
-                      className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded"
+                      className="btn btn-primario btn-sm"
                     >
                       Salvar Segurança
                     </button>
@@ -464,7 +465,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                         <button
                           type="button"
                           onClick={handleCopyBitlocker}
-                          className="flex items-center gap-1 px-2 py-1 text-xs text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors"
+                          className="btn btn-secundario btn-sm"
                         >
                           {copiedBitlocker ? (
                             <>
@@ -598,7 +599,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                 <button
                   type="button"
                   onClick={handleCopyKey}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors shrink-0"
+                  className="btn btn-secundario btn-sm shrink-0"
                 >
                   {copiedKey ? (
                     <>
@@ -670,7 +671,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                       <button
                         type="button"
                         onClick={() => handleViewTerm(entry.termoId)}
-                        className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-blue-700 bg-slate-50 px-2 py-1 rounded border border-slate-200"
+                        className="btn btn-secundario btn-sm"
                       >
                         <FileText className="w-3 h-3" />
                         Ver Termo A4

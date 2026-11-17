@@ -56,7 +56,7 @@ export const DefinirSenhaView: React.FC = () => {
               autoComplete="new-password"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-600"
+              className="campo w-full"
             />
           </div>
           <div>
@@ -67,7 +67,7 @@ export const DefinirSenhaView: React.FC = () => {
               autoComplete="new-password"
               value={confirmacao}
               onChange={(e) => setConfirmacao(e.target.value)}
-              className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-600"
+              className="campo w-full"
             />
           </div>
 
@@ -86,7 +86,7 @@ export const DefinirSenhaView: React.FC = () => {
           <button
             type="submit"
             disabled={salvando}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+            className="btn btn-primario w-full"
           >
             {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar senha e entrar'}
           </button>

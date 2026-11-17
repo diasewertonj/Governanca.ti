@@ -1,3 +1,4 @@
+import { confirmar } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { Archive, History, RotateCcw } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
@@ -75,7 +76,7 @@ export const BaixaPatrimonial: React.FC<{ asset: Asset }> = ({ asset }) => {
     e.preventDefault();
     if (!vigente || salvando) return;
     if (!motivo.trim()) return setErro('Informe o motivo do estorno.');
-    if (!window.confirm(`Estornar a baixa de ${asset.tag}? O ativo volta ao estoque como "Disponível" e a baixa fica no histórico.`)) return;
+    if (!(await confirmar(`Estornar a baixa de ${asset.tag}? O ativo volta ao estoque como "Disponível" e a baixa fica no histórico.`))) return;
     setErro('');
     setSalvando(true);
     const falha = await estornarBaixa(vigente.id, motivo);
@@ -98,7 +99,7 @@ export const BaixaPatrimonial: React.FC<{ asset: Asset }> = ({ asset }) => {
               <button
                 type="button"
                 onClick={() => setEstornando(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+                className="btn btn-secundario btn-sm"
               >
                 <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Estornar baixa
               </button>
@@ -135,14 +136,14 @@ export const BaixaPatrimonial: React.FC<{ asset: Asset }> = ({ asset }) => {
                     setMotivo('');
                     setErro('');
                   }}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-md disabled:opacity-50"
+                  className="btn btn-secundario btn-sm"
                 >
                   Voltar
                 </button>
                 <button
                   type="submit"
                   disabled={salvando}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+                  className="btn btn-primario btn-sm"
                 >
                   <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                   {salvando ? 'Estornando...' : 'Confirmar estorno'}

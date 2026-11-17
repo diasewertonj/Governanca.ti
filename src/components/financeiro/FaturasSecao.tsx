@@ -23,6 +23,7 @@ import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
 import { formaCobrancaDe, ROTULO_FORMA_PAGAMENTO } from '../../utils/financeiro.ts';
+import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 
 interface FaturasSecaoProps {
   /** Licença OU contrato dono das faturas. Sem alvo = Contas a pagar (todas, com filtros) */
@@ -75,7 +76,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
     return licenses.find((l) => l.id === f.licencaId)?.nome || 'Licença';
   };
   const desfazer = async (f: Fatura) => {
-    const motivo = window.prompt(`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?\n\nInforme o motivo:`);
+    const motivo = (await pedirTexto(`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?\n\nInforme o motivo:`));
     if (motivo === null) return;
     const falha = await desfazerPagamento(f.id, motivo);
     setErro(falha ? `Não foi possível desfazer: ${falha}` : '');
@@ -93,9 +94,9 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
     setErro('');
   };
 
-  const cancelar = (f: Fatura) => {
+  const cancelar = async (f: Fatura) => {
     const aviso = `Cancelar a fatura de ${rotuloCompetencia(f.competencia)}?\n\nEla continua no histórico, mas deixa de contar como paga ou a pagar.`;
-    if (window.confirm(aviso)) alterarFatura(f.id, { status: 'cancelada' });
+    if ((await confirmar(aviso))) alterarFatura(f.id, { status: 'cancelada' });
   };
 
   const escolherArquivo = (arquivo: File | undefined) => {
@@ -113,8 +114,8 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
     setAnexando(ok ? null : { ...anexando, enviando: false });
   };
 
-  const excluir = (f: Fatura) => {
-    if (window.confirm(`Excluir a fatura de ${rotuloCompetencia(f.competencia)}? Esta ação não pode ser desfeita.`)) {
+  const excluir = async (f: Fatura) => {
+    if ((await confirmar(`Excluir a fatura de ${rotuloCompetencia(f.competencia)}? Esta ação não pode ser desfeita.`))) {
       excluirFatura(f.id);
     }
   };
@@ -137,7 +138,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
             <button
               type="button"
               onClick={() => setLancando(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+              className="btn btn-primario btn-sm"
             >
               <Plus className="w-3.5 h-3.5" /> Lançar fatura
             </button>
@@ -233,7 +234,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                             type="button"
                             onClick={enviarArquivo}
                             disabled={!anexando.arquivo || anexando.enviando}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+                            className="btn btn-primario btn-sm"
                           >
                             <Upload className="w-3.5 h-3.5" aria-hidden="true" />
                             {anexando.enviando ? 'Enviando...' : 'Enviar'}
@@ -245,7 +246,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                               setErro('');
                             }}
                             disabled={anexando.enviando}
-                            className="px-2 py-1 text-xs text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-50"
+                            className="btn btn-secundario btn-sm"
                           >
                             Voltar
                           </button>
@@ -276,12 +277,12 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                           type="date"
                           value={pagando.data}
                           onChange={(e) => setPagando({ ...pagando, data: e.target.value })}
-                          className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-md text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                          className="campo campo-sm"
                         />
                         <button
                           type="button"
                           onClick={confirmarPagamento}
-                          className="px-2 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md"
+                          className="btn btn-primario btn-sm"
                         >
                           Confirmar
                         </button>
@@ -291,7 +292,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                             setPagando(null);
                             setErro('');
                           }}
-                          className="px-2 py-1 text-xs text-slate-600 hover:bg-slate-100 rounded-md"
+                          className="btn btn-secundario btn-sm"
                         >
                           Voltar
                         </button>
@@ -302,7 +303,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                           <button
                             type="button"
                             onClick={() => setPagando({ id: f.id, data: isoLocal(new Date()) })}
-                            className="inline-flex items-center gap-1 px-2 py-1 mr-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md whitespace-nowrap"
+                            className="btn btn-primario btn-sm mr-1"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Pagar
                           </button>
@@ -389,7 +390,7 @@ const FormFatura: React.FC<{
   const pendenciasFatura = valores !== valoresIniciais || arquivo ? ['Fatura nova não lançada'] : [];
   useRegistrarPendencias(`fatura:${chave}`, pendenciasFatura);
   const cancelarDigitacao = () => {
-    if (confirmarDescarte(pendenciasFatura)) onFechar();
+    void confirmarDescarte(pendenciasFatura).then((ok) => ok && onFechar());
   };
 
   const mudarCompetencia = (nova: string) => {
@@ -660,14 +661,14 @@ const FormFatura: React.FC<{
         <button
           type="button"
           onClick={cancelarDigitacao}
-          className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg"
+          className="btn btn-secundario"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={salvando}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+          className="btn btn-primario"
         >
           <Plus className="w-3.5 h-3.5" /> {salvando ? 'Salvando…' : editando ? 'Salvar fatura' : 'Lançar fatura'}
         </button>

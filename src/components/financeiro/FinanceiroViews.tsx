@@ -23,7 +23,7 @@ import {
 import { FaturasSecao } from './FaturasSecao.tsx';
 
 const Topo: React.FC<{ titulo: string; sub: string; children?: React.ReactNode }> = ({ titulo, sub, children }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+  <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
     <div className="min-w-0">
       <h2 className="text-sm font-semibold text-slate-900">{titulo}</h2>
       <p className="text-xs text-slate-500">{sub}</p>
@@ -32,7 +32,7 @@ const Topo: React.FC<{ titulo: string; sub: string; children?: React.ReactNode }
   </div>
 );
 
-const CAMPO_FILTRO = 'text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900';
+const CAMPO_FILTRO = 'campo campo-sm w-auto';
 
 // -----------------------------------------------------------------------------
 // Vencimentos
@@ -81,7 +81,7 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
       {lista.length === 0 ? (
         <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4">Nada vencendo neste período.</p>
       ) : (
-        <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden">
+        <div className="cartao overflow-hidden">
           <table className="tabela-cartoes w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
@@ -113,7 +113,7 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
                   </td>
                   <td data-label="Ação" className="py-2 px-3 text-right">
                     {v.alvo.tipo !== 'estoque' && v.alvo.tipo !== 'linha' && (
-                      <button type="button" onClick={() => abrir(v)} className="px-2 py-1 text-xs font-medium text-blue-700 border border-blue-200 rounded-md hover:bg-blue-50">
+                      <button type="button" onClick={() => abrir(v)} className="btn btn-secundario btn-sm">
                         {v.tipo === 'contrato' || v.tipo === 'cancelamento' ? 'Abrir contrato (renovar/encerrar)' : 'Abrir'}
                       </button>
                     )}
@@ -194,7 +194,7 @@ export const ContasPagarView: React.FC = () => {
   return (
     <div className="space-y-3">
       {/* Um cartão só: filtros à esquerda, total e CSV à direita (mesmo padrão das outras telas) */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-3 flex flex-wrap items-center gap-2">
+      <div className="cartao p-3 flex flex-wrap items-center gap-2">
         <div className="relative">
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar origem ou documento..." aria-label="Buscar" className={`${CAMPO_FILTRO} pl-8 w-full sm:w-60`} />
           <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" aria-hidden="true" />
@@ -215,7 +215,7 @@ export const ContasPagarView: React.FC = () => {
         <span className="ml-auto text-xs text-slate-600">
           Total na lista: <span className="font-mono font-semibold text-slate-900">{brl(total)}</span>
         </span>
-        <button type="button" onClick={exportar} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">
+        <button type="button" onClick={exportar} className="btn btn-secundario">
           <Download className="w-3.5 h-3.5" /> CSV
         </button>
       </div>      <FaturasSecao listaGlobal={lista} />

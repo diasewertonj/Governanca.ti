@@ -25,6 +25,7 @@ import { HistoricoAlteracoes } from '../comum/HistoricoAlteracoes.tsx';
 import { LembreteLicenca } from './LembreteLicenca.tsx';
 import { ContratoPorId } from '../financeiro/FinanceiroViews.tsx';
 import { historicoAssentos, licencaAtiva } from '../../utils/licencas.ts';
+import { confirmar } from '../ui/dialogo.tsx';
 
 interface Software360ModalProps {
   softwareId: string;
@@ -88,7 +89,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setFeedbackMsg({ text: 'Licença inativada. Ela sai das listas de atribuição.', type: 'success' });
   };
   const reativar = async () => {
-    if (!window.confirm(`Reativar ${license.nome}? Ela volta às listas de atribuição.`)) return;
+    if (!(await confirmar(`Reativar ${license.nome}? Ela volta às listas de atribuição.`))) return;
     const falha = await mudarSituacaoLicenca(license.id, true);
     setFeedbackMsg(falha ? { text: falha, type: 'error' } : { text: 'Licença reativada.', type: 'success' });
   };
@@ -96,7 +97,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   const nomeFornecedor = fornecedores.find((f) => f.id === license.fornecedorId)?.nome || license.fornecedor;
   // Fecha perguntando se houver fatura em digitação
   const fechar = () => {
-    if (podeDescartarPendencias()) onClose();
+    void podeDescartarPendencias().then((ok) => ok && onClose());
   };
   const freeSeats = Math.max(0, license.assentosTotais - license.assentosAlocados);
   const occupancyPercentage = Math.round((license.assentosAlocados / (license.assentosTotais || 1)) * 100);
@@ -138,9 +139,9 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setTimeout(() => setFeedbackMsg(null), 3000);
   };
 
-  const handleRevoke = (empId: string, empNome: string) => {
+  const handleRevoke = async (empId: string, empNome: string) => {
     // Fase 5: liberar assento tira o acesso da pessoa; pede confirmação
-    if (!window.confirm(`Liberar o assento de ${empNome} em ${license.nome}?\n\nA pessoa perde o acesso a este software.`)) return;
+    if (!(await confirmar(`Liberar o assento de ${empNome} em ${license.nome}?\n\nA pessoa perde o acesso a este software.`))) return;
     revokeLicense(license.id, empId);
     setFeedbackMsg({
       text: `Assento de ${empNome} liberado com sucesso. Saldo livre atualizado!`,
@@ -169,8 +170,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+    <div className="janela-fundo modal-tela">
+      <div className="janela janela-m">
         {/* Cabeçalho */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-3 min-w-0">
@@ -219,14 +220,14 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             {isTI && (
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   // Fase 8: a ficha fecha; pergunta antes se há fatura em digitação
-                  if (!podeDescartarPendencias()) return;
+                  if (!(await podeDescartarPendencias())) return;
                   setSoftwareToEdit(license);
                   setSoftwareModalOpen(true);
                   onClose();
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                className="btn btn-secundario btn-sm"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 <span>Editar Dados</span>
@@ -238,7 +239,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               <button
                 type="button"
                 onClick={() => setMotivoInativar(motivoInativar === null ? '' : null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100"
+                className="btn btn-secundario btn-sm"
               >
                 <Ban className="w-3.5 h-3.5" />
                 <span>Inativar</span>
@@ -248,7 +249,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               <button
                 type="button"
                 onClick={reativar}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100"
+                className="btn btn-secundario btn-sm"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Reativar</span>
@@ -259,7 +260,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               type="button"
               aria-label="Fechar"
               onClick={fechar}
-              className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
+              className="btn-icone ml-1"
             >
               <X className="w-5 h-5" />
             </button>
@@ -279,7 +280,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                 value={motivoInativar}
                 onChange={(e) => setMotivoInativar(e.target.value)}
                 placeholder="Motivo (ex.: contrato encerrado; trocado pelo Google Workspace)"
-                className="flex-1 min-w-[16rem] px-2.5 py-1.5 border border-slate-300 rounded-md"
+                className="campo campo-sm flex-1 min-w-[16rem]"
               />
               <button
                 type="button"
@@ -351,19 +352,19 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                           min={license.assentosAlocados}
                           value={newTotalSeats}
                           onChange={(e) => setNewTotalSeats(Number(e.target.value))}
-                          className="w-16 text-xs font-mono font-bold px-2 py-1 bg-white border border-slate-300 rounded"
+                          className="campo campo-sm w-16 font-mono font-mono font-bold"
                         />
                         <button
                           type="button"
                           onClick={handleSaveTotalSeats}
-                          className="px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded"
+                          className="btn btn-primario btn-sm"
                         >
                           Salvar
                         </button>
                         <button
                           type="button"
                           onClick={() => setIsEditingSeats(false)}
-                          className="px-2 py-1 text-xs text-slate-600 hover:bg-slate-200 rounded"
+                          className="btn btn-secundario btn-sm"
                         >
                           Cancelar
                         </button>
@@ -430,11 +431,11 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                     {isTI && (
                       <div className="flex flex-wrap gap-2">
                         {ultimoContrato && (
-                          <button type="button" onClick={() => setContratoAberto(ultimoContrato.id)} className="px-2 py-1 font-semibold border border-red-300 rounded-md bg-white">
+                          <button type="button" onClick={() => setContratoAberto(ultimoContrato.id)} className="btn btn-secundario btn-sm">
                             Renovar o contrato {nomeContrato(ultimoContrato)}
                           </button>
                         )}
-                        <button type="button" onClick={() => onEditar()} className="px-2 py-1 font-semibold border border-red-300 rounded-md bg-white">
+                        <button type="button" onClick={() => onEditar()} className="btn btn-secundario btn-sm">
                           Passar a cobrar no software
                         </button>
                       </div>
@@ -575,7 +576,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   value={selectedColabToAssign}
                   onChange={(e) => setSelectedColabToAssign(e.target.value)}
                   disabled={freeSeats <= 0}
-                  className="w-full sm:flex-1 text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 disabled:opacity-50"
+                  className="campo w-full sm:flex-1"
                 >
                   <option value="">
                     {freeSeats <= 0
@@ -592,7 +593,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                 <button
                   type="submit"
                   disabled={!selectedColabToAssign || freeSeats <= 0}
-                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors shadow-xs"
+                  className="btn btn-primario w-full sm:w-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Alocar Assento</span>
@@ -621,7 +622,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   value={colabFilterSearch}
                   onChange={(e) => setColabFilterSearch(e.target.value)}
                   placeholder="Buscar colaborador na licença..."
-                  className="w-60 text-xs pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500"
+                  className="campo campo-sm w-60 pl-7 pr-3"
                 />
                 <Search className="w-3 h-3 text-slate-500 absolute left-2.5 top-2.5" />
               </div>
@@ -672,7 +673,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                                 <button
                                   type="button"
                                   onClick={() => handleRevoke(emp.id, emp.nome)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded transition-colors"
+                                  className="btn btn-perigo btn-sm"
                                 >
                                   <UserMinus className="w-3 h-3" />
                                   <span>Liberar Assento</span>

@@ -30,7 +30,7 @@ export const TermsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">
             Termos de Responsabilidade & Devolução Patrimonial
@@ -70,14 +70,14 @@ export const TermsView: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por código ou colaborador..."
-            className="w-full sm:w-72 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            className="campo campo-sm w-full sm:w-72 pl-8 pr-3"
           />
           <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
         </div>
       </div>
 
       {/* Tabela de Termos */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="cartao overflow-hidden">
         <div className="overflow-x-auto">
           <table className="tabela-cartoes w-full text-left text-xs border-collapse">
             <thead>
@@ -159,7 +159,7 @@ export const TermsView: React.FC = () => {
                           e.stopPropagation();
                           setSelectedTermForPrint(term);
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors ml-auto"
+                        className="btn btn-secundario btn-sm ml-auto"
                       >
                         <Printer className="w-3.5 h-3.5 text-blue-600" />
                         <span>Imprimir A4</span>

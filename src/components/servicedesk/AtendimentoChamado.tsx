@@ -57,7 +57,7 @@ export const BlocoResolucao: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
           <button
             type="button"
             onClick={() => setReabrindo(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+            className="btn btn-secundario btn-sm"
           >
             <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
             O problema voltou? Reabrir
@@ -122,13 +122,13 @@ const Avaliacao: React.FC<{
             onChange={(e) => setComentario(e.target.value)}
             placeholder="Comentário (opcional)"
             aria-label="Comentário da avaliação"
-            className="px-2 py-1 border border-slate-300 rounded-md bg-white text-xs w-48"
+            className="campo campo-sm w-48"
           />
           <button
             type="button"
             disabled={enviando}
             onClick={enviar}
-            className="px-2.5 py-1 font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+            className="btn btn-primario btn-sm"
           >
             Avaliar
           </button>
@@ -212,7 +212,7 @@ const Janela: React.FC<{ titulo: string; onClose: () => void; children: React.Re
       <div className="relative w-full max-w-lg bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 my-0 sm:my-6">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50">
           <h2 className="text-sm font-semibold text-slate-900">{titulo}</h2>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100">
+          <button type="button" onClick={onClose} aria-label="Fechar" className="btn-icone">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -311,8 +311,8 @@ export const FormResolucao: React.FC<{ ticket: Ticket; onClose: () => void }> = 
         </div>
         {erro && <p role="alert" className="text-rose-700">{erro}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Voltar</button>
-          <button type="submit" disabled={salvando} className="px-4 py-2 font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50">
+          <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+          <button type="submit" disabled={salvando} className="btn btn-primario">
             {salvando ? 'Registrando…' : 'Registrar e encerrar'}
           </button>
         </div>
@@ -390,8 +390,8 @@ export const FormCancelamento: React.FC<{ ticket: Ticket; onClose: () => void }>
         </div>
         {erro && <p role="alert" className="text-rose-700">{erro}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Voltar</button>
-          <button type="submit" disabled={salvando} className="px-4 py-2 font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-50">
+          <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+          <button type="submit" disabled={salvando} className="btn btn-perigo-cheio">
             {salvando ? 'Cancelando…' : processo ? 'Cancelar processo' : 'Cancelar chamado'}
           </button>
         </div>
@@ -426,8 +426,8 @@ const FormReabrir: React.FC<{ ticket: Ticket; onClose: () => void }> = ({ ticket
         </div>
         {erro && <p role="alert" className="text-rose-700">{erro}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Voltar</button>
-          <button type="submit" disabled={salvando} className="px-4 py-2 font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+          <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+          <button type="submit" disabled={salvando} className="btn btn-primario">
             {salvando ? 'Reabrindo…' : 'Reabrir'}
           </button>
         </div>

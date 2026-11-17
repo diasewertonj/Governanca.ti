@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
 import { TIPOS_COM_LINHAS } from '../../utils/financeiro.ts';
 import { normalizar } from '../../utils/processos.ts';
+import { confirmar } from '../ui/dialogo.tsx';
 
 const ROTULO_STATUS: Record<LinhaTelefonica['status'], string> = { ativa: 'Ativa', suspensa: 'Suspensa', cancelada: 'Cancelada' };
 
@@ -42,7 +43,7 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
         <button
           type="button"
           onClick={() => setEditando('nova')}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
+          className="btn btn-secundario"
         >
           <Plus className="w-3.5 h-3.5" /> Nova linha
         </button>
@@ -66,7 +67,7 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
       {lista.length === 0 ? (
         <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4">Nenhuma linha cadastrada.</p>
       ) : (
-        <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden">
+        <div className="cartao overflow-hidden">
           <table className="tabela-cartoes w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
@@ -117,10 +118,10 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
                       <td data-label="Situação" className="py-2 px-3">{ROTULO_STATUS[l.status]}</td>
                       <td data-label="Ações" className="py-2 px-3 text-right">
                         <span className="inline-flex flex-wrap justify-end gap-1.5">
-                          <button type="button" onClick={() => setHistorico(historico === l.id ? null : l.id)} className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md">
+                          <button type="button" onClick={() => setHistorico(historico === l.id ? null : l.id)} className="btn btn-secundario btn-sm">
                             <History className="w-3.5 h-3.5" /> Histórico
                           </button>
-                          <button type="button" onClick={() => setEditando(l)} aria-label={`Editar ${l.numero}`} className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md">
+                          <button type="button" onClick={() => setEditando(l)} aria-label={`Editar ${l.numero}`} className="btn btn-secundario btn-sm">
                             <Pencil className="w-3.5 h-3.5" /> Editar
                           </button>
                           {currentRole === 'ti_admin' && (
@@ -128,9 +129,9 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
                               type="button"
                               aria-label={`Excluir ${l.numero}`}
                               onClick={async () => {
-                                if (window.confirm(`Excluir a linha ${l.numero}? Esta ação não pode ser desfeita.`)) setErro((await excluirLinha(l.id)) || '');
+                                if ((await confirmar(`Excluir a linha ${l.numero}? Esta ação não pode ser desfeita.`))) setErro((await excluirLinha(l.id)) || '');
                               }}
-                              className="p-1.5 text-red-700 hover:bg-red-50 rounded-md"
+                              className="btn-icone btn-icone-perigo"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -308,8 +309,8 @@ const FormLinha: React.FC<{
       </div>
       {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancelar} className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">Cancelar</button>
-        <button type="submit" className="px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Salvar linha</button>
+        <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
+        <button type="submit" className="btn btn-primario">Salvar linha</button>
       </div>
     </form>
   );

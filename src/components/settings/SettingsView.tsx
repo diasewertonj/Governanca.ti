@@ -1,3 +1,4 @@
+import { confirmar } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { AssetCategory, Employee, ModeloDocumento, UserRole } from '../../types/index.ts';
@@ -182,7 +183,7 @@ export const SettingsView: React.FC = () => {
     setLogoUrl(settings.logoUrl || '');
   };
 
-  const salvarTudo = () => {
+  const salvarTudo = async () => {
     // Valida antes de gravar qualquer coisa (nada fica salvo pela metade)
     if (logoInvalido) {
       setActiveTab('empresa');
@@ -197,10 +198,10 @@ export const SettingsView: React.FC = () => {
       .map(([id]) => employees.find((e) => e.id === id)?.nome);
     if (
       viramAdmin.length > 0 &&
-      !window.confirm(
+      !(await confirmar(
         `Dar acesso TOTAL (Administrador de T.I.) a: ${viramAdmin.join(', ')}?\n\n` +
           'Administradores trocam papéis, alteram setores e configurações e anonimizam dados pessoais.'
-      )
+      ))
     ) {
       return;
     }
@@ -247,12 +248,12 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setSuccessMsg(null), 3000);
   };
 
-  const handleDeleteDepartment = (depId: string) => {
+  const handleDeleteDepartment = async (depId: string) => {
     setErrorMsg(null);
     const dep = departments.find((d) => d.id === depId);
     const vinculados = employees.filter((e) => e.setorId === depId).length;
     // Fase 5: exclusão sempre pede confirmação (antes: um clique apagava)
-    if (vinculados === 0 && !window.confirm(`Excluir o setor "${dep?.nome}"?\n\nEssa ação não pode ser desfeita.`)) return;
+    if (vinculados === 0 && !(await confirmar(`Excluir o setor "${dep?.nome}"?\n\nEssa ação não pode ser desfeita.`))) return;
     setSetoresPendentes((p) => {
       const resto = { ...p };
       delete resto[depId];
@@ -305,12 +306,12 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setSuccessMsg(null), 3000);
   };
 
-  const handleRemoveCustomField = (cfId: string) => {
+  const handleRemoveCustomField = async (cfId: string) => {
     const campo = settings.camposPersonalizados.find((cf) => cf.id === cfId);
     if (
-      !window.confirm(
+      !(await confirmar(
         `Remover o campo personalizado "${campo?.label}"?\n\nOs valores já preenchidos nos ativos deixam de aparecer na ficha.`
-      )
+      ))
     ) {
       return;
     }
@@ -322,7 +323,7 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+      <div className="cartao p-4 space-y-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">Configurações</h2>
         </div>
@@ -374,7 +375,7 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h4 className="col-span-full text-xs font-bold uppercase tracking-wider text-slate-500">
+            <h4 className="col-span-full secao-titulo">
               Identificação jurídica
             </h4>
             <div>
@@ -384,7 +385,7 @@ export const SettingsView: React.FC = () => {
                 required
                 value={razaoSocial}
                 onChange={(e) => setRazaoSocial(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
             </div>
             <div>
@@ -394,7 +395,7 @@ export const SettingsView: React.FC = () => {
                 required
                 value={nomeFantasia}
                 onChange={(e) => setNomeFantasia(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
             </div>
             <div>
@@ -404,13 +405,13 @@ export const SettingsView: React.FC = () => {
                 required
                 value={cnpj}
                 onChange={(e) => setCnpj(e.target.value)}
-                className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full font-mono font-mono"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <h4 className="col-span-full text-xs font-bold uppercase tracking-wider text-slate-500">Endereço</h4>
+            <h4 className="col-span-full secao-titulo">Endereço</h4>
             <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">Endereço Completo</label>
               <input
@@ -418,7 +419,7 @@ export const SettingsView: React.FC = () => {
                 required
                 value={endereco}
                 onChange={(e) => setEndereco(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
             </div>
             <div>
@@ -428,7 +429,7 @@ export const SettingsView: React.FC = () => {
                 required
                 value={cep}
                 onChange={(e) => setCep(e.target.value)}
-                className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full font-mono font-mono"
               />
             </div>
             <div>
@@ -438,13 +439,13 @@ export const SettingsView: React.FC = () => {
                 required
                 value={cidadeUF}
                 onChange={(e) => setCidadeUF(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <h4 className="col-span-full text-xs font-bold uppercase tracking-wider text-slate-500">
+            <h4 className="col-span-full secao-titulo">
               Contatos da T.I.
             </h4>
             <div>
@@ -454,7 +455,7 @@ export const SettingsView: React.FC = () => {
                 required
                 value={emailTI}
                 onChange={(e) => setEmailTI(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
             </div>
             <div>
@@ -464,7 +465,7 @@ export const SettingsView: React.FC = () => {
                 required
                 value={telefoneTI}
                 onChange={(e) => setTelefoneTI(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
             </div>
           </div>
@@ -479,7 +480,7 @@ export const SettingsView: React.FC = () => {
                 onChange={(e) => setLogoUrl(e.target.value)}
                 placeholder="https://www.suaempresa.com.br/logo.png"
                 aria-invalid={logoInvalido}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
               {logoInvalido && <span className="block text-xs text-red-700 mt-1">Use um link que começa com https://</span>}
             </label>
@@ -525,7 +526,7 @@ export const SettingsView: React.FC = () => {
                     <input
                       value={doc[chave]}
                       onChange={(e) => setDoc({ ...doc, [chave]: e.target.value })}
-                      className="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                      className="campo campo-sm w-full"
                     />
                   </label>
                 ))}
@@ -536,7 +537,7 @@ export const SettingsView: React.FC = () => {
                   rows={3}
                   value={texto}
                   onChange={(e) => setTexto(e.target.value)}
-                  className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-800 leading-relaxed"
+                  className="campo w-full leading-relaxed"
                 />
               </div>
               </div>
@@ -563,7 +564,7 @@ export const SettingsView: React.FC = () => {
                   value={novoSetorNome}
                   onChange={(e) => setNovoSetorNome(e.target.value)}
                   placeholder="Ex: Operações & Logística"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
 
@@ -576,7 +577,7 @@ export const SettingsView: React.FC = () => {
                   value={novoSetorCodigo}
                   onChange={(e) => setNovoSetorCodigo(e.target.value)}
                   placeholder="Ex: OPR"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full font-mono font-mono"
                 />
               </div>
 
@@ -587,13 +588,13 @@ export const SettingsView: React.FC = () => {
                   value={novoSetorDesc}
                   onChange={(e) => setNovoSetorDesc(e.target.value)}
                   placeholder="Ex: Centro de distribuição e fretes"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
 
               <button
                 type="submit"
-                className="md:col-span-1 self-end flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                className="btn btn-primario md:col-span-1 self-end"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Adicionar Setor</span>
@@ -602,7 +603,7 @@ export const SettingsView: React.FC = () => {
           </form>
 
           {/* Tabela de Setores Existentes */}
-          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <div className="cartao overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Setores Cadastrados ({departments.length})</h3>
@@ -696,7 +697,7 @@ export const SettingsView: React.FC = () => {
                 <select
                   value={novoCampoCategoria}
                   onChange={(e) => setNovoCampoCategoria(e.target.value as AssetCategory)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 >
                   <option value="hardware">Hardware</option>
                   <option value="periferico">Periféricos</option>
@@ -713,7 +714,7 @@ export const SettingsView: React.FC = () => {
                   value={novoCampoLabel}
                   onChange={(e) => setNovoCampoLabel(e.target.value)}
                   placeholder="Ex: Versão do Firmware, Voltagem..."
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
 
@@ -722,7 +723,7 @@ export const SettingsView: React.FC = () => {
                 <select
                   value={novoCampoTipo}
                   onChange={(e) => setNovoCampoTipo(e.target.value as 'text' | 'number' | 'date')}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 >
                   <option value="text">Texto Livre</option>
                   <option value="number">Numérico</option>
@@ -732,7 +733,7 @@ export const SettingsView: React.FC = () => {
 
               <button
                 type="submit"
-                className="self-end flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                className="btn btn-primario self-end"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Adicionar campo</span>
@@ -741,14 +742,14 @@ export const SettingsView: React.FC = () => {
           </form>
 
           {/* Lista de Campos Cadastrados */}
-          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+          <div className="cartao p-5 space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Campos criados</h3>
             {(Object.keys(ROTULO_CATEGORIA) as AssetCategory[]).map((cat) => {
               const doGrupo = settings.camposPersonalizados.filter((cf) => cf.categoria === cat);
               if (doGrupo.length === 0) return null;
               return (
                 <div key={cat} className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <h4 className="secao-titulo">
                     {ROTULO_CATEGORIA[cat]}
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -785,7 +786,7 @@ export const SettingsView: React.FC = () => {
 
       {/* ABA 4: EQUIPE TI & RH / DEFINIÇÃO DE QUEM OPERA O SISTEMA */}
       {activeTab === 'equipe' && (
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-6 space-y-6">
+        <div className="cartao p-6 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
@@ -802,7 +803,7 @@ export const SettingsView: React.FC = () => {
                   value={equipeSearch}
                   onChange={(e) => setEquipeSearch(e.target.value)}
                   placeholder="Buscar colaborador..."
-                  className="w-48 text-xs pl-7 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                  className="campo campo-sm w-48 pl-7 pr-3"
                 />
                 <Search className="w-3 h-3 text-slate-500 absolute left-2.5 top-2.5" />
               </div>
@@ -810,7 +811,7 @@ export const SettingsView: React.FC = () => {
               <select
                 value={equipeFilter}
                 onChange={(e) => setEquipeFilter(e.target.value as 'todos' | 'operadores')}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700"
+                className="campo campo-sm"
               >
                 <option value="todos">Todos os Colaboradores</option>
                 <option value="operadores">Apenas Operadores (TI & RH)</option>
@@ -939,7 +940,7 @@ export const SettingsView: React.FC = () => {
                               value={papelPendente ?? currentEmpRole}
                               onChange={(e) => alterarPapel(emp, e.target.value as UserRole)}
                               aria-label={`Papel de ${emp.nome}`}
-                              className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                              className="campo campo-sm cursor-pointer"
                             >
                               <option value="ti_admin">Administrador de T.I.</option>
                               <option value="ti_suporte">Suporte de T.I.</option>
@@ -960,7 +961,7 @@ export const SettingsView: React.FC = () => {
       {/* Aba: Banco de Dados & Conexão Supabase */}
       {activeTab === 'banco' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-6">
+          <div className="cartao p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
@@ -980,7 +981,7 @@ export const SettingsView: React.FC = () => {
                     setSuccessMsg('Verificação com o Supabase concluída.');
                     setTimeout(() => setSuccessMsg(null), 3000);
                   }}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  className="btn btn-secundario btn-sm"
                   title="Testar conexão e recarregar dados do banco"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
@@ -1033,21 +1034,21 @@ export const SettingsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowResetModal(true)}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+                  className="btn btn-perigo-cheio cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Zerar Dados de Exemplo (Reset de Fábrica)</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm('Restaurar a base completa de demonstração fictícia?')) {
+                  onClick={async () => {
+                    if ((await confirmar('Restaurar a base completa de demonstração fictícia?'))) {
                       resetToInitialData();
                       setSuccessMsg('Base de demonstração restaurada no navegador.');
                       setTimeout(() => setSuccessMsg(null), 3000);
                     }
                   }}
-                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="btn btn-secundario cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Restaurar Base de Demonstração</span>
@@ -1062,7 +1063,7 @@ export const SettingsView: React.FC = () => {
       {/* Modal Seguro para Zerar Dados */}
       {showResetModal && !isSupabaseConnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
+          <div className="cartao max-w-md w-full p-6 space-y-4 shadow-xl">
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />
             </div>
@@ -1084,7 +1085,7 @@ export const SettingsView: React.FC = () => {
                 value={resetConfirmText}
                 onChange={(e) => setResetConfirmText(e.target.value)}
                 placeholder="Digite ZERAR"
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-md font-mono text-center font-bold tracking-wider text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                className="campo w-full font-mono text-center tracking-wider font-mono font-bold"
               />
             </div>
 
@@ -1096,7 +1097,7 @@ export const SettingsView: React.FC = () => {
                   setShowResetModal(false);
                   setResetConfirmText('');
                 }}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+                className="btn btn-secundario"
               >
                 Cancelar
               </button>
@@ -1118,7 +1119,7 @@ export const SettingsView: React.FC = () => {
                     setIsResetting(false);
                   }
                 }}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                className="btn btn-perigo-cheio cursor-pointer"
               >
                 {isResetting ? (
                   <>

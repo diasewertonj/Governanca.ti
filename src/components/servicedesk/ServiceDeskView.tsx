@@ -120,7 +120,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">
             {isRH ? 'Chamados do RH' : 'Chamados'}
@@ -135,7 +135,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
         <button
           type="button"
           onClick={onOpenNewTicketModal}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors self-start sm:self-auto"
+          className="btn btn-primario self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>{isRH ? 'Solicitar Suporte Técnico' : 'Abrir Chamado'}</span>
@@ -193,7 +193,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={fila === 'encerrados' ? 'Buscar por equipamento, causa, solução…' : 'Buscar chamado, código ou solicitante…'}
-                className="w-full sm:w-64 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                className="campo campo-sm w-full sm:w-64 pl-8 pr-3"
               />
               <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
             </div>
@@ -201,7 +201,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700"
+              className="campo campo-sm"
             >
               <option value="todos">Todas as situações</option>
               {fila === 'atendimento' ? (
@@ -221,7 +221,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700"
+              className="campo campo-sm"
             >
               <option value="todos">Todas Prioridades</option>
               <option value="baixa">Baixa</option>
@@ -235,7 +235,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                 value={origemFiltro}
                 onChange={(e) => setOrigemFiltro(e.target.value as typeof origemFiltro)}
                 aria-label="Quem abriu"
-                className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700"
+                className="campo campo-sm"
               >
                 <option value="todos">Todos os solicitantes</option>
                 <option value="meus">Abertos por mim</option>
@@ -303,7 +303,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
         )}
       </ul>
 
-      <div className="hidden xl:block bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="cartao hidden xl:block overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>

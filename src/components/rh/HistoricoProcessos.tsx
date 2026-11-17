@@ -6,7 +6,7 @@ import { formatDate } from '../../utils/formatters.ts';
 import { progresso } from '../../utils/processos.ts';
 import { normalizar } from '../../utils/processos.ts';
 
-const CAMPO = 'text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900';
+const CAMPO = 'campo';
 
 const SITUACAO: Record<Ticket['status'], { r: string; c: string }> = {
   aberto: { r: 'Aguardando a T.I.', c: 'text-blue-700 bg-blue-50 border-blue-200' },
@@ -74,7 +74,7 @@ export const HistoricoProcessos: React.FC = () => {
       {lista.length === 0 ? (
         <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4">Nenhum processo com estes filtros.</p>
       ) : (
-        <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden">
+        <div className="cartao overflow-hidden">
           <table className="tabela-cartoes w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">

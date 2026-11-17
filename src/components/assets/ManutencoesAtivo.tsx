@@ -176,7 +176,7 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
           <button
             type="button"
             onClick={() => setForm({ modo: 'feita' })}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
+            className="btn btn-secundario"
           >
             <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Registrar manutenção já feita
           </button>

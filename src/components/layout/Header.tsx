@@ -130,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
         {showSwitchMenu && (
           <div
             role="menu"
-            className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50"
+            className="cartao absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-1.5rem)] shadow-lg py-2 z-50"
           >
             <div className="px-3.5 py-2.5 border-b border-slate-100">
               <p className="font-semibold text-slate-900 text-sm truncate">{currentUser?.nome || supabaseUser?.nome}</p>
@@ -174,7 +174,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
                 role="menuitem"
                 onClick={() => {
                   setShowSwitchMenu(false);
-                  if (podeDescartarPendencias()) logout();
+                  void podeDescartarPendencias().then((ok) => ok && logout());
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-rose-700 hover:bg-rose-50 transition-colors text-left"
               >

@@ -1,3 +1,4 @@
+import { confirmar } from '../ui/dialogo.tsx';
 import React from 'react';
 
 interface BarraAlteracoesProps {
@@ -45,7 +46,7 @@ export const BarraAlteracoes: React.FC<BarraAlteracoesProps> = ({
           type="button"
           onClick={onCancelar}
           disabled={salvando}
-          className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+          className="btn btn-secundario btn-sm"
         >
           Cancelar
         </button>
@@ -53,7 +54,7 @@ export const BarraAlteracoes: React.FC<BarraAlteracoesProps> = ({
           type="button"
           onClick={onSalvar}
           disabled={salvando}
-          className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          className="btn btn-primario btn-sm"
         >
           {salvando ? 'Salvando...' : rotuloSalvar}
         </button>
@@ -63,11 +64,13 @@ export const BarraAlteracoes: React.FC<BarraAlteracoesProps> = ({
 };
 
 /** Pergunta antes de descartar alterações (fechar janela, trocar de aba). */
-export function confirmarDescarte(itens: string[]): boolean {
+export async function confirmarDescarte(itens: string[]): Promise<boolean> {
   if (itens.length === 0) return true;
-  return window.confirm(
-    `Há ${itens.length === 1 ? '1 alteração não salva' : `${itens.length} alterações não salvas`}:\n\n` +
-      itens.map((i) => `• ${i}`).join('\n') +
-      '\n\nDescartar e continuar?'
-  );
+  return confirmar({
+    titulo: itens.length === 1 ? 'Há 1 alteração não salva' : `Há ${itens.length} alterações não salvas`,
+    mensagem: itens.map((i) => `• ${i}`).join('\n') + '\n\nSe continuar, elas serão descartadas.',
+    confirmar: 'Descartar e continuar',
+    cancelar: 'Voltar e salvar',
+    perigo: true,
+  });
 }

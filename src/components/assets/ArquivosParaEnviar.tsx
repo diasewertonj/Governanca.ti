@@ -97,7 +97,7 @@ export const ArquivosParaEnviar: React.FC<ArquivosParaEnviarProps> = ({ id, rotu
                     id={`${id}-${i.chave}`}
                     value={i.categoria}
                     onChange={(e) => mudarCategoria(i.chave, e.target.value as CategoriaAnexoAtivo)}
-                    className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-md text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="campo campo-sm"
                   >
                     {categorias.map((c) => (
                       <option key={c} value={c}>
@@ -111,7 +111,7 @@ export const ArquivosParaEnviar: React.FC<ArquivosParaEnviarProps> = ({ id, rotu
                 type="button"
                 onClick={() => onChange(itens.filter((x) => x.chave !== i.chave))}
                 aria-label={`Retirar ${i.arquivo.name}`}
-                className="p-1 text-slate-600 hover:text-red-700 hover:bg-red-50 rounded-md"
+                className="btn-icone"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

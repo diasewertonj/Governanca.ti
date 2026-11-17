@@ -21,7 +21,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Meus chamados</h2>
         </div>
@@ -29,7 +29,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
         <button
           type="button"
           onClick={onOpenNewTicketModal}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors self-start sm:self-auto"
+          className="btn btn-primario self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Abrir Novo Chamado</span>
@@ -37,7 +37,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
       </div>
 
       {/* Lista de Chamados */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs divide-y divide-slate-100 overflow-hidden">
+      <div className="cartao divide-y divide-slate-100 overflow-hidden">
         {myTickets.length > 0 ? (
           myTickets.map((tkt) => {
             const asset = getAsset(tkt.ativoId);

@@ -1,3 +1,4 @@
+import { confirmar } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { Paperclip, ExternalLink, Trash2, Upload } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
@@ -59,7 +60,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
 
   const remover = async (id: string) => {
     const anexo = anexos.find((a) => a.id === id);
-    if (!anexo || !window.confirm(`Remover o arquivo "${anexo.nome}"? Esta ação não pode ser desfeita.`)) return;
+    if (!anexo || !(await confirmar(`Remover o arquivo "${anexo.nome}"? Esta ação não pode ser desfeita.`))) return;
     await removerAnexoAtivo(anexo);
   };
 
@@ -91,7 +92,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
                 <button
                   type="button"
                   onClick={() => abrir(a.caminho)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-md"
+                  className="btn btn-secundario btn-sm"
                 >
                   <ExternalLink className="w-3.5 h-3.5" /> Abrir
                 </button>
@@ -100,7 +101,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
                     type="button"
                     onClick={() => remover(a.id)}
                     aria-label={`Remover ${a.nome}`}
-                    className="p-1.5 text-red-700 hover:bg-red-50 rounded-md"
+                    className="btn-icone btn-icone-perigo"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -120,7 +121,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
             id={`anexo-cat-${asset.id}`}
             value={categoria}
             onChange={(e) => setCategoria(e.target.value as CategoriaAnexoAtivo)}
-            className="w-full text-xs px-2 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+            className="campo w-full"
           >
             {(Object.keys(ROTULO_CATEGORIA_ANEXO) as CategoriaAnexoAtivo[])
               .filter((c) => c !== 'evidencia_baixa')
@@ -145,7 +146,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
             type="button"
             onClick={anexar}
             disabled={!arquivo || enviando}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+            className="btn btn-primario"
           >
             <Upload className="w-3.5 h-3.5" />
             {enviando ? 'Enviando...' : 'Anexar'}

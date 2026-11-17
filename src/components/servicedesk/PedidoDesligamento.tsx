@@ -81,7 +81,7 @@ const ListaEtiquetas: React.FC<{
               </>
             );
             return i.onClick ? (
-              <button key={i.id} type="button" onClick={i.onClick} title={i.texto} className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100">
+              <button key={i.id} type="button" onClick={i.onClick} title={i.texto} className="btn btn-secundario btn-sm">
                 {conteudo}
               </button>
             ) : (

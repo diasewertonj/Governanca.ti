@@ -98,7 +98,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
   return (
     <div className="space-y-6">
       {/* Topo */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-900">{modo === 'fornecedores' ? 'Fornecedores' : 'Contratos'}</h2>
           <p className="text-xs text-slate-500">
@@ -156,7 +156,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder={aba === 'contratos' ? 'Buscar contrato ou fornecedor...' : 'Buscar nome, CNPJ ou contato...'}
-              className="w-full sm:w-64 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="campo campo-sm w-full sm:w-64 pl-8 pr-3"
             />
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" aria-hidden="true" />
           </div>
@@ -165,7 +165,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               value={filtroContrato}
               onChange={(e) => setFiltroContrato(e.target.value as FiltroContrato)}
               aria-label="Filtrar contratos"
-              className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+              className="campo"
             >
               {FILTROS_CONTRATO.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -178,7 +178,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               value={filtroFornecedor}
               onChange={(e) => setFiltroFornecedor(e.target.value as FiltroFornecedor)}
               aria-label="Filtrar fornecedores"
-              className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+              className="campo"
             >
               <option value="todos">Todos</option>
               <option value="ativos">Ativos</option>
@@ -193,7 +193,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
       ) : aba === 'linhas' ? (
         <LinhasLista busca={termo} />
       ) : aba === 'contratos' ? (
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="cartao overflow-hidden">
           <table className="tabela-cartoes w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
@@ -244,7 +244,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                         type="button"
                         onClick={() => setContratoAberto(c)}
                         aria-label={`Abrir o contrato ${c.numero || c.descricao}`}
-                        className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200 transition-colors"
+                        className="btn btn-secundario btn-sm"
                       >
                         Abrir
                       </button>
@@ -264,7 +264,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
           </table>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="cartao overflow-hidden">
           <table className="tabela-cartoes w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
@@ -310,7 +310,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                         type="button"
                         onClick={() => setFornecedorAberto(f)}
                         aria-label={`Editar o fornecedor ${f.nome}`}
-                        className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200 transition-colors"
+                        className="btn btn-secundario btn-sm"
                       >
                         Editar
                       </button>

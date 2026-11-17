@@ -101,13 +101,13 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-slate-900/50 overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl border border-slate-200 my-6">
+      <div className="cartao relative w-full max-w-lg shadow-2xl my-6">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-blue-600" />
             <h2 className="text-sm font-semibold text-slate-900">Meus dados (LGPD)</h2>
           </div>
-          <button onClick={onClose} aria-label="Fechar" className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+          <button onClick={onClose} aria-label="Fechar" className="btn-icone">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -125,7 +125,7 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
             <button
               type="button"
               onClick={handleBaixar}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+              className="btn btn-primario btn-sm"
             >
               <Download className="w-3.5 h-3.5" /> Baixar meus dados (.json)
             </button>
@@ -168,13 +168,13 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
                   onChange={(e) => setDetalhe(e.target.value)}
                   rows={3}
                   placeholder={pedido === 'correcao' ? 'O que está errado e qual o valor correto?' : 'Algum detalhe para a T.I.? (opcional)'}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                  className="campo w-full"
                 />
                 <button
                   type="button"
                   onClick={handleEnviarPedido}
                   disabled={enviando || (pedido === 'correcao' && !detalhe.trim())}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 font-medium text-white bg-slate-800 hover:bg-slate-900 rounded-lg disabled:opacity-50"
+                  className="btn btn-secundario btn-sm"
                 >
                   <Send className="w-3.5 h-3.5" /> {enviando ? 'Registrando...' : 'Registrar pedido'}
                 </button>

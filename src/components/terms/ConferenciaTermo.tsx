@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { CondicaoItem, ItemTermo, ResponsibilityTerm } from '../../types/index.ts';
 import { erroCancelarTermo, erroConferenciaTermo } from '../../utils/termos.ts';
 
-const campo = 'w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+const campo = 'campo';
 
 interface Props {
   tipo: 'entrega' | 'devolucao';
@@ -131,7 +131,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
           type="button"
           disabled={gravando}
           onClick={onVoltar}
-          className="px-3 py-1.5 font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+          className="btn btn-secundario btn-sm"
         >
           Voltar
         </button>
@@ -139,7 +139,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
           type="button"
           disabled={gravando}
           onClick={confirmar}
-          className="px-3 py-1.5 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="btn btn-primario btn-sm"
         >
           {gravando ? 'Gerando…' : termoAnterior ? 'Gerar novo termo e substituir' : 'Gerar termo'}
         </button>

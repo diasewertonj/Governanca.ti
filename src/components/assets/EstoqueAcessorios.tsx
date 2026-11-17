@@ -5,6 +5,7 @@ import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { ItemEstoque, TipoAcessorio, TipoMovimentoEstoque } from '../../types/index.ts';
 import { CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { formatDate } from '../../utils/formatters.ts';
+import { confirmar } from '../ui/dialogo.tsx';
 
 const ROTULO_TIPO: Record<TipoAcessorio, string> = {
   monitor: 'Monitor',
@@ -56,7 +57,7 @@ export const EstoqueAcessorios: React.FC = () => {
         <button
           type="button"
           onClick={() => setEditando('novo')}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+          className="btn btn-primario"
         >
           <Plus className="w-3.5 h-3.5" /> Novo acessório
         </button>
@@ -101,7 +102,7 @@ export const EstoqueAcessorios: React.FC = () => {
       {lista.length === 0 ? (
         <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4">Nenhum acessório cadastrado.</p>
       ) : (
-        <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden">
+        <div className="cartao overflow-hidden">
           <table className="tabela-cartoes w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
@@ -158,10 +159,10 @@ export const EstoqueAcessorios: React.FC = () => {
                               type="button"
                               aria-label={`Excluir ${i.nome}`}
                               onClick={async () => {
-                                if (!window.confirm(`Excluir ${i.nome}? Esta ação não pode ser desfeita.`)) return;
+                                if (!(await confirmar(`Excluir ${i.nome}? Esta ação não pode ser desfeita.`))) return;
                                 setErro((await excluirItemEstoque(i.id)) || '');
                               }}
-                              className="p-1.5 text-red-700 hover:bg-red-50 rounded-md"
+                              className="btn-icone btn-icone-perigo"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -310,8 +311,8 @@ const FormItem: React.FC<{
       </div>
       {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancelar} className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">Cancelar</button>
-        <button type="submit" disabled={salvando} className="px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+        <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
+        <button type="submit" disabled={salvando} className="btn btn-primario">
           {salvando ? 'Salvando…' : 'Salvar'}
         </button>
       </div>
@@ -366,8 +367,8 @@ const FormMovimento: React.FC<{
       </div>
       {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancelar} className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">Cancelar</button>
-        <button type="submit" className="px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Confirmar</button>
+        <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
+        <button type="submit" className="btn btn-primario">Confirmar</button>
       </div>
     </form>
   );

@@ -96,7 +96,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   useRegistrarPendencias(ativo ? `ativo:${ativo.id}` : 'novo-ativo', itensPendentes);
 
   const fechar = () => {
-    if (confirmarDescarte(itensPendentes)) onClose();
+    void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
   };
 
   const escolherNotaFiscal = (arquivo: File | undefined) => {
@@ -203,8 +203,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-6xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+    <div className="janela-fundo modal-tela">
+      <div className="janela janela-ficha">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
@@ -221,7 +221,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
             type="button"
             aria-label="Fechar"
             onClick={fechar}
-            className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="btn-icone"
           >
             <X className="w-5 h-5" />
           </button>
@@ -231,7 +231,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
         <form onSubmit={handleSubmit} className="p-6 space-y-5 sm:max-h-[85vh] sm:overflow-y-auto">
           {/* Seção 1: Identificação */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <h3 className="secao-titulo">
               1. Identificação
             </h3>
 
@@ -246,7 +246,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Ex: Notebook Dell Latitude 5430"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -259,7 +259,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   required
                   value={tag}
                   onChange={(e) => setTag(e.target.value)}
-                  className="w-full text-xs font-mono font-bold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-blue-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full font-mono font-mono font-bold"
                 />
               </div>
 
@@ -270,7 +270,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                 <select
                   value={categoria}
                   onChange={(e) => setCategoria(e.target.value as AssetCategory)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 >
                   <option value="hardware">Hardware (Notebooks, Workstations, Servidores)</option>
                   <option value="periferico">Periféricos (Monitores, Teclados, Mouses, Docks)</option>
@@ -289,7 +289,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={marca}
                   onChange={(e) => setMarca(e.target.value)}
                   placeholder="Ex: Dell, Lenovo, Apple"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -302,7 +302,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={modelo}
                   onChange={(e) => setModelo(e.target.value)}
                   placeholder="Ex: Latitude 5430 Core i7"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -316,7 +316,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
                   placeholder="Ex: CN084920M12"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full font-mono font-mono"
                 />
               </div>
             </div>
@@ -325,7 +325,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
           {/* Seção 2: Especificações técnicas */}
           {(availableCustomFields.length > 0 || categoria === 'hardware') && (
             <div className="space-y-3 pt-3 border-t border-slate-100">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <h3 className="secao-titulo">
                 2. Especificações técnicas ({CATEGORIA_LABEL[categoria] ?? categoria})
               </h3>
 
@@ -343,7 +343,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                           setCustomFields({ ...customFields, [cf.key]: e.target.value })
                         }
                         placeholder={`Informe ${cf.label.toLowerCase()}...`}
-                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                        className="campo w-full"
                       />
                     </div>
                   ))}
@@ -359,7 +359,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                     <select
                       value={sistemaOperacional}
                       onChange={(e) => setSistemaOperacional(e.target.value)}
-                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                      className="campo w-full"
                     >
                       <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
                       <option value="Windows 11 Home">Windows 11 Home</option>
@@ -380,7 +380,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                       value={bitlockerKey}
                       onChange={(e) => setBitlockerKey(e.target.value)}
                       placeholder="Ex: 419204-183029-482019-582019-..."
-                      className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                      className="campo w-full font-mono font-mono"
                     />
                     <span className="text-xs text-slate-500 mt-0.5 block">
                       Chave numérica/alfanumérica para desbloqueio emergencial de disco criptografado
@@ -393,7 +393,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
 
           {/* Seção 3: Custódia e alocação */}
           <div className="space-y-3 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <h3 className="secao-titulo">
               3. Custódia e alocação
             </h3>
 
@@ -406,7 +406,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                 <select
                   value={custodianteId}
                   onChange={(e) => setCustodianteId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 >
                   <option value="">Manter Disponível no Almoxarifado / Estoque de T.I.</option>
                   <optgroup label="Entregar Imediatamente a um Colaborador">
@@ -429,7 +429,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                 <select
                   value={setorId}
                   onChange={(e) => setSetorId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 >
                   {departments
                     .filter((d) => d.ativo)
@@ -454,7 +454,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                     value={localizacaoFisica}
                     onChange={(e) => setLocalizacaoFisica(e.target.value)}
                     placeholder="Ex.: Almoxarifado T.I. - Armário B3"
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="campo w-full"
                   />
                 </div>
               )}
@@ -463,7 +463,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
 
           {/* Seção 4: Dados fiscais e garantia */}
           <div className="space-y-3 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <h3 className="secao-titulo">
               4. Dados fiscais e garantia
             </h3>
 
@@ -477,7 +477,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={numeroNF}
                   onChange={(e) => setNumeroNF(e.target.value)}
                   placeholder="Ex: 004821"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -491,7 +491,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={valorCompra || ''}
                   onChange={(e) => setValorCompra(parseFloat(e.target.value))}
                   placeholder="6850.00"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full font-mono font-mono"
                 />
               </div>
 
@@ -505,7 +505,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                     id="ativo-fornecedor"
                     value={fornecedorId}
                     onChange={(e) => setFornecedorId(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="campo w-full"
                   >
                     <option value="">Não informado</option>
                     {opcoesFornecedor.map((f) => (
@@ -541,7 +541,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   type="date"
                   value={dataAquisicao}
                   onChange={(e) => setDataAquisicao(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -553,7 +553,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   type="date"
                   value={dataGarantia}
                   onChange={(e) => setDataGarantia(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -566,7 +566,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={suporteContato}
                   onChange={(e) => setSuporteContato(e.target.value)}
                   placeholder="Ex: 0800 970 3355 (Dell ProSupport 24x7)"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -580,7 +580,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                   value={chaveAcesso44}
                   onChange={(e) => setChaveAcesso44(e.target.value)}
                   placeholder="35240112345678000190550010000048211002938475"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full font-mono font-mono"
                 />
               </div>
 
@@ -611,7 +611,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
 
           {/* Seção 5: Observações */}
           <div className="space-y-3 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">5. Observações</h3>
+            <h3 className="secao-titulo">5. Observações</h3>
             <div>
               <label htmlFor="ativo-observacoes" className="sr-only">
                 Observações do ativo
@@ -622,7 +622,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
                 placeholder="Ex.: tecla Enter com folga; acompanha carregador original."
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                className="campo w-full"
               />
               <p className="mt-1 text-xs text-slate-500">
                 Visível para quem vê o ativo, inclusive o colaborador que está com ele.
@@ -639,14 +639,14 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
             <button
               type="button"
               onClick={fechar}
-              className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="btn btn-secundario"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={salvando}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              className="btn btn-primario"
             >
               {ativo ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
               {salvando ? 'Salvando…' : ativo ? 'Salvar alterações' : 'Cadastrar Ativo Patrimonial'}

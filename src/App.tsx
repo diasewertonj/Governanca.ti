@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { DialogoHost } from './components/ui/dialogo.tsx';
 import { AppProvider, useApp } from './context/AppContext.tsx';
 import { RecursosProvider } from './context/RecursosContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
@@ -70,13 +71,30 @@ function MainApp() {
   const [menuAberto, setMenuAberto] = useState(false);
   const fecharMenu = useCallback(() => setMenuAberto(false), []);
 
+  // Padrão: Esc fecha a janela de cima (pelo botão Fechar dela, que já avisa alterações não salvas)
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const janelas = [...document.querySelectorAll<HTMLElement>('.modal-tela')].filter((j) => j.offsetParent !== null || j.getClientRects().length);
+      const topo = janelas[janelas.length - 1];
+      const fechar = topo?.querySelector<HTMLButtonElement>('button[aria-label^="Fechar"], button[aria-label^="fechar"]');
+      if (fechar) {
+        e.preventDefault();
+        fechar.click();
+      }
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, []);
+
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
   const currentView = vistaPermitida(currentRole, viewSolicitada);
 
   // Fase 5: trocar de tela com alterações não salvas pede confirmação
   const navegar = (view: string) => {
-    if (view === currentView || podeDescartarPendencias()) setCurrentView(view);
+    if (view === currentView) return setCurrentView(view);
+    void podeDescartarPendencias().then((ok) => ok && setCurrentView(view));
   };
 
   if (authLoading) {
@@ -222,6 +240,7 @@ function MainApp() {
         />
       )}
       </Suspense>
+      <DialogoHost />
     </div>
   );
 }

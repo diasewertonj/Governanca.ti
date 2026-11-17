@@ -49,7 +49,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-      <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="cartao relative w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
@@ -58,7 +58,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="btn-icone"
           >
             <X className="w-5 h-5" />
           </button>
@@ -116,7 +116,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
           <button
             type="button"
             onClick={handleDownloadImage}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            className="btn btn-secundario"
           >
             <Download className="w-3.5 h-3.5" />
             Baixar Imagem PNG
@@ -124,7 +124,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
           <button
             type="button"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-xs transition-colors"
+            className="btn btn-primario"
           >
             <Printer className="w-3.5 h-3.5" />
             Imprimir Etiqueta

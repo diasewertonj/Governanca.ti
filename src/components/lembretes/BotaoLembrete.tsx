@@ -34,7 +34,7 @@ export const BotaoLembrete: React.FC<{ jaExiste: boolean; criar: () => Promise<s
         type="button"
         onClick={clicar}
         disabled={gravando}
-        className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="btn btn-secundario btn-sm"
       >
         <BellPlus className="w-3.5 h-3.5" />
         {gravando ? 'Criando...' : 'Criar lembrete'}

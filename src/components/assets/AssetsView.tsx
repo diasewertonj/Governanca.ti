@@ -74,7 +74,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
   return (
     <div className="space-y-6">
       {/* Barra de Ações do Topo */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">
             {categoryFilter === 'licencas_tab'
@@ -99,7 +99,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                   setSoftwareToEdit(null);
                   setSoftwareModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                className="btn btn-primario"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nova Assinatura / SaaS</span>
@@ -109,7 +109,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                 <button
                   type="button"
                   onClick={() => setShowNewAssetModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                  className="btn btn-primario"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Cadastrar Novo Ativo</span>
@@ -120,7 +120,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                     setSoftwareToEdit(null);
                     setSoftwareModalOpen(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
+                  className="btn btn-secundario"
                 >
                   <Key className="w-3.5 h-3.5 text-blue-600" />
                   <span>Nova Licença SaaS</span>
@@ -170,7 +170,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Buscar patrimônio, modelo, serial ou NF..."
-                  className="w-full sm:w-64 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo campo-sm w-full sm:w-64 pl-8 pr-3"
                 />
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
               </div>
@@ -179,7 +179,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 aria-label="Filtrar por status"
-                className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo"
               >
                 <option value="ativos">Todos (exceto baixados)</option>
                 <option value="em_uso">Em Uso (Alocado)</option>
@@ -192,7 +192,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                 value={garantiaFilter}
                 onChange={(e) => setGarantiaFilter(e.target.value)}
                 aria-label="Filtrar por garantia"
-                className="text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo"
               >
                 <option value="todas">Garantia: todas</option>
                 <option value="expirando">Vencendo</option>
@@ -307,7 +307,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                               key={empId}
                               type="button"
                               onClick={() => setSelectedEmployeeIdFor360(emp.id)}
-                              className="inline-flex items-center gap-1 text-xs text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded transition-colors"
+                              className="btn btn-secundario btn-sm"
                             >
                               <span>{emp.nome}</span>
                               <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
@@ -332,7 +332,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                     <button
                       type="button"
                       onClick={() => setSelectedSoftwareIdFor360(lic.id)}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
+                      className="btn btn-secundario btn-sm flex-1"
                     >
                       <Users className="w-3.5 h-3.5" />
                       <span>Assentos e ficha</span>
@@ -345,7 +345,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                           setSoftwareToEdit(lic);
                           setSoftwareModalOpen(true);
                         }}
-                        className="px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+                        className="btn btn-secundario btn-sm"
                       >
                         Editar
                       </button>
@@ -358,7 +358,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
         </div>
       ) : (
         /* Tabela de Ativos Físicos (Hardware, Periféricos, Telefonia) */
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="cartao overflow-hidden">
           <div className="overflow-x-auto">
             <table className="tabela-cartoes w-full text-left text-xs border-collapse">
               <thead>
@@ -465,14 +465,14 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                               type="button"
                               onClick={() => setSelectedAssetForQrCode(asset)}
                               title="Imprimir Etiqueta com QR Code"
-                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                              className="btn-icone"
                             >
                               <QrCode className="w-4 h-4" />
                             </button>
                             <button
                               type="button"
                               onClick={() => setSelectedAssetIdFor360(asset.id)}
-                              className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200 transition-colors"
+                              className="btn btn-secundario btn-sm"
                             >
                               Ficha
                             </button>

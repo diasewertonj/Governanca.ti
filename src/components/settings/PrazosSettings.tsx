@@ -62,7 +62,7 @@ export const PrazosSettings: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-6 space-y-4 text-xs">
+    <div className="cartao p-6 space-y-4 text-xs">
       <div>
         <h3 className="text-sm font-semibold text-slate-900">Prazos de atendimento</h3>
         <p className="text-slate-500 mt-0.5">
@@ -91,7 +91,7 @@ export const PrazosSettings: React.FC = () => {
                     value={rascunho[p][campo]}
                     disabled={!podeEditar}
                     onChange={(e) => mudar(p, campo, e.target.value)}
-                    className="w-24 px-2.5 py-1.5 border border-slate-300 rounded-md bg-white disabled:bg-slate-100"
+                    className="campo campo-sm w-24"
                   />
                 </td>
               ))}
@@ -108,11 +108,11 @@ export const PrazosSettings: React.FC = () => {
             type="button"
             onClick={salvar}
             disabled={!alterado}
-            className="px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="btn btn-primario"
           >
             Salvar prazos
           </button>
-          <button type="button" onClick={padrao} className="px-4 py-2 font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">
+          <button type="button" onClick={padrao} className="btn btn-secundario">
             Voltar ao padrão
           </button>
         </div>

@@ -17,7 +17,7 @@ interface ProblemaRelatadoProps {
 /** Fase 10: o problema relatado em destaque, logo abaixo do título */
 export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titulo, ativo, onAbrirAnexo, erroArquivo }) => (
   <section aria-labelledby={`problema-${ticket.id}`} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs">
-    <h3 id={`problema-${ticket.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <h3 id={`problema-${ticket.id}`} className="secao-titulo">
       {titulo || 'Problema relatado'}
     </h3>
     <p className="mt-2 text-[15px] leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{ticket.descricao}</p>
@@ -48,7 +48,7 @@ export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titu
               type="button"
               key={att.id}
               onClick={() => onAbrirAnexo(att.caminho || att.url)}
-              className="flex items-center gap-1.5 text-blue-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded hover:bg-blue-50"
+              className="btn btn-secundario btn-sm"
             >
               <Paperclip className="w-3 h-3 text-slate-500" aria-hidden="true" />
               <span className="break-all">{att.nome}</span>

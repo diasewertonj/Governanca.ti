@@ -17,6 +17,7 @@ import {
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { FormItemProcesso } from './FormItemProcesso.tsx';
+import { confirmar } from '../ui/dialogo.tsx';
 
 const TIPOS_LIVRES_ONB: TipoItemProcesso[] = ['conta', 'grupo_email', 'licenca', 'equipamento', 'acessorio', 'tarefa'];
 const TIPOS_LIVRES_OFF: TipoItemProcesso[] = ['tarefa', 'dados_drive', 'email'];
@@ -96,7 +97,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   };
 
   const remover = async (item: ProcessoItem) => {
-    if (!window.confirm(`Remover o passo "${item.titulo}" do checklist?`)) return;
+    if (!(await confirmar(`Remover o passo "${item.titulo}" do checklist?`))) return;
     await removerItemProcesso(item.id);
   };
 
@@ -111,7 +112,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     const termo = prog.termoPendente
       ? '\n\nO termo ainda não foi assinado: será criado um lembrete para coletar a assinatura.'
       : '';
-    if (!window.confirm(`Concluir ${acao}? O chamado será encerrado.${efeitos}${termo}`)) return;
+    if (!(await confirmar(`Concluir ${acao}? O chamado será encerrado.${efeitos}${termo}`))) return;
     setConcluindo(true);
     const erro = await concluirProcesso(ticket.id);
     setConcluindo(false);
@@ -174,7 +175,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
               <button
                 type="button"
                 onClick={montarSugestao}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                className="btn btn-primario btn-sm"
               >
                 <ClipboardList className="w-3.5 h-3.5" /> Montar checklist sugerido
               </button>
@@ -196,7 +197,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
           key={g.etapa}
           className="space-y-1.5"
         >
-          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.etapa}</h5>
+          <h5 className="secao-titulo">{g.etapa}</h5>
           {g.itens.map((item) => (
             <LinhaItem
               key={item.id}
@@ -234,7 +235,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
             <button
               type="button"
               onClick={() => setRascunho([])}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50"
+              className="btn btn-secundario btn-sm"
             >
               <Plus className="w-3.5 h-3.5" /> Adicionar passos
             </button>
@@ -242,7 +243,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
               type="button"
               onClick={concluir}
               disabled={!prog.podeConcluir || concluindo}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+              className="btn btn-primario btn-sm"
             >
               {concluindo ? 'Concluindo...' : ehOnb ? 'Concluir admissão' : 'Concluir desligamento'}
             </button>
@@ -429,7 +430,7 @@ const Montagem: React.FC<{
           <select
             value={doCatalogo}
             onChange={(e) => incluirCatalogo(e.target.value)}
-            className="px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+            className="campo campo-sm"
             aria-label="Adicionar do catálogo"
           >
             <option value="">+ Do catálogo...</option>
@@ -445,7 +446,7 @@ const Montagem: React.FC<{
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value as TipoItemProcesso)}
-          className="px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+          className="campo campo-sm"
           aria-label="Tipo do passo"
         >
           {tipos.map((t) => (
@@ -464,12 +465,12 @@ const Montagem: React.FC<{
             }
           }}
           placeholder="Nome (ex.: VPN, grupo financeiro@...)"
-          className="flex-1 min-w-[10rem] px-2 py-1.5 text-xs border border-slate-300 rounded-md"
+          className="campo campo-sm flex-1 min-w-[10rem]"
         />
         <button
           type="button"
           onClick={incluirLivre}
-          className="px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100"
+          className="btn btn-secundario btn-sm"
         >
           Incluir
         </button>

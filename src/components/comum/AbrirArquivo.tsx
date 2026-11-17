@@ -22,7 +22,7 @@ export const AbrirArquivo: React.FC<{ caminho: string; rotulo?: string }> = ({ c
         type="button"
         onClick={abrir}
         title={`Abrir ${nome}`}
-        className="inline-flex items-center gap-1 min-w-0 px-1.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-md text-left"
+        className="btn btn-secundario btn-sm min-w-0 text-left"
       >
         <ExternalLink className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
         <span className="break-all">{nome}</span>

@@ -31,6 +31,7 @@ import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
 import { FornecedorFormModal } from './FornecedorFormModal.tsx';
 import { LembreteContrato } from './LembreteContrato.tsx';
 import { SeletorItensContrato } from './SeletorItensContrato.tsx';
+import { confirmar } from '../ui/dialogo.tsx';
 
 interface ContratoFormModalProps {
   /** Quando informado, edita este contrato e mostra o vencimento e as faturas */
@@ -42,7 +43,7 @@ interface ContratoFormModalProps {
 
 const ROTULO_ANEXO: Record<TipoAnexoContrato, string> = { proposta: 'Proposta', contrato: 'Contrato', aditivo: 'Aditivo', nota: 'Nota fiscal', outro: 'Outro' };
 
-const SECAO = 'text-xs font-bold uppercase tracking-wider text-slate-500';
+const SECAO = 'secao-titulo';
 
 /** Fase 8: cadastro e ficha do contrato (só a T.I.). Excluir só para ti_admin. */
 export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: contratoProp, inicial, onClose }) => {
@@ -120,7 +121,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
   useRegistrarPendencias(contrato ? `contrato:${contrato.id}` : 'novo-contrato', itensPendentes);
 
   const fechar = () => {
-    if (podeDescartarPendencias()) onClose();
+    void podeDescartarPendencias().then((ok) => ok && onClose());
   };
 
   // Inativos ficam fora da lista, exceto o fornecedor atual do contrato
@@ -155,14 +156,14 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
     if (formaPagamento === 'cartao' && cartaoFinal && !/^\d{4}$/.test(cartaoFinal)) return setErro('Do cartão, informe só os 4 últimos dígitos.');
     // Seção 6: avisos de duplicidade e de fornecedor divergente (a pessoa decide)
     const mesmoNumero = numero.trim() && contratos.find((c) => c.id !== contrato?.id && c.fornecedorId === fornecedorId && (c.numero || '').trim().toLowerCase() === numero.trim().toLowerCase());
-    if (mesmoNumero && !window.confirm(`Já existe o contrato ${nomeContrato(mesmoNumero)} deste fornecedor com o mesmo número. Salvar mesmo assim?`)) return;
+    if (mesmoNumero && !(await confirmar(`Já existe o contrato ${nomeContrato(mesmoNumero)} deste fornecedor com o mesmo número. Salvar mesmo assim?`))) return;
     const licencasDoContrato = itens.filter((i) => i.licencaId).map((i) => licenses.find((l) => l.id === i.licencaId)).filter(Boolean) as typeof licenses;
     const jaPagas = tipo === 'licenciamento'
       ? licencasDoContrato.filter((l) => contratos.some((c) => c.id !== contrato?.id && c.tipo === 'licenciamento' && contratoVigente(c) && c.itens.some((i) => i.licencaId === l.id) && c.renovadoDe !== contrato?.id && contrato?.renovadoDe !== c.id))
       : [];
-    if (jaPagas.length && !window.confirm(`Já pago por outro contrato vigente: ${jaPagas.map((l) => l.nome).join(', ')}. Salvar mesmo assim?`)) return;
+    if (jaPagas.length && !(await confirmar(`Já pago por outro contrato vigente: ${jaPagas.map((l) => l.nome).join(', ')}. Salvar mesmo assim?`))) return;
     const divergentes = licencasDoContrato.filter((l) => l.fornecedorId && l.fornecedorId !== fornecedorId);
-    if (divergentes.length && !window.confirm(`Estes softwares estão com outro fornecedor: ${divergentes.map((l) => l.nome).join(', ')}. Ajuste o fornecedor deles na ficha do software. Salvar o contrato assim mesmo?`)) return;
+    if (divergentes.length && !(await confirmar(`Estes softwares estão com outro fornecedor: ${divergentes.map((l) => l.nome).join(', ')}. Ajuste o fornecedor deles na ficha do software. Salvar o contrato assim mesmo?`))) return;
 
     const dados = {
       fornecedorId,
@@ -219,14 +220,14 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
     onClose();
   };
 
-  const excluir = () => {
+  const excluir = async () => {
     if (!contrato) return;
     const qtdFaturas = faturas.filter((f) => f.contratoId === contrato.id).length;
     if (qtdFaturas > 0) {
       setErro(`O contrato tem ${qtdFaturas} fatura(s) lançada(s) e não pode ser excluído. As faturas guardam o histórico de custo.`);
       return;
     }
-    if (!window.confirm(`Excluir o contrato ${nomeContrato(contrato)}? Esta ação não pode ser desfeita.`)) return;
+    if (!(await confirmar(`Excluir o contrato ${nomeContrato(contrato)}? Esta ação não pode ser desfeita.`))) return;
     const r = excluirContrato(contrato.id);
     if (r.success) onClose();
     else setErro(r.message || 'Não foi possível excluir o contrato.');
@@ -236,12 +237,12 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
+      <div className="janela-fundo modal-tela">
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="contrato-titulo"
-          className="relative w-full max-w-6xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
+          className="janela janela-ficha"
         >
           <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -269,7 +270,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
               type="button"
               aria-label="Fechar"
               onClick={fechar}
-              className="p-1.5 shrink-0 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              className="btn-icone shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -656,7 +657,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                       {contrato.encerramentoMotivo ? ` · ${contrato.encerramentoMotivo}` : ''}
                     </span>
                     {currentRole === 'ti_admin' && (
-                      <button type="button" onClick={async () => setErro((await reabrirContrato(contrato.id)) || '')} className="inline-flex items-center gap-1 px-2 py-1 border border-slate-300 rounded-md">
+                      <button type="button" onClick={async () => setErro((await reabrirContrato(contrato.id)) || '')} className="btn btn-secundario btn-sm">
                         <RotateCcw className="w-3.5 h-3.5" /> Reabrir
                       </button>
                     )}
@@ -676,11 +677,11 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                         novoFim.setDate(novoFim.getDate() - 1);
                         setRenovacao({ inicio: novoIni, fim: isoLocal(novoFim), valor: String(contrato.valor), numero: '' });
                       }}
-                      className="inline-flex items-center gap-1 px-2 py-1 font-semibold text-blue-700 border border-blue-200 rounded-md hover:bg-blue-50"
+                      className="btn btn-secundario btn-sm"
                     >
                       <RefreshCw className="w-3.5 h-3.5" /> Renovar contrato
                     </button>
-                    <button type="button" onClick={() => setAcao('encerrar')} className="inline-flex items-center gap-1 px-2 py-1 text-slate-700 border border-slate-300 rounded-md hover:bg-slate-50">
+                    <button type="button" onClick={() => setAcao('encerrar')} className="btn btn-secundario btn-sm">
                       <Ban className="w-3.5 h-3.5" /> Encerrar
                     </button>
                     {contrato.renovadoDe && <span className="text-slate-500 self-center">Renovação de {nomeContrato(contratos.find((c) => c.id === contrato.renovadoDe) || { descricao: 'contrato anterior' })}</span>}
@@ -704,7 +705,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                     >
                       Confirmar encerramento
                     </button>
-                    <button type="button" onClick={() => setAcao(null)} className="px-3 py-2 border border-slate-300 rounded-lg">Voltar</button>
+                    <button type="button" onClick={() => setAcao(null)} className="btn btn-secundario">Voltar</button>
                   </div>
                 )}
                 {acao === 'renovar' && (
@@ -734,11 +735,11 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                           setAcao(null);
                           onClose();
                         }}
-                        className="px-3 py-2 font-semibold text-white bg-blue-600 rounded-lg"
+                        className="btn btn-primario"
                       >
                         Renovar
                       </button>
-                      <button type="button" onClick={() => setAcao(null)} className="px-3 py-2 border border-slate-300 rounded-lg">Voltar</button>
+                      <button type="button" onClick={() => setAcao(null)} className="btn btn-secundario">Voltar</button>
                     </div>
                     <p className="md:col-span-5 text-slate-500">Cria um contrato novo com os mesmos itens e linhas; este termina na véspera do novo início e fica no histórico.</p>
                   </div>
@@ -773,10 +774,10 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                           <button
                             type="button"
                             onClick={async () => {
-                              if (window.confirm('Remover este anexo?')) setErro((await removerAnexoContrato(a.id)) || '');
+                              if ((await confirmar('Remover este anexo?'))) setErro((await removerAnexoContrato(a.id)) || '');
                             }}
                             aria-label="Remover anexo"
-                            className="p-1 text-red-700 hover:bg-red-50 rounded"
+                            className="btn-icone btn-icone-perigo"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -815,7 +816,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                       setAnexoArquivo(null);
                       setAnexoDescricao('');
                     }}
-                    className="px-3 py-2 text-xs font-semibold text-blue-700 border border-blue-200 rounded-lg disabled:opacity-50"
+                    className="btn btn-secundario"
                   >
                     {enviandoAnexo ? 'Enviando…' : 'Anexar'}
                   </button>
@@ -862,7 +863,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
               <button
                 type="button"
                 onClick={excluir}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 rounded-lg"
+                className="btn btn-perigo"
               >
                 <Trash2 className="w-3.5 h-3.5" /> Excluir contrato
               </button>
@@ -873,7 +874,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
               <button
                 type="button"
                 onClick={fechar}
-                className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                className="btn btn-secundario"
               >
                 Cancelar
               </button>
@@ -881,7 +882,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                 type="submit"
                 form="form-contrato"
                 disabled={salvando}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+                className="btn btn-primario"
               >
                 <Save className="w-3.5 h-3.5" />
                 {salvando ? 'Salvando…' : contrato ? 'Salvar alterações' : 'Cadastrar contrato'}

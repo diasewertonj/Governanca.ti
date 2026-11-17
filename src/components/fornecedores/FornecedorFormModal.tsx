@@ -9,6 +9,7 @@ import { CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { normalizar } from '../../utils/processos.ts';
 import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../../utils/contratos.ts';
 import { nomesParecidos, soDigitos } from '../../utils/financeiro.ts';
+import { confirmar } from '../ui/dialogo.tsx';
 
 interface FornecedorFormModalProps {
   /** Quando informado, edita este fornecedor */
@@ -52,7 +53,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
   useRegistrarPendencias(fornecedor ? `fornecedor:${fornecedor.id}` : 'novo-fornecedor', itensPendentes);
 
   const fechar = () => {
-    if (confirmarDescarte(itensPendentes)) onClose();
+    void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
   };
 
   const vinculos = fornecedor
@@ -100,23 +101,23 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
     onClose();
   };
 
-  const excluir = () => {
+  const excluir = async () => {
     if (!fornecedor || !vinculos) return;
     if (temVinculos(vinculos)) {
       if (!fornecedor.ativo) {
         setErro(`O fornecedor está vinculado a ${resumoVinculos(vinculos)} e não pode ser excluído.`);
         return;
       }
-      const desativar = window.confirm(
+      const desativar = (await confirmar(
         `${fornecedor.nome} está vinculado a ${resumoVinculos(vinculos)} e não pode ser excluído.\n\nDesativar o fornecedor? Ele sai das listas de escolha, mas o histórico continua.`
-      );
+      ));
       if (desativar) {
         alterarFornecedor(fornecedor.id, { ativo: false });
         onClose();
       }
       return;
     }
-    if (!window.confirm(`Excluir o fornecedor ${fornecedor.nome}? Esta ação não pode ser desfeita.`)) return;
+    if (!(await confirmar(`Excluir o fornecedor ${fornecedor.nome}? Esta ação não pode ser desfeita.`))) return;
     const r = excluirFornecedor(fornecedor.id);
     if (r.success) onClose();
     else setErro(r.message || 'Não foi possível excluir o fornecedor.');
@@ -129,7 +130,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
         role="dialog"
         aria-modal="true"
         aria-labelledby="fornecedor-titulo"
-        className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6"
+        className="janela janela-g"
       >
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -149,7 +150,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
             type="button"
             aria-label="Fechar"
             onClick={fechar}
-            className="p-1.5 shrink-0 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="btn-icone shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -283,7 +284,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
               <button
                 type="button"
                 onClick={excluir}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 rounded-lg"
+                className="btn btn-perigo"
               >
                 <Trash2 className="w-3.5 h-3.5" /> Excluir fornecedor
               </button>
@@ -294,14 +295,14 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
               <button
                 type="button"
                 onClick={fechar}
-                className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                className="btn btn-secundario"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={salvando}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+                className="btn btn-primario"
               >
                 <Save className="w-3.5 h-3.5" />
                 {salvando ? 'Salvando…' : fornecedor ? 'Salvar alterações' : 'Cadastrar fornecedor'}

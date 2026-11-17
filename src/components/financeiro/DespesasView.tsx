@@ -29,7 +29,7 @@ import {
 } from '../../utils/financeiro.ts';
 import { ContasPagarView, ContratoPorId } from './FinanceiroViews.tsx';
 
-const CAMPO = 'text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900';
+const CAMPO = 'campo';
 
 type Atalho = 'este_mes' | 'mes_anterior' | 'ult3' | 'ult6' | 'ult12' | 'este_ano' | 'ano_anterior' | 'personalizado';
 const ROTULO_ATALHO: Record<Atalho, string> = {
@@ -244,7 +244,7 @@ export const DespesasView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Período e filtros */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-end gap-2">
+      <div className="cartao p-3 flex flex-wrap items-end gap-2">
         <div>
           <label htmlFor="desp-periodo" className="block text-xs font-semibold text-slate-700 mb-1">Período</label>
           <select id="desp-periodo" value={atalho} onChange={(e) => setAtalho(e.target.value as Atalho)} className={CAMPO}>
@@ -301,8 +301,8 @@ export const DespesasView: React.FC = () => {
             <option value="linha">Linhas avulsas</option>
           </select>
         </div>
-        <button type="button" onClick={limpar} className="px-3 py-2 text-xs text-slate-700 border border-slate-300 rounded-lg">Limpar filtros</button>
-        <button type="button" onClick={exportar} className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">
+        <button type="button" onClick={limpar} className="btn btn-secundario">Limpar filtros</button>
+        <button type="button" onClick={exportar} className="btn btn-secundario ml-auto">
           <Download className="w-3.5 h-3.5" /> CSV
         </button>
         <p className="w-full text-xs text-slate-500">
@@ -312,7 +312,7 @@ export const DespesasView: React.FC = () => {
 
       {/* Números do período */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-3">
+        <div className="cartao p-3">
           <p className="text-xs text-slate-500">Realizado (pago)</p>
           <p className="text-lg font-semibold font-mono text-slate-900">{brl(dados.realizado)}</p>
           {variacao !== undefined && (
@@ -322,16 +322,16 @@ export const DespesasView: React.FC = () => {
             </p>
           )}
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3">
+        <div className="cartao p-3">
           <p className="text-xs text-slate-500">Previsto (recorrente)</p>
           <p className="text-lg font-semibold font-mono text-slate-900">{brl(dados.previsto)}</p>
           <p className="text-xs text-slate-500">diferença: {brl(dados.realizado - dados.previsto)}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3">
+        <div className="cartao p-3">
           <p className="text-xs text-slate-500">A pagar no período</p>
           <p className="text-lg font-semibold font-mono text-amber-800">{brl(dados.aPagar)}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3">
+        <div className="cartao p-3">
           <p className="text-xs text-slate-500">Assentos sem uso (por mês)</p>
           <p className="text-lg font-semibold font-mono text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}</p>
           <p className="text-xs text-slate-500">{ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || 'nenhum'}</p>
@@ -340,7 +340,7 @@ export const DespesasView: React.FC = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {/* Mês a mês */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+        <div className="cartao p-3 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Mês a mês</h3>
             <span className="text-xs text-slate-500">
@@ -366,7 +366,7 @@ export const DespesasView: React.FC = () => {
         </div>
 
         {/* Agrupamento do realizado */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+        <div className="cartao p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Realizado por</h3>
             <select value={agrupar} onChange={(e) => setAgrupar(e.target.value as typeof agrupar)} aria-label="Agrupar por" className={CAMPO}>
@@ -399,7 +399,7 @@ export const DespesasView: React.FC = () => {
       </div>
 
       {/* Detalhe */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="cartao overflow-hidden">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 px-3 pt-3">Faturas do período ({dados.doPeriodo.length})</h3>
         {dados.doPeriodo.length === 0 ? (
           <p className="text-xs text-slate-500 p-3">Nenhuma fatura no período com estes filtros.</p>

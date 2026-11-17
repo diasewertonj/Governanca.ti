@@ -86,7 +86,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     <div className="space-y-6">
       {/* 4 Cards de Métricas Principais (Clean, sem pills decorativas) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
+        <div className="cartao p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Ativos Totais de T.I.
@@ -106,7 +106,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
+        <div className="cartao p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Chamados em aberto
@@ -131,7 +131,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
+        <div className="cartao p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Colaboradores Ativos
@@ -149,7 +149,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
+        <div className="cartao p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Licenças de Software
@@ -191,22 +191,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 <button
                   type="button"
                   onClick={() => document.getElementById('precisa-atencao')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1"
+                  className="btn-icone text-left -m-1"
                 >
                   <div className="text-xl font-bold text-amber-900">{contratosVencendo}</div>
                   <div className="text-xs text-amber-800 underline-offset-2 hover:underline">
                     {contratosVencendo === 1 ? 'contrato vence' : 'contratos vencem'} em {DIAS_ALERTA_CONTRATO} dias
                   </div>
                 </button>
-                <button type="button" onClick={() => onNavigate('financeiro')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                <button type="button" onClick={() => onNavigate('financeiro')} className="btn-icone text-left -m-1">
                   <div className="text-xl font-bold text-amber-900 font-mono">{brl(custoMensal)}</div>
                   <div className="text-xs text-amber-800 underline-offset-2 hover:underline">custo mensal recorrente</div>
                 </button>
-                <button type="button" onClick={() => document.getElementById('precisa-atencao')?.scrollIntoView({ behavior: 'smooth' })} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                <button type="button" onClick={() => document.getElementById('precisa-atencao')?.scrollIntoView({ behavior: 'smooth' })} className="btn-icone text-left -m-1">
                   <div className="text-xl font-bold text-amber-900">{renovacoes30}</div>
                   <div className="text-xs text-amber-800 underline-offset-2 hover:underline">renovações e prazos de cancelamento em 30 dias</div>
                 </button>
-                <button type="button" onClick={() => onNavigate('financeiro')} className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1">
+                <button type="button" onClick={() => onNavigate('financeiro')} className="btn-icone text-left -m-1">
                   <div className="text-xl font-bold text-amber-900">
                     <span className={faturasAPagar.vencidas > 0 ? 'text-red-700' : ''}>{faturasAPagar.vencidas}</span>
                     <span className="text-amber-700 font-normal"> · </span>
@@ -217,7 +217,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 <button
                   type="button"
                   onClick={() => onNavigate('assets')}
-                  className="text-left rounded-md hover:bg-amber-100/70 -m-1 p-1"
+                  className="btn-icone text-left -m-1"
                 >
                   <div className="text-xl font-bold text-amber-900">{emManutencao}</div>
                   <div className="text-xs text-amber-800 underline-offset-2 hover:underline">
@@ -266,7 +266,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tabela de Chamados Recentes */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="cartao lg:col-span-2 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <div>
               <h2 className="text-sm font-semibold text-slate-900">Chamados recentes</h2>
@@ -322,7 +322,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* Resumo Rápido de Acesso & Estoque */}
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+          <div className="cartao p-5 space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Estoque Disponível para Empréstimo</h3>
             <p className="text-xs text-slate-500">
               Equipamentos prontos no almoxarifado para novos colaboradores ou reposições rápidas.

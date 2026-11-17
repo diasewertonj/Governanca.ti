@@ -31,8 +31,8 @@ const ROTULO_FORMA: Record<string, string> = {
   dispensada: 'assinatura dispensada',
 };
 
-const campo = 'w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
-const rotulo = 'block text-xs font-semibold text-slate-600 mb-0.5';
+const campo = 'campo';
+const rotulo = 'rotulo';
 
 interface Props {
   item: ProcessoItem;
@@ -390,7 +390,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               type="button"
               disabled={gravando}
               onClick={() => setCadastrando(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="btn btn-primario btn-sm"
             >
               <UserPlus className="w-3.5 h-3.5" /> Cadastrar {ob.nomeColaborador} (dados do RH, para conferir)
             </button>
@@ -421,7 +421,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               type="button"
               disabled={gravando}
               onClick={() => registrar('feito', 'Pessoa já cadastrada com o e-mail informado pelo RH', colabPorEmail.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="btn btn-primario btn-sm"
             >
               <UserPlus className="w-3.5 h-3.5" /> {colabPorEmail.nome} já está cadastrada: ligar e concluir
             </button>
@@ -639,7 +639,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard?.writeText(senha.senha)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100"
+                  className="btn btn-secundario btn-sm"
                 >
                   <Copy className="w-3 h-3" /> Copiar
                 </button>
@@ -659,7 +659,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                   type="button"
                   disabled={gravando || !colabId}
                   onClick={() => gerarAcesso('criar')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                  className="btn btn-primario btn-sm"
                 >
                   <KeyRound className="w-3.5 h-3.5" /> Criar login e gerar senha
                 </button>
@@ -668,7 +668,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                     type="button"
                     disabled={gravando}
                     onClick={() => gerarAcesso('redefinir')}
-                    className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50"
+                    className="btn btn-secundario btn-sm"
                   >
                     Gerar nova senha provisória
                   </button>
@@ -690,7 +690,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               <button
                 type="button"
                 onClick={() => setSelectedTermForPrint(termo)}
-                className="px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
+                className="btn btn-secundario btn-sm"
               >
                 Abrir termo
               </button>
@@ -699,7 +699,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                   type="button"
                   disabled={gravando}
                   onClick={abrirConferencia}
-                  className="px-2 py-1 text-xs font-semibold text-rose-700 bg-white border border-rose-200 rounded hover:bg-rose-50"
+                  className="btn btn-perigo btn-sm"
                 >
                   Substituir termo
                 </button>
@@ -711,7 +711,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                 type="button"
                 disabled={gravando}
                 onClick={abrirConferencia}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="btn btn-primario btn-sm"
               >
                 Conferir itens e gerar {ticket.tipo === 'onboarding' ? 'termo de entrega' : 'recibo de devolução'}
               </button>
@@ -786,7 +786,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
           type="button"
           onClick={onFechar}
           disabled={gravando}
-          className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+          className="btn btn-secundario btn-sm"
         >
           {senha ? 'Fechar' : 'Cancelar'}
         </button>
@@ -796,7 +796,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               type="button"
               onClick={() => registrar('nao_se_aplica')}
               disabled={gravando}
-              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50"
+              className="btn btn-secundario btn-sm"
             >
               Não se aplica
             </button>
@@ -810,7 +810,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               }
               disabled={gravando || (item.tipo === 'termo' && !termoOk)}
               title={item.tipo === 'termo' && !termoOk ? 'Disponível quando o termo estiver assinado ou dispensado' : undefined}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+              className="btn btn-primario btn-sm"
             >
               {gravando ? 'Gravando...' : 'Marcar como feito'}
             </button>

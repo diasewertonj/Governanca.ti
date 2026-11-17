@@ -30,7 +30,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="cartao p-5">
         <h2 className="text-sm font-semibold text-slate-900">Meus equipamentos e licenças</h2>
       </div>
 
@@ -49,7 +49,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                 <button
                   type="button"
                   onClick={() => setSelectedTermForPrint(t)}
-                  className="px-3 py-1 text-xs font-semibold text-white bg-amber-600 rounded-md hover:bg-amber-700"
+                  className="btn btn-primario btn-sm"
                 >
                   Ler e assinar
                 </button>
@@ -73,7 +73,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
             {myAssets.map((asset) => (
               <div
                 key={asset.id}
-                className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between space-y-4"
+                className="cartao p-5 flex flex-col justify-between space-y-4"
               >
                 <div>
                   <div className="flex items-center justify-between">
@@ -84,7 +84,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                       type="button"
                       onClick={() => setSelectedAssetForQrCode(asset)}
                       title="Ver etiqueta com QR Code"
-                      className="text-slate-500 hover:text-slate-700 p-1 rounded"
+                      className="btn-icone"
                     >
                       <QrCode className="w-4 h-4" />
                     </button>
@@ -112,14 +112,14 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                   <button
                     type="button"
                     onClick={() => setSelectedAssetIdFor360(asset.id)}
-                    className="flex-1 py-1.5 px-2 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-center"
+                    className="btn btn-secundario btn-sm flex-1 text-center"
                   >
                     Ver Detalhes
                   </button>
                   <button
                     type="button"
                     onClick={() => onOpenNewTicketForAsset(asset.id)}
-                    className="flex-1 py-1.5 px-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100/70 rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1"
+                    className="btn btn-secundario btn-sm flex-1"
                   >
                     <LifeBuoy className="w-3.5 h-3.5" />
                     <span>Reportar Defeito</span>
@@ -129,7 +129,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
             ))}
           </div>
         ) : (
-          <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500 text-xs">
+          <div className="cartao p-8 text-center text-slate-500 text-xs">
             Você não possui nenhum equipamento físico atribuído no momento.
           </div>
         )}
@@ -148,7 +148,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
           {myLicenses.map((lic) => (
             <div
               key={lic.id}
-              className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between text-xs"
+              className="cartao p-4 flex items-center justify-between text-xs"
             >
               <div>
                 <p className="font-semibold text-slate-900">{lic.nome}</p>
@@ -171,7 +171,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
           </h3>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs divide-y divide-slate-100 overflow-hidden">
+        <div className="cartao divide-y divide-slate-100 overflow-hidden">
           {myTerms.length > 0 ? (
             myTerms.map((term) => (
               <div key={term.id} className="p-4 flex items-center justify-between text-xs">
@@ -194,7 +194,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                 <button
                   type="button"
                   onClick={() => setSelectedTermForPrint(term)}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                  className="btn btn-secundario btn-sm"
                 >
                   Visualizar Termo A4
                 </button>

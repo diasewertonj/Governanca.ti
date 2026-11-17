@@ -55,7 +55,7 @@ export const CollaboratorsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Colaboradores</h2>
         </div>
@@ -63,7 +63,7 @@ export const CollaboratorsView: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowNewEmployeeModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors self-start sm:self-auto"
+          className="btn btn-primario self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4" />
           <span>Cadastrar Colaborador</span>
@@ -78,7 +78,7 @@ export const CollaboratorsView: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por nome, matrícula, cargo ou e-mail..."
-            className="w-80 text-xs pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            className="campo w-80 pl-8 pr-3"
           />
           <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-3" />
         </div>
@@ -87,7 +87,7 @@ export const CollaboratorsView: React.FC = () => {
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-700"
+            className="campo"
           >
             <option value="todos">Todos os Setores</option>
             {departments.map((d) => (
@@ -100,7 +100,7 @@ export const CollaboratorsView: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-700"
+            className="campo"
           >
             <option value="todos">Todos os Status</option>
             <option value="ativo">Ativo</option>
@@ -111,7 +111,7 @@ export const CollaboratorsView: React.FC = () => {
       </div>
 
       {/* Tabela de Colaboradores */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="cartao overflow-hidden">
         <div className="overflow-x-auto">
           <table className="tabela-cartoes w-full text-left text-xs border-collapse">
             <thead>
@@ -207,7 +207,7 @@ export const CollaboratorsView: React.FC = () => {
                             e.stopPropagation();
                             setSelectedEmployeeIdFor360(emp.id);
                           }}
-                          className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200 transition-colors inline-flex items-center gap-1"
+                          className="btn btn-secundario btn-sm"
                         >
                           <span>Ver ficha</span>
                           <ExternalLink className="w-3 h-3 text-slate-500" />

@@ -47,7 +47,7 @@ export const RhInicioView: React.FC<{ onNavigate: (view: string) => void }> = ({
         <button
           type="button"
           onClick={() => onNavigate('rh_processes')}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          className="btn btn-primario"
         >
           <ArrowLeftRight className="w-4 h-4" aria-hidden="true" /> Nova admissão ou desligamento
         </button>
@@ -55,7 +55,7 @@ export const RhInicioView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {cartoes.map(({ rotulo, valor, Icone }) => (
-          <div key={rotulo} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div key={rotulo} className="cartao p-4 flex items-center gap-3">
             <Icone className="w-5 h-5 text-slate-500" aria-hidden="true" />
             <div>
               <p className="text-sm text-slate-600">{rotulo}</p>

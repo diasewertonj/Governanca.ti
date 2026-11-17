@@ -6,6 +6,7 @@ import { Printer, X, CheckCircle2, Upload, FileText, PenLine, Ban } from 'lucide
 import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO, SEM_TOMBO } from '../../utils/processos.ts';
 import { erroCancelarTermo, situacaoTermo, termoCancelado } from '../../utils/termos.ts';
+import { confirmar } from '../ui/dialogo.tsx';
 
 interface PrintableTermModalProps {
   term: ResponsibilityTerm;
@@ -128,7 +129,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
 
   const assinar = async () => {
     const quem = souColaborador ? 'Declaro que li e concordo com este termo.' : 'Assinar este termo como responsável da T.I.?';
-    if (!window.confirm(`${quem}\n\nO aceite fica registrado com data, hora, usuário e um código de verificação do conteúdo.`))
+    if (!(await confirmar(`${quem}\n\nO aceite fica registrado com data, hora, usuário e um código de verificação do conteúdo.`)))
       return;
     setGravando(true);
     const falha = await aceitarTermo(t.id);
@@ -170,7 +171,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+      <div className="cartao relative w-full max-w-4xl shadow-2xl overflow-hidden my-6">
         {/* Barra de ações (fora da impressão) */}
         <div className="no-print flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/80">
           <div>
@@ -200,7 +201,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
                 type="button"
                 disabled={gravando}
                 onClick={assinar}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                className="btn btn-primario btn-sm"
               >
                 <PenLine className="w-3.5 h-3.5" />
                 {souColaborador ? 'Li e concordo' : 'Assinar como T.I.'}
@@ -210,7 +211,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
               <button
                 type="button"
                 onClick={handleVerAssinado}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 hover:bg-emerald-100"
+                className="btn btn-secundario btn-sm"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Ver documento assinado
               </button>
@@ -235,7 +236,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
                   <button
                     type="button"
                     onClick={() => setDispensando(dispensando === null ? '' : null)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100"
+                    className="btn btn-secundario btn-sm"
                   >
                     <Ban className="w-3.5 h-3.5" /> Dispensar assinatura
                   </button>
@@ -246,7 +247,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
               <button
                 type="button"
                 onClick={() => setCancelando(cancelando === null ? '' : null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
+                className="btn btn-perigo btn-sm"
               >
                 <Ban className="w-3.5 h-3.5" /> Cancelar termo
               </button>
@@ -254,7 +255,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              className="btn btn-primario btn-sm"
             >
               <Printer className="w-3.5 h-3.5" /> Imprimir A4
             </button>
@@ -262,7 +263,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200"
+              className="btn-icone"
             >
               <X className="w-5 h-5" />
             </button>
@@ -283,13 +284,13 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
                     value={cancelando}
                     onChange={(e) => setCancelando(e.target.value)}
                     placeholder="Motivo (ex.: patrimônio errado; item que não foi entregue)"
-                    className="flex-1 min-w-[16rem] px-2.5 py-1.5 border border-slate-300 rounded-md"
+                    className="campo campo-sm flex-1 min-w-[16rem]"
                   />
                   <button
                     type="button"
                     disabled={gravando}
                     onClick={confirmarCancelamento}
-                    className="px-3 py-1.5 font-semibold text-white bg-rose-600 rounded-md disabled:opacity-50"
+                    className="btn btn-perigo-cheio btn-sm"
                   >
                     Confirmar cancelamento
                   </button>
@@ -302,7 +303,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
                   value={dispensando}
                   onChange={(e) => setDispensando(e.target.value)}
                   placeholder="Motivo (ex.: colaborador não compareceu; desligamento não amigável)"
-                  className="flex-1 min-w-[16rem] px-2.5 py-1.5 border border-slate-300 rounded-md"
+                  className="campo campo-sm flex-1 min-w-[16rem]"
                 />
                 <button
                   type="button"

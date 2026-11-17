@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Employee, EmployeeStatus, UserRole } from '../../types/index.ts';
 import { X, UserPlus } from 'lucide-react';
+import { confirmar } from '../ui/dialogo.tsx';
 
 /** Fase 10: dados que já vêm preenchidos (ex.: do chamado de admissão) */
 export interface DadosIniciaisColaborador {
@@ -74,9 +75,9 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
     if (
       desligado &&
       status !== 'desligado' &&
-      !window.confirm(
+      !(await confirmar(
         `Reativar ${colaborador.nome}?\n\nA pessoa volta a aparecer como ativa. Se tinha login, o acesso ao sistema volta a funcionar.`
-      )
+      ))
     ) {
       return;
     }
@@ -118,7 +119,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
   // Em portal e acima das outras janelas: abre por cima do chamado sem ficar presa nele
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+      <div className="cartao relative w-full max-w-5xl shadow-2xl overflow-hidden my-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div>
@@ -130,7 +131,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
             type="button"
             aria-label="Fechar"
             onClick={onClose}
-            className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="btn-icone"
           >
             <X className="w-5 h-5" />
           </button>
@@ -139,7 +140,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
           <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Identificação</h3>
+            <h3 className="secao-titulo">Identificação</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               <div className="md:col-span-2 xl:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -151,7 +152,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Ex: Amanda Silva Castro"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -165,14 +166,14 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   value={matricula}
                   disabled={editando}
                   onChange={(e) => setMatricula(e.target.value)}
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
+                  className="campo w-full font-mono font-mono"
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-2 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Contato</h3>
+            <h3 className="secao-titulo">Contato</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               <div className="md:col-span-2 xl:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -185,7 +186,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   disabled={!podeMudarEmail}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nome@empresa.com.br"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
+                  className="campo w-full"
                 />
                 {editando && temLogin && (
                   <p className="text-xs text-slate-500 mt-1">
@@ -211,7 +212,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
                   placeholder="(11) 98765-0000"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
             </div>
@@ -219,7 +220,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
 
           {/* Entradas Dinâmicas Estritas (Setor & Gestor) */}
           <div className="space-y-2 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Vínculo</h3>
+            <h3 className="secao-titulo">Vínculo</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -231,7 +232,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   value={cargo}
                   onChange={(e) => setCargo(e.target.value)}
                   placeholder="Ex: Engenheiro(a) de Software"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
 
@@ -243,7 +244,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   value={setorId}
                   onChange={(e) => setSetorId(e.target.value)}
                   required
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 >
                   {departments
                     .filter((d) => d.ativo)
@@ -262,7 +263,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                 <select
                   value={gestorId}
                   onChange={(e) => setGestorId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 >
                   <option value="">Nenhum (Diretoria / Gestão Superior)</option>
                   {activeEmployees.map((emp) => (
@@ -276,7 +277,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
           </div>
 
           <div className="space-y-2 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Situação</h3>
+            <h3 className="secao-titulo">Situação</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -286,7 +287,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   value={status}
                   disabled={!podeReativar}
                   onChange={(e) => setStatus(e.target.value as EmployeeStatus)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100"
+                  className="campo w-full"
                 >
                   <option value="ativo">{desligado ? 'Ativo (reativar)' : 'Ativo'}</option>
                   <option value="ferias">Férias</option>
@@ -306,7 +307,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
                   type="date"
                   value={dataAdmissao}
                   onChange={(e) => setDataAdmissao(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
             </div>
@@ -321,14 +322,14 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="btn btn-secundario"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={salvando}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              className="btn btn-primario"
             >
               <UserPlus className="w-3.5 h-3.5" />
               {editando

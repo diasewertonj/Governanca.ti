@@ -51,7 +51,7 @@ export const LembretesView: React.FC = () => {
     setEncerrando(null);
   };
 
-  const campo = 'w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white';
+  const campo = 'campo';
 
   return (
     <div className="space-y-5">
@@ -68,7 +68,7 @@ export const LembretesView: React.FC = () => {
         <button
           type="button"
           onClick={() => setNovo({ titulo: '', descricao: '', venceEm: hoje })}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          className="btn btn-primario"
         >
           <Plus className="w-4 h-4" /> Novo lembrete
         </button>
@@ -93,10 +93,10 @@ export const LembretesView: React.FC = () => {
             onChange={(e) => setNovo({ ...novo, descricao: e.target.value })}
           />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setNovo(null)} className="px-3 py-1.5 text-xs border border-slate-300 rounded-md bg-white">
+            <button type="button" onClick={() => setNovo(null)} className="btn btn-secundario btn-sm">
               Cancelar
             </button>
-            <button type="button" onClick={salvarNovo} className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md">
+            <button type="button" onClick={salvarNovo} className="btn btn-primario btn-sm">
               Salvar lembrete
             </button>
           </div>
@@ -174,14 +174,14 @@ export const LembretesView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setEncerrando({ id: l.id, status: 'feito', obs: '' })}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded"
+                        className="btn btn-secundario btn-sm"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" /> Concluir
                       </button>
                       <button
                         type="button"
                         onClick={() => setEncerrando({ id: l.id, status: 'cancelado', obs: '' })}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-slate-600 bg-white border border-slate-200 rounded"
+                        className="btn btn-secundario btn-sm"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Cancelar
                       </button>
@@ -198,13 +198,13 @@ export const LembretesView: React.FC = () => {
                       onChange={(e) => setEncerrando({ ...encerrando, obs: e.target.value })}
                     />
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => setEncerrando(null)} className="px-3 py-1.5 text-xs border border-slate-300 rounded-md bg-white">
+                      <button type="button" onClick={() => setEncerrando(null)} className="btn btn-secundario btn-sm">
                         Voltar
                       </button>
                       <button
                         type="button"
                         onClick={confirmarEncerramento}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md"
+                        className="btn btn-primario btn-sm"
                       >
                         {encerrando.status === 'feito' ? 'Confirmar conclusão' : 'Confirmar cancelamento'}
                       </button>

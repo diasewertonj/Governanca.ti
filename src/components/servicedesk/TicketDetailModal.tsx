@@ -30,6 +30,7 @@ import {
   UserPlus,
   ShieldCheck,
 } from 'lucide-react';
+import { confirmar } from '../ui/dialogo.tsx';
 
 interface TicketDetailModalProps {
   ticketId: string;
@@ -148,7 +149,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   };
 
   const fechar = () => {
-    if (confirmarDescarte(itensPendentes)) onClose();
+    void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
   };
 
   // Fase 3: anexos privados abrem por link temporário (5 min).
@@ -174,13 +175,13 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
   const handleConcluirOffboarding = async () => {
     if (!colaboradorDesligado) return;
-    const ok = window.confirm(
+    const ok = (await confirmar(
       `Concluir o desligamento de ${colaboradorDesligado.nome}?\n\n` +
         '• Todos os equipamentos voltam ao estoque (custódia fechada hoje)\n' +
         '• Todas as licenças são liberadas\n' +
         '• O acesso ao sistema é encerrado (status "desligado")\n' +
         '• O chamado é resolvido\n\nEssa ação é registrada e não pode ser desfeita pela tela.'
-    );
+    ));
     if (!ok) return;
     setConcluindoOffboarding(true);
     const resumo = await concluirOffboarding(ticket.id);
@@ -234,8 +235,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   }[ticket.prioridade];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-6xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+    <div className="janela-fundo modal-tela">
+      <div className="janela janela-ficha">
         {/* Barra Superior */}
         {/* Fase 7: no celular o cabeçalho quebra em duas linhas (etiquetas em cima, título embaixo) */}
         {/* Fase 10: o título é a manchete; código, tipo e categoria numa linha pequena acima */}
@@ -255,7 +256,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla))
               }
               title="Relatório do chamado (imprimir ou salvar em PDF)"
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-md hover:bg-slate-100"
+              className="btn btn-secundario btn-sm"
             >
               <Printer className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">Relatório</span>
@@ -267,7 +268,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               type="button"
               onClick={fechar}
               aria-label="Fechar chamado"
-              className="p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+              className="btn-icone"
             >
               <X className="w-5 h-5" />
             </button>
@@ -293,7 +294,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     <select
                       value={statusExibido}
                       onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-                      className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-900"
+                      className="campo campo-sm"
                     >
                       <option value="aberto">Aberto (na fila)</option>
                       <option value="em_andamento">Em atendimento</option>
@@ -305,7 +306,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       aria-label="Aguardando o quê"
                       value={rascAguardando ?? (ticket.aguardandoMotivo || '')}
                       onChange={(e) => setRascAguardando(e.target.value as AguardandoMotivo | '')}
-                      className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-900"
+                      className="campo campo-sm"
                     >
                       <option value="">Aguardando o quê?</option>
                       <option value="peca">Peça</option>
@@ -320,7 +321,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 <select
                   value={tecnicoExibido}
                   onChange={(e) => handleTechnicianChange(e.target.value)}
-                  className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 max-w-56"
+                  className="campo campo-sm max-w-56"
                 >
                   <option value="">Não atribuído...</option>
                   {tecnicosTI.map((tech) => (
@@ -336,7 +337,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     <button
                       type="button"
                       onClick={() => setResolvendo(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                      className="btn btn-primario btn-sm"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
                       Registrar solução
@@ -345,7 +346,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   <button
                     type="button"
                     onClick={() => setCancelando(true)}
-                    className="px-3 py-1.5 font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
+                    className="btn btn-perigo btn-sm"
                   >
                     {ticket.tipo === 'suporte' ? 'Cancelar' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
                   </button>
@@ -478,7 +479,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                         type="button"
                         onClick={handleConcluirOffboarding}
                         disabled={concluindoOffboarding}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors disabled:opacity-50"
+                        className="btn btn-primario w-full"
                       >
                         <ShieldCheck className="w-4 h-4" />
                         {concluindoOffboarding
@@ -533,7 +534,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       <button
                         type="button"
                         onClick={() => setCadastrandoAdmitido(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                        className="btn btn-primario btn-sm"
                       >
                         <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
                         Cadastrar colaborador

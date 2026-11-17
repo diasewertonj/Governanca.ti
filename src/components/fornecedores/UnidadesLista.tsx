@@ -40,7 +40,7 @@ export const UnidadesLista: React.FC = () => {
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button type="button" onClick={() => abrir('nova')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg">
+        <button type="button" onClick={() => abrir('nova')} className="btn btn-secundario">
           <Plus className="w-3.5 h-3.5" /> Nova unidade
         </button>
       </div>
@@ -70,8 +70,8 @@ export const UnidadesLista: React.FC = () => {
           </div>
           {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setEditando(null)} className="px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white">Cancelar</button>
-            <button type="submit" className="px-3 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg">Salvar</button>
+            <button type="button" onClick={() => setEditando(null)} className="btn btn-secundario">Cancelar</button>
+            <button type="submit" className="btn btn-primario">Salvar</button>
           </div>
         </form>
       )}
@@ -85,7 +85,7 @@ export const UnidadesLista: React.FC = () => {
                 <span className="font-semibold text-slate-900">{u.nome}</span>
                 <span className="text-slate-500"> {[u.endereco, u.cidade, u.uf].filter(Boolean).join(', ')}</span>
               </span>
-              <button type="button" onClick={() => abrir(u)} className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md">
+              <button type="button" onClick={() => abrir(u)} className="btn btn-secundario btn-sm">
                 <Pencil className="w-3.5 h-3.5" /> Editar
               </button>
             </li>

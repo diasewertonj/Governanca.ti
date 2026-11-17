@@ -26,6 +26,7 @@ import {
   Mail,
   Phone,
 } from 'lucide-react';
+import { avisar, confirmar } from '../ui/dialogo.tsx';
 
 interface Employee360ModalProps {
   employeeId: string;
@@ -65,7 +66,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
 
   const handleSenhaProvisoria = async () => {
     const nome = employee?.nome || 'este colaborador';
-    if (!window.confirm(`Gerar uma senha provisória para ${nome}?\n\nSe a pessoa já tem login, a senha atual deixa de valer.`)) return;
+    if (!(await confirmar(`Gerar uma senha provisória para ${nome}?\n\nSe a pessoa já tem login, a senha atual deixa de valer.`))) return;
     setGerandoSenha(true);
     setSenhaGerada(null);
     setErroSenha(null);
@@ -80,11 +81,11 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   // Fase 3 · LGPD: só ti_admin, só desligados; preserva a trilha sem identificar a pessoa
   const handleAnonimizar = async () => {
     if (!employee) return;
-    const ok = window.confirm(
+    const ok = (await confirmar(
       `Anonimizar os dados pessoais de ${employee.nome}?\n\n` +
         'Nome, e-mail, matrícula e telefone serão substituídos em todo o sistema (cadastro, histórico, chamados e termos). ' +
         'O histórico de equipamentos e chamados continua existindo, sem identificar a pessoa.\n\nNão é possível desfazer.'
-    );
+    ));
     if (!ok) return;
     setAnonimizando(true);
     const feito = await anonimizarColaborador(employee.id);
@@ -102,7 +103,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   if (isUnauthorized) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-        <div className="bg-white rounded-xl max-w-md w-full p-6 text-center space-y-4 shadow-xl border border-slate-200">
+        <div className="cartao max-w-md w-full p-6 text-center space-y-4 shadow-xl">
           <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
             <AlertCircle className="w-6 h-6" />
           </div>
@@ -115,7 +116,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className="btn btn-primario w-full"
           >
             Fechar
           </button>
@@ -159,7 +160,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   // Lote 1 (1.12): antes de gerar, a T.I. confere item a item (nada vem marcado "Bom")
   const abrirConferencia = () => {
     if (currentAssets.length === 0) {
-      alert('O colaborador não possui equipamentos vinculados para gerar o termo.');
+      void avisar('O colaborador não possui equipamentos vinculados para gerar o termo.');
       return;
     }
     setConferencia(
@@ -211,8 +212,8 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   const nomeLicenca = (id: string) => licenses.find((l) => l.id === id)?.nome || 'Licença removida';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
+    <div className="janela-fundo modal-tela">
+      <div className="janela janela-m">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center gap-3">
@@ -249,7 +250,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                 type="button"
                 onClick={handleAnonimizar}
                 disabled={anonimizando}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
+                className="btn btn-perigo btn-sm"
               >
                 {anonimizando ? 'Anonimizando...' : 'Anonimizar dados (LGPD)'}
               </button>
@@ -260,7 +261,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                 <button
                   type="button"
                   onClick={() => setEditandoDados(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                  className="btn btn-secundario btn-sm"
                 >
                   <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                   Editar dados
@@ -271,7 +272,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                 type="button"
                 onClick={handleSenhaProvisoria}
                 disabled={gerandoSenha}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                className="btn btn-secundario btn-sm"
               >
                 <KeyRound className="w-3.5 h-3.5" />
                 {gerandoSenha ? 'Gerando...' : 'Senha provisória'}
@@ -281,7 +282,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               <button
                 type="button"
                 onClick={abrirConferencia}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-2xs"
+                className="btn btn-primario btn-sm"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
                 Gerar termo de entrega
@@ -292,7 +293,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              className="btn-icone"
             >
               <X className="w-5 h-5" />
             </button>
@@ -538,7 +539,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                     <button
                       type="button"
                       onClick={() => setSelectedTermForPrint(term)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50"
+                      className="btn btn-secundario btn-sm"
                     >
                       <FileText className="w-3.5 h-3.5 text-blue-600" />
                       Visualizar / Imprimir A4
