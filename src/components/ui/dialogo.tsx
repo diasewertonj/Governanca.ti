@@ -58,35 +58,39 @@ export function avisar(x: string | OpcoesConfirmar): Promise<void> {
 }
 
 export const DialogoHost: React.FC = () => {
-  const [fila, setFila] = useState<Pedido[]>([]);
-  const [texto, setTexto] = useState('');
-  const campo = useRef<HTMLInputElement>(null);
-  const botao = useRef<HTMLButtonElement>(null);
-  const atual = fila[0];
+  const [fila, setFila] = useState<{ id: number; p: Pedido }[]>([]);
+  const seq = useRef(0);
 
   useEffect(() => {
-    mostrar = (p) => setFila((f) => [...f, p]);
+    mostrar = (p) => setFila((f) => [...f, { id: ++seq.current, p }]);
     return () => {
       mostrar = null;
     };
   }, []);
 
-  useEffect(() => {
-    if (!atual) return;
-    setTexto(atual.tipo === 'texto' ? atual.op.inicial || '' : '');
-    setTimeout(() => (atual.tipo === 'texto' ? campo.current : botao.current)?.focus(), 0);
-  }, [atual]);
-
+  const atual = fila[0];
   if (!atual) return null;
-  const { op } = atual;
-  const minimo = atual.tipo === 'texto' ? atual.op.minimo || 0 : 0;
+  // key: cada pedido começa com o campo limpo
+  return <Caixa key={atual.id} pedido={atual.p} onFim={() => setFila((f) => f.slice(1))} />;
+};
+
+const Caixa: React.FC<{ pedido: Pedido; onFim: () => void }> = ({ pedido, onFim }) => {
+  const [texto, setTexto] = useState(pedido.tipo === 'texto' ? pedido.op.inicial || '' : '');
+  const campo = useRef<HTMLInputElement>(null);
+  const botao = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    (pedido.tipo === 'texto' ? campo.current : botao.current)?.focus();
+  }, [pedido.tipo]);
+
+  const { op } = pedido;
+  const minimo = pedido.tipo === 'texto' ? pedido.op.minimo || 0 : 0;
   const fechar = (ok: boolean) => {
-    if (atual.tipo === 'confirmar') atual.resolver(ok);
-    else if (atual.tipo === 'texto') atual.resolver(ok ? texto.trim() : null);
-    else atual.resolver();
-    setFila((f) => f.slice(1));
+    if (pedido.tipo === 'confirmar') pedido.resolver(ok);
+    else if (pedido.tipo === 'texto') pedido.resolver(ok ? texto.trim() : null);
+    else pedido.resolver();
+    onFim();
   };
-  const podeConfirmar = atual.tipo !== 'texto' || texto.trim().length >= minimo;
+  const podeConfirmar = pedido.tipo !== 'texto' || texto.trim().length >= minimo;
 
   return (
     <div
@@ -94,6 +98,7 @@ export const DialogoHost: React.FC = () => {
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();
+          e.preventDefault();
           fechar(false);
         }
       }}
@@ -108,10 +113,10 @@ export const DialogoHost: React.FC = () => {
               {op.titulo}
             </h2>
             {op.mensagem && <p className="text-xs whitespace-pre-line text-slate-600">{op.mensagem}</p>}
-            {atual.tipo === 'texto' && (
+            {pedido.tipo === 'texto' && (
               <div>
                 <label htmlFor="dialogo-texto" className="rotulo">
-                  {atual.op.rotulo || 'Motivo'}
+                  {pedido.op.rotulo || 'Motivo'}
                   {minimo ? ' *' : ''}
                 </label>
                 <input
@@ -128,7 +133,7 @@ export const DialogoHost: React.FC = () => {
           </div>
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          {atual.tipo !== 'aviso' && (
+          {pedido.tipo !== 'aviso' && (
             <button type="button" onClick={() => fechar(false)} className="btn btn-secundario">
               {op.cancelar || 'Voltar'}
             </button>
