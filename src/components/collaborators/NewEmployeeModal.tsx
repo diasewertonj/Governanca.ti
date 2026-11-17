@@ -5,6 +5,7 @@ import type { Employee, EmployeeStatus, UserRole } from '../../types/index.ts';
 import { UserPlus } from 'lucide-react';
 import { Janela } from '../ui/Janela.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
+import { CampoMascara } from '../ui/Campos.tsx';
 
 /** Fase 10: dados que já vêm preenchidos (ex.: do chamado de admissão) */
 export interface DadosIniciaisColaborador {
@@ -168,7 +169,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
             </div>
             <div>
               <label htmlFor="colab-telefone" className="rotulo">Telefone / ramal</label>
-              <input id="colab-telefone" type="text" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 98765-0000" className="campo" />
+              <CampoMascara id="colab-telefone" tipo="telefone" value={telefone} onChange={setTelefone} placeholder="(11) 98765-0000 ou ramal 2345" />
             </div>
           </div>
         </div>

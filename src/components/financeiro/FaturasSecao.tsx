@@ -25,6 +25,7 @@ import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts'
 import { nomeContrato } from '../../utils/contratos.ts';
 import { formaCobrancaDe, ROTULO_FORMA_PAGAMENTO } from '../../utils/financeiro.ts';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
+import { CampoMoeda } from '../ui/Campos.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { Vazio } from '../ui/Tela.tsx';
 
@@ -77,7 +78,16 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
     return licenses.find((l) => l.id === f.licencaId)?.nome || 'Licença';
   };
   const desfazer = async (f: Fatura) => {
-    const motivo = await pedirTexto(`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?\n\nInforme o motivo:`);
+    const motivo = await pedirTexto({
+      titulo: `Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?`,
+      mensagem:
+        'Ela volta para "a pagar", sem a data de pagamento, e sai do realizado em Despesas. O motivo fica registrado na fatura. Dá para desfazer: marque como paga de novo.',
+      rotulo: 'Motivo',
+      minimo: 5,
+      confirmar: 'Desfazer pagamento',
+      cancelar: 'Voltar',
+      perigo: true,
+    });
     if (motivo === null) return;
     const falha = await desfazerPagamento(f.id, motivo);
     setErro(falha ? `Não foi possível desfazer: ${falha}` : '');
@@ -96,8 +106,14 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   };
 
   const cancelar = async (f: Fatura) => {
-    const aviso = `Cancelar a fatura de ${rotuloCompetencia(f.competencia)}?\n\nEla continua no histórico, mas deixa de contar como paga ou a pagar.`;
-    if (await confirmar(aviso)) alterarFatura(f.id, { status: 'cancelada' });
+    const ok = await confirmar({
+      titulo: `Cancelar a fatura de ${rotuloCompetencia(f.competencia)}?`,
+      mensagem: 'Ela sai do total a pagar e fica no histórico como cancelada. Não dá para desfazer: lance outra se precisar.',
+      confirmar: 'Cancelar fatura',
+      cancelar: 'Voltar',
+      perigo: true,
+    });
+    if (ok) alterarFatura(f.id, { status: 'cancelada' });
   };
 
   const escolherArquivo = (arquivo: File | undefined) => {
@@ -116,9 +132,16 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   };
 
   const excluir = async (f: Fatura) => {
-    if (await confirmar(`Excluir a fatura de ${rotuloCompetencia(f.competencia)}? Esta ação não pode ser desfeita.`)) {
-      excluirFatura(f.id);
-    }
+    const ok = await confirmar({
+      titulo: `Excluir a fatura de ${rotuloCompetencia(f.competencia)}?`,
+      mensagem:
+        `Ela é apagada e sai da lista e dos totais${f.arquivoCaminho ? ', junto com o arquivo anexado' : ''}. Não dá para desfazer.` +
+        (f.status === 'a_pagar' ? ' Para só tirar do total a pagar e manter o registro, prefira Cancelar fatura.' : ''),
+      confirmar: 'Excluir',
+      cancelar: 'Voltar',
+      perigo: true,
+    });
+    if (ok) excluirFatura(f.id);
   };
 
   const alvoDaFatura = (f: Fatura): AlvoFatura => (f.contratoId ? { contratoId: f.contratoId } : { licencaId: f.licencaId as string });
@@ -407,7 +430,7 @@ const FormFatura: React.FC<{
   const doMesmoAlvo = alvoFixo ? doMesmoAlvoFixo : alvo ? faturasDoAlvo(faturas, alvo) : [];
   const [sugerida] = useState(() => editando?.competencia || proximaCompetencia(doMesmoAlvo, periodicidade));
   const [competencia, setCompetencia] = useState(sugerida);
-  const [valor, setValor] = useState(String(editando?.valor ?? valorPadrao));
+  const [valor, setValor] = useState<number | undefined>(editando?.valor ?? valorPadrao);
   const [vencimento, setVencimento] = useState(() => editando?.vencimento || vencimentoSugerido(sugerida));
   const [vencimentoEditado, setVencimentoEditado] = useState(!!editando);
   const [status, setStatus] = useState<Exclude<StatusFatura, 'cancelada'>>('a_pagar');
@@ -464,7 +487,7 @@ const FormFatura: React.FC<{
       valorMoeda: moeda !== 'BRL' && valorMoeda !== '' ? Number(valorMoeda) : undefined,
       formaPagamento: (formaPagamento || undefined) as Fatura['formaPagamento'],
       competencia,
-      valor: valor === '' ? Number.NaN : Number(valor),
+      valor: valor ?? Number.NaN,
       vencimento,
       status,
       pagoEm: status === 'paga' ? pagoEm || undefined : undefined,
@@ -532,8 +555,8 @@ const FormFatura: React.FC<{
                   setAlvoEscolhido(e.target.value);
                   const c = contratos.find((x) => 'c:' + x.id === e.target.value);
                   const l = licenses.find((x) => 'l:' + x.id === e.target.value);
-                  if (c) setValor(String(c.valor));
-                  if (l) setValor(String(l.valorMensal));
+                  if (c) setValor(c.valor);
+                  if (l) setValor(l.valorMensal);
                 }}
                 className={CLASSE_CAMPO}
               >
@@ -575,17 +598,7 @@ const FormFatura: React.FC<{
             <label htmlFor={id('valor')} className={CLASSE_ROTULO}>
               Valor (R$) *
             </label>
-            <input
-              id={id('valor')}
-              type="number"
-              min={0}
-              step="0.01"
-              inputMode="decimal"
-              required
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              className={`${CLASSE_CAMPO} font-mono`}
-            />
+            <CampoMoeda id={id('valor')} required valor={valor} onMudar={setValor} className={CLASSE_CAMPO} />
           </div>
           <div>
             <label htmlFor={id('venc')} className={CLASSE_ROTULO}>

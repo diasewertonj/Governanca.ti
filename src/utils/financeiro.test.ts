@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Contrato, SoftwareLicense } from '../types/index.ts';
+import type { Asset, Contrato, SoftwareLicense } from '../types/index.ts';
 import {
   assentosOciosos,
+  comprasDeEquipamentos,
   dataLimiteCancelamento,
   despesasRecorrentes,
   fonteCustoLicenca,
@@ -9,6 +10,7 @@ import {
   nomesParecidos,
   paraCsv,
   pendenciasConciliacao,
+  valorPatrimonio,
 } from './financeiro.ts';
 
 const agora = new Date(2026, 10, 16);
@@ -110,5 +112,42 @@ describe('regras auxiliares', () => {
 
   it('CSV usa ; e vírgula decimal', () => {
     expect(paraCsv(['a', 'b'], [['x;y', 1.5]])).toBe('a;b\n"x;y";1,50');
+  });
+});
+
+describe('seção 9.4 · compras e valor do patrimônio', () => {
+  const ativo = (p: Omit<Partial<Asset>, 'fiscal'> & { fiscal?: Partial<Asset['fiscal']> }): Asset =>
+    ({ id: 'a1', tag: '#PAT-1', nome: 'Notebook', categoria: 'hardware', status: 'em_uso', ...p, fiscal: { ...p.fiscal } }) as Asset;
+
+  it('patrimônio: equipamentos sem baixa + acessórios em estoque × valor unitário', () => {
+    const vp = valorPatrimonio(
+      [
+        ativo({ fiscal: { valorCompra: 5000 } }),
+        ativo({ id: 'a2', fiscal: {} }),
+        ativo({ id: 'a3', status: 'descartado', fiscal: { valorCompra: 9000 } }),
+      ],
+      [
+        { ativo: true, quantidade: 3, valorUnitario: 100 },
+        { ativo: false, quantidade: 10, valorUnitario: 50 },
+        { ativo: true, quantidade: 0, valorUnitario: 80 },
+      ]
+    );
+    expect(vp.equipamentos).toBe(5000);
+    expect(vp.qtdEquipamentos).toBe(2);
+    expect(vp.semValor).toBe(1);
+    expect(vp.acessorios).toBe(300);
+    expect(vp.qtdAcessorios).toBe(3);
+    expect(vp.total).toBe(5300);
+  });
+
+  it('compras: só quem tem valor ou data, mais recentes primeiro, baixado marcado', () => {
+    const c = comprasDeEquipamentos([
+      ativo({ id: 'a1', fiscal: { valorCompra: 5000, dataAquisicao: '2026-03-10', numeroNF: '123' } }),
+      ativo({ id: 'a2', fiscal: {} }),
+      ativo({ id: 'a3', status: 'descartado', fiscal: { dataAquisicao: '2026-08-01', fornecedor: 'Loja antiga' } }),
+    ]);
+    expect(c.map((x) => x.ativoId)).toEqual(['a3', 'a1']);
+    expect(c[0]).toMatchObject({ baixado: true, valor: 0, fornecedorTexto: 'Loja antiga' });
+    expect(c[1]).toMatchObject({ baixado: false, valor: 5000, numeroNF: '123' });
   });
 });

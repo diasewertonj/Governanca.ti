@@ -227,6 +227,8 @@ export interface AtribuicaoLicenca {
   fim?: string;
   atribuidoPor?: string;
   removidoPor?: string;
+  /** Seção 9.1: por que o assento foi liberado (desligamento, troca, não usa mais...) */
+  motivoRemocao?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -496,6 +498,8 @@ export interface Ticket {
   avaliacao?: { nota: number; comentario?: string };
   aguardandoMotivo?: AguardandoMotivo;
   primeiraRespostaEm?: string; // Fase 10 C1: carimbada pelo banco
+  /** Seção 9.2: anotações fixas do processo (visíveis durante e depois de concluir) */
+  anotacoesProcesso?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -744,4 +748,6 @@ export interface CompanySettings {
   camposPersonalizados: CustomFieldDefinition[];
   docEntrega?: ModeloDocumento; // Fase 6: documento controlado da Qualidade
   docDevolucao?: ModeloDocumento;
+  /** Seção 9.5: o que exige termo (vazio = computador, celular e monitor) */
+  termoExige?: { computador: boolean; celular: boolean; monitor: boolean };
 }

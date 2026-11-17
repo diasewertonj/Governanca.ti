@@ -12,6 +12,7 @@ import { formatDate } from '../../utils/formatters.ts';
 import { statusExibido } from '../../utils/faturas.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
 import { normalizar } from '../../utils/processos.ts';
+import { pendenciasTermo } from '../../utils/inventario.ts';
 import {
   ROTULO_VENCIMENTO,
   baixarCsv,
@@ -27,19 +28,27 @@ import { FaturasSecao } from './FaturasSecao.tsx';
 // Vencimentos
 // -----------------------------------------------------------------------------
 export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) => {
-  const { assets, contratos, licenses, faturas, employees, abrirFicha } = useApp();
+  const { assets, contratos, licenses, faturas, employees, tickets, terms, settings, processoItens, abrirFicha, setSelectedTicketIdForDetail } = useApp();
   const { estoque, linhas } = useRecursos();
   const [horizonte, setHorizonte] = useState(60);
   const [tipo, setTipo] = useState<TipoVencimento | 'todos'>('todos');
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
 
-  const lista = useMemo(
-    () => listarVencimentos({ ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees }, horizonte),
-    [assets, contratos, licenses, faturas, estoque, linhas, employees, horizonte]
-  ).filter((v) => tipo === 'todos' || v.tipo === tipo);
+  // Seção 9.2/9.5: passos agendados dos processos e termos desatualizados entram aqui também
+  const lista = useMemo(() => {
+    const termosDesatualizados = pendenciasTermo(employees, { ativos: assets, termos: terms, chamados: tickets, cfg: settings.termoExige });
+    return listarVencimentos(
+      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados },
+      horizonte
+    );
+  }, [assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, horizonte]).filter(
+    (v) => tipo === 'todos' || v.tipo === tipo
+  );
 
   const abrir = (v: Vencimento) => {
-    if (v.alvo.tipo === 'ativo') abrirFicha({ tipo: 'ativo', id: v.alvo.id });
+    if (v.alvo.tipo === 'processo') setSelectedTicketIdForDetail(v.alvo.id);
+    else if (v.alvo.tipo === 'pessoa') abrirFicha({ tipo: 'colaborador', id: v.alvo.id });
+    else if (v.alvo.tipo === 'ativo') abrirFicha({ tipo: 'ativo', id: v.alvo.id });
     else if (v.alvo.tipo === 'licenca') abrirFicha({ tipo: 'software', id: v.alvo.id });
     else if (v.alvo.tipo === 'contrato') setContratoAberto(v.alvo.id);
     else if (v.alvo.tipo === 'fatura') {
@@ -53,7 +62,7 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
     <div className="space-y-4">
       <CabecalhoTela
         titulo={noInicio ? 'Precisa de atenção' : 'Vencimentos'}
-        subtitulo="Garantias, contratos, prazos de cancelamento, renovações, faturas, estoque baixo e recursos de desligados"
+        subtitulo="Garantias, contratos, prazos de cancelamento, renovações, faturas, estoque baixo, recursos de desligados, passos agendados de admissões e desligamentos e termos desatualizados"
         filtros={
           <>
             <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoVencimento | 'todos')} aria-label="Tipo" className="campo campo-sm">
@@ -108,7 +117,13 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
                     {v.alvo.tipo !== 'estoque' && v.alvo.tipo !== 'linha' && (
                       <span className="acoes-linha">
                         <button type="button" onClick={() => abrir(v)} className="btn btn-sm btn-secundario">
-                          {v.tipo === 'contrato' || v.tipo === 'cancelamento' ? 'Abrir contrato (renovar/encerrar)' : 'Abrir'}
+                          {v.alvo.tipo === 'processo'
+                            ? 'Abrir processo'
+                            : v.alvo.tipo === 'pessoa'
+                              ? 'Abrir ficha'
+                              : v.tipo === 'contrato' || v.tipo === 'cancelamento'
+                                ? 'Abrir contrato (renovar/encerrar)'
+                                : 'Abrir'}
                         </button>
                       </span>
                     )}

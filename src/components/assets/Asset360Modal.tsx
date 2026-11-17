@@ -1,7 +1,11 @@
-import { avisar } from '../ui/dialogo.tsx';
+import { avisar, confirmarMovimento } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatCurrency, formatDate, formatChaveNFe } from '../../utils/formatters.ts';
+import { CHAVE, ROTULO_CHAVE, SISTEMAS_OPERACIONAIS, resumoEspecificacoes } from '../../utils/especificacoes.ts';
+import { avisoSegundoAtivo, classeDoAtivo, exigeTermo, temProcessoAberto } from '../../utils/inventario.ts';
+import { aplicarMascara } from '../../utils/mascaras.ts';
+import { CampoSugestoes } from '../ui/Campos.tsx';
 import { contratosQueCobrem, garantiaEfetiva, nomeContrato } from '../../utils/contratos.ts';
 import {
   QrCode,
@@ -28,7 +32,7 @@ import { ManutencoesAtivo } from './ManutencoesAtivo.tsx';
 import { FormManutencao } from './FormManutencao.tsx';
 import { FormBaixa } from './FormBaixa.tsx';
 import { BaixaPatrimonial } from './BaixaPatrimonial.tsx';
-import { ROTULO_MOTIVO_BAIXA, ROTULO_TIPO_MANUTENCAO, baixaVigente, podeEnviarParaManutencao } from '../../utils/cicloVida.ts';
+import { ROTULO_MOTIVO_BAIXA, ROTULO_TIPO_MANUTENCAO, baixaVigente, podeEnviarParaManutencao, statusAoMudarCustodia } from '../../utils/cicloVida.ts';
 import { chamadosDoAtivo } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
 import { ContratoPorId } from '../financeiro/FinanceiroViews.tsx';
@@ -137,6 +141,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
     currentRole,
     contratos,
     fornecedores,
+    settings,
+    setSelectedTicketIdForDetail,
   } = useApp();
 
   const [aba, setAba] = useState<AbaAtivo>(manutencaoDoChamado ? 'manutencoes' : 'resumo');
@@ -147,6 +153,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
   const [motivoDevolucao, setMotivoDevolucao] = useState('');
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [editando, setEditando] = useState(false);
+  const [duplicando, setDuplicando] = useState(false);
   const [enviandoManutencao, setEnviandoManutencao] = useState(Boolean(manutencaoDoChamado));
   const [dandoBaixa, setDandoBaixa] = useState(false);
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
@@ -189,7 +196,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
 
   const handleSaveSecurity = () => {
     updateAsset(asset.id, {
-      sistemaOperacional: tempSO || undefined,
+      sistemaOperacional: tempSO.trim() || undefined,
       bitlockerKey: tempBitlocker.trim() || undefined,
     });
     setIsEditingSecurity(false);
@@ -216,10 +223,66 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
       <span className="font-medium text-slate-900">{nome}</span>
     );
 
-  const handleExecuteTransfer = (e: React.FormEvent) => {
+  // Seção 9.1: quem está com o equipamento tem admissão/desligamento em andamento? (o certo é pelo checklist)
+  const processoDoCustodiante = currentCustodian
+    ? tickets.find((t) => temProcessoAberto(currentCustodian.id, [t]))
+    : undefined;
+  const textoProcesso =
+    currentCustodian && processoDoCustodiante
+      ? processoDoCustodiante.tipo === 'offboarding'
+        ? `${currentCustodian.nome} tem desligamento em andamento: o certo é registrar a devolução no checklist do desligamento.`
+        : `${currentCustodian.nome} tem admissão em andamento: o certo é registrar a entrega no checklist da admissão.`
+      : '';
+
+  // Seção 9.1/9.6: nada muda de mãos sem o resumo "de → para", o termo e o que falta fazer fora do Nexus
+  const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedNewUser) return;
     const newId = selectedNewUser === 'estoque' ? null : selectedNewUser;
-    transferAssetCustody(asset.id, newId, motivoDevolucao);
+    const novo = newId ? employees.find((x) => x.id === newId) : undefined;
+    const atual = currentCustodian;
+    const motivo = motivoDevolucao.trim();
+    if (atual && !motivo) return;
+    const nomeNovo = novo?.nome || 'a pessoa escolhida';
+    const classe = classeDoAtivo(asset);
+    const aviso = newId ? avisoSegundoAtivo(asset, newId, assets) : null;
+    const status = statusAoMudarCustodia(asset, newId);
+    const envolvidos = [atual?.nome, newId ? nomeNovo : undefined].filter((x): x is string => Boolean(x));
+    const termo = !exigeTermo(asset, settings.termoExige)
+      ? 'Este item não exige termo.'
+      : envolvidos.length > 1
+        ? `Os termos de ${envolvidos[0]} e de ${envolvidos[1]} ficarão desatualizados: gere o termo atualizado na ficha de cada pessoa (não bloqueia).`
+        : `O termo de ${envolvidos[0] || 'a pessoa'} ficará desatualizado: gere o termo atualizado na ficha da pessoa (não bloqueia).`;
+
+    const resposta = await confirmarMovimento({
+      titulo: newId ? (atual ? 'Transferir custódia' : 'Entregar equipamento') : 'Devolver ao estoque',
+      item: `${asset.tag} · ${asset.nome}`,
+      de: atual?.nome || 'Estoque de T.I.',
+      para: newId ? nomeNovo : 'Estoque de T.I. (devolução)',
+      efeitos: [
+        ...(atual ? [`A custódia de ${atual.nome} é fechada hoje com o motivo "${motivo}".`] : []),
+        ...(newId ? [`A entrega para ${nomeNovo} fica registrada hoje no histórico de custódia.`] : []),
+        status === 'manutencao'
+          ? 'A situação continua "Em manutenção" até a manutenção ser concluída.'
+          : status === 'em_uso'
+            ? 'A situação passa a "Em uso".'
+            : 'A situação passa a "Disponível em estoque".',
+        ...(textoProcesso ? [textoProcesso] : []),
+      ],
+      foraDoNexus: [
+        ...(atual ? [`Recolher o equipamento com ${atual.nome}.`] : []),
+        ...(atual ? [`Fazer backup dos dados de ${atual.nome} e limpar o equipamento antes de ${newId ? `entregar a ${nomeNovo}` : 'guardar no estoque'}.`] : []),
+        ...(newId ? [`Entregar o equipamento a ${nomeNovo}.`] : []),
+        ...(classe === 'computador' ? ['Trocar o usuário do computador e atualizar o MDM, se for o caso.'] : []),
+        ...(classe === 'celular' ? ['Trocar a conta do aparelho e atualizar o MDM, se for o caso.'] : []),
+      ],
+      termo,
+      justificativa: aviso ? { aviso } : undefined,
+      desfazer: 'Dá para desfazer transferindo de volta; o histórico guarda as duas movimentações.',
+      confirmar: newId ? (atual ? 'Transferir' : 'Entregar') : 'Registrar devolução',
+    });
+    if (!resposta) return;
+    transferAssetCustody(asset.id, newId, atual ? motivo : undefined, resposta.justificativa);
     setShowTransferModal(false);
     setSelectedNewUser('');
     setMotivoDevolucao('');
@@ -248,7 +311,13 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
   // Painéis ficam montados (escondidos): o que está em digitação não se perde ao trocar de aba
   const painel = (id: AbaAtivo) => (abaAtual === id ? 'space-y-4' : 'hidden');
   const eventos = eventosDoAtivo(asset, nomeFornecedor);
-  const temEspecificacoes = asset.categoria === 'hardware' || (asset.customFields && Object.keys(asset.customFields).length > 0);
+  // Seção 9.3: Service Tag e IMEI ficam em "Dados do equipamento"; o resto das especificações com rótulos legíveis
+  const serviceTag = asset.customFields?.[CHAVE.serviceTag] || '';
+  const imei = asset.customFields?.[CHAVE.imei] ? aplicarMascara('imei', asset.customFields[CHAVE.imei]) : '';
+  const especificacoes = resumoEspecificacoes(asset.customFields, settings.camposPersonalizados).filter(
+    (i) => i.rotulo !== ROTULO_CHAVE[CHAVE.serviceTag] && i.rotulo !== ROTULO_CHAVE[CHAVE.imei]
+  );
+  const temEspecificacoes = asset.categoria === 'hardware' || especificacoes.length > 0;
 
   return (
     <>
@@ -279,6 +348,18 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               <button type="button" title="Editar" aria-label="Editar" onClick={() => setEditando(true)} className="btn btn-sm btn-secundario">
                 <Pencil />
                 <Rotulo texto="Editar" />
+              </button>
+            )}
+            {isTI && !descartado && (
+              <button
+                type="button"
+                title="Duplicar (cadastrar outro do mesmo lote)"
+                aria-label="Duplicar"
+                onClick={() => setDuplicando(true)}
+                className="btn btn-sm btn-secundario"
+              >
+                <Copy />
+                <Rotulo texto="Duplicar" />
               </button>
             )}
             {isTI && !descartado && (
@@ -352,6 +433,16 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               <Dado rotulo="Número de série">
                 <span className="font-mono break-all">{asset.serialNumber || '—'}</span>
               </Dado>
+              {serviceTag && (
+                <Dado rotulo="Service Tag / código expresso">
+                  <span className="font-mono break-all">{serviceTag}</span>
+                </Dado>
+              )}
+              {imei && (
+                <Dado rotulo="IMEI">
+                  <span className="font-mono break-all">{imei}</span>
+                </Dado>
+              )}
               <Dado rotulo="Com quem está">
                 {currentCustodian ? pessoa(currentCustodian.id, currentCustodian.nome) : 'Em estoque'}
               </Dado>
@@ -396,15 +487,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                         <label htmlFor={`so-${asset.id}`} className="rotulo">
                           Sistema operacional
                         </label>
-                        <select id={`so-${asset.id}`} value={tempSO} onChange={(e) => setTempSO(e.target.value)} className="campo">
-                          <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
-                          <option value="Windows 11 Home">Windows 11 Home</option>
-                          <option value="Windows 10 Pro 64-bit">Windows 10 Pro (64-bit)</option>
-                          <option value="macOS Sequoia 15.x">macOS Sequoia (Apple Silicon / Intel)</option>
-                          <option value="macOS Sonoma 14.x">macOS Sonoma (Apple Silicon)</option>
-                          <option value="Ubuntu Linux 24.04 LTS">Ubuntu Linux 24.04 LTS</option>
-                          <option value="Outro Sistema">Outro Sistema</option>
-                        </select>
+                        <CampoSugestoes id={`so-${asset.id}`} value={tempSO} onChange={setTempSO} sugestoes={SISTEMAS_OPERACIONAIS} placeholder="Ex.: Windows 11 Pro 64-bit" />
                       </div>
                       <div>
                         <label htmlFor={`bitlocker-${asset.id}`} className="rotulo">
@@ -458,11 +541,11 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                   </dl>
                 ))}
 
-              {asset.customFields && Object.keys(asset.customFields).length > 0 && (
-                <dl className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 lg:grid-cols-4">
-                  {Object.entries(asset.customFields).map(([key, value]) => (
-                    <Dado key={key} rotulo={key}>
-                      {value}
+              {especificacoes.length > 0 && (
+                <dl className={`grid grid-cols-2 gap-3 lg:grid-cols-4 ${asset.categoria === 'hardware' ? 'border-t border-slate-100 pt-3' : ''}`}>
+                  {especificacoes.map((i, n) => (
+                    <Dado key={`${n}-${i.rotulo}`} rotulo={i.rotulo}>
+                      <span className="break-words">{i.valor}</span>
                     </Dado>
                   ))}
                 </dl>
@@ -507,6 +590,15 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
             {showTransferModal && (
               <form onSubmit={handleExecuteTransfer} className="space-y-3 border-t border-slate-100 pt-3">
                 <h4 className="text-xs font-semibold text-slate-900">Transferência / devolução de custódia</h4>
+                {textoProcesso && processoDoCustodiante && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <span>{textoProcesso}</span>
+                    <button type="button" onClick={() => setSelectedTicketIdForDetail(processoDoCustodiante.id)} className="btn btn-sm btn-secundario">
+                      Abrir o processo
+                      <ChevronRight />
+                    </button>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div>
                     <label htmlFor={`destino-${asset.id}`} className="rotulo">
@@ -519,8 +611,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                       required
                       className="campo"
                     >
-                      <option value="">Selecione um colaborador ou estoque...</option>
-                      <option value="estoque">Devolver para almoxarifado / estoque de T.I.</option>
+                      <option value="">{currentCustodian ? 'Selecione um colaborador ou o estoque...' : 'Selecione um colaborador...'}</option>
+                      {currentCustodian && <option value="estoque">Devolver para o estoque de T.I.</option>}
                       <optgroup label="Colaboradores ativos">
                         {employees
                           .filter((e) => e.status === 'ativo' && e.id !== asset.custodianteId)
@@ -532,27 +624,29 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                       </optgroup>
                     </select>
                   </div>
-                  <div>
-                    <label htmlFor={`motivo-${asset.id}`} className="rotulo">
-                      Motivo da movimentação *
-                    </label>
-                    <input
-                      id={`motivo-${asset.id}`}
-                      type="text"
-                      value={motivoDevolucao}
-                      onChange={(e) => setMotivoDevolucao(e.target.value)}
-                      placeholder="Ex: Substituição, upgrade ou desligamento..."
-                      required
-                      className="campo"
-                    />
-                  </div>
+                  {currentCustodian && (
+                    <div>
+                      <label htmlFor={`motivo-${asset.id}`} className="rotulo">
+                        Motivo da devolução por {currentCustodian.nome} *
+                      </label>
+                      <input
+                        id={`motivo-${asset.id}`}
+                        type="text"
+                        value={motivoDevolucao}
+                        onChange={(e) => setMotivoDevolucao(e.target.value)}
+                        placeholder="Ex.: substituição, upgrade ou desligamento..."
+                        required
+                        className="campo"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={() => setShowTransferModal(false)} className="btn btn-sm btn-secundario">
                     Cancelar
                   </button>
                   <button type="submit" className="btn btn-sm btn-primario">
-                    Confirmar transferência
+                    Continuar
                   </button>
                 </div>
               </form>
@@ -730,6 +824,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
       {/* Fora da janela da ficha: o fundo desfocado (backdrop-filter) prenderia a janela nova na
           rolagem da ficha, e no celular ela abriria fora da tela */}
       {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
+      {duplicando && <NewAssetModal duplicarDe={asset} onClose={() => setDuplicando(false)} />}
       {enviandoManutencao && isTI && podeEnviarParaManutencao(asset) && (
         <FormManutencao asset={asset} modo="abrir" chamadoInicial={manutencaoDoChamado} onClose={() => setEnviandoManutencao(false)} />
       )}

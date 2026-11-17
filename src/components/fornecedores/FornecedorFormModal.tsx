@@ -11,6 +11,9 @@ import { resumoVinculos, temVinculos, vinculosDoFornecedor } from '../../utils/c
 import { nomesParecidos, soDigitos } from '../../utils/financeiro.ts';
 import { confirmar } from '../ui/dialogo.tsx';
 import { Janela } from '../ui/Janela.tsx';
+import { CampoCnpj, CampoMascara } from '../ui/Campos.tsx';
+import { formatarTelefone } from '../../utils/mascaras.ts';
+import type { DadosCnpj } from '../../services/consultas.ts';
 
 interface FornecedorFormModalProps {
   /** Quando informado, edita este fornecedor */
@@ -45,6 +48,14 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
 
   const fechar = () => {
     void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
+  };
+
+  // 9.3: CNPJ achado na Receita preenche só o que ainda está vazio
+  const preencherDoCnpj = (d: DadosCnpj) => {
+    // Razão social: o nome fantasia às vezes é só a unidade ("DIRECAO GERAL"); a pessoa ajusta se quiser
+    setNome((v) => (v.trim() ? v : d.razaoSocial || d.nomeFantasia || ''));
+    setTelefone((v) => (v.trim() ? v : d.telefone ? formatarTelefone(d.telefone) : ''));
+    setEmail((v) => (v.trim() ? v : d.email || ''));
   };
 
   const vinculos = fornecedor ? vinculosDoFornecedor(fornecedor.id, { contratos, ativos: assets, licencas: licenses }) : null;
@@ -100,7 +111,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
       }
       const desativar = await confirmar({
         titulo: `${fornecedor.nome} não pode ser excluído`,
-        mensagem: `Ele está vinculado a ${resumoVinculos(vinculos)}.\n\nDesativar o fornecedor? Ele sai das listas de escolha, mas o histórico continua.`,
+        mensagem: `Ele está vinculado a ${resumoVinculos(vinculos)}.\n\nDesativar o fornecedor? Ele sai das listas de escolha, mas o histórico continua. Dá para desfazer: edite o fornecedor e marque "Fornecedor ativo".`,
         confirmar: 'Desativar',
         cancelar: 'Voltar',
       });
@@ -110,7 +121,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
       }
       return;
     }
-    if (!(await confirmar(`Excluir o fornecedor ${fornecedor.nome}?\n\nEsta ação não pode ser desfeita.`))) return;
+    if (!(await confirmar(`Excluir o fornecedor ${fornecedor.nome}?\n\nO cadastro sai das listas. Não dá para desfazer.`))) return;
     const r = excluirFornecedor(fornecedor.id);
     if (r.success) onClose();
     else setErro(r.message || 'Não foi possível excluir o fornecedor.');
@@ -170,16 +181,8 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
             <label htmlFor="forn-cnpj" className={CLASSE_ROTULO}>
               CNPJ
             </label>
-            <input
-              id="forn-cnpj"
-              type="text"
-              inputMode="numeric"
-              value={cnpj}
-              onChange={(e) => setCnpj(e.target.value)}
-              placeholder="00.000.000/0000-00"
-              className={`${CLASSE_CAMPO} font-mono`}
-            />
-            <p className="ajuda">Opcional para empresa estrangeira.</p>
+            <CampoCnpj id="forn-cnpj" value={cnpj} onChange={setCnpj} onAchado={preencherDoCnpj} className={CLASSE_CAMPO} />
+            <p className="ajuda">Opcional para empresa estrangeira. "Buscar" preenche nome, telefone e e-mail que estiverem vazios.</p>
           </div>
           <div>
             <label htmlFor="forn-contato" className={CLASSE_ROTULO}>
@@ -198,14 +201,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
             <label htmlFor="forn-telefone" className={CLASSE_ROTULO}>
               Telefone
             </label>
-            <input
-              id="forn-telefone"
-              type="tel"
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              placeholder="Ex.: 0800 970 3355"
-              className={CLASSE_CAMPO}
-            />
+            <CampoMascara id="forn-telefone" tipo="telefone" value={telefone} onChange={setTelefone} placeholder="Ex.: 0800 970 3355" className={CLASSE_CAMPO} />
           </div>
           <div>
             <label htmlFor="forn-email" className={CLASSE_ROTULO}>

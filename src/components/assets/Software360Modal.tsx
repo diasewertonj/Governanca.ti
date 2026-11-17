@@ -11,7 +11,8 @@ import { HistoricoAlteracoes } from '../comum/HistoricoAlteracoes.tsx';
 import { LembreteLicenca } from './LembreteLicenca.tsx';
 import { ContratoPorId } from '../financeiro/FinanceiroViews.tsx';
 import { historicoAssentos, licencaAtiva } from '../../utils/licencas.ts';
-import { avisar, confirmar, pedirTexto } from '../ui/dialogo.tsx';
+import { avisar, confirmar, confirmarMovimento, pedirTexto } from '../ui/dialogo.tsx';
+import { chamadoEncerrado } from '../../utils/atendimento.ts';
 import { Janela, Dado } from '../ui/Janela.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
 import { Busca, Vazio } from '../ui/Tela.tsx';
@@ -100,6 +101,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     revokeLicense,
     editarLicenca,
     setSelectedEmployeeIdFor360,
+    setSelectedTicketIdForDetail,
     setSoftwareToEdit,
     setSoftwareModalOpen,
     currentRole,
@@ -149,7 +151,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
 
   // Lote 1 (L3): inativar com motivo (a licença fica no histórico); antes, liberar os assentos
   const inativar = async () => {
-    const explicacao = 'A licença não é excluída: fica no histórico e sai das listas de atribuição.';
+    const explicacao =
+      'A licença não é excluída: fica no histórico e sai das listas de atribuição. Dá para desfazer: o administrador de T.I. reativa quando quiser.';
     if (license.colaboradoresIds.length > 0) {
       setAba('pessoas');
       await avisar({
@@ -172,7 +175,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setFeedbackMsg({ text: 'Licença inativada. Ela sai das listas de atribuição.', type: 'success' });
   };
   const reativar = async () => {
-    if (!(await confirmar(`Reativar ${license.nome}? Ela volta às listas de atribuição.`))) return;
+    if (!(await confirmar(`Reativar ${license.nome}?\n\nEla volta às listas de atribuição. Dá para inativar de novo depois, com motivo.`))) return;
     const falha = await mudarSituacaoLicenca(license.id, true);
     setFeedbackMsg(falha ? { text: falha, type: 'error' } : { text: 'Licença reativada.', type: 'success' });
   };
@@ -219,9 +222,43 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   };
 
   const handleRevoke = async (empId: string, empNome: string) => {
-    // Fase 5: liberar assento tira o acesso da pessoa; pede confirmação
-    if (!(await confirmar(`Liberar o assento de ${empNome} em ${license.nome}?\n\nA pessoa perde o acesso a este software.`))) return;
-    revokeLicense(license.id, empId);
+    // Seção 9.1: com desligamento em andamento, a liberação é feita pelo passo do checklist
+    const desligamento = tickets.find(
+      (t) => t.tipo === 'offboarding' && !chamadoEncerrado(t) && (t.colaboradorId || t.offboarding?.colaboradorId) === empId
+    );
+    if (desligamento) {
+      const ir = await confirmar({
+        titulo: `${empNome} está em desligamento (${desligamento.codigo})`,
+        mensagem: `Libere o assento pelo passo "Liberar licença" do checklist: assim o desligamento registra quem fez, quando e a confirmação de que o acesso foi removido no painel do fornecedor.\n\nNada é alterado aqui.`,
+        confirmar: 'Abrir o desligamento',
+      });
+      if (ir) setSelectedTicketIdForDetail(desligamento.id);
+      return;
+    }
+    const primeiro = empNome.split(' ')[0];
+    const r = await confirmarMovimento({
+      titulo: `Liberar o assento de ${empNome}`,
+      item: license.nome,
+      de: empNome,
+      para: 'Saldo livre da licença',
+      efeitos: [
+        `A vaga volta ao saldo livre na hora (${license.assentosAlocados - 1} de ${license.assentosTotais} em uso)`,
+        'A saída fica no histórico de assentos, com o motivo',
+      ],
+      foraDoNexus: [`Remover o acesso de ${primeiro} no painel do fornecedor (o Nexus não mexe na conta lá)`],
+      motivos: ['Desligamento', 'Troca de licença / plano', 'Não usa mais'],
+      confirmacoes: [
+        {
+          texto: `Removi o acesso de ${primeiro} a ${license.nome} no painel do fornecedor`,
+          link: license.urlPainel ? { url: license.urlPainel, rotulo: `Abrir o painel de ${license.nome}` } : undefined,
+        },
+      ],
+      desfazer: 'Dá para desfazer alocando o assento de novo; o histórico guarda as duas movimentações.',
+      confirmar: 'Liberar assento',
+      perigo: true,
+    });
+    if (!r) return;
+    revokeLicense(license.id, empId, r.motivo);
     setFeedbackMsg({
       text: `Assento de ${empNome} liberado com sucesso. Saldo livre atualizado!`,
       type: 'success',
@@ -616,6 +653,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                           <td data-label="Saiu">
                             {a.fim ? formatDate(a.fim) : '—'}
                             {a.fim && a.removidoPor && <span className="block text-slate-500">por {nomePessoa(a.removidoPor)}</span>}
+                            {a.fim && a.motivoRemocao && <span className="block text-slate-500">motivo: {a.motivoRemocao}</span>}
                           </td>
                           <td data-label="Situação" className="text-right">
                             <span className={`selo ${a.fim ? 'selo-neutro' : 'selo-ok'}`}>{a.fim ? 'Encerrado' : 'Em uso'}</span>

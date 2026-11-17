@@ -353,6 +353,8 @@ const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
   anexos: json(t.anexos || []),
   colaborador_id: t.colaboradorId || null,
   aguardando_motivo: t.status === 'aguardando_terceiro' ? t.aguardandoMotivo || null : null,
+  // Seção 9.2: só entra na linha quando existe (antes da migration a coluna não existe)
+  ...(t.anotacoesProcesso !== undefined ? { anotacoes_processo: t.anotacoesProcesso || null } : {}),
 });
 
 const linhaMensagem = (chamadoId: string, m: TicketMessage): TablesInsert<'chamado_mensagens'> => ({
@@ -850,6 +852,7 @@ export async function fetchAtribuicoesLicencaFromDb(): Promise<AtribuicaoLicenca
     fim: a.fim || undefined,
     atribuidoPor: a.atribuido_por || undefined,
     removidoPor: a.removido_por || undefined,
+    motivoRemocao: a.motivo_remocao || undefined,
   }));
 }
 
@@ -899,6 +902,18 @@ export async function revogarLicencaDb(licencaId: string, colaboradorId: string)
   return (await checar(
     supabase.rpc('revogar_licenca', { p_licenca: licencaId, p_colaborador: colaboradorId })
   )) as string[];
+}
+
+/**
+ * Seção 9.1: libera o assento gravando o motivo no histórico. Enquanto a migration
+ * da seção 9 não roda (função ausente), libera do jeito antigo, sem o motivo.
+ */
+export async function liberarAssentoDb(licencaId: string, colaboradorId: string, motivo: string): Promise<string[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('liberar_assento', { p_licenca: licencaId, p_colaborador: colaboradorId, p_motivo: motivo });
+  if (error && (error.code === 'PGRST202' || /liberar_assento/.test(error.message || ''))) return revogarLicencaDb(licencaId, colaboradorId);
+  if (error) throw new DbError(error.message, error.code);
+  return data as unknown as string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1451,6 +1466,7 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     dataCriacao: t.data_criacao,
     dataAtualizacao: t.data_atualizacao,
     colaboradorId: t.colaborador_id || undefined,
+    anotacoesProcesso: t.anotacoes_processo || undefined,
     ...camposAtendimento(t),
   })) : [];
 }
@@ -1691,6 +1707,7 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     docDevolucao: (data.doc_devolucao || undefined) as unknown as ModeloDocumento | undefined,
     logoUrl: data.logo_url || undefined,
     sla: (data.sla || undefined) as CompanySettings['sla'],
+    termoExige: (data.termo_exige || undefined) as CompanySettings['termoExige'],
   };
 }
 
@@ -1714,6 +1731,8 @@ export async function saveSettingsDb(st: CompanySettings) {
         campos_personalizados: json(st.camposPersonalizados || []),
         ...(st.docEntrega ? { doc_entrega: json(st.docEntrega) } : {}),
         ...(st.docDevolucao ? { doc_devolucao: json(st.docDevolucao) } : {}),
+        // Seção 9.5: só vai quando configurado (antes da migration a coluna não existe)
+        ...(st.termoExige ? { termo_exige: json(st.termoExige) } : {}),
         logo_url: st.logoUrl || null,
         sla: st.sla ? json(st.sla) : null,
         updated_at: new Date().toISOString(),
@@ -1953,6 +1972,11 @@ export async function registrarItemProcessoDb(
       p_dados: json(dados),
     })
   );
+}
+
+/** Seção 9.2: tira a data agendada de um passo pendente (o registro do passo não apaga datas) */
+export async function limparAgendaItemDb(itemId: string) {
+  await atualizar('processo_itens', itemId, { lembrete_em: null });
 }
 
 export async function concluirProcessoDb(chamadoId: string) {

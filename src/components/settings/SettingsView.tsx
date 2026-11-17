@@ -12,6 +12,9 @@ import { CabecalhoTela } from '../ui/Tela.tsx';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { mensagemDeErro } from '../../services/supabaseDb.ts';
+import { CampoCep, CampoCnpj, CampoMascara } from '../ui/Campos.tsx';
+import { formatarCep } from '../../utils/mascaras.ts';
+import type { DadosCep, DadosCnpj } from '../../services/consultas.ts';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -132,6 +135,24 @@ export const SettingsView: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState(settings.logoUrl || '');
   const logoAlterado = logoUrl.trim() !== (settings.logoUrl || '');
   const logoInvalido = logoUrl.trim() !== '' && !/^https:\/\//i.test(logoUrl.trim());
+  // 9.5: o que exige termo de responsabilidade (vazio = tudo marcado)
+  const termoExigeSalvo = settings.termoExige || { computador: true, celular: true, monitor: true };
+  const [termoExige, setTermoExige] = useState(termoExigeSalvo);
+  const termoExigeAlterado = JSON.stringify(termoExige) !== JSON.stringify(termoExigeSalvo);
+
+  // 9.3: CNPJ/CEP achados preenchem só os campos vazios
+  const cidadeUfDe = (cidade?: string, uf?: string) => [cidade, uf].filter(Boolean).join(' - ');
+  const preencherDoCnpj = (d: DadosCnpj) => {
+    setRazaoSocial((v) => (v.trim() ? v : d.razaoSocial));
+    setNomeFantasia((v) => (v.trim() ? v : d.nomeFantasia || ''));
+    setEndereco((v) => (v.trim() ? v : d.endereco || ''));
+    setCep((v) => (v.trim() ? v : d.cep ? formatarCep(d.cep) : ''));
+    setCidadeUF((v) => (v.trim() ? v : cidadeUfDe(d.cidade, d.uf)));
+  };
+  const preencherDoCep = (d: DadosCep) => {
+    setEndereco((v) => (v.trim() ? v : [d.endereco, d.bairro].filter(Boolean).join(' - ')));
+    setCidadeUF((v) => (v.trim() ? v : cidadeUfDe(d.cidade, d.uf)));
+  };
 
   // Estados para Novo Setor
   const [novoSetorNome, setNovoSetorNome] = useState('');
@@ -182,6 +203,7 @@ export const SettingsView: React.FC = () => {
       : []),
     ...(docsAlterados ? ['Documentos da Qualidade (código/versão dos termos)'] : []),
     ...(logoAlterado ? ['Logo da empresa'] : []),
+    ...(termoExigeAlterado ? ['O que exige termo de responsabilidade'] : []),
   ];
   useRegistrarPendencias('configuracoes', itensPendentes);
 
@@ -201,6 +223,7 @@ export const SettingsView: React.FC = () => {
     setDocEntrega(docEntregaSalvo);
     setDocDevolucao(docDevolucaoSalvo);
     setLogoUrl(settings.logoUrl || '');
+    setTermoExige(termoExigeSalvo);
   };
 
   const salvarTudo = async () => {
@@ -227,8 +250,14 @@ export const SettingsView: React.FC = () => {
     }
     Object.entries(papeisPendentes).forEach(([id, papel]) => updateEmployeeRole(id, papel));
     Object.entries(setoresPendentes).forEach(([id, ativo]) => updateDepartment(id, { ativo }));
-    if (camposEmpresaAlterados.length > 0 || docsAlterados || logoAlterado) {
-      updateSettings({ ...empresaRascunho, docEntrega, docDevolucao, logoUrl: logoUrl.trim() || undefined });
+    if (camposEmpresaAlterados.length > 0 || docsAlterados || logoAlterado || termoExigeAlterado) {
+      updateSettings({
+        ...empresaRascunho,
+        docEntrega,
+        docDevolucao,
+        logoUrl: logoUrl.trim() || undefined,
+        ...(termoExigeAlterado ? { termoExige } : {}),
+      });
     }
     setPapeisPendentes({});
     setSetoresPendentes({});
@@ -273,7 +302,7 @@ export const SettingsView: React.FC = () => {
     const dep = departments.find((d) => d.id === depId);
     const vinculados = employees.filter((e) => e.setorId === depId).length;
     // Fase 5: exclusão sempre pede confirmação (antes: um clique apagava)
-    if (vinculados === 0 && !(await confirmar(`Excluir o setor "${dep?.nome}"?\n\nEssa ação não pode ser desfeita.`))) return;
+    if (vinculados === 0 && !(await confirmar(`Excluir o setor "${dep?.nome}"?\n\nO setor sai das listas. Não dá para desfazer: para só tirar das listas, inative em vez de excluir.`))) return;
     setSetoresPendentes((p) => {
       const resto = { ...p };
       delete resto[depId];
@@ -330,7 +359,7 @@ export const SettingsView: React.FC = () => {
     const campo = settings.camposPersonalizados.find((cf) => cf.id === cfId);
     if (
       !(await confirmar(
-        `Remover o campo personalizado "${campo?.label}"?\n\nOs valores já preenchidos nos ativos deixam de aparecer na ficha.`
+        `Remover o campo personalizado "${campo?.label}"?\n\nO campo sai dos ativos na hora e os valores já preenchidos deixam de aparecer na ficha. Não dá para desfazer.`
       ))
     ) {
       return;
@@ -386,17 +415,18 @@ export const SettingsView: React.FC = () => {
                   <div className="cartao p-4">
                     {secao('Identificação jurídica', 'Aparece no cabeçalho dos termos e nas etiquetas')}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                      <div className="xl:col-span-2">
+                      <div className="md:col-span-2 xl:col-span-2">
                         <label htmlFor="emp-razao" className="rotulo">Razão social</label>
                         <input id="emp-razao" type="text" required value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)} className="campo" />
                       </div>
-                      <div>
+                      <div className="xl:col-span-2">
                         <label htmlFor="emp-fantasia" className="rotulo">Nome fantasia</label>
                         <input id="emp-fantasia" type="text" required value={nomeFantasia} onChange={(e) => setNomeFantasia(e.target.value)} className="campo" />
                       </div>
-                      <div>
+                      <div className="md:col-span-2 xl:col-span-2">
                         <label htmlFor="emp-cnpj" className="rotulo">CNPJ</label>
-                        <input id="emp-cnpj" type="text" required value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="campo font-mono" />
+                        <CampoCnpj id="emp-cnpj" required value={cnpj} onChange={setCnpj} onAchado={preencherDoCnpj} />
+                        <p className="ajuda">"Buscar" preenche razão social, nome fantasia, endereço, CEP e cidade/UF que estiverem vazios.</p>
                       </div>
                     </div>
                   </div>
@@ -408,9 +438,9 @@ export const SettingsView: React.FC = () => {
                         <label htmlFor="emp-endereco" className="rotulo">Endereço completo</label>
                         <input id="emp-endereco" type="text" required value={endereco} onChange={(e) => setEndereco(e.target.value)} className="campo" />
                       </div>
-                      <div>
+                      <div className="md:col-span-2 xl:col-span-1">
                         <label htmlFor="emp-cep" className="rotulo">CEP</label>
-                        <input id="emp-cep" type="text" required value={cep} onChange={(e) => setCep(e.target.value)} className="campo font-mono" />
+                        <CampoCep id="emp-cep" required value={cep} onChange={setCep} onAchado={preencherDoCep} />
                       </div>
                       <div>
                         <label htmlFor="emp-cidade" className="rotulo">Cidade / UF</label>
@@ -428,7 +458,7 @@ export const SettingsView: React.FC = () => {
                       </div>
                       <div>
                         <label htmlFor="emp-telefone" className="rotulo">Telefone / ramal de TI</label>
-                        <input id="emp-telefone" type="text" required value={telefoneTI} onChange={(e) => setTelefoneTI(e.target.value)} className="campo" />
+                        <CampoMascara id="emp-telefone" tipo="telefone" required value={telefoneTI} onChange={setTelefoneTI} />
                       </div>
                     </div>
                   </div>
@@ -499,6 +529,33 @@ export const SettingsView: React.FC = () => {
                       </div>
                     </div>
                   ))}
+
+                  {/* 9.5: quais itens geram "Termo desatualizado" ao entregar ou devolver */}
+                  <div className="cartao p-4">
+                    {secao(
+                      'O que exige termo de responsabilidade',
+                      "Ao entregar ou devolver um desses itens fora de uma admissão/desligamento, a ficha da pessoa e o Precisa de atenção mostram 'Termo desatualizado'. Acessórios (mouse, cabo) não geram pendência."
+                    )}
+                    <div role="group" aria-label="Itens que exigem termo de responsabilidade" className="flex flex-wrap gap-x-6 gap-y-2">
+                      {(
+                        [
+                          ['computador', 'Computadores'],
+                          ['celular', 'Celulares'],
+                          ['monitor', 'Monitores'],
+                        ] as const
+                      ).map(([chave, rotulo]) => (
+                        <label key={chave} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={termoExige[chave]}
+                            onChange={(e) => setTermoExige({ ...termoExige, [chave]: e.target.checked })}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                          {rotulo}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
             </form>
@@ -844,7 +901,7 @@ export const SettingsView: React.FC = () => {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (await confirmar('Restaurar a base completa de demonstração fictícia?')) {
+                        if (await confirmar('Restaurar a base completa de demonstração fictícia?\n\nOs dados deste navegador são trocados pelos de exemplo. Não dá para desfazer.')) {
                           resetToInitialData();
                           setSuccessMsg('Base de demonstração restaurada no navegador.');
                           setTimeout(() => setSuccessMsg(null), 3000);

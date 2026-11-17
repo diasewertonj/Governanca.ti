@@ -74,6 +74,8 @@ import {
   deleteLicenseDb,
   alocarLicencaDb,
   revogarLicencaDb,
+  liberarAssentoDb,
+  limparAgendaItemDb,
   fetchTicketsFromDb,
   insertTicketDb,
   updateTicketDb,
@@ -245,7 +247,9 @@ interface AppContextType {
   transferAssetCustody: (
     assetId: string,
     newColaboradorId: string | null,
-    motivoDevolucao?: string
+    motivoDevolucao?: string,
+    /** Seção 9.6: justificativa do 2º item (fica na entrega, no histórico de custódia) */
+    observacaoEntrega?: string
   ) => void;
 
   // Fase 8 · Manutenção e baixa. As funções do banco mudam o status e a custódia:
@@ -265,7 +269,8 @@ interface AppContextType {
   updateLicense: (id: string, updates: Partial<SoftwareLicense>) => void;
   deleteLicense: (id: string) => { success: boolean; message?: string };
   allocateLicense: (licenseId: string, employeeId: string) => void;
-  revokeLicense: (licenseId: string, employeeId: string) => void;
+  /** Seção 9.1: o motivo vai para o histórico de assentos */
+  revokeLicense: (licenseId: string, employeeId: string, motivo?: string) => void;
 
   // Ações de Chamados (Service Desk)
   // Assíncrono: o código (#CH-AAAA-NNNN) vem do banco. Devolve null se falhar.
@@ -322,6 +327,14 @@ interface AppContextType {
     dados: DadosRegistroItem
   ) => Promise<string | null>;
   concluirProcesso: (chamadoId: string) => Promise<string | null>;
+  /** Seção 9.2: marca (ou tira, com null) a data de um passo pendente; gera o lembrete */
+  agendarPasso: (itemId: string, data: string | null, observacao?: string) => Promise<string | null>;
+  /** Seção 9.2: anotações fixas do processo */
+  salvarAnotacoesProcesso: (chamadoId: string, texto: string) => Promise<string | null>;
+  /** Seção 9.2: tela própria do processo (no lugar da janela do chamado) */
+  processoAberto: string | null;
+  abrirProcesso: (chamadoId: string) => void;
+  fecharProcesso: () => void;
   acessoNexus: (
     colaboradorId: string,
     acao: 'criar' | 'redefinir',
@@ -764,7 +777,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setSelectedAssetIdFor360 = abrirOuFechar('ativo');
   const setSelectedSoftwareIdFor360 = abrirOuFechar('software');
   const setSelectedEmployeeIdFor360 = abrirOuFechar('colaborador');
-  const setSelectedTicketIdForDetail = abrirOuFechar('chamado');
+  // Seção 9.2: admissão/desligamento abre a tela própria do processo (largura total);
+  // as fichas por cima fecham (perguntando se houver alteração não salva)
+  const [processoAberto, setProcessoAberto] = useState<string | null>(null);
+  const abrirProcesso = (chamadoId: string) => {
+    if (pilhaFichas.length === 0) return setProcessoAberto(chamadoId);
+    void podeDescartarPendencias().then((ok) => {
+      if (!ok) return;
+      setPilhaFichas([]);
+      setProcessoAberto(chamadoId);
+    });
+  };
+  const fecharProcesso = () => setProcessoAberto(null);
+  const abrirChamado = abrirOuFechar('chamado');
+  const setSelectedTicketIdForDetail = (id: string | null) => {
+    const t = id ? tickets.find((x) => x.id === id) : undefined;
+    if (t && (t.tipo === 'onboarding' || t.tipo === 'offboarding')) return abrirProcesso(t.id);
+    abrirChamado(id);
+  };
   const [softwareModalOpen, setSoftwareModalOpen] = useState<boolean>(false);
   const [softwareToEdit, setSoftwareToEdit] = useState<SoftwareLicense | null>(null);
   const [selectedTermForPrint, setSelectedTermForPrint] = useState<ResponsibilityTerm | null>(null);
@@ -1129,7 +1159,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const transferAssetCustody = (
     assetId: string,
     newColaboradorId: string | null,
-    motivoDevolucao?: string
+    motivoDevolucao?: string,
+    observacaoEntrega?: string
   ) => {
     const antes = assets.find((a) => a.id === assetId);
     if (!antes) return;
@@ -1159,7 +1190,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         colaboradorId: newColaboradorId,
         colaboradorNome: newEmp?.nome || 'Colaborador',
         dataEntrega: today,
-        observacoes: 'Transferência de custódia realizada pelo setor de TI',
+        observacoes: observacaoEntrega
+          ? `Entrega pela T.I. — justificativa: ${observacaoEntrega}`
+          : 'Transferência de custódia realizada pelo setor de TI',
       };
       historico.push(entradaNova);
     }
@@ -1412,7 +1445,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const lidas = await fetchAtribuicoesLicencaFromDb();
     if (lidas) setAtribuicoesLicenca(lidas);
   };
-  const registrarAtribuicaoLocal = (licencaId: string, colaboradorId: string, entrou: boolean) => {
+  const registrarAtribuicaoLocal = (licencaId: string, colaboradorId: string, entrou: boolean, motivo?: string) => {
     const agora = new Date().toISOString();
     setAtribuicoesLicenca((prev) => {
       if (entrou) {
@@ -1421,11 +1454,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const aberta = prev.some((a) => a.licencaId === licencaId && a.colaboradorId === colaboradorId && !a.fim);
       // Assento que já existia antes do histórico (dados iniciais): registra a saída com início desconhecido
       if (!aberta) {
-        return [{ id: novoId('atr'), licencaId, colaboradorId, fim: agora, removidoPor: currentUser?.id }, ...prev];
+        return [{ id: novoId('atr'), licencaId, colaboradorId, fim: agora, removidoPor: currentUser?.id, motivoRemocao: motivo }, ...prev];
       }
       return prev.map((a) =>
         a.licencaId === licencaId && a.colaboradorId === colaboradorId && !a.fim
-          ? { ...a, fim: agora, removidoPor: currentUser?.id }
+          ? { ...a, fim: agora, removidoPor: currentUser?.id, motivoRemocao: motivo }
           : a
       );
     });
@@ -1452,14 +1485,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const revokeLicense = (licenseId: string, employeeId: string) => {
+  const revokeLicense = (licenseId: string, employeeId: string, motivo?: string) => {
     const antes = licenses.find((l) => l.id === licenseId);
     if (!antes || !antes.colaboradoresIds.includes(employeeId)) return;
     const ids = antes.colaboradoresIds.filter((x) => x !== employeeId);
     setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
-    if (!isProduction) registrarAtribuicaoLocal(licenseId, employeeId, false);
+    if (!isProduction) registrarAtribuicaoLocal(licenseId, employeeId, false, motivo);
     persistir(
-      revogarLicencaDb(licenseId, employeeId).then((doBanco) => {
+      (motivo ? liberarAssentoDb(licenseId, employeeId, motivo) : revogarLicencaDb(licenseId, employeeId)).then((doBanco) => {
         aplicarAssentos(licenseId, doBanco);
         if (isProduction) void recarregarAtribuicoes();
       }),
@@ -2430,7 +2463,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (status === 'feito' && item.tipo === 'cadastro') {
       if (!dados.colaborador_id) return 'Informe o colaborador cadastrado';
       setTickets((prev) => prev.map((t) => (t.id === item.chamadoId ? { ...t, colaboradorId: dados.colaborador_id } : t)));
-    } else if (status === 'feito' && !chamado?.colaboradorId) {
+    } else if (status === 'feito' && !chamado?.colaboradorId && !dados.colaborador_id) {
       return 'Faça primeiro o passo "Cadastrar colaborador"';
     }
     const agora = new Date().toISOString();
@@ -2454,6 +2487,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
       )
     );
+    // Mesmo efeito do banco: data informada vira lembrete do passo
+    if (dados.lembrete_em) {
+      setLembretes((prev) => [
+        ...prev,
+        {
+          id: novoId('lem'),
+          titulo: item.titulo + (dados.destino ? ` — ${dados.destino}` : ''),
+          descricao: observacao,
+          venceEm: dados.lembrete_em as string,
+          status: 'aberto',
+          chamadoId: item.chamadoId,
+          colaboradorId: chamado?.colaboradorId || dados.colaborador_id,
+          itemId: item.id,
+          criadoEm: agora,
+          criadoPor: currentUserId || undefined,
+        },
+      ]);
+    }
+    return null;
+  };
+
+  /**
+   * Seção 9.2: "Agendar" um passo pendente (ex.: entregar o notebook no 1º dia). O passo
+   * continua pendente, mostra "Agendado para dd/mm", gera o lembrete e entra no Precisa
+   * de atenção. Reagendar cancela o lembrete anterior; `null` tira a data.
+   */
+  const agendarPasso = async (itemId: string, data: string | null, observacao?: string): Promise<string | null> => {
+    const item = processoItens.find((i) => i.id === itemId);
+    if (!item) return 'Passo não encontrado';
+    if (item.status !== 'pendente') return 'Só passos pendentes podem ser agendados';
+    const abertos = lembretes.filter((l) => l.itemId === itemId && l.status === 'aberto');
+    for (const l of abertos) {
+      const falha = await encerrarLembrete(l.id, 'cancelado', data ? `Reagendado para ${data.split('-').reverse().join('/')}` : 'Agendamento retirado');
+      if (falha) return falha;
+    }
+    if (!data) {
+      if (isProduction) {
+        try {
+          await limparAgendaItemDb(itemId);
+          await recarregarProcesso();
+        } catch (err) {
+          return mensagemDeErro(err);
+        }
+        return null;
+      }
+      setProcessoItens((prev) => prev.map((i) => (i.id === itemId ? { ...i, lembreteEm: undefined } : i)));
+      return null;
+    }
+    return registrarItemProcesso(itemId, 'pendente', observacao, { lembrete_em: data });
+  };
+
+  /** Seção 9.2: anotações fixas do processo (gravadas no chamado; ficam depois de concluir) */
+  const salvarAnotacoesProcesso = async (chamadoId: string, texto: string): Promise<string | null> => {
+    const antes = tickets.find((t) => t.id === chamadoId);
+    if (!antes) return 'Processo não encontrado';
+    if (currentRole !== 'ti_admin' && currentRole !== 'ti_suporte') return 'Apenas a T.I. escreve as anotações do processo';
+    const depois: Ticket = { ...antes, anotacoesProcesso: texto.trim() };
+    if (isProduction) {
+      try {
+        await updateTicketDb(antes, depois);
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    setTickets((prev) => trocar(prev, depois));
     return null;
   };
 
@@ -2730,6 +2828,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         removerItemProcesso,
         registrarItemProcesso,
         concluirProcesso,
+        agendarPasso,
+        salvarAnotacoesProcesso,
+        processoAberto,
+        abrirProcesso,
+        fecharProcesso,
         acessoNexus,
         salvarCatalogo,
         criarLembrete,

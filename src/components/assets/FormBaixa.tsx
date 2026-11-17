@@ -15,6 +15,7 @@ import {
 import { isoLocal } from '../../utils/formatters.ts';
 import { ArquivosParaEnviar, enviarArquivos, type ArquivoParaEnviar } from './ArquivosParaEnviar.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
+import { CampoMoeda } from '../ui/Campos.tsx';
 
 /**
  * Fase 8: "Dar baixa" (só ti_admin) em modal-tela. Explica na tela o que
@@ -28,7 +29,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
   const [dataBaixa, setDataBaixa] = useState(isoLocal(new Date()));
   const [destinatario, setDestinatario] = useState('');
   const [documento, setDocumento] = useState('');
-  const [valorVenda, setValorVenda] = useState('');
+  const [valorVenda, setValorVenda] = useState<number | undefined>(undefined);
   const [observacoes, setObservacoes] = useState('');
   const [evidencias, setEvidencias] = useState<ArquivoParaEnviar[]>([]);
   const [erro, setErro] = useState('');
@@ -56,11 +57,19 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
   const registrar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (salvando || bloqueios.length > 0 || !motivo || !destino) return;
-    const aviso =
-      `Confirmar a baixa de ${asset.tag} (${ROTULO_MOTIVO_BAIXA[motivo]} · ${ROTULO_DESTINO_BAIXA[destino]})?\n\n` +
-      'O ativo sai da lista principal e não pode mais ser editado nem transferido. Só um estorno o traz de volta.' +
-      (encerraCustodia ? `\n\nA custódia de ${custodiante?.nome || 'colaborador'} será encerrada.` : '');
-    if (!(await confirmar(aviso))) return;
+    const ok = await confirmar({
+      titulo: `Dar baixa em ${asset.tag}?`,
+      mensagem:
+        `${ROTULO_MOTIVO_BAIXA[motivo]} · ${ROTULO_DESTINO_BAIXA[destino]}.\n\n` +
+        'O ativo sai da lista principal e do valor do patrimônio e não pode mais ser editado nem transferido. O histórico continua na ficha.' +
+        (encerraCustodia ? `\n\nA custódia de ${custodiante?.nome || 'colaborador'} é encerrada.` : '') +
+        '\n\nDá para desfazer: o administrador estorna a baixa na ficha e o ativo volta ao estoque como disponível' +
+        (encerraCustodia ? ' (sem voltar para a pessoa).' : '.'),
+      confirmar: 'Dar baixa',
+      cancelar: 'Voltar',
+      perigo: true,
+    });
+    if (!ok) return;
 
     setErro('');
     setSalvando(true);
@@ -70,7 +79,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
       dataBaixa,
       destinatario: destinatario || undefined,
       documento: documento || undefined,
-      valorVenda: destino === 'venda' && valorVenda.trim() !== '' ? Number(valorVenda) : undefined,
+      valorVenda: destino === 'venda' ? valorVenda : undefined,
       observacoes: observacoes || undefined,
     });
     if (r.erro !== undefined) {
@@ -210,16 +219,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 <label htmlFor={id('valor')} className="rotulo">
                   Valor de venda (R$)
                 </label>
-                <input
-                  id={id('valor')}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={valorVenda}
-                  onChange={(e) => setValorVenda(e.target.value)}
-                  className="campo font-mono"
-                />
+                <CampoMoeda id={id('valor')} valor={valorVenda} onMudar={setValorVenda} />
               </div>
             )}
             <div className="md:col-span-2 xl:col-span-2">

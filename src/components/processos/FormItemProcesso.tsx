@@ -8,6 +8,7 @@ import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
 import type { CondicaoItem, DestinoRecurso, ItemTermo, ProcessoItem, Ticket } from '../../types/index.ts';
 import { termoCancelado } from '../../utils/termos.ts';
 import { ConferenciaTermo } from '../terms/ConferenciaTermo.tsx';
+import { usePassoProcesso, type ResultadoLogin } from './usePassoProcesso.ts';
 import { licencaAtiva } from '../../utils/licencas.ts';
 import {
   DOC_DEVOLUCAO_PADRAO,
@@ -38,6 +39,8 @@ interface Props {
   item: ProcessoItem;
   ticket: Ticket;
   onFechar: () => void;
+  /** Seção 9.2: login criado sozinho depois do cadastro (a tela mostra a senha) */
+  onLogin?: (r: ResultadoLogin) => void;
 }
 
 /**
@@ -46,7 +49,8 @@ interface Props {
  * Nada grava até clicar em "Registrar" ou "Não se aplica"; o banco
  * valida de novo e aplica os efeitos no inventário numa transação.
  */
-export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) => {
+export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLogin }) => {
+  const { criarLogin } = usePassoProcesso(ticket);
   const {
     employees,
     assets,
@@ -147,7 +151,8 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
         ? licencaDaConta(recurso.nome, licenses)
         : undefined;
 
-  const registrar = async (status: 'feito' | 'nao_se_aplica', observacaoExtra?: string, colaboradorDoCadastro?: string) => {
+  /** Devolve true quando o passo (e os efeitos) foram registrados */
+  const registrar = async (status: 'feito' | 'nao_se_aplica', observacaoExtra?: string, colaboradorDoCadastro?: string): Promise<boolean | void> => {
     setErro(null);
     const observacao = [obs.trim(), observacaoExtra].filter(Boolean).join(' — ') || undefined;
     if (status === 'nao_se_aplica' && !obs.trim()) return setErro('Escreva o motivo para marcar como "não se aplica".');
@@ -229,6 +234,14 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       if (falhaEst) return setErro(`Passo registrado, mas o estoque não baixou: ${falhaEst}`);
     }
     if (!senha) onFechar();
+    return true;
+  };
+
+  /** Seção 9.2: pessoa ligada ao processo → o login é criado na hora (sem o passo extra) */
+  const loginAutomatico = async (id: string, temLogin?: boolean) => {
+    if (temLogin) return;
+    const r = await criarLogin(id);
+    onLogin?.(r);
   };
 
   // Cadastro a partir do pedido do RH: abre o formulário já preenchido (dá para corrigir
@@ -237,7 +250,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const concluirCadastro = async (id: string) => {
     setColaboradorId(id);
     setAviso('Cadastro criado.');
-    await registrar('feito', 'Cadastro criado a partir do pedido do RH', id);
+    if (await registrar('feito', 'Cadastro criado a partir do pedido do RH', id)) await loginAutomatico(id);
   };
 
   const gerarAcesso = async (acao: 'criar' | 'redefinir') => {
@@ -420,7 +433,11 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
             <button
               type="button"
               disabled={gravando}
-              onClick={() => registrar('feito', 'Pessoa já cadastrada com o e-mail informado pelo RH', colabPorEmail.id)}
+              onClick={async () => {
+                if (await registrar('feito', 'Pessoa já cadastrada com o e-mail informado pelo RH', colabPorEmail.id)) {
+                  await loginAutomatico(colabPorEmail.id, colabPorEmail.temLogin);
+                }
+              }}
               className="btn btn-sm btn-primario"
             >
               <UserPlus aria-hidden="true" /> {colabPorEmail.nome} já está cadastrada: ligar e concluir

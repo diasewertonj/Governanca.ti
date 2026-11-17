@@ -1,7 +1,8 @@
 /**
- * Financeiro (um item no menu) com abas Contas a pagar e Despesas.
+ * Financeiro (um item no menu) com abas Contas a pagar, Despesas e Compras (seção 9.4).
  * Despesas: período escolhido pela pessoa, filtros combináveis, realizado × previsto,
  * comparação com o período anterior, evolução mês a mês, agrupamento, detalhe clicável e CSV.
+ * O período é o mesmo em Despesas e Compras (trocar de aba não perde a escolha).
  *
  * Realizado = faturas pagas cuja competência cai no período.
  * Previsto  = custo recorrente de cada mês do período (contratos vigentes naquele mês,
@@ -28,6 +29,7 @@ import {
   somarPor,
 } from '../../utils/financeiro.ts';
 import { ContasPagarView, ContratoPorId } from './FinanceiroViews.tsx';
+import { CartaoPatrimonio, ComprasView } from './ComprasView.tsx';
 import { Abas } from '../ui/Abas.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
@@ -94,7 +96,16 @@ interface Origem {
 }
 
 export const FinanceiroView: React.FC = () => {
-  const [aba, setAba] = useState<'contas' | 'despesas'>('contas');
+  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras'>('contas');
+  // Período em comum entre Despesas e Compras
+  const [atalho, setAtalho] = useState<Atalho>('ult6');
+  const [deManual, setDeManual] = useState('');
+  const [ateManual, setAteManual] = useState('');
+  const periodo =
+    atalho === 'personalizado' && deManual && ateManual && deManual <= ateManual
+      ? { de: deManual, ate: ateManual }
+      : periodoDoAtalho(atalho === 'personalizado' ? 'este_mes' : atalho);
+
   const abas = (
     <Abas
       rotulo="Financeiro"
@@ -103,17 +114,39 @@ export const FinanceiroView: React.FC = () => {
       itens={[
         { id: 'contas', rotulo: 'Contas a pagar' },
         { id: 'despesas', rotulo: 'Despesas' },
+        { id: 'compras', rotulo: 'Compras' },
       ]}
     />
   );
-  return aba === 'contas' ? <ContasPagarView abas={abas} /> : <DespesasView abas={abas} />;
+  const filtroPeriodo = (
+    <>
+      <select aria-label="Período" value={atalho} onChange={(e) => setAtalho(e.target.value as Atalho)} className="campo campo-sm">
+        {Object.entries(ROTULO_ATALHO).map(([k, v]) => (
+          <option key={k} value={k}>{v}</option>
+        ))}
+      </select>
+      {atalho === 'personalizado' && (
+        <>
+          <input aria-label="De" title="De" type="date" value={deManual} onChange={(e) => setDeManual(e.target.value)} className="campo campo-sm" />
+          <input aria-label="Até" title="Até" type="date" value={ateManual} min={deManual || undefined} onChange={(e) => setAteManual(e.target.value)} className="campo campo-sm" />
+        </>
+      )}
+    </>
+  );
+  if (aba === 'contas') return <ContasPagarView abas={abas} />;
+  if (aba === 'compras') return <ComprasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
+  return <DespesasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
 };
-export const DespesasView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
+
+export const DespesasView: React.FC<{
+  abas?: React.ReactNode;
+  /** Período escolhido no Financeiro (o mesmo de Compras) */
+  periodo: { de: string; ate: string };
+  /** Seletor de período (atalhos ou de/até), montado pelo Financeiro */
+  filtroPeriodo: React.ReactNode;
+}> = ({ abas, periodo, filtroPeriodo }) => {
   const { licenses, contratos, faturas, fornecedores, abrirFicha } = useApp();
   const { linhas } = useRecursos();
-  const [atalho, setAtalho] = useState<Atalho>('ult6');
-  const [deManual, setDeManual] = useState('');
-  const [ateManual, setAteManual] = useState('');
   const [fFornecedor, setFFornecedor] = useState('');
   const [fCategoria, setFCategoria] = useState('');
   const [fArea, setFArea] = useState('');
@@ -121,10 +154,6 @@ export const DespesasView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => 
   const [agrupar, setAgrupar] = useState<'categoria' | 'fornecedor' | 'area' | 'origem'>('categoria');
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
 
-  const periodo =
-    atalho === 'personalizado' && deManual && ateManual && deManual <= ateManual
-      ? { de: deManual, ate: ateManual }
-      : periodoDoAtalho(atalho === 'personalizado' ? 'este_mes' : atalho);
   const meses = mesesEntre(periodo.de, periodo.ate);
   const anterior = periodoAnterior(periodo.de, periodo.ate);
 
@@ -244,17 +273,7 @@ export const DespesasView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => 
         abas={abas}
         filtros={
           <>
-            <select aria-label="Período" value={atalho} onChange={(e) => setAtalho(e.target.value as Atalho)} className="campo campo-sm">
-              {Object.entries(ROTULO_ATALHO).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-            {atalho === 'personalizado' && (
-              <>
-                <input aria-label="De" title="De" type="date" value={deManual} onChange={(e) => setDeManual(e.target.value)} className="campo campo-sm" />
-                <input aria-label="Até" title="Até" type="date" value={ateManual} min={deManual || undefined} onChange={(e) => setAteManual(e.target.value)} className="campo campo-sm" />
-              </>
-            )}
+            {filtroPeriodo}
             <select aria-label="Fornecedor" value={fFornecedor} onChange={(e) => setFFornecedor(e.target.value)} className="campo campo-sm">
               <option value="">Todos os fornecedores</option>
               {fornecedores.map((f) => (
@@ -283,8 +302,8 @@ export const DespesasView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => 
           </>
         }
       />
-      {/* Números do período */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Números do período (o valor do patrimônio é de hoje: só leitura da ficha fiscal) */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <div className="cartao p-3">
           <p className="text-xs text-slate-500">Realizado (pago)</p>
           <p className="text-lg font-semibold font-mono text-slate-900">{brl(dados.realizado)}</p>
@@ -309,6 +328,7 @@ export const DespesasView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => 
           <p className="text-lg font-semibold font-mono text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}</p>
           <p className="text-xs text-slate-500">{ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || 'nenhum'}</p>
         </div>
+        <CartaoPatrimonio className="col-span-2 xl:col-span-1" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">

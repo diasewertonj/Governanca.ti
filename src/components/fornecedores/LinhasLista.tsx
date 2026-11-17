@@ -8,9 +8,12 @@ import { formatCurrency, formatDate } from '../../utils/formatters.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
 import { TIPOS_COM_LINHAS } from '../../utils/financeiro.ts';
 import { normalizar } from '../../utils/processos.ts';
-import { confirmar } from '../ui/dialogo.tsx';
+import { confirmar, confirmarMovimento } from '../ui/dialogo.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { Vazio } from '../ui/Tela.tsx';
+import { CampoMascara, CampoMoeda } from '../ui/Campos.tsx';
+
+const SEM_PESSOA = 'Sem pessoa (estoque)';
 
 const ROTULO_STATUS: Record<LinhaTelefonica['status'], string> = { ativa: 'Ativa', suspensa: 'Suspensa', cancelada: 'Cancelada' };
 const SELO_STATUS: Record<LinhaTelefonica['status'], string> = { ativa: 'selo-ok', suspensa: 'selo-atencao', cancelada: 'selo-neutro' };
@@ -154,7 +157,12 @@ export const LinhasLista: React.FC<{
                               title="Excluir"
                               aria-label={`Excluir ${l.numero}`}
                               onClick={async () => {
-                                if ((await confirmar(`Excluir a linha ${l.numero}? Esta ação não pode ser desfeita.`))) setErro((await excluirLinha(l.id)) || '');
+                                // Com histórico de uso o banco não deixa excluir: avisa antes de pedir confirmação
+                                if (atribuicoesLinha.some((a) => a.linhaId === l.id)) {
+                                  setErro(`A linha ${l.numero} tem histórico de uso: em vez de excluir, edite e mude a situação para Cancelada.`);
+                                  return;
+                                }
+                                if (await confirmar(`Excluir a linha ${l.numero}?\n\nO cadastro sai das listas. Não dá para desfazer.`)) setErro((await excluirLinha(l.id)) || '');
                               }}
                               className="btn-icone btn-icone-perigo"
                             >
@@ -213,7 +221,7 @@ const FormLinha: React.FC<{
     ativoId: linha?.ativoId || '',
     colaboradorId: linha?.colaboradorId || '',
     status: linha?.status || ('ativa' as LinhaTelefonica['status']),
-    valorMensal: linha?.valorMensal != null ? String(linha.valorMensal) : '',
+    valorMensal: linha?.valorMensal ?? undefined,
     centroCusto: linha?.centroCusto || '',
     observacoes: linha?.observacoes || '',
   });
@@ -230,8 +238,66 @@ const FormLinha: React.FC<{
     setD((p) => ({ ...p, ativoId: id, colaboradorId: p.colaboradorId || a?.custodianteId || '' }));
   };
 
+  const nome = (id?: string) => employees.find((x) => x.id === id)?.nome || 'Pessoa';
+
+  /** 9.1: mudar quem usa a linha (ou cancelar a linha) passa pela confirmação "de → para". false = não grava */
+  const confirmarMudanca = async (): Promise<boolean> => {
+    const antes = linha?.colaboradorId || '';
+    // Linha cancelada fica sem pessoa (o salvar já faz isso)
+    const depois = d.status === 'cancelada' ? '' : d.colaboradorId;
+    if (linha && linha.status !== 'cancelada' && d.status === 'cancelada') {
+      const r = await confirmarMovimento({
+        titulo: 'Cancelar linha',
+        item: d.numero,
+        de: antes ? nome(antes) : SEM_PESSOA,
+        para: 'Linha cancelada',
+        efeitos: [
+          'A linha sai das listas (só aparece em "Mostrar canceladas") e o número fica livre para outro cadastro',
+          ...(antes ? [`A linha sai da ficha de ${nome(antes)}; o histórico de uso registra o fim hoje`] : []),
+        ],
+        foraDoNexus: ['Pedir o cancelamento à operadora (o Nexus não cancela lá)', ...(antes ? [`Recolher o chip/aparelho com ${nome(antes)}`] : [])],
+        desfazer: 'Dá para reativar: marque "Mostrar canceladas", edite a linha e volte a situação para Ativa. A pessoa precisa ser escolhida de novo.',
+        confirmar: 'Confirmar cancelamento',
+        perigo: true,
+      });
+      return r !== null;
+    }
+    if (antes === depois) return true;
+    const titulo = !antes ? 'Entregar linha' : !depois ? 'Devolver linha' : 'Trocar quem usa a linha';
+    const aparelho = assets.find((a) => a.id === d.ativoId);
+    const r = await confirmarMovimento({
+      titulo,
+      item: [d.numero, d.plano].filter(Boolean).join(' · '),
+      de: antes ? nome(antes) : SEM_PESSOA,
+      para: depois ? nome(depois) : SEM_PESSOA,
+      efeitos: [
+        ...(depois ? [`A linha passa a constar na ficha de ${nome(depois)}`] : []),
+        ...(antes ? [`A linha sai da ficha de ${nome(antes)}`] : []),
+        !antes ? 'O histórico de uso registra o início hoje' : !depois ? 'O histórico de uso registra o fim do uso hoje' : 'O histórico de uso registra a troca hoje',
+        ...(aparelho && (aparelho.custodianteId || '') !== depois
+          ? [`O aparelho ${aparelho.tag} não muda de mãos por aqui: se ele também mudou, troque a custódia na ficha dele`]
+          : []),
+      ],
+      foraDoNexus: [
+        ...(depois ? [`Entregar o chip/aparelho a ${nome(depois)}`] : []),
+        ...(antes ? [`Recolher o chip/aparelho com ${nome(antes)}`] : []),
+        'Se mudar o titular ou o centro de custo, avisar a operadora',
+      ],
+      desfazer: 'Dá para desfazer editando a linha de novo; o histórico guarda as duas trocas.',
+      confirmar: !antes ? 'Entregar' : !depois ? 'Devolver' : 'Trocar',
+    });
+    return r !== null;
+  };
+
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Confere o número antes de perguntar (o mesmo que o salvar confere)
+    const digitos = d.numero.replace(/\D/g, '');
+    if (digitos.length < 8) return setErro('Informe o número completo da linha (com DDD).');
+    const repetida = linhas.find((l) => l.id !== linha?.id && l.status !== 'cancelada' && l.numero.replace(/\D/g, '') === digitos);
+    if (repetida) return setErro(`O número ${repetida.numero} já está cadastrado.`);
+    setErro('');
+    if (!(await confirmarMudanca())) return;
     const falha = await onSalvar({
       id: linha?.id,
       numero: d.numero,
@@ -243,7 +309,7 @@ const FormLinha: React.FC<{
       ativoId: d.ativoId || undefined,
       colaboradorId: d.colaboradorId || undefined,
       status: d.status,
-      valorMensal: d.valorMensal === '' ? undefined : Number(d.valorMensal),
+      valorMensal: d.valorMensal,
       centroCusto: d.centroCusto || undefined,
       observacoes: d.observacoes || undefined,
     });
@@ -269,7 +335,7 @@ const FormLinha: React.FC<{
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="ln-num" className={CLASSE_ROTULO}>Número *</label>
-          <input id="ln-num" required value={d.numero} onChange={(e) => set('numero', e.target.value)} className={`${CLASSE_CAMPO} font-mono`} placeholder="(11) 99999-0000" />
+          <CampoMascara id="ln-num" tipo="telefone" required value={d.numero} onChange={(v) => set('numero', v)} className={CLASSE_CAMPO} placeholder="(11) 99999-0000" />
         </div>
         <div>
           <label htmlFor="ln-tipo" className={CLASSE_ROTULO}>Tipo</label>
@@ -300,7 +366,7 @@ const FormLinha: React.FC<{
         {!d.contratoId && (
           <div>
             <label htmlFor="ln-valor" className={CLASSE_ROTULO}>Valor mensal (R$)</label>
-            <input id="ln-valor" type="number" min={0} step="0.01" value={d.valorMensal} onChange={(e) => set('valorMensal', e.target.value)} className={CLASSE_CAMPO} />
+            <CampoMoeda id="ln-valor" valor={d.valorMensal} onMudar={(v) => setD((p) => ({ ...p, valorMensal: v }))} className={CLASSE_CAMPO} />
           </div>
         )}
         <div>
@@ -313,7 +379,7 @@ const FormLinha: React.FC<{
         </div>
         <div>
           <label htmlFor="ln-chip" className={CLASSE_ROTULO}>Chip (ICCID)</label>
-          <input id="ln-chip" value={d.chip} onChange={(e) => set('chip', e.target.value)} className={`${CLASSE_CAMPO} font-mono`} />
+          <CampoMascara id="ln-chip" tipo="iccid" value={d.chip} onChange={(v) => set('chip', v)} className={CLASSE_CAMPO} />
         </div>
         <div>
           <label htmlFor="ln-aparelho" className={CLASSE_ROTULO}>Aparelho</label>

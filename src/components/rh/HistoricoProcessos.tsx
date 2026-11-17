@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserMinus, UserPlus } from 'lucide-react';
+import { StickyNote, UserMinus, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Ticket } from '../../types/index.ts';
 import { formatDate } from '../../utils/formatters.ts';
@@ -21,7 +21,7 @@ const SITUACAO: Record<Ticket['status'], { r: string; c: string }> = {
 /**
  * Histórico de admissões e desligamentos (tela inicial de Admissões e desligamentos).
  * Os processos não aparecem mais em Chamados: aqui ficam o andamento (passos feitos)
- * e o histórico. Clicar abre o chamado do processo com o checklist.
+ * e o histórico. Clicar abre a tela própria do processo (seção 9.2).
  * Os filtros ficam no cabeçalho da tela (RhProcessesView) e chegam por props.
  */
 export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: FiltroSituacaoProcesso; busca: string }> = ({ tipo, situacao, busca }) => {
@@ -84,6 +84,13 @@ export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: 
                 </td>
                 <td data-label="Pessoa" className="font-semibold text-slate-900">
                   {pessoa(t)}
+                  {/* Seção 9.2: anotações fixas do processo, visíveis também depois de concluir */}
+                  {t.anotacoesProcesso && (
+                    <span className="block max-w-xs truncate font-normal text-slate-500" title={t.anotacoesProcesso}>
+                      <StickyNote className="mr-1 inline h-3 w-3" aria-label="Anotações" />
+                      {t.anotacoesProcesso}
+                    </span>
+                  )}
                 </td>
                 <td data-label="Data">
                   {dataProcesso(t) ? formatDate(dataProcesso(t)) : '—'}

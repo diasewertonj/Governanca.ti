@@ -10,6 +10,7 @@ import { ROTULO_TIPO_MANUTENCAO, statusAposManutencao } from '../../utils/cicloV
 import { formatCurrency, formatDate, isoLocal } from '../../utils/formatters.ts';
 import { ArquivosParaEnviar, enviarArquivos, type ArquivoParaEnviar } from './ArquivosParaEnviar.tsx';
 import { chamadoEmAberto, chamadosDaPessoa, chamadosDoAtivo } from '../../utils/vinculos.ts';
+import { CampoMoeda } from '../ui/Campos.tsx';
 
 /** abrir = "Enviar para manutenção"; feita = histórico sem mudar o status; concluir/cancelar = encerrar a aberta */
 export type ModoManutencao = 'abrir' | 'feita' | 'concluir' | 'cancelar';
@@ -25,9 +26,6 @@ const CATEGORIAS_ABERTURA: CategoriaAnexoAtivo[] = ['orcamento', 'os', 'laudo', 
 const CATEGORIAS_CONCLUSAO: CategoriaAnexoAtivo[] = ['os', 'laudo', 'orcamento', 'foto', 'outro'];
 
 const ROTULO_RETORNO = { em_uso: 'Em uso', disponivel: 'Disponível' } as const;
-
-/** Texto do campo de valor em número (vazio = sem valor) */
-const valorDigitado = (v: string) => (v.trim() === '' ? undefined : Number(v));
 
 interface FormManutencaoProps {
   asset: Asset;
@@ -66,7 +64,8 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
   const [chamadoId, setChamadoId] = useState(chamadoInicial ?? '');
   const [abertaEm, setAbertaEm] = useState(hoje);
   const [previsao, setPrevisao] = useState('');
-  const [custo, setCusto] = useState(encerrando && manutencao ? String(manutencao.custo) : '');
+  // Vazio = sem valor
+  const [custo, setCusto] = useState<number | undefined>(encerrando && manutencao ? manutencao.custo : undefined);
   const [cobertoGarantia, setCobertoGarantia] = useState(false);
   // Conclusão (também a data da manutenção já feita)
   const [concluidaEm, setConcluidaEm] = useState(hoje);
@@ -110,7 +109,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
     chamadoId: chamadoId || undefined,
     abertaEm,
     previsao: modo === 'abrir' ? previsao || undefined : undefined,
-    custo: valorDigitado(custo) ?? 0,
+    custo: custo ?? 0,
     cobertoGarantia,
     observacoes: observacoes || undefined,
   });
@@ -121,7 +120,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
     if (!manutencao) return { erro: 'Manutenção não encontrada.' };
     const erroEncerrar = await encerrarManutencao(manutencao.id, modo === 'concluir' ? 'concluida' : 'cancelada', {
       concluidaEm: modo === 'concluir' ? concluidaEm : undefined,
-      custo: modo === 'concluir' ? valorDigitado(custo) : undefined,
+      custo: modo === 'concluir' ? custo : undefined,
       observacoes: observacoes || undefined,
     });
     return { id: manutencao.id, erro: erroEncerrar };
@@ -170,6 +169,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
           {modo === 'abrir' && `O ativo fica "Em manutenção" até a conclusão. A custódia não muda.`}
           {modo === 'feita' && 'Lança no histórico um serviço já concluído (ex.: troca de SSD em março), sem mudar o status do ativo.'}
           {encerrando && `Ao ${modo === 'concluir' ? 'concluir' : 'cancelar'}, o ativo volta para "${retorno}".`}
+          {modo === 'cancelar' && ' A manutenção fica no histórico como cancelada. Não dá para reabrir: se precisar, envie para manutenção de novo.'}
         </p>
 
         {encerrando && manutencao && (
@@ -327,17 +327,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
                 <label htmlFor={id('custo')} className="rotulo">
                   {modo === 'abrir' ? 'Custo estimado (R$)' : 'Custo (R$)'}
                 </label>
-                <input
-                  id={id('custo')}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={custo}
-                  onChange={(e) => setCusto(e.target.value)}
-                  placeholder="0,00"
-                  className="campo font-mono"
-                />
+                <CampoMoeda id={id('custo')} valor={custo} onMudar={setCusto} />
               </div>
               <div className="flex items-center md:pt-5">
                 <label htmlFor={id('garantia')} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
@@ -369,16 +359,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
               <label htmlFor={id('custo')} className="rotulo">
                 Custo final (R$)
               </label>
-              <input
-                id={id('custo')}
-                type="number"
-                min={0}
-                step="0.01"
-                inputMode="decimal"
-                value={custo}
-                onChange={(e) => setCusto(e.target.value)}
-                className="campo font-mono"
-              />
+              <CampoMoeda id={id('custo')} valor={custo} onMudar={setCusto} />
             </div>
           </div>
         )}
