@@ -577,7 +577,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     {/* Só o que o RH escreveu (chamados antigos: o perfil escolhido vira observação) */}
                     {ticket.onboarding.tipoComputador?.trim() && (
                       <div className="pt-2 border-t border-slate-100">

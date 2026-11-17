@@ -18,9 +18,9 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
   const equipamentos = pessoa ? assets.filter((a) => a.custodianteId === pessoa.id) : [];
   const softwares = pessoa ? licenses.filter((l) => l.colaboradoresIds.includes(pessoa.id)) : [];
   const linha = (rotulo: string, valor: React.ReactNode) => (
-    <div className="flex flex-col sm:flex-row sm:gap-2">
-      <span className="text-slate-500 sm:w-40 shrink-0">{rotulo}</span>
-      <span className="text-slate-900">{valor}</span>
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
+      <span className="text-slate-500">{rotulo}</span>
+      <span className="text-slate-900 break-words">{valor}</span>
     </div>
   );
 
@@ -30,7 +30,7 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
         <UserMinus className="w-4 h-4" aria-hidden="true" />
         Pedido do RH
       </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1 text-[13px]">
+      <div className="grid grid-cols-1 gap-y-1 text-[13px]">
         {linha('Quem sai', pessoa ? `${pessoa.nome} · ${pessoa.cargo}` : 'colaborador não encontrado')}
         {linha('Último dia', formatDate(off.dataDesligamento))}
         {linha('E-mail', off.redirecionarEmail ? `redirecionar/dar acesso para ${nome(off.redirecionarEmailParaId)}` : 'não redirecionar')}
@@ -39,7 +39,7 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
         {off.observacoes?.trim() && linha('Observações', <span className="whitespace-pre-wrap">{off.observacoes}</span>)}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
         <div>
           <p className="font-semibold text-slate-700 mb-1">Equipamentos com a pessoa ({equipamentos.length})</p>
           {equipamentos.length === 0 ? (
