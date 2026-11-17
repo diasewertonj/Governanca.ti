@@ -63,9 +63,23 @@ export const BarraAlteracoes: React.FC<BarraAlteracoesProps> = ({
   );
 };
 
+// Fechar vários níveis do caminho de uma vez: a pergunta é feita uma vez só (antes),
+// e os fechamentos em seguida não perguntam de novo.
+let pularConfirmacao = false;
+export function pularConfirmacaoDescarte(fechar: () => void) {
+  pularConfirmacao = true;
+  try {
+    fechar();
+  } finally {
+    setTimeout(() => {
+      pularConfirmacao = false;
+    }, 0);
+  }
+}
+
 /** Pergunta antes de descartar alterações (fechar janela, trocar de aba). */
 export async function confirmarDescarte(itens: string[]): Promise<boolean> {
-  if (itens.length === 0) return true;
+  if (itens.length === 0 || pularConfirmacao) return true;
   return confirmar({
     titulo: itens.length === 1 ? 'Há 1 alteração não salva' : `Há ${itens.length} alterações não salvas`,
     mensagem: itens.map((i) => `• ${i}`).join('\n') + '\n\nSe continuar, elas serão descartadas.',

@@ -31,6 +31,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { confirmar } from '../ui/dialogo.tsx';
+import { BotaoVoltar, Caminho, useNivelNavegacao } from '../ui/navegacao.tsx';
 
 interface TicketDetailModalProps {
   ticketId: string;
@@ -115,8 +116,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     }
   }
   useRegistrarPendencias(`chamado:${ticketId}`, itensPendentes);
+  // Caminho (seção 8.8): o chamado é um nível como as fichas
+  const fecharChamado = () => void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
+  const nav = useNivelNavegacao(ticket ? `Chamado ${ticket.codigo}` : 'Chamado', fecharChamado);
 
   if (!ticket) return null;
+  const temAnterior = nav.noCaminho && nav.indice > 0;
 
   const encerrado = chamadoEncerrado(ticket);
   const statusExibido = rascStatus ?? ticket.status;
@@ -237,11 +242,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   );
 
   return (
-    <div className="janela-fundo modal-tela">
+    <div className={`janela-fundo modal-tela ${nav.topo ? '' : 'hidden'}`}>
       <div role="dialog" aria-modal="true" aria-labelledby={`chamado-titulo-${ticket.id}`} className="janela janela-ficha">
         {/* Cabeçalho fixo: código, tipo, situação, prioridade e título; abaixo, a faixa de ações do atendimento */}
         <div className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
+            {temAnterior && <BotaoVoltar onClick={fecharChamado} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
             <span className="font-mono text-xs font-semibold text-slate-700">{ticket.codigo}</span>
             <span className="text-xs text-slate-500">
               · {ROTULO_TIPO_CHAMADO[ticket.tipo]} · {ticket.categoria}
@@ -262,10 +268,21 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               <Printer aria-hidden="true" />
               <span className="hidden sm:inline">Relatório</span>
             </button>
-            <button type="button" onClick={fechar} aria-label="Fechar chamado" title="Fechar" className="btn-icone">
-              <X className="!h-5 !w-5" />
-            </button>
+            {temAnterior ? (
+              <button type="button" onClick={() => void nav.fecharTudo?.()} aria-label="Fechar tudo" title="Fechar tudo" className="btn-icone">
+                <X className="!h-5 !w-5" />
+              </button>
+            ) : (
+              <button type="button" onClick={fechar} aria-label="Fechar chamado" title="Fechar" className="btn-icone">
+                <X className="!h-5 !w-5" />
+              </button>
+            )}
           </div>
+          {temAnterior && (
+            <div className="mt-1">
+              <Caminho niveis={nav.niveis} indice={nav.indice} voltarAte={nav.voltarAte} />
+            </div>
+          )}
           <h2 id={`chamado-titulo-${ticket.id}`} className="tela-titulo mt-1 break-words">
             {ticket.titulo}
           </h2>

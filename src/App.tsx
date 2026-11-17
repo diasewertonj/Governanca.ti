@@ -5,6 +5,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { DialogoHost } from './components/ui/dialogo.tsx';
+import { NavegacaoProvider } from './components/ui/navegacao.tsx';
 import { AppProvider, useApp } from './context/AppContext.tsx';
 import { RecursosProvider } from './context/RecursosContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
@@ -78,7 +79,10 @@ function MainApp() {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       const janelas = [...document.querySelectorAll<HTMLElement>('.modal-tela')].filter((j) => j.offsetParent !== null || j.getClientRects().length);
       const topo = janelas[janelas.length - 1];
-      const fechar = topo?.querySelector<HTMLButtonElement>('button[aria-label^="Fechar"], button[aria-label^="fechar"]');
+      // No caminho, Esc volta um nível (botão Voltar); sem caminho, fecha a janela
+      const fechar =
+        topo?.querySelector<HTMLButtonElement>('button[aria-label="Voltar"]') ||
+        topo?.querySelector<HTMLButtonElement>('button[aria-label^="Fechar"]:not([aria-label="Fechar tudo"]), button[aria-label^="fechar"]');
       if (fechar) {
         e.preventDefault();
         fechar.click();
@@ -251,7 +255,9 @@ export default function App() {
   return (
     <AppProvider>
       <RecursosProvider>
-        <MainApp />
+        <NavegacaoProvider>
+          <MainApp />
+        </NavegacaoProvider>
       </RecursosProvider>
     </AppProvider>
   );
