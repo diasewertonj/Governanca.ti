@@ -29,7 +29,7 @@ interface VinculosChamadoProps {
  * Cada vínculo abre a ficha por cima do chamado (fechar volta para cá). A T.I.
  * altera os vínculos como rascunho, gravado no "Salvar alterações" do chamado.
  */
-export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascunho, onMudar }) => {
+export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boolean }> = ({ ticket, rascunho, onMudar, embutido }) => {
   const { assets, licenses, employees, fornecedores, contratos, currentRole, currentUser, abrirFicha, processoItens } = useApp();
   const id = useId();
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
@@ -94,7 +94,8 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
   if (vazio && !isTI) return null;
 
   return (
-    <section aria-label="Vínculos" className="cartao p-4 space-y-3 text-xs">
+    // embutido: faixa fina no topo do chamado (sem cartão; itens lado a lado)
+    <section aria-label="Vínculos" className={embutido ? 'space-y-1.5 text-xs' : 'cartao p-4 space-y-3 text-xs'}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="secao-titulo">Vínculos</h3>
         {podeAlterar && (
@@ -110,7 +111,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
       </div>
 
       {podeAlterar && (editando || mexeu) && (
-        <div className="space-y-3 border-b border-slate-100 pb-3">
+        <div className={embutido ? 'grid gap-2 border-b border-slate-100 pb-2 md:grid-cols-3' : 'space-y-3 border-b border-slate-100 pb-3'}>
           {!processo && (
             <div>
               <label htmlFor={`${id}-pessoa`} className="rotulo">
@@ -195,10 +196,11 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
               </optgroup>
             </select>
           </div>
-          <p className="ajuda">As mudanças são gravadas em “Salvar alterações”.</p>
+          <p className={embutido ? 'ajuda md:col-span-3' : 'ajuda'}>As mudanças são gravadas em “Salvar alterações”.</p>
         </div>
       )}
 
+      <div className={embutido ? 'flex flex-wrap items-start gap-x-8 gap-y-2' : 'space-y-3'}>
       {vazio && (
         <p className="text-xs text-slate-500">
           {processo
@@ -346,6 +348,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
           ))}
         </div>
       )}
+      </div>
     </section>
   );
 };

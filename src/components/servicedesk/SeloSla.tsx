@@ -49,13 +49,14 @@ export const SeloSla: React.FC<{ tkt: Ticket }> = ({ tkt }) => {
 };
 
 /** Fase 10 C1: prazos no chamado (1ª resposta e solução) */
-export const PrazosChamado: React.FC<{ tkt: Ticket }> = ({ tkt }) => {
+/** embutido: versão compacta para a faixa do topo do chamado (sem cartão) */
+export const PrazosChamado: React.FC<{ tkt: Ticket; embutido?: boolean }> = ({ tkt, embutido }) => {
   const { eventosSla, prazosSla } = useApp();
   const s = situacaoSla(tkt, eventosSla[tkt.id] || [], prazosSla);
   if (!s) return null;
   const { resposta, solucao } = s;
   return (
-    <section aria-label="Prazos" className="cartao p-4 space-y-3 text-xs">
+    <section aria-label="Prazos" className={embutido ? 'w-full space-y-1.5 text-xs lg:w-72 lg:shrink-0' : 'cartao p-4 space-y-3 text-xs'}>
       <h3 className="secao-titulo">Prazos</h3>
       <div className="flex items-center justify-between gap-2">
         <span className="text-slate-600">1ª resposta</span>

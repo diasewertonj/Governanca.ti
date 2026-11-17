@@ -25,7 +25,6 @@ import {
   Lock,
   Send,
   CheckCircle2,
-  ExternalLink,
   FileCheck,
   UserPlus,
   ShieldCheck,
@@ -286,9 +285,21 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           <h2 id={`chamado-titulo-${ticket.id}`} className="tela-titulo mt-1 break-words">
             {ticket.titulo}
           </h2>
+          {/* Solicitante na linha de abertura (antes era um cartão à parte) */}
           <p className="mt-0.5 text-xs text-slate-600">
-            Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · Técnico:{' '}
-            {ticket.tecnicoResponsavelNome || 'não atribuído'}
+            Aberto por{' '}
+            {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
+              <span className="font-semibold text-slate-900">{ticket.solicitanteNome}</span>
+            ) : (
+              <button type="button" onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)} className="link" title={ticket.solicitanteEmail}>
+                {ticket.solicitanteNome}
+              </button>
+            )}
+            {[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).length > 0 && (
+              <span className="text-slate-500"> ({[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).join(' · ')})</span>
+            )}{' '}
+            em {formatDateTime(ticket.dataCriacao)}
+            {!isTI && <> · Técnico: {ticket.tecnicoResponsavelNome || 'não atribuído'}</>}
           </p>
           {/* Ações do atendimento numa faixa compacta do cabeçalho */}
           {isTI && (
@@ -361,40 +372,22 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           )}
         </div>
 
-        <div className="sm:max-h-[85vh] sm:overflow-y-auto">
-          {/* Solicitante, prazos e vínculos numa faixa acima do conteúdo */}
-          <div className="grid grid-cols-1 items-start gap-3 px-4 pt-3 sm:px-5 md:grid-cols-3">
-            <section aria-label="Solicitante" className="cartao space-y-3 p-4 text-xs">
-              <h3 className="secao-titulo">Solicitante</h3>
-              <div className="space-y-0.5">
-                {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
-                  <span className="block font-semibold text-slate-900">{ticket.solicitanteNome}</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)}
-                    className="link inline-flex items-center gap-1 text-left"
-                  >
-                    {ticket.solicitanteNome}
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  </button>
-                )}
-                <p className="text-slate-600">{[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).join(' · ')}</p>
-                <p className="break-all text-slate-500">{ticket.solicitanteEmail}</p>
-                <p className="text-slate-500">Atualizado em {formatDate(ticket.dataAtualizacao)}</p>
-              </div>
-            </section>
-            <PrazosChamado tkt={ticket} />
-            <VinculosChamado
-              key={salvamentos}
-              ticket={ticket}
-              rascunho={rascVinculos}
-              onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
-            />
+        <div className="sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
+          {/* Prazos e vínculos numa faixa fina (sem cartões) */}
+          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-2.5 sm:px-5 lg:flex-row lg:items-start lg:gap-8">
+            <PrazosChamado tkt={ticket} embutido />
+            <div className="min-w-0 flex-1">
+              <VinculosChamado
+                key={salvamentos}
+                ticket={ticket}
+                rascunho={rascVinculos}
+                onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
+                embutido
+              />
+            </div>
           </div>
-
           {/* O pedido, o checklist e a solução ocupam 2/3; anotações e conversa ficam ao lado (1/3) */}
-          <div className="mt-3 grid grid-cols-1 gap-0 divide-y divide-slate-200 border-t border-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
+          <div className="grid grid-cols-1 gap-0 divide-y divide-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
             <div className="min-w-0 space-y-3 p-4 sm:p-5">
               {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
               {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}

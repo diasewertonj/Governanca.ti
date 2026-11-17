@@ -172,7 +172,8 @@
     @apply fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-900/50 p-0 backdrop-blur-xs sm:items-center sm:p-4;
   }
   .janela {
-    @apply relative my-0 min-h-[100dvh] w-full border border-slate-200 bg-white shadow-2xl sm:my-6 sm:min-h-0 sm:overflow-hidden sm:rounded-xl;
+    /* Cabe na altura da tela (ex.: notebook 1080p a 125%): o corpo rola, cabeçalho e rodapé ficam */
+    @apply relative my-0 min-h-[100dvh] w-full border border-slate-200 bg-white shadow-2xl sm:my-4 sm:flex sm:max-h-[calc(100dvh-2rem)] sm:min-h-0 sm:flex-col sm:overflow-hidden sm:rounded-xl;
   }
   .janela-p {
     @apply sm:max-w-lg;
@@ -190,14 +191,14 @@
     @apply flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-5;
   }
   .janela-corpo {
-    @apply space-y-4 p-5 sm:max-h-[78vh] sm:overflow-y-auto;
+    @apply space-y-4 p-4 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:p-5;
   }
   /* Fichas e formulários em etapas: altura estável ao trocar de aba (a janela não pula) */
-  .janela-ficha .janela-corpo {
-    @apply sm:h-[72vh] sm:max-h-[72vh];
+  .janela-ficha {
+    @apply sm:h-[min(52rem,calc(100dvh-2rem))];
   }
-  .janela-g .janela-corpo {
-    @apply sm:min-h-[60vh];
+  .janela-g {
+    @apply sm:h-[min(44rem,calc(100dvh-2rem))];
   }
   .janela-rodape {
     @apply flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3;
@@ -241,27 +242,32 @@ body:has(.modal-tela) {
   }
   .tabela-cartoes tr {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem 1rem;
-    margin: 0.75rem;
-    padding: 0.875rem 1rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+    margin: 0.5rem;
+    padding: 0.625rem 0.75rem;
     border: 1px solid #e2e8f0;
     border-radius: 0.75rem;
     background: #fff;
   }
   .tabela-cartoes td {
+    grid-column: 1 / -1;
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.125rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.5rem;
     min-width: 0;
     padding: 0;
     text-align: left;
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .tabela-cartoes td > .block {
+    display: inline;
+  }
   .tabela-cartoes td[data-label]::before {
     content: attr(data-label);
+    flex: 0 0 6.5rem;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     font-size: 0.75rem;
     font-weight: 500;
@@ -269,29 +275,26 @@ body:has(.modal-tela) {
     text-transform: none;
     color: #64748b;
   }
-  .tabela-cartoes td:first-child,
-  .tabela-cartoes td:last-child,
+  /* 1ª célula = título do cartão; última = ações, no canto direito da 1ª linha */
+  .tabela-cartoes td:first-child {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: 600;
+  }
+  .tabela-cartoes td:first-child::before,
+  .tabela-cartoes td:last-child:not(:first-child)::before {
+    display: none;
+  }
+  .tabela-cartoes td:last-child:not(:first-child):not([colspan]) {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-content: flex-end;
+  }
   .tabela-cartoes td[colspan] {
     grid-column: 1 / -1;
   }
-  .tabela-cartoes td:first-child::before,
-  .tabela-cartoes td:last-child::before {
-    display: none;
-  }
-  .tabela-cartoes td:last-child:not([colspan]) {
-    flex-direction: row;
-    justify-content: flex-end;
-    padding-top: 0.75rem;
-    border-top: 1px solid #f1f5f9;
-  }
 }
-
-@media (max-width: 420px) {
-  .tabela-cartoes tr {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
