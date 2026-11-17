@@ -12,6 +12,7 @@ import {
 } from '../../services/supabaseDb.ts';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
+import { Janela } from '../ui/Janela.tsx';
 
 // Anexo escolhido, ainda só no navegador (Fase 5: sobe apenas ao enviar o chamado)
 interface AnexoPendente {
@@ -176,137 +177,139 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
     setSelectedTicketIdForDetail(created.id);
   };
 
+  const idForm = 'novo-chamado-form';
+
   return (
-    <div className="janela-fundo modal-tela">
-      <div className="janela janela-g">
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Abrir chamado</h2>
+    <Janela
+      titulo="Abrir chamado"
+      tamanho="m"
+      onFechar={fechar}
+      idTitulo="novo-chamado-titulo"
+      rodape={
+        <>
+          <span />
+          <span className="flex gap-2">
+            <button type="button" onClick={fechar} className="btn btn-secundario">
+              Cancelar
+            </button>
+            <button type="submit" form={idForm} disabled={enviandoChamado || enviandoAnexo} className="btn btn-primario">
+              <Send aria-hidden="true" />
+              {enviandoChamado ? 'Abrindo...' : 'Abrir chamado'}
+            </button>
+          </span>
+        </>
+      }
+    >
+      <form id={idForm} onSubmit={handleSubmit} className="space-y-4">
+        {/* Preenchimento automático do solicitante */}
+        <div className="cartao flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-800">
+              {solicitante.nome.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-900">
+                {solicitante.nome} <span className="font-normal text-slate-500">({solicitante.matricula})</span>
+              </p>
+              <p className="text-slate-600">
+                {solicitante.cargo} · {userDepartment?.nome || 'Setor'}
+              </p>
+              {emNomeDeOutro && <p className="text-blue-800">Registrado pela T.I. em nome desta pessoa</p>}
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={fechar}
-            aria-label="Fechar"
-            className="btn-icone"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {isTI && (
+            <div className="w-full sm:w-64">
+              <label htmlFor="novo-chamado-solicitante" className="sr-only">
+                Solicitante
+              </label>
+              <select
+                id="novo-chamado-solicitante"
+                value={solicitante.id}
+                onChange={(e) => trocarSolicitante(e.target.value)}
+                className="campo campo-sm"
+              >
+                {pessoasAtivas.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.id === currentUser.id ? `${e.nome} (eu)` : e.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
-          {/* Card com preenchimento automático do Solicitante */}
-          <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                {solicitante.nome.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-slate-900">
-                  {solicitante.nome} <span className="text-slate-500 font-normal">({solicitante.matricula})</span>
-                </p>
-                <p className="text-xs text-slate-600">
-                  {solicitante.cargo} · {userDepartment?.nome || 'Setor'}
-                </p>
-                {emNomeDeOutro && <p className="text-xs text-blue-800 mt-0.5">Registrado pela T.I. em nome desta pessoa</p>}
-              </div>
-            </div>
-            {isTI && (
-              <div className="w-full sm:w-64">
-                <label htmlFor="novo-chamado-solicitante" className="sr-only">
-                  Solicitante
-                </label>
-                <select
-                  id="novo-chamado-solicitante"
-                  value={solicitante.id}
-                  onChange={(e) => trocarSolicitante(e.target.value)}
-                  className="campo campo-sm w-full"
-                >
-                  {pessoasAtivas.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.id === currentUser.id ? `${e.nome} (eu)` : e.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+        <div>
+          <label htmlFor="novo-chamado-titulo-campo" className="rotulo">
+            Título resumido do chamado
+          </label>
+          <input
+            id="novo-chamado-titulo-campo"
+            type="text"
+            required
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            placeholder="Ex.: Teclado falhando teclas específicas ou tela piscando na docking"
+            className="campo"
+          />
+        </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Título Resumido do Chamado
-            </label>
-            <input
-              type="text"
-              required
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Ex: Teclado falhando teclas específicas ou tela piscando na docking"
-              className="campo w-full"
-            />
-          </div>
+        <div>
+          <label htmlFor="novo-chamado-descricao" className="rotulo">
+            Descrição detalhada do problema
+          </label>
+          <textarea
+            id="novo-chamado-descricao"
+            required
+            rows={4}
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            placeholder="Descreva quando o problema começou, se há mensagens de erro na tela e os passos para reproduzir a falha..."
+            className="campo"
+          />
+        </div>
 
+        {/* Fase 9: equipamento e software afetados (opcionais; dá para informar os dois) */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Descrição Detalhada do Problema
-            </label>
-            <textarea
-              required
-              rows={4}
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Descreva quando o problema começou, se há mensagens de erro na tela e os passos para reproduzir a falha..."
-              className="campo w-full"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          {/* Fase 9: equipamento e software afetados (opcionais; dá para informar os dois) */}
-          <div>
-            <label htmlFor="novo-chamado-ativo" className="block text-xs font-semibold text-slate-700 mb-1">
+            <label htmlFor="novo-chamado-ativo" className="rotulo">
               Equipamento afetado <span className="font-normal text-slate-500">(se houver)</span>
             </label>
             {/* Fase 10: vindo do painel do equipamento, ele já está escolhido (dá para trocar) */}
             {!trocandoAtivo && ativoEscolhido ? (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs">
+              <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="min-w-0 break-words">
                   <span className="font-semibold text-slate-900">{ativoEscolhido.tag}</span> · {ativoEscolhido.nome}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setTrocandoAtivo(true)}
-                  className="shrink-0 text-xs font-medium text-blue-700 hover:underline"
-                >
+                <button type="button" onClick={() => setTrocandoAtivo(true)} className="link shrink-0 text-xs">
                   Trocar
                 </button>
               </div>
             ) : (
-            <select
-              id="novo-chamado-ativo"
-              value={ativoSel}
-              onChange={(e) => {
-                setAtivoSel(e.target.value);
-                if (e.target.value && !softwareSel) setCategoria('Hardware / Equipamento');
-              }}
-              className="campo w-full"
-            >
-              <option value="">— nenhum —</option>
-              {myCustodyAssets.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {asset.tag} · {asset.nome} ({asset.marca})
-                </option>
-              ))}
-            </select>
+              <select
+                id="novo-chamado-ativo"
+                value={ativoSel}
+                onChange={(e) => {
+                  setAtivoSel(e.target.value);
+                  if (e.target.value && !softwareSel) setCategoria('Hardware / Equipamento');
+                }}
+                className="campo"
+              >
+                <option value="">— nenhum —</option>
+                {myCustodyAssets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.tag} · {asset.nome} ({asset.marca})
+                  </option>
+                ))}
+              </select>
             )}
             {trocandoAtivo && myCustodyAssets.length === 0 && (
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="ajuda">
                 {emNomeDeOutro ? 'Nenhum equipamento com esta pessoa.' : 'Nenhum equipamento sob sua responsabilidade.'}
               </p>
             )}
           </div>
           <div>
-            <label htmlFor="novo-chamado-software" className="block text-xs font-semibold text-slate-700 mb-1">
+            <label htmlFor="novo-chamado-software" className="rotulo">
               Software / licença afetado <span className="font-normal text-slate-500">(se houver)</span>
             </label>
             <select
@@ -316,7 +319,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
                 setSoftwareSel(e.target.value);
                 if (e.target.value && !ativoSel) setCategoria('Softwares & Licenças');
               }}
-              className="campo w-full"
+              className="campo"
             >
               <option value="">— nenhum —</option>
               {myLicenses.length > 0 && (
@@ -339,113 +342,81 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
               )}
             </select>
           </div>
-          <p className="md:col-span-2 xl:col-span-2 -mt-1 text-xs text-slate-500">
-            Informar o equipamento e o software afetados ajuda a T.I. a saber do que se trata.
-          </p>
+          <p className="ajuda sm:col-span-2">Informar o equipamento e o software afetados ajuda a T.I. a saber do que se trata.</p>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Categoria do Problema
-              </label>
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="campo w-full"
-              >
-                <option value="Hardware / Equipamento">Hardware / Equipamento Físico</option>
-                <option value="Periféricos / Telas / Cabos">Periféricos / Telas / Cabos</option>
-                <option value="Softwares & Licenças">Softwares & Licenças</option>
-                <option value="Rede / VPN / Wi-Fi">Rede / VPN / Wi-Fi</option>
-                <option value="Acessos & E-mail">Acessos & E-mail Corporativo</option>
-                <option value="Outros">Outros</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Prioridade Informada
-              </label>
-              <select
-                value={prioridade}
-                onChange={(e) => setPrioridade(e.target.value as TicketPriority)}
-                className="campo w-full"
-              >
-                <option value="baixa">Baixa (Dúvida ou solicitação sem impacto)</option>
-                <option value="media">Média (Impacto parcial no trabalho diário)</option>
-                <option value="alta">Alta (Impossibilita atividades principais)</option>
-                <option value="critica">Urgente (Bloqueio total / Falha crítica de máquina)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Anexos de Arquivos / Prints de Erro */}
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <label className="block text-xs font-semibold text-slate-700">
-              Anexos (Prints de erro, fotos do estado físico, logs)
+          <div>
+            <label htmlFor="novo-chamado-categoria" className="rotulo">
+              Categoria do problema
             </label>
+            <select id="novo-chamado-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="campo">
+              <option value="Hardware / Equipamento">Hardware / Equipamento Físico</option>
+              <option value="Periféricos / Telas / Cabos">Periféricos / Telas / Cabos</option>
+              <option value="Softwares & Licenças">Softwares & Licenças</option>
+              <option value="Rede / VPN / Wi-Fi">Rede / VPN / Wi-Fi</option>
+              <option value="Acessos & E-mail">Acessos & E-mail Corporativo</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
 
-            <div className="flex items-center gap-3">
-              <label
-                className={`px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer ${
-                  enviandoAnexo ? 'opacity-50 pointer-events-none' : ''
-                }`}
-              >
-                <Paperclip className="w-3.5 h-3.5" />
-                Escolher arquivos
-                <input
-                  type="file"
-                  multiple
-                  accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
-                  onChange={handleSelecionarArquivos}
-                  className="sr-only"
-                />
-              </label>
-              <span className="text-xs text-slate-500">PDF, PNG, JPG, WEBP ou TXT · até 10 MB cada</span>
-            </div>
-            {erroAnexo && <p className="text-xs text-rose-700">{erroAnexo}</p>}
+          <div>
+            <label htmlFor="novo-chamado-prioridade" className="rotulo">
+              Prioridade informada
+            </label>
+            <select
+              id="novo-chamado-prioridade"
+              value={prioridade}
+              onChange={(e) => setPrioridade(e.target.value as TicketPriority)}
+              className="campo"
+            >
+              <option value="baixa">Baixa (Dúvida ou solicitação sem impacto)</option>
+              <option value="media">Média (Impacto parcial no trabalho diário)</option>
+              <option value="alta">Alta (Impossibilita atividades principais)</option>
+              <option value="critica">Urgente (Bloqueio total / Falha crítica de máquina)</option>
+            </select>
+          </div>
+        </div>
 
-            {anexos.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {anexos.map((att) => (
-                  <span
-                    key={att.id}
-                    className="inline-flex items-center gap-1.5 text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200"
+        {/* Anexos de arquivos / prints de erro */}
+        <div className="space-y-2">
+          <p className="rotulo">Anexos (prints de erro, fotos do estado físico, logs)</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className={`btn btn-sm btn-secundario cursor-pointer ${enviandoAnexo ? 'pointer-events-none opacity-50' : ''}`}>
+              <Paperclip aria-hidden="true" />
+              Escolher arquivos
+              <input
+                type="file"
+                multiple
+                accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
+                onChange={handleSelecionarArquivos}
+                className="sr-only"
+              />
+            </label>
+            <span className="ajuda !mt-0">PDF, PNG, JPG, WEBP ou TXT · até 10 MB cada</span>
+          </div>
+          {erroAnexo && <p className="erro">{erroAnexo}</p>}
+
+          {anexos.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {anexos.map((att) => (
+                <span key={att.id} className="selo selo-neutro">
+                  <Paperclip aria-hidden="true" />
+                  <span>{att.nome}</span>
+                  <span className="text-slate-500">({att.tamanho})</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(att.id)}
+                    title="Remover anexo"
+                    aria-label={`Remover o anexo ${att.nome}`}
+                    className="btn-icone btn-icone-perigo !p-0.5"
                   >
-                    <Paperclip className="w-3 h-3 text-slate-500" />
-                    <span>{att.nome}</span>
-                    <span className="text-xs text-slate-500">({att.tamanho})</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAttachment(att.id)}
-                      className="text-slate-500 hover:text-rose-600 ml-1"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={fechar}
-              className="btn btn-secundario"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={enviandoChamado || enviandoAnexo}
-              className="btn btn-primario"
-            >
-              <Send className="w-3.5 h-3.5" />
-              Enviar Chamado para T.I.
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+                    <X />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </form>
+    </Janela>
   );
 };

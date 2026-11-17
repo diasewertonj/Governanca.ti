@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Paperclip, Pencil, Plus, Receipt, RotateCcw, Trash2, Upload, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
@@ -24,6 +25,8 @@ import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts'
 import { nomeContrato } from '../../utils/contratos.ts';
 import { formaCobrancaDe, ROTULO_FORMA_PAGAMENTO } from '../../utils/financeiro.ts';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
+import { Janela } from '../ui/Janela.tsx';
+import { Vazio } from '../ui/Tela.tsx';
 
 interface FaturasSecaoProps {
   /** Licença OU contrato dono das faturas. Sem alvo = Contas a pagar (todas, com filtros) */
@@ -38,21 +41,19 @@ interface FaturasSecaoProps {
   bloqueioLancamento?: string;
 }
 
-const COR_STATUS: Record<StatusExibidoFatura, string> = {
-  vencida: 'text-red-700 bg-red-50 border-red-200',
-  a_pagar: 'text-amber-800 bg-amber-50 border-amber-200',
-  paga: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-  cancelada: 'text-slate-600 bg-slate-100 border-slate-200',
+/** Selo de situação da fatura (padrão único: ok / atenção / problema / neutro) */
+const SELO_STATUS: Record<StatusExibidoFatura, string> = {
+  vencida: 'selo-problema',
+  a_pagar: 'selo-atencao',
+  paga: 'selo-ok',
+  cancelada: 'selo-neutro',
 };
-
-/** Ações da linha: só ícone, com dica (o texto vira title/aria-label) */
-const ICONE = 'p-1.5 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900';
 
 /**
  * Fase 8: faturas de uma licença ou de um contrato (só a T.I.). Lista por
- * competência, total pago no ano, "+ Lançar fatura" (já preenchida com a
- * próxima competência e o valor cadastrado), "Marcar como paga" e "Cancelar
- * fatura". Excluir só para ti_admin. Nada grava sem o clique no botão.
+ * competência, total pago no ano, "Lançar fatura" (janela já preenchida com a
+ * próxima competência e o valor cadastrado), "Pagar" e "Cancelar fatura".
+ * Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
 export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal }) => {
   const { faturas, currentRole, alterarFatura, editarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
@@ -76,7 +77,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
     return licenses.find((l) => l.id === f.licencaId)?.nome || 'Licença';
   };
   const desfazer = async (f: Fatura) => {
-    const motivo = (await pedirTexto(`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?\n\nInforme o motivo:`));
+    const motivo = await pedirTexto(`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?\n\nInforme o motivo:`);
     if (motivo === null) return;
     const falha = await desfazerPagamento(f.id, motivo);
     setErro(falha ? `Não foi possível desfazer: ${falha}` : '');
@@ -96,7 +97,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
 
   const cancelar = async (f: Fatura) => {
     const aviso = `Cancelar a fatura de ${rotuloCompetencia(f.competencia)}?\n\nEla continua no histórico, mas deixa de contar como paga ou a pagar.`;
-    if ((await confirmar(aviso))) alterarFatura(f.id, { status: 'cancelada' });
+    if (await confirmar(aviso)) alterarFatura(f.id, { status: 'cancelada' });
   };
 
   const escolherArquivo = (arquivo: File | undefined) => {
@@ -115,240 +116,275 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   };
 
   const excluir = async (f: Fatura) => {
-    if ((await confirmar(`Excluir a fatura de ${rotuloCompetencia(f.competencia)}? Esta ação não pode ser desfeita.`))) {
+    if (await confirmar(`Excluir a fatura de ${rotuloCompetencia(f.competencia)}? Esta ação não pode ser desfeita.`)) {
       excluirFatura(f.id);
     }
   };
 
+  const alvoDaFatura = (f: Fatura): AlvoFatura => (f.contratoId ? { contratoId: f.contratoId } : { licencaId: f.licencaId as string });
+
   return (
-    <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-slate-600" aria-hidden="true" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Faturas</h3>
-          <span className="text-xs text-slate-500">({lista.length})</span>
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="secao-titulo inline-flex items-center gap-1.5">
+          <Receipt className="h-3.5 w-3.5" aria-hidden="true" />
+          Faturas ({lista.length})
+        </h3>
+        <div className="flex flex-wrap items-center gap-3">
           {alvo && (
             <span className="text-xs text-slate-600">
-              Pago em {ano}: <span className="font-semibold font-mono text-slate-900">{formatCurrency(totalPagoNoAno(lista, ano))}</span>
+              Pago em {ano}: <span className="font-mono font-semibold text-slate-900">{formatCurrency(totalPagoNoAno(lista, ano))}</span>
             </span>
           )}
-          {!bloqueioLancamento && !lancando && !editando && (
+          {!bloqueioLancamento && (
             <button
               type="button"
-              onClick={() => setLancando(true)}
-              className="btn btn-primario btn-sm"
+              onClick={() => {
+                setEditando(null);
+                setLancando(true);
+              }}
+              className="btn btn-sm btn-primario"
             >
-              <Plus className="w-3.5 h-3.5" /> Lançar fatura
+              <Plus aria-hidden="true" /> Lançar fatura
             </button>
           )}
         </div>
       </div>
 
-      {editando ? (
-        <FormFatura
-          key={editando.id}
-          alvo={editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string }}
-          periodicidade={periodicidade}
-          valorPadrao={editando.valor}
-          doMesmoAlvo={faturasDoAlvo(faturas, editando.contratoId ? { contratoId: editando.contratoId } : { licencaId: editando.licencaId as string })}
-          editando={editando}
-          onFechar={() => setEditando(null)}
-        />
-      ) : lancando && !bloqueioLancamento ? (
-        <FormFatura alvo={alvo} periodicidade={periodicidade} valorPadrao={valorPadrao} doMesmoAlvo={lista} onFechar={() => setLancando(false)} />
-      ) : null}
-      {bloqueioLancamento && <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5">{bloqueioLancamento}</p>}
+      {bloqueioLancamento && <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">{bloqueioLancamento}</p>}
+
       {lista.length === 0 ? (
-        <p className="text-xs text-slate-500">Nenhuma fatura lançada.</p>
+        <Vazio>Nenhuma fatura lançada.</Vazio>
       ) : (
-        <table className="tabela-cartoes w-full text-left text-xs border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
-              {!alvo && <th className="py-2 px-3">Origem</th>}
-              <th className="py-2 px-3">Competência</th>
-              <th className="py-2 px-3">Valor</th>
-              <th className="py-2 px-3">Vencimento</th>
-              <th className="py-2 px-3">Status</th>
-              <th className="hidden xl:table-cell py-2 px-3">Nº do documento</th>
-              <th className="py-2 px-3">Arquivo</th>
-              <th className="py-2 px-3 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-slate-700">
-            {lista.map((f) => {
-              const status = statusExibido(f, agora);
-              return (
-                <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
-                  {!alvo && (
-                    <td data-label="Origem" className="py-2 px-3 font-medium text-slate-900">
-                      {origem(f)}
+        <div className="cartao overflow-hidden">
+          <table className="tabela tabela-cartoes">
+            <thead>
+              <tr>
+                {!alvo && <th>Origem</th>}
+                <th>Competência</th>
+                <th className="text-right">Valor</th>
+                <th>Vencimento</th>
+                <th>Situação</th>
+                <th className="hidden xl:table-cell">Nº do documento</th>
+                <th>Arquivo</th>
+                <th className="text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map((f) => {
+                const status = statusExibido(f, agora);
+                return (
+                  <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
+                    {!alvo && (
+                      <td data-label="Origem" className="font-medium text-slate-900">
+                        {origem(f)}
+                      </td>
+                    )}
+                    <td data-label="Competência" className="font-semibold text-slate-900">
+                      {rotuloCompetencia(f.competencia)}
                     </td>
-                  )}
-                  <td data-label="Competência" className="py-2 px-3 font-semibold text-slate-900">
-                    {rotuloCompetencia(f.competencia)}
-                  </td>
-                  <td data-label="Valor" className="py-2 px-3 font-mono text-slate-800">
-                    {formatCurrency(f.valor)}
-                    {f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null && (
-                      <span className="block text-slate-500">
-                        {f.moeda} {f.valorMoeda.toFixed(2)}
+                    <td data-label="Valor" className="text-right font-mono text-slate-800">
+                      {formatCurrency(f.valor)}
+                      {f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null && (
+                        <span className="block text-slate-500">
+                          {f.moeda} {f.valorMoeda.toFixed(2)}
+                        </span>
+                      )}
+                      {f.formaPagamento && <span className="block font-sans text-slate-500">{ROTULO_FORMA_PAGAMENTO[f.formaPagamento]}</span>}
+                    </td>
+                    <td data-label="Vencimento">{formatDate(f.vencimento)}</td>
+                    <td data-label="Situação">
+                      <span className={`selo ${SELO_STATUS[status]}`}>
+                        {status === 'vencida' && <AlertTriangle aria-hidden="true" />}
+                        {status === 'paga' && <CheckCircle2 aria-hidden="true" />}
+                        {ROTULO_STATUS_FATURA[status]}
                       </span>
-                    )}
-                    {f.formaPagamento && <span className="block text-slate-500">{ROTULO_FORMA_PAGAMENTO[f.formaPagamento]}</span>}
-                  </td>
-                  <td data-label="Vencimento" className="py-2 px-3">
-                    {formatDate(f.vencimento)}
-                  </td>
-                  <td data-label="Status" className="py-2 px-3">
-                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-xs font-medium ${COR_STATUS[status]}`}>
-                      {status === 'vencida' && <AlertTriangle className="w-3 h-3" aria-hidden="true" />}
-                      {status === 'paga' && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
-                      {ROTULO_STATUS_FATURA[status]}
-                    </span>
-                    {f.status === 'paga' && f.pagoEm && (
-                      <span className="block text-slate-500 mt-0.5">em {formatDate(f.pagoEm)}</span>
-                    )}
-                  </td>
-                  <td data-label="Nº do documento" className="hidden xl:table-cell py-2 px-3 font-mono break-all">
-                    {f.numeroDocumento || '-'}
-                  </td>
-                  <td data-label="Arquivo" className="py-2 px-3 min-w-0">
-                    {f.arquivoCaminho ? (
-                      <AbrirArquivo caminho={f.arquivoCaminho} />
-                    ) : anexando?.id === f.id ? (
-                      <span className="flex flex-col gap-1.5 min-w-0">
-                        <label htmlFor={`fatura-arq-${f.id}`} className="sr-only">
-                          Arquivo da fatura de {rotuloCompetencia(f.competencia)}
-                        </label>
-                        <input
-                          id={`fatura-arq-${f.id}`}
-                          type="file"
-                          accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
-                          onChange={(e) => escolherArquivo(e.target.files?.[0])}
-                          className={CLASSE_ARQUIVO}
-                        />
-                        <span className="inline-flex flex-wrap gap-1.5">
-                          <button
-                            type="button"
-                            onClick={enviarArquivo}
-                            disabled={!anexando.arquivo || anexando.enviando}
-                            className="btn btn-primario btn-sm"
-                          >
-                            <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-                            {anexando.enviando ? 'Enviando...' : 'Enviar'}
+                      {f.status === 'paga' && f.pagoEm && <span className="mt-0.5 block text-slate-500">em {formatDate(f.pagoEm)}</span>}
+                    </td>
+                    <td data-label="Nº do documento" className="hidden font-mono break-all xl:table-cell">
+                      {f.numeroDocumento || '-'}
+                    </td>
+                    <td data-label="Arquivo" className="min-w-0">
+                      {f.arquivoCaminho ? (
+                        <AbrirArquivo caminho={f.arquivoCaminho} />
+                      ) : anexando?.id === f.id ? (
+                        <span className="flex min-w-0 flex-col gap-1.5">
+                          <label htmlFor={`fatura-arq-${f.id}`} className="sr-only">
+                            Arquivo da fatura de {rotuloCompetencia(f.competencia)}
+                          </label>
+                          <input
+                            id={`fatura-arq-${f.id}`}
+                            type="file"
+                            accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
+                            onChange={(e) => escolherArquivo(e.target.files?.[0])}
+                            className={CLASSE_ARQUIVO}
+                          />
+                          <span className="inline-flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={enviarArquivo}
+                              disabled={!anexando.arquivo || anexando.enviando}
+                              className="btn btn-sm btn-primario"
+                            >
+                              <Upload aria-hidden="true" />
+                              {anexando.enviando ? 'Enviando...' : 'Enviar'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAnexando(null);
+                                setErro('');
+                              }}
+                              disabled={anexando.enviando}
+                              className="btn btn-sm btn-secundario"
+                            >
+                              Voltar
+                            </button>
+                          </span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAnexando({ id: f.id, arquivo: null, enviando: false });
+                            setErro('');
+                          }}
+                          aria-label={`Anexar arquivo à fatura de ${rotuloCompetencia(f.competencia)}`}
+                          className="link inline-flex items-center gap-1 text-xs"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" aria-hidden="true" /> Anexar
+                        </button>
+                      )}
+                    </td>
+                    <td data-label="Ações" className="text-right">
+                      {pagando?.id === f.id ? (
+                        <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                          <label htmlFor={`pago-em-${f.id}`} className="text-xs text-slate-700">
+                            Pago em
+                          </label>
+                          <input
+                            id={`pago-em-${f.id}`}
+                            type="date"
+                            value={pagando.data}
+                            onChange={(e) => setPagando({ ...pagando, data: e.target.value })}
+                            className="campo campo-sm w-auto"
+                          />
+                          <button type="button" onClick={confirmarPagamento} className="btn btn-sm btn-primario">
+                            Confirmar
                           </button>
                           <button
                             type="button"
                             onClick={() => {
-                              setAnexando(null);
+                              setPagando(null);
                               setErro('');
                             }}
-                            disabled={anexando.enviando}
-                            className="btn btn-secundario btn-sm"
+                            className="btn btn-sm btn-secundario"
                           >
                             Voltar
                           </button>
                         </span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAnexando({ id: f.id, arquivo: null, enviando: false });
-                          setErro('');
-                        }}
-                        aria-label={`Anexar arquivo à fatura de ${rotuloCompetencia(f.competencia)}`}
-                        className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline"
-                      >
-                        <Paperclip className="w-3.5 h-3.5" aria-hidden="true" /> Anexar
-                      </button>
-                    )}
-                  </td>
-                  <td data-label="Ações" className="py-2 px-3 text-right">
-                    {pagando?.id === f.id ? (
-                      <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                        <label htmlFor={`pago-em-${f.id}`} className="text-xs text-slate-700">
-                          Pago em
-                        </label>
-                        <input
-                          id={`pago-em-${f.id}`}
-                          type="date"
-                          value={pagando.data}
-                          onChange={(e) => setPagando({ ...pagando, data: e.target.value })}
-                          className="campo campo-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={confirmarPagamento}
-                          className="btn btn-primario btn-sm"
-                        >
-                          Confirmar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPagando(null);
-                            setErro('');
-                          }}
-                          className="btn btn-secundario btn-sm"
-                        >
-                          Voltar
-                        </button>
-                      </span>
-                    ) : (
-                      <span className="inline-flex flex-nowrap items-center justify-end gap-0.5">
-                        {f.status === 'a_pagar' && (
-                          <button
-                            type="button"
-                            onClick={() => setPagando({ id: f.id, data: isoLocal(new Date()) })}
-                            className="btn btn-primario btn-sm mr-1"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Pagar
-                          </button>
-                        )}
-                        {f.status === 'a_pagar' && (
-                          <button type="button" onClick={() => { setEditando(f); setLancando(false); }} title="Editar fatura" aria-label="Editar fatura" className={ICONE}>
-                            <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
-                          </button>
-                        )}
-                        {f.status === 'paga' && currentRole === 'ti_admin' && (
-                          <button type="button" onClick={() => desfazer(f)} title="Desfazer pagamento" aria-label="Desfazer pagamento" className={ICONE}>
-                            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-                          </button>
-                        )}
-                        {f.status === 'a_pagar' && (
-                          <button type="button" onClick={() => cancelar(f)} title="Cancelar fatura" aria-label="Cancelar fatura" className={ICONE}>
-                            <XCircle className="w-3.5 h-3.5" aria-hidden="true" />
-                          </button>
-                        )}
-                        {currentRole === 'ti_admin' && (
-                          <button type="button" onClick={() => excluir(f)} title="Excluir fatura" aria-label={`Excluir a fatura de ${rotuloCompetencia(f.competencia)}`} className={`${ICONE} text-red-700 hover:bg-red-50`}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      ) : (
+                        <span className="acoes-linha">
+                          {f.status === 'a_pagar' && (
+                            <button
+                              type="button"
+                              onClick={() => setPagando({ id: f.id, data: isoLocal(new Date()) })}
+                              aria-label={`Pagar a fatura de ${rotuloCompetencia(f.competencia)}`}
+                              className="btn btn-sm btn-primario mr-1"
+                            >
+                              <CheckCircle2 aria-hidden="true" /> Pagar
+                            </button>
+                          )}
+                          {f.status === 'a_pagar' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLancando(false);
+                                setEditando(f);
+                              }}
+                              title="Editar fatura"
+                              aria-label={`Editar a fatura de ${rotuloCompetencia(f.competencia)}`}
+                              className="btn-icone"
+                            >
+                              <Pencil aria-hidden="true" />
+                            </button>
+                          )}
+                          {f.status === 'paga' && currentRole === 'ti_admin' && (
+                            <button
+                              type="button"
+                              onClick={() => desfazer(f)}
+                              title="Desfazer pagamento"
+                              aria-label={`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}`}
+                              className="btn-icone"
+                            >
+                              <RotateCcw aria-hidden="true" />
+                            </button>
+                          )}
+                          {f.status === 'a_pagar' && (
+                            <button
+                              type="button"
+                              onClick={() => cancelar(f)}
+                              title="Cancelar fatura"
+                              aria-label={`Cancelar a fatura de ${rotuloCompetencia(f.competencia)}`}
+                              className="btn-icone"
+                            >
+                              <XCircle aria-hidden="true" />
+                            </button>
+                          )}
+                          {currentRole === 'ti_admin' && (
+                            <button
+                              type="button"
+                              onClick={() => excluir(f)}
+                              title="Excluir fatura"
+                              aria-label={`Excluir a fatura de ${rotuloCompetencia(f.competencia)}`}
+                              className="btn-icone btn-icone-perigo"
+                            >
+                              <Trash2 aria-hidden="true" />
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {erro && (
-        <p className="text-xs font-medium text-red-700" role="alert">
+        <p className="erro" role="alert">
           {erro}
         </p>
       )}
 
+      {/* Lançar / editar em janela própria. Em portal: a seção pode estar dentro de uma ficha
+          (janela com fundo desfocado), que prenderia a janela nova na rolagem dela. */}
+      {editando
+        ? createPortal(
+            <FormFatura
+              key={editando.id}
+              alvo={alvoDaFatura(editando)}
+              periodicidade={periodicidade}
+              valorPadrao={editando.valor}
+              doMesmoAlvo={faturasDoAlvo(faturas, alvoDaFatura(editando))}
+              editando={editando}
+              onFechar={() => setEditando(null)}
+            />,
+            document.body
+          )
+        : lancando && !bloqueioLancamento
+          ? createPortal(
+              <FormFatura alvo={alvo} periodicidade={periodicidade} valorPadrao={valorPadrao} doMesmoAlvo={lista} onFechar={() => setLancando(false)} />,
+              document.body
+            )
+          : null}
     </div>
   );
 };
 
-/** Formulário de fatura nova, já preenchido com a próxima competência, o valor e o vencimento no dia 10 */
+/** Janela de fatura nova (ou edição), já preenchida com a próxima competência, o valor e o vencimento no dia 10 */
 const FormFatura: React.FC<{
   alvo?: AlvoFatura; // sem alvo: Contas a pagar escolhe licença ou contrato
   periodicidade: PeriodicidadeContrato;
@@ -387,11 +423,20 @@ const FormFatura: React.FC<{
   const chave = editando ? `editar:${editando.id}` : alvo?.licencaId ? `licenca:${alvo.licencaId}` : alvo?.contratoId ? `contrato:${alvo.contratoId}` : 'nova';
   const valores = JSON.stringify([competencia, valor, vencimento, status, pagoEm, numeroDocumento, observacoes]);
   const [valoresIniciais] = useState(valores);
-  const pendenciasFatura = valores !== valoresIniciais || arquivo ? ['Fatura nova não lançada'] : [];
+  const pendenciasFatura = valores !== valoresIniciais || arquivo ? [editando ? 'Edição da fatura não salva' : 'Fatura nova não lançada'] : [];
   useRegistrarPendencias(`fatura:${chave}`, pendenciasFatura);
   const cancelarDigitacao = () => {
     void confirmarDescarte(pendenciasFatura).then((ok) => ok && onFechar());
   };
+
+  const nomeAlvo = (() => {
+    if (!alvo) return 'Escolha de quem é a fatura';
+    if (alvo.contratoId) {
+      const c = contratos.find((x) => x.id === alvo.contratoId);
+      return c ? `Contrato ${nomeContrato(c)}` : 'Contrato';
+    }
+    return licenses.find((l) => l.id === alvo.licencaId)?.nome || 'Licença';
+  })();
 
   const mudarCompetencia = (nova: string) => {
     setCompetencia(nova);
@@ -409,6 +454,8 @@ const FormFatura: React.FC<{
   // Lote 1: só fecha depois do banco confirmar; se recusar, o digitado continua aqui
   const lancar = async (e: React.FormEvent) => {
     e.preventDefault();
+    // A janela fica em portal, mas o React ainda propaga o "submit" pela árvore: não deixa chegar a um formulário de fora
+    e.stopPropagation();
     if (salvando) return;
     if (!alvo) return setErro('Escolha de quem é a fatura (contrato ou licença).');
     const dados = {
@@ -453,226 +500,218 @@ const FormFatura: React.FC<{
   const id = (campo: string) => `fatura-${chave}-${campo}`;
 
   return (
-    <form onSubmit={lancar} className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-3">
-      <h4 className="text-xs font-bold text-blue-900">{editando ? 'Editar fatura' : 'Lançar fatura'}</h4>
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
-        {!alvoFixo && (
-          <div className="md:col-span-3 xl:col-span-4">
-            <label htmlFor={id('alvo')} className={CLASSE_ROTULO}>
-              De quem é a fatura *
+    <Janela
+      tamanho="p"
+      titulo={editando ? `Editar fatura de ${rotuloCompetencia(editando.competencia)}` : 'Lançar fatura'}
+      subtitulo={nomeAlvo}
+      icone={<Receipt className="h-4 w-4" />}
+      idTitulo="janela-fatura-titulo"
+      onFechar={cancelarDigitacao}
+      rodape={
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={cancelarDigitacao} className="btn btn-secundario">
+            Cancelar
+          </button>
+          <button type="submit" form={id('form')} disabled={salvando} className="btn btn-primario">
+            {salvando ? 'Salvando…' : editando ? 'Salvar' : 'Lançar fatura'}
+          </button>
+        </div>
+      }
+    >
+      <form id={id('form')} onSubmit={lancar} className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {!alvoFixo && (
+            <div className="sm:col-span-2">
+              <label htmlFor={id('alvo')} className={CLASSE_ROTULO}>
+                De quem é a fatura *
+              </label>
+              <select
+                id={id('alvo')}
+                value={alvoEscolhido}
+                onChange={(e) => {
+                  setAlvoEscolhido(e.target.value);
+                  const c = contratos.find((x) => 'c:' + x.id === e.target.value);
+                  const l = licenses.find((x) => 'l:' + x.id === e.target.value);
+                  if (c) setValor(String(c.valor));
+                  if (l) setValor(String(l.valorMensal));
+                }}
+                className={CLASSE_CAMPO}
+              >
+                <option value="">Escolha…</option>
+                <optgroup label="Contratos">
+                  {contratos
+                    .filter((c) => c.status !== 'encerrado')
+                    .map((c) => (
+                      <option key={c.id} value={`c:${c.id}`}>
+                        {nomeContrato(c)}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Softwares com cobrança própria">
+                  {licenses
+                    .filter((l) => l.status !== 'inativa' && formaCobrancaDe(l, contratos) === 'propria')
+                    .map((l) => (
+                      <option key={l.id} value={`l:${l.id}`}>
+                        {l.nome}
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+            </div>
+          )}
+          <div>
+            <label htmlFor={id('comp')} className={CLASSE_ROTULO}>
+              Competência *
             </label>
-            <select
-              id={id('alvo')}
-              value={alvoEscolhido}
-              onChange={(e) => {
-                setAlvoEscolhido(e.target.value);
-                const c = contratos.find((x) => 'c:' + x.id === e.target.value);
-                const l = licenses.find((x) => 'l:' + x.id === e.target.value);
-                if (c) setValor(String(c.valor));
-                if (l) setValor(String(l.valorMensal));
-              }}
-              className={CLASSE_CAMPO}
-            >
-              <option value="">Escolha…</option>
-              <optgroup label="Contratos">
-                {contratos
-                  .filter((c) => c.status !== 'encerrado')
-                  .map((c) => (
-                    <option key={c.id} value={`c:${c.id}`}>
-                      {nomeContrato(c)}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Softwares com cobrança própria">
-                {licenses
-                  .filter((l) => l.status !== 'inativa' && formaCobrancaDe(l, contratos) === 'propria')
-                  .map((l) => (
-                    <option key={l.id} value={`l:${l.id}`}>
-                      {l.nome}
-                    </option>
-                  ))}
-              </optgroup>
+            <select id={id('comp')} value={competencia} onChange={(e) => mudarCompetencia(e.target.value)} className={CLASSE_CAMPO}>
+              {opcoesCompetencia(sugerida).map((c) => (
+                <option key={c} value={c}>
+                  {rotuloCompetencia(c)}
+                </option>
+              ))}
             </select>
           </div>
-        )}
-        <div>
-          <label htmlFor={id('comp')} className={CLASSE_ROTULO}>
-            Competência *
-          </label>
-          <select id={id('comp')} value={competencia} onChange={(e) => mudarCompetencia(e.target.value)} className={CLASSE_CAMPO}>
-            {opcoesCompetencia(sugerida).map((c) => (
-              <option key={c} value={c}>
-                {rotuloCompetencia(c)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor={id('valor')} className={CLASSE_ROTULO}>
-            Valor (R$) *
-          </label>
-          <input
-            id={id('valor')}
-            type="number"
-            min={0}
-            step="0.01"
-            inputMode="decimal"
-            required
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            className={`${CLASSE_CAMPO} font-mono`}
-          />
-        </div>
-        <div>
-          <label htmlFor={id('venc')} className={CLASSE_ROTULO}>
-            Vencimento *
-          </label>
-          <input
-            id={id('venc')}
-            type="date"
-            required
-            value={vencimento}
-            onChange={(e) => {
-              setVencimento(e.target.value);
-              setVencimentoEditado(true);
-            }}
-            className={CLASSE_CAMPO}
-          />
-        </div>
-        <div>
-          <label htmlFor={id('status')} className={CLASSE_ROTULO}>
-            Situação
-          </label>
-          <select
-            id={id('status')}
-            value={status}
-            onChange={(e) => {
-              const novo = e.target.value as 'a_pagar' | 'paga';
-              setStatus(novo);
-              if (novo === 'paga' && !pagoEm) setPagoEm(isoLocal(new Date()));
-            }}
-            className={CLASSE_CAMPO}
-          >
-            <option value="a_pagar">A pagar</option>
-            <option value="paga">Já paga</option>
-          </select>
-        </div>
-        {status === 'paga' && (
           <div>
-            <label htmlFor={id('pago')} className={CLASSE_ROTULO}>
-              Pago em *
+            <label htmlFor={id('valor')} className={CLASSE_ROTULO}>
+              Valor (R$) *
             </label>
             <input
-              id={id('pago')}
-              type="date"
-              required
-              value={pagoEm}
-              onChange={(e) => setPagoEm(e.target.value)}
-              className={CLASSE_CAMPO}
-            />
-          </div>
-        )}
-        <div>
-          <label htmlFor={id('doc')} className={CLASSE_ROTULO}>
-            Nº do documento
-          </label>
-          <input
-            id={id('doc')}
-            type="text"
-            value={numeroDocumento}
-            onChange={(e) => setNumeroDocumento(e.target.value)}
-            placeholder="Fatura, invoice ou NF de serviço"
-            className={`${CLASSE_CAMPO} font-mono`}
-          />
-        </div>
-        <div>
-          <label htmlFor={id('moeda')} className={CLASSE_ROTULO}>
-            Moeda da cobrança
-          </label>
-          <select id={id('moeda')} value={moeda} onChange={(e) => setMoeda(e.target.value as 'BRL')} className={CLASSE_CAMPO}>
-            <option value="BRL">Real (R$)</option>
-            <option value="USD">Dólar (US$)</option>
-            <option value="EUR">Euro (€)</option>
-          </select>
-        </div>
-        {moeda !== 'BRL' && (
-          <div>
-            <label htmlFor={id('vmoeda')} className={CLASSE_ROTULO}>
-              Valor em {moeda}
-            </label>
-            <input
-              id={id('vmoeda')}
+              id={id('valor')}
               type="number"
               min={0}
               step="0.01"
-              value={valorMoeda}
-              onChange={(e) => setValorMoeda(e.target.value)}
+              inputMode="decimal"
+              required
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
               className={`${CLASSE_CAMPO} font-mono`}
             />
-            <p className="text-xs text-slate-500 mt-1">O campo Valor (R$) é o que saiu da conta, já com IOF.</p>
           </div>
+          <div>
+            <label htmlFor={id('venc')} className={CLASSE_ROTULO}>
+              Vencimento *
+            </label>
+            <input
+              id={id('venc')}
+              type="date"
+              required
+              value={vencimento}
+              onChange={(e) => {
+                setVencimento(e.target.value);
+                setVencimentoEditado(true);
+              }}
+              className={CLASSE_CAMPO}
+            />
+          </div>
+          {!editando && (
+            <div>
+              <label htmlFor={id('status')} className={CLASSE_ROTULO}>
+                Situação
+              </label>
+              <select
+                id={id('status')}
+                value={status}
+                onChange={(e) => {
+                  const novo = e.target.value as 'a_pagar' | 'paga';
+                  setStatus(novo);
+                  if (novo === 'paga' && !pagoEm) setPagoEm(isoLocal(new Date()));
+                }}
+                className={CLASSE_CAMPO}
+              >
+                <option value="a_pagar">A pagar</option>
+                <option value="paga">Já paga</option>
+              </select>
+            </div>
+          )}
+          {status === 'paga' && !editando && (
+            <div>
+              <label htmlFor={id('pago')} className={CLASSE_ROTULO}>
+                Pago em *
+              </label>
+              <input id={id('pago')} type="date" required value={pagoEm} onChange={(e) => setPagoEm(e.target.value)} className={CLASSE_CAMPO} />
+            </div>
+          )}
+          <div>
+            <label htmlFor={id('doc')} className={CLASSE_ROTULO}>
+              Nº do documento
+            </label>
+            <input
+              id={id('doc')}
+              type="text"
+              value={numeroDocumento}
+              onChange={(e) => setNumeroDocumento(e.target.value)}
+              placeholder="Fatura, invoice ou NF de serviço"
+              className={`${CLASSE_CAMPO} font-mono`}
+            />
+          </div>
+          <div>
+            <label htmlFor={id('pgto')} className={CLASSE_ROTULO}>
+              Forma de pagamento
+            </label>
+            <select id={id('pgto')} value={formaPagamento} onChange={(e) => setFormaPagamento(e.target.value)} className={CLASSE_CAMPO}>
+              <option value="">—</option>
+              {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor={id('moeda')} className={CLASSE_ROTULO}>
+              Moeda da cobrança
+            </label>
+            <select id={id('moeda')} value={moeda} onChange={(e) => setMoeda(e.target.value as 'BRL')} className={CLASSE_CAMPO}>
+              <option value="BRL">Real (R$)</option>
+              <option value="USD">Dólar (US$)</option>
+              <option value="EUR">Euro (€)</option>
+            </select>
+          </div>
+          {moeda !== 'BRL' && (
+            <div>
+              <label htmlFor={id('vmoeda')} className={CLASSE_ROTULO}>
+                Valor em {moeda}
+              </label>
+              <input
+                id={id('vmoeda')}
+                type="number"
+                min={0}
+                step="0.01"
+                value={valorMoeda}
+                onChange={(e) => setValorMoeda(e.target.value)}
+                className={`${CLASSE_CAMPO} font-mono`}
+              />
+              <p className="ajuda">O campo Valor (R$) é o que saiu da conta, já com IOF.</p>
+            </div>
+          )}
+          {!editando && (
+            <div className="sm:col-span-2">
+              <label htmlFor={id('arq')} className={CLASSE_ROTULO}>
+                Arquivo (PDF ou imagem)
+              </label>
+              <input
+                id={id('arq')}
+                type="file"
+                accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
+                onChange={(e) => escolherArquivo(e.target.files?.[0])}
+                className={CLASSE_ARQUIVO}
+              />
+            </div>
+          )}
+          <div className="sm:col-span-2">
+            <label htmlFor={id('obs')} className={CLASSE_ROTULO}>
+              Observações
+            </label>
+            <textarea id={id('obs')} rows={2} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} className={CLASSE_CAMPO} />
+          </div>
+        </div>
+
+        {erro && (
+          <p className="erro" role="alert">
+            {erro}
+          </p>
         )}
-        <div>
-          <label htmlFor={id('pgto')} className={CLASSE_ROTULO}>
-            Forma de pagamento
-          </label>
-          <select id={id('pgto')} value={formaPagamento} onChange={(e) => setFormaPagamento(e.target.value)} className={CLASSE_CAMPO}>
-            <option value="">—</option>
-            {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="md:col-span-3 xl:col-span-4">
-          <label htmlFor={id('arq')} className={CLASSE_ROTULO}>
-            Arquivo (PDF ou imagem)
-          </label>
-          <input
-            id={id('arq')}
-            type="file"
-            accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
-            onChange={(e) => escolherArquivo(e.target.files?.[0])}
-            className={CLASSE_ARQUIVO}
-          />
-        </div>
-        <div className="md:col-span-3 xl:col-span-4">
-          <label htmlFor={id('obs')} className={CLASSE_ROTULO}>
-            Observações
-          </label>
-          <textarea
-            id={id('obs')}
-            rows={2}
-            value={observacoes}
-            onChange={(e) => setObservacoes(e.target.value)}
-            className={CLASSE_CAMPO}
-          />
-        </div>
-      </div>
-
-      {erro && (
-        <p className="text-xs font-medium text-red-700" role="alert">
-          {erro}
-        </p>
-      )}
-
-      <div className="flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          onClick={cancelarDigitacao}
-          className="btn btn-secundario"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={salvando}
-          className="btn btn-primario"
-        >
-          <Plus className="w-3.5 h-3.5" /> {salvando ? 'Salvando…' : editando ? 'Salvar fatura' : 'Lançar fatura'}
-        </button>
-      </div>
-    </form>
+      </form>
+    </Janela>
   );
 };

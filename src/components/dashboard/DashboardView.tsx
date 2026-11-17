@@ -9,6 +9,7 @@ import { VencimentosView } from '../financeiro/FinanceiroViews.tsx';
 import { termoAberto } from '../../utils/termos.ts';
 import { LembreteGarantia } from '../assets/LembreteGarantia.tsx';
 import { IndicadoresAtendimento } from './IndicadoresAtendimento.tsx';
+import { CabecalhoTela } from '../ui/Tela.tsx';
 import {
   Laptop,
   LifeBuoy,
@@ -84,11 +85,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-6">
+      <CabecalhoTela titulo="Início" subtitulo="Visão geral do parque de T.I., do atendimento e do que precisa de atenção" />
+
       {/* 4 Cards de Métricas Principais (Clean, sem pills decorativas) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="cartao p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <span className="secao-titulo">
               Ativos Totais de T.I.
             </span>
             <Laptop className="w-4 h-4 text-blue-600" />
@@ -108,10 +111,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         <div className="cartao p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <span className="secao-titulo">
               Chamados em aberto
             </span>
-            <LifeBuoy className="w-4 h-4 text-amber-600" />
+            <LifeBuoy className="w-4 h-4 text-blue-600" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold font-mono tracking-tight text-slate-900">
@@ -121,7 +124,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
           <div className="mt-2 text-xs text-slate-500 flex items-center gap-1.5">
             {urgentTickets > 0 ? (
-              <span className="text-rose-600 font-semibold flex items-center gap-1">
+              <span className="text-red-700 font-semibold flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
                 {urgentTickets} com prioridade urgente
               </span>
@@ -133,10 +136,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         <div className="cartao p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <span className="secao-titulo">
               Colaboradores Ativos
             </span>
-            <Users className="w-4 h-4 text-purple-600" />
+            <Users className="w-4 h-4 text-blue-600" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold font-mono tracking-tight text-slate-900">
@@ -151,10 +154,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         <div className="cartao p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <span className="secao-titulo">
               Licenças de Software
             </span>
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <ShieldCheck className="w-4 h-4 text-blue-600" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold font-mono tracking-tight text-slate-900">
@@ -269,15 +272,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div className="cartao lg:col-span-2 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Chamados recentes</h2>
+              <h2 className="secao-titulo">Chamados recentes</h2>
             </div>
             <button
               type="button"
               onClick={() => onNavigate('servicedesk')}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              className="btn btn-sm btn-discreto"
             >
               <span>Ver todos</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight />
             </button>
           </div>
 
@@ -304,12 +307,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
                 <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-md font-medium capitalize ${
+                    className={`selo ${
                       t.status === 'aberto'
-                        ? 'text-blue-700 bg-blue-50'
-                        : t.status === 'em_andamento'
-                        ? 'text-amber-700 bg-amber-50'
-                        : 'text-emerald-700 bg-emerald-50'
+                        ? 'selo-info'
+                        : t.status === 'em_andamento' || t.status === 'aguardando_terceiro'
+                        ? 'selo-atencao'
+                        : t.status === 'cancelado'
+                        ? 'selo-neutro'
+                        : 'selo-ok'
                     }`}
                   >
                     {rotuloStatus(t.status)}
@@ -323,7 +328,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         {/* Resumo Rápido de Acesso & Estoque */}
         <div className="space-y-4">
           <div className="cartao p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">Estoque Disponível para Empréstimo</h3>
+            <h3 className="secao-titulo">Estoque disponível para empréstimo</h3>
             <p className="text-xs text-slate-500">
               Equipamentos prontos no almoxarifado para novos colaboradores ou reposições rápidas.
             </p>
@@ -353,9 +358,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <button
               type="button"
               onClick={() => onNavigate('assets')}
-              className="w-full text-center py-2 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/60 rounded-lg transition-colors block"
+              className="btn btn-secundario w-full"
             >
-              Ver Inventário Completo
+              Ver inventário completo
             </button>
           </div>
         </div>
@@ -364,11 +369,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       <section id="precisa-atencao" className="space-y-3 scroll-mt-20">
         {termosAguardando.length > 0 && (
           <div className="bg-white border border-amber-200 rounded-xl p-3 text-xs space-y-1">
-            <h3 className="font-bold uppercase tracking-wider text-amber-900">Termos aguardando assinatura ({termosAguardando.length})</h3>
+            <h3 className="secao-titulo">Termos aguardando assinatura ({termosAguardando.length})</h3>
             <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1">
               {termosAguardando.map((t) => (
                 <li key={t.id}>
-                  <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: t.colaboradorId })} className="text-blue-700 hover:underline text-left">
+                  <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: t.colaboradorId })} className="link text-left">
                     {employees.find((e) => e.id === t.colaboradorId)?.nome || 'Pessoa'}
                   </button>
                   <span className="text-slate-500"> · {t.codigo || 'termo'} de {t.tipo === 'entrega' ? 'entrega' : 'devolução'}</span>
@@ -378,6 +383,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         )}
         <VencimentosView noInicio />
-      </section>    </div>
+      </section>
+    </div>
   );
 };

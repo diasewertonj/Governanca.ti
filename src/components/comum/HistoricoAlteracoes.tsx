@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { History } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { fetchEventosCadastroDb } from '../../services/supabaseDb.ts';
 import type { EventoCadastro } from '../../types/index.ts';
+import { Vazio } from '../ui/Tela.tsx';
 
 /** Campos técnicos que não interessam a quem lê o histórico */
 const IGNORAR = new Set(['id', 'criado_em', 'criado_por', 'colaboradores_ids']);
@@ -28,16 +29,39 @@ const ROTULO_CAMPO: Record<string, string> = {
   encerramento_motivo: 'Motivo do encerramento',
 };
 
+const ROTULO_ACAO: Record<EventoCadastro['acao'], { texto: string; selo: string }> = {
+  criado: { texto: 'Criado', selo: 'selo-ok' },
+  alterado: { texto: 'Alterado', selo: 'selo-info' },
+  excluido: { texto: 'Excluído', selo: 'selo-problema' },
+};
+
 const mostrar = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 /**
  * Seção 6 · Histórico de alterações de um cadastro (quem, quando, antes → depois).
  * Carrega só ao abrir. Só a T.I. lê (RLS). Na demonstração não há histórico.
+ * `semBotao`: já abre carregado (aba "Histórico" das fichas).
  */
-export const HistoricoAlteracoes: React.FC<{ entidade: string; registro: string }> = ({ entidade, registro }) => {
+export const HistoricoAlteracoes: React.FC<{ entidade: string; registro: string; semBotao?: boolean }> = ({
+  entidade,
+  registro,
+  semBotao = false,
+}) => {
   const { employees, isSupabaseConnected } = useApp();
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(semBotao);
   const [eventos, setEventos] = useState<EventoCadastro[] | null>(null);
+
+  // Aba "Histórico": carrega ao montar (a aba só monta quando é aberta)
+  useEffect(() => {
+    if (!semBotao) return;
+    let vivo = true;
+    void fetchEventosCadastroDb(entidade, registro).then((lista) => {
+      if (vivo) setEventos(lista);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [semBotao, entidade, registro]);
 
   const abrir = async () => {
     setAberto(!aberto);
@@ -45,35 +69,57 @@ export const HistoricoAlteracoes: React.FC<{ entidade: string; registro: string 
   };
   const nome = (id?: string) => employees.find((e) => e.id === id)?.nome || 'Sistema';
 
-  return (
-    <div className="border border-slate-200 rounded-xl p-3 text-xs">
-      <button type="button" onClick={abrir} className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
-        <History className="w-3.5 h-3.5" /> {aberto ? 'Ocultar histórico de alterações' : 'Ver histórico de alterações'}
-      </button>
-      {aberto && (
-        <div className="mt-2 space-y-2">
-          {!isSupabaseConnected && <p className="text-slate-500">Na demonstração o histórico não é gravado.</p>}
-          {eventos && eventos.length === 0 && isSupabaseConnected && <p className="text-slate-500">Nenhuma alteração registrada.</p>}
-          {eventos?.map((ev) => (
-            <div key={ev.id} className="border-l-2 border-slate-200 pl-2">
-              <p className="text-slate-600">
-                {new Date(ev.em).toLocaleString('pt-BR')} · {nome(ev.por)} · {ev.acao}
-              </p>
-              {ev.acao === 'alterado' && ev.depois && (
-                <ul className="text-slate-700">
-                  {Object.keys(ev.depois)
-                    .filter((k) => !IGNORAR.has(k))
-                    .map((k) => (
-                      <li key={k}>
-                        {ROTULO_CAMPO[k] || k}: {mostrar(ev.antes?.[k])} → {mostrar(ev.depois?.[k])}
+  const lista = (
+    <div className="space-y-2">
+      {!isSupabaseConnected && <Vazio>Na demonstração o histórico não é gravado.</Vazio>}
+      {isSupabaseConnected && eventos === null && <p className="text-xs text-slate-500">Carregando histórico…</p>}
+      {eventos && eventos.length === 0 && isSupabaseConnected && <Vazio>Nenhuma alteração registrada.</Vazio>}
+      {eventos && eventos.length > 0 && (
+        <ol className="cartao divide-y divide-slate-100">
+          {eventos.map((ev) => {
+            const acao = ROTULO_ACAO[ev.acao];
+            const campos =
+              ev.acao === 'alterado' && ev.depois ? Object.keys(ev.depois).filter((k) => !IGNORAR.has(k)) : [];
+            return (
+              <li key={ev.id} className="space-y-1 px-4 py-3 text-xs">
+                <p className="flex flex-wrap items-center gap-2 text-slate-600">
+                  <span className={`selo ${acao?.selo || 'selo-neutro'}`}>{acao?.texto || ev.acao}</span>
+                  <span className="font-medium text-slate-900">{nome(ev.por)}</span>
+                  <span>{new Date(ev.em).toLocaleString('pt-BR')}</span>
+                </p>
+                {campos.length > 0 && (
+                  <ul className="space-y-0.5 text-slate-700">
+                    {campos.map((k) => (
+                      <li key={k} className="break-words">
+                        <span className="text-slate-500">{ROTULO_CAMPO[k] || k}:</span> {mostrar(ev.antes?.[k])} →{' '}
+                        <span className="font-medium text-slate-900">{mostrar(ev.depois?.[k])}</span>
                       </li>
                     ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       )}
+    </div>
+  );
+
+  if (semBotao) {
+    return (
+      <section className="space-y-2">
+        <h3 className="secao-titulo">Histórico de alterações</h3>
+        {lista}
+      </section>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <button type="button" onClick={abrir} aria-expanded={aberto} className="btn btn-sm btn-discreto">
+        <History /> {aberto ? 'Ocultar histórico de alterações' : 'Ver histórico de alterações'}
+      </button>
+      {aberto && lista}
     </div>
   );
 };

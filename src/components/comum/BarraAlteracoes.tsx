@@ -46,7 +46,7 @@ export const BarraAlteracoes: React.FC<BarraAlteracoesProps> = ({
           type="button"
           onClick={onCancelar}
           disabled={salvando}
-          className="btn btn-secundario btn-sm"
+          className="btn btn-secundario"
         >
           Cancelar
         </button>
@@ -54,7 +54,7 @@ export const BarraAlteracoes: React.FC<BarraAlteracoesProps> = ({
           type="button"
           onClick={onSalvar}
           disabled={salvando}
-          className="btn btn-primario btn-sm"
+          className="btn btn-primario"
         >
           {salvando ? 'Salvando...' : rotuloSalvar}
         </button>

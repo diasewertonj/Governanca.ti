@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BellPlus } from 'lucide-react';
+import { BellPlus, Check } from 'lucide-react';
 
 /**
  * Botão "Criar lembrete" de 1 clique (garantia do ativo, vencimento do
@@ -14,7 +14,12 @@ export const BotaoLembrete: React.FC<{ jaExiste: boolean; criar: () => Promise<s
   const [erro, setErro] = useState('');
 
   if (jaExiste) {
-    return <span className="text-xs font-medium text-emerald-700">✓ Lembrete criado</span>;
+    return (
+      <span className="selo selo-ok">
+        <Check aria-hidden="true" />
+        Lembrete criado
+      </span>
+    );
   }
 
   const clicar = async () => {
@@ -36,11 +41,11 @@ export const BotaoLembrete: React.FC<{ jaExiste: boolean; criar: () => Promise<s
         disabled={gravando}
         className="btn btn-secundario btn-sm"
       >
-        <BellPlus className="w-3.5 h-3.5" />
+        <BellPlus aria-hidden="true" />
         {gravando ? 'Criando...' : 'Criar lembrete'}
       </button>
       {erro && (
-        <span className="text-xs text-red-700" role="alert">
+        <span className="erro" role="alert">
           {erro}
         </span>
       )}

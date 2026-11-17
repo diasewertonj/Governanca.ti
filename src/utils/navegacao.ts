@@ -9,6 +9,7 @@ export type Vista =
   | 'dashboard'
   | 'assets'
   | 'softwares'
+  | 'linhas'
   | 'fornecedores'
   | 'contratos'
   | 'vencimentos'
@@ -30,6 +31,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   dashboard: 'Início',
   assets: 'Hardware',
   softwares: 'Softwares e licenças',
+  linhas: 'Linhas telefônicas',
   fornecedores: 'Fornecedores',
   contratos: 'Contratos',
   vencimentos: 'Vencimentos',
@@ -59,6 +61,7 @@ export type Icone =
   | 'ativos'
   | 'fornecedores'
   | 'softwares'
+  | 'linhas'
   | 'contratos'
   | 'vencimentos'
   | 'contas_pagar'
@@ -117,7 +120,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
     { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados'), item('lembretes', 'lembretes', 'lembretes')] },
     { titulo: 'Pessoas', itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes', 'processos')] },
     // Seção 6: inventário separado de fornecedores/contratos; Financeiro centraliza as despesas
-    { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares')] },
+    { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares'), item('linhas', 'linhas')] },
     {
       titulo: 'Fornecedores e contratos',
       itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],

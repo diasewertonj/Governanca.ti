@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, ExternalLink, Plus, ShieldCheck, Wrench, XCircle } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Plus, ShieldCheck, XCircle } from 'lucide-react';
 import { comQuemEstava } from '../../utils/vinculos.ts';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Asset, Manutencao, StatusManutencao } from '../../types/index.ts';
@@ -16,16 +16,17 @@ import {
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { ROTULO_CATEGORIA_ANEXO } from './AnexosAtivo.tsx';
 import { FormManutencao, type ModoManutencao } from './FormManutencao.tsx';
+import { Dado } from '../ui/Janela.tsx';
+import { Vazio } from '../ui/Tela.tsx';
 
-const COR_STATUS: Record<StatusManutencao, string> = {
-  em_andamento: 'text-amber-800 bg-amber-50 border-amber-200',
-  concluida: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-  cancelada: 'text-slate-600 bg-slate-100 border-slate-200',
+const SELO_STATUS: Record<StatusManutencao, string> = {
+  em_andamento: 'selo-atencao',
+  concluida: 'selo-ok',
+  cancelada: 'selo-neutro',
 };
 
-const BOTAO_LINHA = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border';
 /** Fase 9: chamado e pessoas da manutenção abrem a ficha por cima */
-const LINK = 'inline-flex items-center gap-0.5 font-medium text-blue-700 hover:underline';
+const LINK = 'link inline-flex items-center gap-0.5';
 
 /**
  * Fase 8: manutenções do ativo (só a T.I.), da mais recente para a mais antiga,
@@ -42,23 +43,31 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
   const chamado = (id?: string) => tickets.find((t) => t.id === id);
 
   return (
-    <div className="border border-slate-200 rounded-lg p-4 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-slate-600" aria-hidden="true" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Manutenções</h3>
-          <span className="text-xs text-slate-500">({lista.length})</span>
+    <div className="space-y-4">
+      <section className="cartao space-y-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="secao-titulo">Custos de manutenção</h3>
+          {podeEditar && (
+            <button type="button" onClick={() => setForm({ modo: 'feita' })} className="btn btn-sm btn-secundario">
+              <Plus aria-hidden="true" /> Registrar manutenção já feita
+            </button>
+          )}
         </div>
-        <span className="text-xs text-slate-600">
-          Total gasto:{' '}
-          <span className="font-semibold font-mono text-slate-900">{formatCurrency(totalGastoManutencoes(lista))}</span>
-        </span>
-      </div>
+        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Dado rotulo="Manutenções">{lista.length}</Dado>
+          <Dado rotulo="Total gasto">
+            <span className="font-mono">{formatCurrency(totalGastoManutencoes(lista))}</span>
+          </Dado>
+          <Dado rotulo="Custo acumulado (compra + manutenções)">
+            <span className="font-mono">{formatCurrency(custoAcumulado(asset))}</span>
+          </Dado>
+        </dl>
+      </section>
 
       {lista.length === 0 ? (
-        <p className="text-xs text-slate-500">Nenhuma manutenção registrada.</p>
+        <Vazio>Nenhuma manutenção registrada.</Vazio>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {lista.map((m) => {
             const ct = contrato(m.contratoId);
             const tk = chamado(m.chamadoId);
@@ -67,59 +76,62 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
             const comQuem = comQuemEstava(asset, m.abertaEm);
             const abriu = m.criadoPor ? employees.find((e) => e.id === m.criadoPor) : undefined;
             return (
-              <li key={m.id} className="p-3 bg-slate-50 rounded-md border border-slate-200 text-xs space-y-1.5">
+              <li key={m.id} className="cartao space-y-2 p-4 text-xs">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <p className="flex flex-wrap items-center gap-1.5">
                       <span className="font-semibold text-slate-700">{ROTULO_TIPO_MANUTENCAO[m.tipo]}</span>
-                      <span className={`inline-block px-1.5 py-0.5 rounded border text-xs font-medium ${COR_STATUS[m.status]}`}>
-                        {ROTULO_STATUS_MANUTENCAO[m.status]}
-                      </span>
+                      <span className={`selo ${SELO_STATUS[m.status]}`}>{ROTULO_STATUS_MANUTENCAO[m.status]}</span>
                       {m.cobertoGarantia && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-xs font-medium text-emerald-700 bg-emerald-50 border-emerald-200">
-                          <ShieldCheck className="w-3 h-3" aria-hidden="true" /> Coberto pela garantia
+                        <span className="selo selo-ok">
+                          <ShieldCheck aria-hidden="true" /> Coberto pela garantia
                         </span>
                       )}
                     </p>
-                    <p className="font-semibold text-slate-900 mt-1 break-words">{m.descricao}</p>
+                    <p className="font-semibold break-words text-slate-900">{m.descricao}</p>
                   </div>
-                  <span className={`font-semibold font-mono text-slate-800 ${m.status === 'cancelada' ? 'line-through text-slate-500' : ''}`}>
+                  <span className={`text-right font-mono font-semibold text-slate-800 ${m.status === 'cancelada' ? 'text-slate-500 line-through' : ''}`}>
                     {formatCurrency(m.custo)}
-                    {m.status === 'em_andamento' && <span className="block text-right font-sans font-normal text-slate-500">estimado</span>}
+                    {m.status === 'em_andamento' && <span className="block font-sans font-normal text-slate-500">estimado</span>}
                   </span>
                 </div>
 
-                <p className="text-slate-600 break-words">
+                <p className="break-words text-slate-600">
                   {nomeFornecedor(m.fornecedorId)}
-                  {m.numeroOs && <> · OS <span className="font-mono">{m.numeroOs}</span></>}
+                  {m.numeroOs && (
+                    <>
+                      {' '}
+                      · OS <span className="font-mono">{m.numeroOs}</span>
+                    </>
+                  )}
                   {' · '}Aberta em {formatDate(m.abertaEm)}
                   {m.status === 'concluida' && ` · Concluída em ${formatDate(m.concluidaEm)}`}
                   {m.status === 'em_andamento' && m.previsao && ` · Previsão ${formatDate(m.previsao)}`}
                   {m.status === 'cancelada' && m.encerradoEm && ` · Cancelada em ${formatDate(m.encerradoEm)}`}
                 </p>
                 {(ct || tk) && (
-                  <p className="text-slate-600 break-words">
+                  <p className="break-words text-slate-600">
                     {ct && <>Contrato: {nomeContrato(ct)}</>}
                     {ct && tk && ' · '}
                     {tk && (
                       <>
                         Chamado:{' '}
                         <button type="button" onClick={() => setSelectedTicketIdForDetail(tk.id)} className={LINK}>
-                          {tk.codigo}
-                          <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                          <span className="font-mono">{tk.codigo}</span>
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </button>
                       </>
                     )}
                   </p>
                 )}
                 {(comQuem || abriu) && (
-                  <p className="text-slate-600 break-words">
+                  <p className="break-words text-slate-600">
                     {comQuem && (
                       <>
                         {comQuem.devolvidoEm ? 'Último a usar' : 'Com'}:{' '}
                         <button type="button" onClick={() => setSelectedEmployeeIdFor360(comQuem.colaboradorId)} className={LINK}>
                           {comQuem.colaboradorNome}
-                          <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </button>
                         {comQuem.devolvidoEm && ` (devolvido em ${formatDate(comQuem.devolvidoEm)})`}
                       </>
@@ -130,15 +142,15 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
                         Aberta por:{' '}
                         <button type="button" onClick={() => setSelectedEmployeeIdFor360(abriu.id)} className={LINK}>
                           {abriu.nome}
-                          <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </button>
                       </>
                     )}
                   </p>
                 )}
-                {m.observacoes && <p className="text-slate-700 whitespace-pre-wrap break-words">{m.observacoes}</p>}
+                {m.observacoes && <p className="break-words whitespace-pre-wrap text-slate-700">{m.observacoes}</p>}
                 {arquivos.length > 0 && (
-                  <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                  <ul className="flex flex-wrap gap-x-2 gap-y-1">
                     {arquivos.map((a) => (
                       <li key={a.id} className="min-w-0">
                         <AbrirArquivo caminho={a.caminho} rotulo={`${ROTULO_CATEGORIA_ANEXO[a.categoria]}: ${a.nome}`} />
@@ -148,20 +160,12 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
                 )}
 
                 {podeEditar && m.status === 'em_andamento' && (
-                  <div className="flex flex-wrap justify-end gap-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setForm({ modo: 'concluir', manutencao: m })}
-                      className={`${BOTAO_LINHA} text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100`}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Concluir
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
+                    <button type="button" onClick={() => setForm({ modo: 'cancelar', manutencao: m })} className="btn btn-sm btn-perigo">
+                      <XCircle aria-hidden="true" /> Cancelar
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm({ modo: 'cancelar', manutencao: m })}
-                      className={`${BOTAO_LINHA} text-slate-700 bg-white border-slate-200 hover:bg-slate-50`}
-                    >
-                      <XCircle className="w-3.5 h-3.5" aria-hidden="true" /> Cancelar
+                    <button type="button" onClick={() => setForm({ modo: 'concluir', manutencao: m })} className="btn btn-sm btn-primario">
+                      <CheckCircle2 aria-hidden="true" /> Concluir
                     </button>
                   </div>
                 )}
@@ -170,24 +174,6 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
           })}
         </ul>
       )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-        {podeEditar ? (
-          <button
-            type="button"
-            onClick={() => setForm({ modo: 'feita' })}
-            className="btn btn-secundario"
-          >
-            <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Registrar manutenção já feita
-          </button>
-        ) : (
-          <span />
-        )}
-        <span className="text-xs text-slate-600">
-          Custo acumulado (compra + manutenções):{' '}
-          <span className="font-semibold font-mono text-slate-900">{formatCurrency(custoAcumulado(asset))}</span>
-        </span>
-      </div>
 
       {/* No body: dentro da ficha (fundo com backdrop-filter e rolagem própria) a janela abriria
           fora da tela no celular, no alto da rolagem da ficha */}

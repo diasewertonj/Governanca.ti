@@ -3,7 +3,8 @@
  * Tudo calculado a partir da fonte única (utils/financeiro.ts); nada é digitado duas vezes.
  */
 import React, { useMemo, useState } from 'react';
-import { Download, Search } from 'lucide-react';
+import { Download } from 'lucide-react';
+import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { Fatura } from '../../types/index.ts';
@@ -21,18 +22,6 @@ import {
   type Vencimento,
 } from '../../utils/financeiro.ts';
 import { FaturasSecao } from './FaturasSecao.tsx';
-
-const Topo: React.FC<{ titulo: string; sub: string; children?: React.ReactNode }> = ({ titulo, sub, children }) => (
-  <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
-    <div className="min-w-0">
-      <h2 className="text-sm font-semibold text-slate-900">{titulo}</h2>
-      <p className="text-xs text-slate-500">{sub}</p>
-    </div>
-    {children}
-  </div>
-);
-
-const CAMPO_FILTRO = 'campo campo-sm w-auto';
 
 // -----------------------------------------------------------------------------
 // Vencimentos
@@ -61,40 +50,44 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
   };
 
   return (
-    <div className="space-y-6">
-      <Topo titulo={noInicio ? "Precisa de atenção" : "Vencimentos"} sub="Garantias, contratos, prazos de cancelamento, renovações, faturas, estoque baixo e recursos de desligados">
-        <div className="flex flex-wrap gap-2">
-          <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoVencimento | 'todos')} aria-label="Tipo" className={CAMPO_FILTRO}>
-            <option value="todos">Todos os tipos</option>
-            {Object.entries(ROTULO_VENCIMENTO).map(([k, r]) => (
-              <option key={k} value={k}>{r}</option>
-            ))}
-          </select>
-          <select value={horizonte} onChange={(e) => setHorizonte(Number(e.target.value))} aria-label="Período" className={CAMPO_FILTRO}>
-            <option value={30}>Próximos 30 dias</option>
-            <option value={60}>Próximos 60 dias</option>
-            <option value={90}>Próximos 90 dias</option>
-            <option value={365}>Próximos 12 meses</option>
-          </select>
-        </div>
-      </Topo>
+    <div className="space-y-4">
+      <CabecalhoTela
+        titulo={noInicio ? 'Precisa de atenção' : 'Vencimentos'}
+        subtitulo="Garantias, contratos, prazos de cancelamento, renovações, faturas, estoque baixo e recursos de desligados"
+        filtros={
+          <>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoVencimento | 'todos')} aria-label="Tipo" className="campo campo-sm">
+              <option value="todos">Todos os tipos</option>
+              {Object.entries(ROTULO_VENCIMENTO).map(([k, r]) => (
+                <option key={k} value={k}>{r}</option>
+              ))}
+            </select>
+            <select value={horizonte} onChange={(e) => setHorizonte(Number(e.target.value))} aria-label="Período" className="campo campo-sm">
+              <option value={30}>Próximos 30 dias</option>
+              <option value={60}>Próximos 60 dias</option>
+              <option value={90}>Próximos 90 dias</option>
+              <option value={365}>Próximos 12 meses</option>
+            </select>
+          </>
+        }
+      />
       {lista.length === 0 ? (
-        <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4">Nada vencendo neste período.</p>
+        <Vazio>Nada vencendo neste período.</Vazio>
       ) : (
         <div className="cartao overflow-hidden">
-          <table className="tabela-cartoes w-full text-left text-xs">
+          <table className="tabela tabela-cartoes">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
-                <th className="py-2 px-3">Quando</th>
-                <th className="py-2 px-3">Tipo</th>
-                <th className="py-2 px-3">O quê</th>
-                <th className="py-2 px-3 text-right">Ação</th>
+              <tr>
+                <th>Quando</th>
+                <th>Tipo</th>
+                <th>O quê</th>
+                <th className="text-right">Ação</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody>
               {lista.map((v) => (
                 <tr key={v.id}>
-                  <td data-label="Quando" className="py-2 px-3">
+                  <td data-label="Quando">
                     {v.data ? (
                       <>
                         <span className="font-semibold text-slate-900">{formatDate(v.data)}</span>
@@ -106,16 +99,18 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
                       <span className="text-red-700 font-semibold">Pendência</span>
                     )}
                   </td>
-                  <td data-label="Tipo" className="py-2 px-3">{ROTULO_VENCIMENTO[v.tipo]}</td>
-                  <td data-label="O quê" className="py-2 px-3">
+                  <td data-label="Tipo">{ROTULO_VENCIMENTO[v.tipo]}</td>
+                  <td data-label="O quê">
                     <span className="font-medium text-slate-900">{v.titulo}</span>
                     {v.detalhe && <span className="block text-slate-500">{v.detalhe}</span>}
                   </td>
-                  <td data-label="Ação" className="py-2 px-3 text-right">
+                  <td data-label="Ação" className="text-right">
                     {v.alvo.tipo !== 'estoque' && v.alvo.tipo !== 'linha' && (
-                      <button type="button" onClick={() => abrir(v)} className="btn btn-secundario btn-sm">
-                        {v.tipo === 'contrato' || v.tipo === 'cancelamento' ? 'Abrir contrato (renovar/encerrar)' : 'Abrir'}
-                      </button>
+                      <span className="acoes-linha">
+                        <button type="button" onClick={() => abrir(v)} className="btn btn-sm btn-primario">
+                          {v.tipo === 'contrato' || v.tipo === 'cancelamento' ? 'Abrir contrato (renovar/encerrar)' : 'Abrir'}
+                        </button>
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -129,15 +124,15 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
   );
 };
 
-/** Abre o formulário do contrato a partir de outras telas */
-const ContratoFormModalLazy = React.lazy(() => import('../fornecedores/ContratoFormModal.tsx').then((m) => ({ default: m.ContratoFormModal })));
+/** Abre a ficha do contrato a partir de outras telas */
+const ContratoFichaLazy = React.lazy(() => import('../fornecedores/ContratoFicha.tsx').then((m) => ({ default: m.ContratoFicha })));
 export const ContratoPorId: React.FC<{ id: string; onClose: () => void }> = ({ id, onClose }) => {
   const { contratos } = useApp();
   const contrato = contratos.find((c) => c.id === id);
   if (!contrato) return null;
   return (
     <React.Suspense fallback={null}>
-      <ContratoFormModalLazy contrato={contrato} onClose={onClose} />
+      <ContratoFichaLazy contratoId={contrato.id} onClose={onClose} />
     </React.Suspense>
   );
 };
@@ -145,7 +140,7 @@ export const ContratoPorId: React.FC<{ id: string; onClose: () => void }> = ({ i
 // -----------------------------------------------------------------------------
 // Contas a pagar
 // -----------------------------------------------------------------------------
-export const ContasPagarView: React.FC = () => {
+export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
   const { faturas, contratos, licenses, fornecedores } = useApp();
   const [status, setStatus] = useState<'abertas' | 'vencidas' | 'pagas' | 'todas'>('abertas');
   const [fornecedorId, setFornecedorId] = useState('');
@@ -193,32 +188,38 @@ export const ContasPagarView: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      {/* Um cartão só: filtros à esquerda, total e CSV à direita (mesmo padrão das outras telas) */}
-      <div className="cartao p-3 flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar origem ou documento..." aria-label="Buscar" className={`${CAMPO_FILTRO} pl-8 w-full sm:w-60`} />
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" aria-hidden="true" />
-        </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Situação" className={CAMPO_FILTRO}>
-          <option value="abertas">A pagar e vencidas</option>
-          <option value="vencidas">Só vencidas</option>
-          <option value="pagas">Pagas</option>
-          <option value="todas">Todas</option>
-        </select>
-        <select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} aria-label="Fornecedor" className={CAMPO_FILTRO}>
-          <option value="">Todos os fornecedores</option>
-          {fornecedores.map((f) => (
-            <option key={f.id} value={f.id}>{f.nome}</option>
-          ))}
-        </select>
-        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} aria-label="Competência" title="Competência" className={CAMPO_FILTRO} />
-        <span className="ml-auto text-xs text-slate-600">
-          Total na lista: <span className="font-mono font-semibold text-slate-900">{brl(total)}</span>
-        </span>
-        <button type="button" onClick={exportar} className="btn btn-secundario">
-          <Download className="w-3.5 h-3.5" /> CSV
-        </button>
-      </div>      <FaturasSecao listaGlobal={lista} />
+      <CabecalhoTela
+        titulo="Financeiro"
+        subtitulo="Faturas a pagar e despesas por período"
+        acoes={
+          <button type="button" onClick={exportar} className="btn btn-secundario">
+            <Download /> Exportar CSV
+          </button>
+        }
+        abas={abas}
+        filtros={
+          <>
+            <Busca id="contas-busca" valor={busca} onMudar={setBusca} placeholder="Buscar origem ou documento..." />
+            <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Situação" className="campo campo-sm">
+              <option value="abertas">A pagar e vencidas</option>
+              <option value="vencidas">Só vencidas</option>
+              <option value="pagas">Pagas</option>
+              <option value="todas">Todas</option>
+            </select>
+            <select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} aria-label="Fornecedor" className="campo campo-sm">
+              <option value="">Todos os fornecedores</option>
+              {fornecedores.map((f) => (
+                <option key={f.id} value={f.id}>{f.nome}</option>
+              ))}
+            </select>
+            <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} aria-label="Competência" title="Competência" className="campo campo-sm" />
+            <span className="ml-auto text-xs text-slate-600">
+              Total na lista: <span className="font-mono font-semibold text-slate-900">{brl(total)}</span>
+            </span>
+          </>
+        }
+      />
+      <FaturasSecao listaGlobal={lista} />
     </div>
   );
 };

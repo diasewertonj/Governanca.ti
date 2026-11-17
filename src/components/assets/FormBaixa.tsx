@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Archive, Info, X } from 'lucide-react';
+import { AlertTriangle, Archive, Info } from 'lucide-react';
+import { Janela } from '../ui/Janela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Asset, DestinoBaixa, MotivoBaixa } from '../../types/index.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
-import { CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import {
   MOTIVOS_SEM_DEVOLUCAO,
   ROTULO_DESTINO_BAIXA,
@@ -86,35 +86,27 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
   const id = (campo: string) => `baixa-${asset.id}-${campo}`;
 
   return (
-    <div className="janela-fundo modal-tela">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={id('titulo')}
-        className="janela janela-g"
-      >
-        <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="min-w-0">
-            <h2 id={id('titulo')} className="text-base font-semibold text-slate-900">
-              Dar baixa
-            </h2>
-            <p className="text-xs text-slate-600 break-words">
-              {asset.tag} · {asset.nome}
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label="Fechar"
-            onClick={fechar}
-            className="btn-icone"
-          >
-            <X className="w-5 h-5" />
+    <Janela
+      tamanho="m"
+      idTitulo={id('titulo')}
+      icone={<Archive className="h-4 w-4" aria-hidden="true" />}
+      titulo="Dar baixa"
+      subtitulo={`${asset.tag} · ${asset.nome}`}
+      onFechar={fechar}
+      rodape={
+        <>
+          <button type="button" onClick={fechar} disabled={salvando} className="btn btn-secundario">
+            Cancelar
           </button>
-        </div>
-
-        <form onSubmit={registrar} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
+          <button type="submit" form={id('form')} disabled={salvando || bloqueios.length > 0} className="btn btn-perigo">
+            {salvando ? 'Registrando...' : 'Confirmar baixa'}
+          </button>
+        </>
+      }
+    >
+        <form id={id('form')} onSubmit={registrar} className="space-y-4">
           {bloqueios.length > 0 && (
-            <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-md px-3 py-2 space-y-1" role="status">
+            <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1" role="status">
               <p className="flex items-center gap-1.5 font-semibold">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> A baixa ainda não pode ser feita
               </p>
@@ -135,9 +127,9 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
             </p>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div>
-              <label htmlFor={id('motivo')} className={CLASSE_ROTULO}>
+              <label htmlFor={id('motivo')} className="rotulo">
                 Motivo *
               </label>
               <select
@@ -145,7 +137,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 required
                 value={motivo}
                 onChange={(e) => mudarMotivo(e.target.value as MotivoBaixa | '')}
-                className={CLASSE_CAMPO}
+                className="campo"
               >
                 <option value="">Selecione...</option>
                 {(Object.keys(ROTULO_MOTIVO_BAIXA) as MotivoBaixa[]).map((m) => (
@@ -156,7 +148,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
               </select>
             </div>
             <div>
-              <label htmlFor={id('destino')} className={CLASSE_ROTULO}>
+              <label htmlFor={id('destino')} className="rotulo">
                 Destino *
               </label>
               <select
@@ -164,7 +156,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 required
                 value={destino}
                 onChange={(e) => setDestino(e.target.value as DestinoBaixa | '')}
-                className={CLASSE_CAMPO}
+                className="campo"
               >
                 <option value="">Selecione...</option>
                 {(Object.keys(ROTULO_DESTINO_BAIXA) as DestinoBaixa[]).map((d) => (
@@ -175,7 +167,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
               </select>
             </div>
             <div>
-              <label htmlFor={id('data')} className={CLASSE_ROTULO}>
+              <label htmlFor={id('data')} className="rotulo">
                 Data da baixa *
               </label>
               <input
@@ -184,11 +176,11 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 required
                 value={dataBaixa}
                 onChange={(e) => setDataBaixa(e.target.value)}
-                className={CLASSE_CAMPO}
+                className="campo"
               />
             </div>
             <div>
-              <label htmlFor={id('destinatario')} className={CLASSE_ROTULO}>
+              <label htmlFor={id('destinatario')} className="rotulo">
                 Destinatário
               </label>
               <input
@@ -197,11 +189,11 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 value={destinatario}
                 onChange={(e) => setDestinatario(e.target.value)}
                 placeholder="Instituição, comprador ou recicladora (CNPJ)"
-                className={CLASSE_CAMPO}
+                className="campo"
               />
             </div>
             <div>
-              <label htmlFor={id('documento')} className={CLASSE_ROTULO}>
+              <label htmlFor={id('documento')} className="rotulo">
                 Documento
               </label>
               <input
@@ -210,12 +202,12 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 value={documento}
                 onChange={(e) => setDocumento(e.target.value)}
                 placeholder="Nº do laudo, certificado de descarte, BO..."
-                className={CLASSE_CAMPO}
+                className="campo"
               />
             </div>
             {destino === 'venda' && (
               <div>
-                <label htmlFor={id('valor')} className={CLASSE_ROTULO}>
+                <label htmlFor={id('valor')} className="rotulo">
                   Valor de venda (R$)
                 </label>
                 <input
@@ -226,12 +218,12 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                   inputMode="decimal"
                   value={valorVenda}
                   onChange={(e) => setValorVenda(e.target.value)}
-                  className={`${CLASSE_CAMPO} font-mono`}
+                  className="campo font-mono"
                 />
               </div>
             )}
             <div className="md:col-span-2 xl:col-span-2">
-              <label htmlFor={id('obs')} className={CLASSE_ROTULO}>
+              <label htmlFor={id('obs')} className="rotulo">
                 Observações
               </label>
               <textarea
@@ -239,7 +231,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
                 rows={2}
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                className={CLASSE_CAMPO}
+                className="campo"
               />
             </div>
             <div className="md:col-span-2 xl:col-span-2">
@@ -264,26 +256,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
             </p>
           )}
 
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={fechar}
-              disabled={salvando}
-              className="btn btn-secundario"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={salvando || bloqueios.length > 0}
-              className="btn btn-perigo-cheio"
-            >
-              <Archive className="w-3.5 h-3.5" aria-hidden="true" />
-              {salvando ? 'Registrando...' : 'Confirmar baixa'}
-            </button>
-          </div>
         </form>
-      </div>
-    </div>
+    </Janela>
   );
 };

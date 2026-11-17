@@ -28,8 +28,8 @@ import {
   somarPor,
 } from '../../utils/financeiro.ts';
 import { ContasPagarView, ContratoPorId } from './FinanceiroViews.tsx';
-
-const CAMPO = 'campo';
+import { Abas } from '../ui/Abas.tsx';
+import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
 type Atalho = 'este_mes' | 'mes_anterior' | 'ult3' | 'ult6' | 'ult12' | 'este_ano' | 'ano_anterior' | 'personalizado';
 const ROTULO_ATALHO: Record<Atalho, string> = {
@@ -82,6 +82,8 @@ function periodoAnterior(de: string, ate: string) {
   return { de: isoLocal(new Date(a, m - 1 - n, 1)), ate: isoLocal(new Date(a, m - 1, 0)) };
 }
 
+const SELO_FATURA = { a_pagar: 'selo-atencao', vencida: 'selo-problema', paga: 'selo-ok', cancelada: 'selo-neutro' } as const;
+
 interface Origem {
   tipo: 'contrato' | 'licenca' | 'linha';
   id: string;
@@ -93,33 +95,20 @@ interface Origem {
 
 export const FinanceiroView: React.FC = () => {
   const [aba, setAba] = useState<'contas' | 'despesas'>('contas');
-  return (
-    <div className="space-y-4">
-      <div role="tablist" aria-label="Financeiro" className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start w-fit">
-        {(
-          [
-            ['contas', 'Contas a pagar'],
-            ['despesas', 'Despesas'],
-          ] as const
-        ).map(([id, r]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={aba === id}
-            onClick={() => setAba(id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md ${aba === id ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            {r}
-          </button>
-        ))}
-      </div>
-      {aba === 'contas' ? <ContasPagarView /> : <DespesasView />}
-    </div>
+  const abas = (
+    <Abas
+      rotulo="Financeiro"
+      ativa={aba}
+      onMudar={setAba}
+      itens={[
+        { id: 'contas', rotulo: 'Contas a pagar' },
+        { id: 'despesas', rotulo: 'Despesas' },
+      ]}
+    />
   );
+  return aba === 'contas' ? <ContasPagarView abas={abas} /> : <DespesasView abas={abas} />;
 };
-
-export const DespesasView: React.FC = () => {
+export const DespesasView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
   const { licenses, contratos, faturas, fornecedores, abrirFicha } = useApp();
   const { linhas } = useRecursos();
   const [atalho, setAtalho] = useState<Atalho>('ult6');
@@ -244,72 +233,56 @@ export const DespesasView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Período e filtros */}
-      <div className="cartao p-3 flex flex-wrap items-end gap-2">
-        <div>
-          <label htmlFor="desp-periodo" className="block text-xs font-semibold text-slate-700 mb-1">Período</label>
-          <select id="desp-periodo" value={atalho} onChange={(e) => setAtalho(e.target.value as Atalho)} className={CAMPO}>
-            {Object.entries(ROTULO_ATALHO).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-        </div>
-        {atalho === 'personalizado' && (
+      <CabecalhoTela
+        titulo="Financeiro"
+        subtitulo={`${formatDate(periodo.de)} a ${formatDate(periodo.ate)} (${meses.length} ${meses.length === 1 ? 'mês' : 'meses'}) · comparado com ${formatDate(anterior.de)} a ${formatDate(anterior.ate)}`}
+        acoes={
+          <button type="button" onClick={exportar} className="btn btn-secundario">
+            <Download /> Exportar CSV
+          </button>
+        }
+        abas={abas}
+        filtros={
           <>
-            <div>
-              <label htmlFor="desp-de" className="block text-xs font-semibold text-slate-700 mb-1">De</label>
-              <input id="desp-de" type="date" value={deManual} onChange={(e) => setDeManual(e.target.value)} className={CAMPO} />
-            </div>
-            <div>
-              <label htmlFor="desp-ate" className="block text-xs font-semibold text-slate-700 mb-1">Até</label>
-              <input id="desp-ate" type="date" value={ateManual} min={deManual || undefined} onChange={(e) => setAteManual(e.target.value)} className={CAMPO} />
-            </div>
+            <select aria-label="Período" value={atalho} onChange={(e) => setAtalho(e.target.value as Atalho)} className="campo campo-sm">
+              {Object.entries(ROTULO_ATALHO).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+            {atalho === 'personalizado' && (
+              <>
+                <input aria-label="De" title="De" type="date" value={deManual} onChange={(e) => setDeManual(e.target.value)} className="campo campo-sm" />
+                <input aria-label="Até" title="Até" type="date" value={ateManual} min={deManual || undefined} onChange={(e) => setAteManual(e.target.value)} className="campo campo-sm" />
+              </>
+            )}
+            <select aria-label="Fornecedor" value={fFornecedor} onChange={(e) => setFFornecedor(e.target.value)} className="campo campo-sm">
+              <option value="">Todos os fornecedores</option>
+              {fornecedores.map((f) => (
+                <option key={f.id} value={f.id}>{f.nome}</option>
+              ))}
+            </select>
+            <select aria-label="Categoria" value={fCategoria} onChange={(e) => setFCategoria(e.target.value)} className="campo campo-sm">
+              <option value="">Todas as categorias</option>
+              {Object.entries(ROTULO_CATEGORIA).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+            <select aria-label="Área" value={fArea} onChange={(e) => setFArea(e.target.value)} className="campo campo-sm">
+              <option value="">Todas as áreas</option>
+              {areas.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+            <select aria-label="Origem" value={fOrigem} onChange={(e) => setFOrigem(e.target.value as typeof fOrigem)} className="campo campo-sm">
+              <option value="">Todas as origens</option>
+              <option value="contrato">Contratos</option>
+              <option value="licenca">Softwares</option>
+              <option value="linha">Linhas avulsas</option>
+            </select>
+            <button type="button" onClick={limpar} className="btn btn-sm btn-secundario">Limpar filtros</button>
           </>
-        )}
-        <div>
-          <label htmlFor="desp-forn" className="block text-xs font-semibold text-slate-700 mb-1">Fornecedor</label>
-          <select id="desp-forn" value={fFornecedor} onChange={(e) => setFFornecedor(e.target.value)} className={CAMPO}>
-            <option value="">Todos</option>
-            {fornecedores.map((f) => (
-              <option key={f.id} value={f.id}>{f.nome}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="desp-cat" className="block text-xs font-semibold text-slate-700 mb-1">Categoria</label>
-          <select id="desp-cat" value={fCategoria} onChange={(e) => setFCategoria(e.target.value)} className={CAMPO}>
-            <option value="">Todas</option>
-            {Object.entries(ROTULO_CATEGORIA).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="desp-area" className="block text-xs font-semibold text-slate-700 mb-1">Área</label>
-          <select id="desp-area" value={fArea} onChange={(e) => setFArea(e.target.value)} className={CAMPO}>
-            <option value="">Todas</option>
-            {areas.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="desp-origem" className="block text-xs font-semibold text-slate-700 mb-1">Origem</label>
-          <select id="desp-origem" value={fOrigem} onChange={(e) => setFOrigem(e.target.value as typeof fOrigem)} className={CAMPO}>
-            <option value="">Todas</option>
-            <option value="contrato">Contratos</option>
-            <option value="licenca">Softwares</option>
-            <option value="linha">Linhas avulsas</option>
-          </select>
-        </div>
-        <button type="button" onClick={limpar} className="btn btn-secundario">Limpar filtros</button>
-        <button type="button" onClick={exportar} className="btn btn-secundario ml-auto">
-          <Download className="w-3.5 h-3.5" /> CSV
-        </button>
-        <p className="w-full text-xs text-slate-500">
-          {formatDate(periodo.de)} a {formatDate(periodo.ate)} ({meses.length} {meses.length === 1 ? 'mês' : 'meses'}) · comparado com {formatDate(anterior.de)} a {formatDate(anterior.ate)}
-        </p>
-      </div>
-
+        }
+      />
       {/* Números do período */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="cartao p-3">
@@ -342,7 +315,7 @@ export const DespesasView: React.FC = () => {
         {/* Mês a mês */}
         <div className="cartao p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Mês a mês</h3>
+            <h3 className="secao-titulo">Mês a mês</h3>
             <span className="text-xs text-slate-500">
               <span className="inline-block w-2.5 h-2.5 bg-emerald-600 rounded-sm align-middle" /> realizado{' '}
               <span className="inline-block w-2.5 h-2.5 bg-slate-300 rounded-sm align-middle ml-2" /> previsto
@@ -368,8 +341,8 @@ export const DespesasView: React.FC = () => {
         {/* Agrupamento do realizado */}
         <div className="cartao p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Realizado por</h3>
-            <select value={agrupar} onChange={(e) => setAgrupar(e.target.value as typeof agrupar)} aria-label="Agrupar por" className={CAMPO}>
+            <h3 className="secao-titulo">Realizado por</h3>
+            <select value={agrupar} onChange={(e) => setAgrupar(e.target.value as typeof agrupar)} aria-label="Agrupar por" className="campo campo-sm">
               <option value="categoria">Categoria</option>
               <option value="fornecedor">Fornecedor</option>
               <option value="area">Área / centro de custo</option>
@@ -400,23 +373,25 @@ export const DespesasView: React.FC = () => {
 
       {/* Detalhe */}
       <div className="cartao overflow-hidden">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 px-3 pt-3">Faturas do período ({dados.doPeriodo.length})</h3>
+        <h3 className="secao-titulo px-3 pt-3">Faturas do período ({dados.doPeriodo.length})</h3>
         {dados.doPeriodo.length === 0 ? (
-          <p className="text-xs text-slate-500 p-3">Nenhuma fatura no período com estes filtros.</p>
+          <div className="p-3">
+            <Vazio>Nenhuma fatura no período com estes filtros.</Vazio>
+          </div>
         ) : (
-          <table className="tabela-cartoes w-full text-left text-xs mt-2">
+          <table className="tabela tabela-cartoes mt-2">
             <thead>
-              <tr className="bg-slate-50 border-y border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
-                <th className="py-2 px-3">Competência</th>
-                <th className="py-2 px-3">Origem</th>
-                <th className="py-2 px-3">Fornecedor</th>
-                <th className="hidden xl:table-cell py-2 px-3">Categoria</th>
-                <th className="hidden xl:table-cell py-2 px-3">Área</th>
-                <th className="py-2 px-3">Valor</th>
-                <th className="py-2 px-3">Situação</th>
+              <tr>
+                <th>Competência</th>
+                <th>Origem</th>
+                <th>Fornecedor</th>
+                <th className="hidden xl:table-cell">Categoria</th>
+                <th className="hidden xl:table-cell">Área</th>
+                <th>Valor</th>
+                <th>Situação</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody>
               {[...dados.doPeriodo]
                 .sort((a, b) => b.competencia.localeCompare(a.competencia))
                 .map((f) => {
@@ -424,20 +399,20 @@ export const DespesasView: React.FC = () => {
                   const st = statusExibido(f);
                   return (
                     <tr key={f.id}>
-                      <td data-label="Competência" className="py-2 px-3">{rotuloCompetencia(f.competencia)}</td>
-                      <td data-label="Origem" className="py-2 px-3">
+                      <td data-label="Competência">{rotuloCompetencia(f.competencia)}</td>
+                      <td data-label="Origem">
                         {o && o.tipo !== 'linha' ? (
-                          <button type="button" onClick={() => abrirOrigem(o)} className="text-blue-700 hover:underline text-left">{o.nome}</button>
+                          <button type="button" onClick={() => abrirOrigem(o)} className="link text-left">{o.nome}</button>
                         ) : (
                           o?.nome || '—'
                         )}
                       </td>
-                      <td data-label="Fornecedor" className="py-2 px-3">{nomeForn(o?.fornecedorId)}</td>
-                      <td data-label="Categoria" className="hidden xl:table-cell py-2 px-3">{o ? ROTULO_CATEGORIA[o.categoria] : '—'}</td>
-                      <td data-label="Área" className="hidden xl:table-cell py-2 px-3">{o?.area || '—'}</td>
-                      <td data-label="Valor" className="py-2 px-3 font-mono">{brl(f.valor)}</td>
-                      <td data-label="Situação" className="py-2 px-3">
-                        {ROTULO_STATUS_FATURA[st]}
+                      <td data-label="Fornecedor">{nomeForn(o?.fornecedorId)}</td>
+                      <td data-label="Categoria" className="hidden xl:table-cell">{o ? ROTULO_CATEGORIA[o.categoria] : '—'}</td>
+                      <td data-label="Área" className="hidden xl:table-cell">{o?.area || '—'}</td>
+                      <td data-label="Valor" className="font-mono">{brl(f.valor)}</td>
+                      <td data-label="Situação">
+                        <span className={`selo ${SELO_FATURA[st]}`}>{ROTULO_STATUS_FATURA[st]}</span>
                         {f.pagoEm && <span className="block text-slate-500">em {formatDate(f.pagoEm)}</span>}
                       </td>
                     </tr>
@@ -446,8 +421,7 @@ export const DespesasView: React.FC = () => {
             </tbody>
           </table>
         )}
-      </div>
-      {contratoAberto && <ContratoPorId id={contratoAberto} onClose={() => setContratoAberto(null)} />}
+      </div>      {contratoAberto && <ContratoPorId id={contratoAberto} onClose={() => setContratoAberto(null)} />}
     </div>
   );
 };

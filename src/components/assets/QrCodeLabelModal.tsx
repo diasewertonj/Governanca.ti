@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Asset } from '../../types/index.ts';
-import { Printer, X, Download, ShieldCheck } from 'lucide-react';
+import { Printer, Download, ShieldCheck } from 'lucide-react';
+import { Janela } from '../ui/Janela.tsx';
 
 interface QrCodeLabelModalProps {
   asset: Asset;
@@ -48,24 +49,27 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-      <div className="cartao relative w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <div>
-            <h3 className="text-base font-semibold text-slate-900">Etiqueta Patrimonial de T.I.</h3>
-            <p className="text-xs text-slate-500">QR Code para auditoria e leitura com leitor/celular</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="btn-icone"
-          >
-            <X className="w-5 h-5" />
+    <Janela
+      tamanho="p"
+      icone={<Printer className="h-4 w-4" />}
+      titulo="Etiqueta patrimonial de T.I."
+      subtitulo="QR Code para auditoria e leitura com leitor/celular"
+      onFechar={onClose}
+      rodape={
+        <div className="no-print flex items-center justify-end gap-2">
+          <button type="button" onClick={handleDownloadImage} className="btn btn-secundario">
+            <Download />
+            Baixar imagem PNG
+          </button>
+          <button type="button" onClick={handlePrint} className="btn btn-primario">
+            <Printer />
+            Imprimir etiqueta
           </button>
         </div>
-
-        {/* Pré-visualização da Etiqueta Física */}
-        <div className="p-6 bg-slate-50/70 flex flex-col items-center">
+      }
+    >
+      {/* Pré-visualização da etiqueta física */}
+      <div className="flex flex-col items-center">
           <div className="print-label-sticker w-full max-w-sm bg-white border border-slate-300 rounded-lg p-4 shadow-xs">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
               <div className="flex items-center gap-1.5">
@@ -109,28 +113,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
           <p className="mt-3 text-xs text-slate-500 text-center">
             Formato otimizado para etiquetas adesivas 80x45mm ou papel térmico.
           </p>
-        </div>
-
-        {/* Rodapé de Ações */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-white border-t border-slate-100">
-          <button
-            type="button"
-            onClick={handleDownloadImage}
-            className="btn btn-secundario"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Baixar Imagem PNG
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="btn btn-primario"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            Imprimir Etiqueta
-          </button>
-        </div>
       </div>
-    </div>
+    </Janela>
   );
 };

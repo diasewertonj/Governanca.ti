@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { ItemTermo, ResponsibilityTerm } from '../../types/index.ts';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, formatDateTime } from '../../utils/formatters.ts';
-import { Printer, X, CheckCircle2, Upload, FileText, PenLine, Ban } from 'lucide-react';
+import { Printer, CheckCircle2, Upload, FileText, PenLine, Ban } from 'lucide-react';
 import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO, SEM_TOMBO } from '../../utils/processos.ts';
 import { erroCancelarTermo, situacaoTermo, termoCancelado } from '../../utils/termos.ts';
 import { confirmar } from '../ui/dialogo.tsx';
+import { Janela } from '../ui/Janela.tsx';
 
 interface PrintableTermModalProps {
   term: ResponsibilityTerm;
@@ -170,159 +171,116 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
   const celula = 'border border-slate-400 px-2 py-1';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="cartao relative w-full max-w-4xl shadow-2xl overflow-hidden my-6">
-        {/* Barra de ações (fora da impressão) */}
-        <div className="no-print flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/80">
-          <div>
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" />
-              <h2 className="text-sm font-semibold text-slate-900">
-                {doc.codigo} · {t.codigo}
-              </h2>
-            </div>
-            <p className={`text-xs ${cancelado ? 'text-rose-700' : encerrado ? 'text-emerald-700' : 'text-amber-700'}`}>
-              {cancelado
-                ? `${situacao.rotulo} em ${formatDate(t.canceladoEm || '')}${
-                    t.canceladoPor ? ` por ${employees.find((e) => e.id === t.canceladoPor)?.nome || 'T.I.'}` : ''
-                  } — ${t.cancelamentoMotivo || 'sem motivo'}`
-                : ROTULO_FORMA[forma]}
-              {!cancelado && forma === 'pendente' && (
-                <>
-                  {' · '}colaborador {t.aceiteColaboradorEm ? '✓' : 'pendente'} · T.I. {t.aceiteTiEm ? '✓' : 'pendente'}
-                </>
-              )}
-            </p>
-          </div>
+    <Janela
+      tamanho="ficha"
+      idTitulo="termo-titulo"
+      icone={<FileText className="h-4 w-4" />}
+      titulo={`${doc.codigo} · ${t.codigo}`}
+      subtitulo={
+        <span className={cancelado ? 'text-red-700' : encerrado ? 'text-emerald-700' : 'text-amber-700'}>
+          {cancelado
+            ? `${situacao.rotulo} em ${formatDate(t.canceladoEm || '')}${
+                t.canceladoPor ? ` por ${employees.find((e) => e.id === t.canceladoPor)?.nome || 'T.I.'}` : ''
+              } — ${t.cancelamentoMotivo || 'sem motivo'}`
+            : ROTULO_FORMA[forma]}
+          {!cancelado && forma === 'pendente' && (
+            <>
+              {' · '}colaborador {t.aceiteColaboradorEm ? '✓' : 'pendente'} · T.I. {t.aceiteTiEm ? '✓' : 'pendente'}
+            </>
+          )}
+        </span>
+      }
+      acoes={
+        <button type="button" onClick={() => window.print()} className="btn btn-primario btn-sm no-print">
+          <Printer /> Imprimir A4
+        </button>
+      }
+      onFechar={onClose}
+    >
+      {/* Na impressão só a folha A4 sai: cabeçalho da janela fora */}
 
-          <div className="flex flex-wrap items-center gap-2">
-            {(podeAceitarColab || podeAceitarTI) && (
-              <button
-                type="button"
-                disabled={gravando}
-                onClick={assinar}
-                className="btn btn-primario btn-sm"
-              >
-                <PenLine className="w-3.5 h-3.5" />
-                {souColaborador ? 'Li e concordo' : 'Assinar como T.I.'}
-              </button>
-            )}
-            {t.arquivoAssinadoUrl && (
-              <button
-                type="button"
-                onClick={handleVerAssinado}
-                className="btn btn-secundario btn-sm"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" /> Ver documento assinado
-              </button>
-            )}
-            {isTI && !encerrado && (
-              <>
-                <label
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 cursor-pointer ${
-                    uploadingSigned ? 'opacity-50 pointer-events-none' : ''
-                  }`}
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  {uploadingSigned ? 'Enviando...' : 'Anexar assinado (PDF/foto)'}
-                  <input
-                    type="file"
-                    accept={TIPOS_ARQUIVO_ACEITOS.filter((x) => x !== 'text/plain').join(',')}
-                    onChange={handleEnviarAssinado}
-                    className="sr-only"
-                  />
-                </label>
-                {t.formaAssinatura && (
-                  <button
-                    type="button"
-                    onClick={() => setDispensando(dispensando === null ? '' : null)}
-                    className="btn btn-secundario btn-sm"
-                  >
-                    <Ban className="w-3.5 h-3.5" /> Dispensar assinatura
-                  </button>
-                )}
-              </>
-            )}
-            {isTI && !cancelado && (
-              <button
-                type="button"
-                onClick={() => setCancelando(cancelando === null ? '' : null)}
-                className="btn btn-perigo btn-sm"
-              >
-                <Ban className="w-3.5 h-3.5" /> Cancelar termo
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="btn btn-primario btn-sm"
-            >
-              <Printer className="w-3.5 h-3.5" /> Imprimir A4
+      {/* Barra de ações (fora da impressão) */}
+      <div className="no-print mb-4 space-y-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          {(podeAceitarColab || podeAceitarTI) && (
+            <button type="button" disabled={gravando} onClick={assinar} className="btn btn-primario btn-sm">
+              <PenLine />
+              {souColaborador ? 'Li e concordo' : 'Assinar como T.I.'}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Fechar"
-              className="btn-icone"
-            >
-              <X className="w-5 h-5" />
+          )}
+          {t.arquivoAssinadoUrl && (
+            <button type="button" onClick={handleVerAssinado} className="btn btn-secundario btn-sm">
+              <CheckCircle2 /> Ver documento assinado
             </button>
-          </div>
+          )}
+          {isTI && !encerrado && (
+            <>
+              <label className={`btn btn-secundario btn-sm cursor-pointer ${uploadingSigned ? 'pointer-events-none opacity-50' : ''}`}>
+                <Upload />
+                {uploadingSigned ? 'Enviando...' : 'Anexar assinado (PDF/foto)'}
+                <input
+                  type="file"
+                  accept={TIPOS_ARQUIVO_ACEITOS.filter((x) => x !== 'text/plain').join(',')}
+                  onChange={handleEnviarAssinado}
+                  className="sr-only"
+                />
+              </label>
+              {t.formaAssinatura && (
+                <button type="button" onClick={() => setDispensando(dispensando === null ? '' : null)} className="btn btn-secundario btn-sm">
+                  <Ban /> Dispensar assinatura
+                </button>
+              )}
+            </>
+          )}
+          {isTI && !cancelado && (
+            <button type="button" onClick={() => setCancelando(cancelando === null ? '' : null)} className="btn btn-perigo btn-sm">
+              <Ban /> Cancelar termo
+            </button>
+          )}
         </div>
 
-        {(aviso || erro || dispensando !== null || cancelando !== null) && (
-          <div className="no-print px-6 py-2 border-b border-slate-200 space-y-2 text-xs">
-            {aviso && <p className="text-emerald-700">{aviso}</p>}
-            {erro && <p className="text-rose-700">{erro}</p>}
-            {cancelando !== null && (
-              <div className="space-y-1.5">
-                <p className="text-slate-600">
-                  O termo não é apagado: fica no histórico como cancelado, com o motivo, e não pode mais ser assinado.
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    value={cancelando}
-                    onChange={(e) => setCancelando(e.target.value)}
-                    placeholder="Motivo (ex.: patrimônio errado; item que não foi entregue)"
-                    className="campo campo-sm flex-1 min-w-[16rem]"
-                  />
-                  <button
-                    type="button"
-                    disabled={gravando}
-                    onClick={confirmarCancelamento}
-                    className="btn btn-perigo-cheio btn-sm"
-                  >
-                    Confirmar cancelamento
-                  </button>
-                </div>
-              </div>
-            )}
-            {dispensando !== null && (
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  value={dispensando}
-                  onChange={(e) => setDispensando(e.target.value)}
-                  placeholder="Motivo (ex.: colaborador não compareceu; desligamento não amigável)"
-                  className="campo campo-sm flex-1 min-w-[16rem]"
-                />
-                <button
-                  type="button"
-                  disabled={gravando}
-                  onClick={confirmarDispensa}
-                  className="px-3 py-1.5 font-semibold text-white bg-slate-700 rounded-md disabled:opacity-50"
-                >
-                  Confirmar dispensa
-                </button>
-              </div>
-            )}
+        {aviso && <p className="text-emerald-700">{aviso}</p>}
+        {erro && <p className="erro">{erro}</p>}
+        {cancelando !== null && (
+          <div className="space-y-1.5">
+            <p className="text-slate-600">
+              O termo não é apagado: fica no histórico como cancelado, com o motivo, e não pode mais ser assinado.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={cancelando}
+                onChange={(e) => setCancelando(e.target.value)}
+                aria-label="Motivo do cancelamento"
+                placeholder="Motivo (ex.: patrimônio errado; item que não foi entregue)"
+                className="campo campo-sm min-w-[16rem] flex-1"
+              />
+              <button type="button" disabled={gravando} onClick={confirmarCancelamento} className="btn btn-perigo-cheio btn-sm">
+                Confirmar cancelamento
+              </button>
+            </div>
           </div>
         )}
+        {dispensando !== null && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={dispensando}
+              onChange={(e) => setDispensando(e.target.value)}
+              aria-label="Motivo da dispensa"
+              placeholder="Motivo (ex.: colaborador não compareceu; desligamento não amigável)"
+              className="campo campo-sm min-w-[16rem] flex-1"
+            />
+            <button type="button" disabled={gravando} onClick={confirmarDispensa} className="btn btn-secundario btn-sm">
+              Confirmar dispensa
+            </button>
+          </div>
+        )}
+      </div>
 
-        {/* Folha A4 */}
-        <div className="p-8 md:p-10 bg-white sm:max-h-[75vh] sm:overflow-y-auto print:max-h-none print:p-0">
+      {/* Folha A4 */}
+      <div className="bg-white print:p-0">
           <div className="print-a4-page mx-auto text-slate-900 text-xs leading-relaxed space-y-5">
             {cancelado && (
-              <p className="border-2 border-rose-600 text-rose-700 font-bold uppercase text-center py-1.5 tracking-wider">
+              <p className="border-2 border-red-600 text-red-700 font-bold uppercase text-center py-1.5 tracking-wider">
                 Documento {situacao.rotulo.toLowerCase()} — sem validade
               </p>
             )}
@@ -489,8 +447,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
               </section>
             )}
           </div>
-        </div>
       </div>
-    </div>
+    </Janela>
   );
 };

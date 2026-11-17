@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Bell, CheckCircle2, Plus, XCircle } from 'lucide-react';
+import { CheckCircle2, Plus, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Lembrete } from '../../types/index.ts';
 import { formatDate, formatDateTime } from '../../utils/formatters.ts';
+import { Abas } from '../ui/Abas.tsx';
+import { Janela } from '../ui/Janela.tsx';
+import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
 const hojeISO = () => new Date().toISOString().split('T')[0];
 
@@ -31,8 +34,10 @@ export const LembretesView: React.FC = () => {
     .filter((l) => (filtro === 'abertos' ? l.status === 'aberto' : l.status !== 'aberto'))
     .sort((a, b) => (filtro === 'abertos' ? a.venceEm.localeCompare(b.venceEm) : b.venceEm.localeCompare(a.venceEm)));
   const vencidos = lembretes.filter((l) => situacaoLembrete(l, hoje) === 'vencido').length;
+  const qtdAbertos = lembretes.filter((l) => l.status === 'aberto').length;
   const nomeDe = (id?: string) => employees.find((e) => e.id === id)?.nome;
   const chamado = (id?: string) => tickets.find((t) => t.id === id);
+  const lembreteEncerrando = encerrando ? lembretes.find((l) => l.id === encerrando.id) : undefined;
 
   const salvarNovo = async () => {
     if (!novo || !novo.titulo.trim() || !novo.venceEm) return setErro('Informe o título e a data.');
@@ -51,170 +56,228 @@ export const LembretesView: React.FC = () => {
     setEncerrando(null);
   };
 
-  const campo = 'campo';
-
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-indigo-600" /> Lembretes da T.I.
-          </h2>
-          <p className="text-xs text-slate-500">
+    <div className="space-y-4">
+      <CabecalhoTela
+        titulo="Lembretes"
+        subtitulo={
+          <>
             Pendências com data: exclusões programadas, transferência de dados, assinaturas a coletar.
-            {vencidos > 0 && <span className="ml-1 font-semibold text-red-600">{vencidos} vencido(s).</span>}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setNovo({ titulo: '', descricao: '', venceEm: hoje })}
-          className="btn btn-primario"
-        >
-          <Plus className="w-4 h-4" /> Novo lembrete
-        </button>
+            {vencidos > 0 && <span className="ml-1 font-semibold text-red-700">{vencidos} vencido(s).</span>}
+          </>
+        }
+        acoes={
+          <button type="button" onClick={() => setNovo({ titulo: '', descricao: '', venceEm: hoje })} className="btn btn-primario">
+            <Plus /> Novo lembrete
+          </button>
+        }
+        abas={
+          <Abas
+            rotulo="Lembretes"
+            ativa={filtro}
+            onMudar={setFiltro}
+            itens={[
+              { id: 'abertos', rotulo: 'Em aberto', contador: qtdAbertos },
+              { id: 'encerrados', rotulo: 'Encerrados' },
+            ]}
+          />
+        }
+      />
+
+      {erro && !novo && !encerrando && (
+        <p className="erro" role="alert">
+          {erro}
+        </p>
+      )}
+
+      <div className="cartao overflow-hidden">
+        <table className="tabela tabela-cartoes">
+          <thead>
+            <tr>
+              <th>Lembrete</th>
+              <th>Vencimento</th>
+              <th>Situação</th>
+              <th className="text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lista.length === 0 ? (
+              <tr>
+                <td colSpan={4}>
+                  <Vazio>{filtro === 'abertos' ? 'Nenhum lembrete em aberto.' : 'Nenhum lembrete encerrado.'}</Vazio>
+                </td>
+              </tr>
+            ) : (
+              lista.map((l) => {
+                const sit = situacaoLembrete(l, hoje);
+                const tkt = chamado(l.chamadoId);
+                return (
+                  <tr key={l.id}>
+                    <td data-label="Lembrete">
+                      <span className="font-semibold text-slate-900 block">{l.titulo}</span>
+                      {l.descricao && <span className="text-slate-600 block">{l.descricao}</span>}
+                      <span className="text-slate-500 block">
+                        {l.colaboradorId && <>{nomeDe(l.colaboradorId) || 'colaborador'}</>}
+                        {tkt && (
+                          <>
+                            {l.colaboradorId && ' · '}
+                            <button type="button" onClick={() => setSelectedTicketIdForDetail(tkt.id)} className="link">
+                              {tkt.codigo}
+                            </button>
+                          </>
+                        )}
+                      </span>
+                      {l.status !== 'aberto' && (
+                        <span className="text-slate-500 block">
+                          {l.status === 'feito' ? 'Concluído' : 'Cancelado'} por {nomeDe(l.concluidoPor) || 'T.I.'}
+                          {l.concluidoEm ? ` em ${formatDateTime(l.concluidoEm)}` : ''}
+                          {l.observacaoConclusao ? ` — “${l.observacaoConclusao}”` : ''}
+                        </span>
+                      )}
+                    </td>
+                    <td data-label="Vencimento">{formatDate(l.venceEm)}</td>
+                    <td data-label="Situação">
+                      {sit === 'vencido' && <span className="selo selo-problema">Vencido</span>}
+                      {sit === 'hoje' && <span className="selo selo-atencao">Vence hoje</span>}
+                      {sit === 'futuro' && <span className="selo selo-info">Em aberto</span>}
+                      {sit === 'feito' && <span className="selo selo-ok">Concluído</span>}
+                      {sit === 'cancelado' && <span className="selo selo-neutro">Cancelado</span>}
+                    </td>
+                    <td data-label="Ações" className="text-right">
+                      {l.status === 'aberto' && (
+                        <span className="acoes-linha">
+                          <button type="button" onClick={() => setEncerrando({ id: l.id, status: 'feito', obs: '' })} className="btn btn-sm btn-primario">
+                            <CheckCircle2 /> Concluir
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEncerrando({ id: l.id, status: 'cancelado', obs: '' })}
+                            title="Cancelar lembrete"
+                            aria-label={`Cancelar o lembrete ${l.titulo}`}
+                            className="btn-icone btn-icone-perigo"
+                          >
+                            <XCircle />
+                          </button>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {novo && (
-        <div className="bg-white border border-indigo-200 rounded-lg p-4 space-y-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <input
-              className={`${campo} md:col-span-2`}
-              placeholder="O que precisa ser feito"
-              value={novo.titulo}
-              onChange={(e) => setNovo({ ...novo, titulo: e.target.value })}
-            />
-            <input type="date" className={campo} value={novo.venceEm} onChange={(e) => setNovo({ ...novo, venceEm: e.target.value })} />
-          </div>
-          <textarea
-            className={campo}
-            rows={2}
-            placeholder="Detalhes (opcional)"
-            value={novo.descricao}
-            onChange={(e) => setNovo({ ...novo, descricao: e.target.value })}
-          />
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setNovo(null)} className="btn btn-secundario btn-sm">
-              Cancelar
-            </button>
-            <button type="button" onClick={salvarNovo} className="btn btn-primario btn-sm">
-              Salvar lembrete
-            </button>
-          </div>
-        </div>
+        <Janela
+          tamanho="p"
+          titulo="Novo lembrete"
+          onFechar={() => {
+            setNovo(null);
+            setErro(null);
+          }}
+          idTitulo="janela-novo-lembrete"
+          rodape={
+            <div className="ml-auto flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setNovo(null);
+                  setErro(null);
+                }}
+                className="btn btn-secundario"
+              >
+                Cancelar
+              </button>
+              <button type="submit" form="form-lembrete" className="btn btn-primario">
+                Salvar
+              </button>
+            </div>
+          }
+        >
+          <form
+            id="form-lembrete"
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void salvarNovo();
+            }}
+          >
+            <div>
+              <label htmlFor="lem-titulo" className="rotulo">
+                O que precisa ser feito *
+              </label>
+              <input id="lem-titulo" className="campo" value={novo.titulo} onChange={(e) => setNovo({ ...novo, titulo: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="lem-data" className="rotulo">
+                Vence em *
+              </label>
+              <input id="lem-data" type="date" className="campo" value={novo.venceEm} onChange={(e) => setNovo({ ...novo, venceEm: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="lem-desc" className="rotulo">
+                Detalhes
+              </label>
+              <textarea id="lem-desc" className="campo" rows={3} placeholder="Opcional" value={novo.descricao} onChange={(e) => setNovo({ ...novo, descricao: e.target.value })} />
+            </div>
+            {erro && (
+              <p className="erro" role="alert">
+                {erro}
+              </p>
+            )}
+          </form>
+        </Janela>
       )}
 
-      {erro && <p className="text-xs font-medium text-red-700">{erro}</p>}
-
-      <div className="flex gap-1 text-xs">
-        {(['abertos', 'encerrados'] as const).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFiltro(f)}
-            className={`px-3 py-1.5 rounded-md font-medium ${filtro === f ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}
-          >
-            {f === 'abertos' ? 'Em aberto' : 'Encerrados'}
-          </button>
-        ))}
-      </div>
-
-      {lista.length === 0 ? (
-        <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-lg p-6 text-center">
-          {filtro === 'abertos' ? 'Nenhum lembrete em aberto.' : 'Nenhum lembrete encerrado.'}
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {lista.map((l) => {
-            const sit = situacaoLembrete(l, hoje);
-            const tkt = chamado(l.chamadoId);
-            return (
-              <li
-                key={l.id}
-                className={`bg-white border rounded-lg p-3 text-xs ${
-                  sit === 'vencido' ? 'border-red-300' : sit === 'hoje' ? 'border-amber-300' : 'border-slate-200'
-                }`}
+      {encerrando && (
+        <Janela
+          tamanho="p"
+          titulo={encerrando.status === 'feito' ? 'Concluir lembrete' : 'Cancelar lembrete'}
+          subtitulo={lembreteEncerrando?.titulo}
+          onFechar={() => {
+            setEncerrando(null);
+            setErro(null);
+          }}
+          idTitulo="janela-encerrar-lembrete"
+          rodape={
+            <div className="ml-auto flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEncerrando(null);
+                  setErro(null);
+                }}
+                className="btn btn-secundario"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-900">{l.titulo}</p>
-                    {l.descricao && <p className="text-slate-600 mt-0.5">{l.descricao}</p>}
-                    <p className="text-xs text-slate-500 mt-1">
-                      <span
-                        className={
-                          sit === 'vencido' ? 'font-semibold text-red-600' : sit === 'hoje' ? 'font-semibold text-amber-700' : ''
-                        }
-                      >
-                        {sit === 'vencido' ? 'Venceu em ' : sit === 'hoje' ? 'Vence hoje · ' : 'Vence em '}
-                        {formatDate(l.venceEm)}
-                      </span>
-                      {l.colaboradorId && <> · {nomeDe(l.colaboradorId) || 'colaborador'}</>}
-                      {tkt && (
-                        <>
-                          {' · '}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedTicketIdForDetail(tkt.id)}
-                            className="text-indigo-600 hover:underline"
-                          >
-                            {tkt.codigo}
-                          </button>
-                        </>
-                      )}
-                    </p>
-                    {l.status !== 'aberto' && (
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {l.status === 'feito' ? 'Concluído' : 'Cancelado'} por {nomeDe(l.concluidoPor) || 'T.I.'}
-                        {l.concluidoEm ? ` em ${formatDateTime(l.concluidoEm)}` : ''}
-                        {l.observacaoConclusao ? ` — “${l.observacaoConclusao}”` : ''}
-                      </p>
-                    )}
-                  </div>
-                  {l.status === 'aberto' && encerrando?.id !== l.id && (
-                    <div className="flex gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setEncerrando({ id: l.id, status: 'feito', obs: '' })}
-                        className="btn btn-secundario btn-sm"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Concluir
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEncerrando({ id: l.id, status: 'cancelado', obs: '' })}
-                        className="btn btn-secundario btn-sm"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Cancelar
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {encerrando?.id === l.id && (
-                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
-                    <textarea
-                      className={campo}
-                      rows={2}
-                      placeholder={encerrando.status === 'feito' ? 'O que foi feito (opcional)' : 'Motivo do cancelamento'}
-                      value={encerrando.obs}
-                      onChange={(e) => setEncerrando({ ...encerrando, obs: e.target.value })}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => setEncerrando(null)} className="btn btn-secundario btn-sm">
-                        Voltar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={confirmarEncerramento}
-                        className="btn btn-primario btn-sm"
-                      >
-                        {encerrando.status === 'feito' ? 'Confirmar conclusão' : 'Confirmar cancelamento'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                Voltar
+              </button>
+              <button type="button" onClick={confirmarEncerramento} className={encerrando.status === 'feito' ? 'btn btn-primario' : 'btn btn-perigo'}>
+                {encerrando.status === 'feito' ? 'Confirmar conclusão' : 'Confirmar cancelamento'}
+              </button>
+            </div>
+          }
+        >
+          <div>
+            <label htmlFor="lem-obs" className="rotulo">
+              {encerrando.status === 'feito' ? 'O que foi feito' : 'Motivo do cancelamento *'}
+            </label>
+            <textarea
+              id="lem-obs"
+              className="campo"
+              rows={3}
+              placeholder={encerrando.status === 'feito' ? 'Opcional' : ''}
+              value={encerrando.obs}
+              onChange={(e) => setEncerrando({ ...encerrando, obs: e.target.value })}
+            />
+            {erro && (
+              <p className="erro" role="alert">
+                {erro}
+              </p>
+            )}
+          </div>
+        </Janela>
       )}
     </div>
   );

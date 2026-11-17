@@ -18,7 +18,7 @@ export const LembreteLicenca: React.FC<{ licenca: SoftwareLicense }> = ({ licenc
   const limite = dataLimiteCancelamento(fim, licenca.pagamento?.avisoCancelamentoDias);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs">
+    <div className="cartao flex flex-wrap items-center justify-between gap-2 p-4 text-xs">
       <span className="text-slate-700">
         {diasAte(fim) < 0 ? 'Renovou/venceu em ' : 'Renova em '}
         <span className="font-semibold text-slate-900">{formatDate(fim)}</span>

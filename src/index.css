@@ -104,6 +104,11 @@
   .barra-filtros {
     @apply flex flex-wrap items-center gap-2;
   }
+  /* Nos filtros, seletores e datas têm a largura do conteúdo (a busca tem largura própria) */
+  .barra-filtros select.campo,
+  .barra-filtros input.campo:not([type='search']) {
+    @apply w-auto px-2.5 py-1.5;
+  }
 
   /* Abas: sempre numa linha (rola na horizontal se faltar espaço, nunca quebra) */
   .abas {
@@ -297,6 +302,15 @@ body:has(.modal-tela) {
 
   .no-print {
     display: none !important;
+  }
+
+  /* Janelas de impressão: só o conteúdo (sem cabeçalho, faixa e rodapé da janela) */
+  .janela-cabecalho,
+  .janela-rodape {
+    display: none !important;
+  }
+  .janela {
+    border: none !important;
   }
 
   /* Janelas (termo A4, etiqueta): na impressão deixam de ser janela, sem rolagem nem altura máxima */

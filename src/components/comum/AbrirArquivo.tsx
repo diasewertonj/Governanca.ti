@@ -17,18 +17,13 @@ export const AbrirArquivo: React.FC<{ caminho: string; rotulo?: string }> = ({ c
   };
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1 min-w-0">
-      <button
-        type="button"
-        onClick={abrir}
-        title={`Abrir ${nome}`}
-        className="btn btn-secundario btn-sm min-w-0 text-left"
-      >
-        <ExternalLink className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+    <span className="inline-flex min-w-0 flex-wrap items-center gap-1">
+      <button type="button" onClick={abrir} title={`Abrir ${nome}`} className="btn btn-sm btn-secundario min-w-0 text-left whitespace-normal">
+        <ExternalLink aria-hidden="true" />
         <span className="break-all">{nome}</span>
       </button>
       {erro && (
-        <span className="text-xs text-red-700" role="alert">
+        <span className="erro mt-0" role="alert">
           {erro}
         </span>
       )}

@@ -16,8 +16,7 @@ import {
   type RascunhoVinculos,
 } from '../../utils/vinculos.ts';
 
-const CAMPO = 'campo';
-const LINK = 'inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline text-left break-words';
+const LINK = 'link inline-flex items-center gap-1 text-left break-words';
 
 interface VinculosChamadoProps {
   ticket: Ticket;
@@ -95,14 +94,14 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
   if (vazio && !isTI) return null;
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
+    <section aria-label="Vínculos" className="cartao p-4 space-y-3 text-xs">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs uppercase font-bold text-slate-500 tracking-wide">Vínculos</span>
+        <h3 className="secao-titulo">Vínculos</h3>
         {podeAlterar && (
           <button
             type="button"
             onClick={() => setEditando((v) => !v)}
-            className="text-xs font-medium text-blue-700 hover:underline"
+            className="link text-xs"
             aria-expanded={editando || mexeu}
           >
             {editando || mexeu ? 'Ocultar campos' : 'Alterar'}
@@ -111,17 +110,17 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
       </div>
 
       {podeAlterar && (editando || mexeu) && (
-        <div className="space-y-2.5 p-3 rounded-md bg-slate-50 border border-slate-200">
+        <div className="space-y-3 border-b border-slate-100 pb-3">
           {!processo && (
             <div>
-              <label htmlFor={`${id}-pessoa`} className="text-xs font-medium text-slate-700 block mb-1">
+              <label htmlFor={`${id}-pessoa`} className="rotulo">
                 Colaborador relacionado
               </label>
               <select
                 id={`${id}-pessoa`}
                 value={colaboradorId}
                 onChange={(e) => onMudar('colaboradorId', e.target.value)}
-                className={CAMPO}
+                className="campo"
               >
                 <option value="">— nenhum (só o solicitante) —</option>
                 {opcoesPessoa.map((e) => (
@@ -133,10 +132,10 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
             </div>
           )}
           <div>
-            <label htmlFor={`${id}-ativo`} className="text-xs font-medium text-slate-700 block mb-1">
+            <label htmlFor={`${id}-ativo`} className="rotulo">
               Equipamento
             </label>
-            <select id={`${id}-ativo`} value={ativoId} onChange={(e) => onMudar('ativoId', e.target.value)} className={CAMPO}>
+            <select id={`${id}-ativo`} value={ativoId} onChange={(e) => onMudar('ativoId', e.target.value)} className="campo">
               <option value="">— nenhum —</option>
               {opcoesAtivo.daPessoa.length > 0 && (
                 <optgroup label={`Com ${primeiroNome}`}>
@@ -168,14 +167,14 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
             </select>
           </div>
           <div>
-            <label htmlFor={`${id}-software`} className="text-xs font-medium text-slate-700 block mb-1">
+            <label htmlFor={`${id}-software`} className="rotulo">
               Software / licença
             </label>
             <select
               id={`${id}-software`}
               value={softwareId}
               onChange={(e) => onMudar('softwareId', e.target.value)}
-              className={CAMPO}
+              className="campo"
             >
               <option value="">— nenhum —</option>
               {opcoesSoftware.daPessoa.length > 0 && (
@@ -196,7 +195,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
               </optgroup>
             </select>
           </div>
-          <p className="text-xs text-slate-500">As mudanças são gravadas em “Salvar alterações”.</p>
+          <p className="ajuda">As mudanças são gravadas em “Salvar alterações”.</p>
         </div>
       )}
 
@@ -220,20 +219,20 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
                   <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
                 </button>
               ) : (
-                <span className="font-semibold text-slate-900">{a.tag} · {a.nome}</span>
+                <span className="font-medium text-slate-900">{a.tag} · {a.nome}</span>
               )}
             </div>
           ))}
           {licencasEntregues.map((l) => (
             <div key={l.id} className="flex items-center gap-2 text-xs">
-              <Key className="w-4 h-4 text-purple-600 shrink-0" aria-hidden="true" />
+              <Key className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
               {pode('software') ? (
                 <button type="button" onClick={() => abrirFicha({ tipo: 'software', id: l.id })} className={LINK}>
                   {l.nome}
                   <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
                 </button>
               ) : (
-                <span className="font-semibold text-slate-900">{l.nome}</span>
+                <span className="font-medium text-slate-900">{l.nome}</span>
               )}
             </div>
           ))}
@@ -253,7 +252,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
                 <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
               </button>
             ) : (
-              <span className="font-semibold text-slate-900">{colaborador.nome}</span>
+              <span className="font-medium text-slate-900">{colaborador.nome}</span>
             )}
             <p className="text-xs text-slate-500">{colaborador.cargo}</p>
           </div>
@@ -271,7 +270,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
                 <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
               </button>
             ) : (
-              <span className="font-semibold text-slate-900">
+              <span className="font-medium text-slate-900">
                 <span className="font-mono">{ativo.tag}</span> · {ativo.nome}
               </span>
             )}
@@ -279,7 +278,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
               {ativo.marca} {ativo.modelo} · S/N: <span className="font-mono">{ativo.serialNumber}</span>
             </p>
             {ativo.status === 'manutencao' && (
-              <span className="inline-block mt-1 px-1.5 py-0.5 rounded border text-xs font-medium text-amber-800 bg-amber-50 border-amber-200">
+              <span className="selo selo-atencao mt-1">
                 Em manutenção
               </span>
             )}
@@ -287,7 +286,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
               <button
                 type="button"
                 onClick={() => abrirFicha({ tipo: 'ativo', id: ativo.id, manutencaoDoChamado: ticket.id })}
-                className="btn btn-secundario btn-sm mt-2"
+                className="btn btn-sm btn-secundario mt-2"
               >
                 <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
                 {ativo.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
@@ -299,7 +298,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
 
       {nomeSoftware && (
         <div className="flex items-start gap-2">
-          <Key className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" aria-hidden="true" />
+          <Key className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" aria-hidden="true" />
           <div className="min-w-0">
             <span className="text-xs text-slate-500 block">Software / licença</span>
             {licenca && pode('software') ? (
@@ -308,7 +307,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
                 <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
               </button>
             ) : (
-              <span className="font-semibold text-slate-900">{nomeSoftware}</span>
+              <span className="font-medium text-slate-900">{nomeSoftware}</span>
             )}
             {isTI && fornecedorSoftware && <p className="text-xs text-slate-600">Fornecedor: {fornecedorSoftware}</p>}
             {isTI && licenca && (
@@ -336,7 +335,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
               key={m.id}
               type="button"
               onClick={() => abrirFicha({ tipo: 'ativo', id: a.id })}
-              className="w-full text-left flex flex-wrap items-center gap-x-1.5 text-xs text-slate-700 hover:text-blue-700"
+              className="link flex w-full flex-wrap items-center gap-x-1.5 text-left"
             >
               <Wrench className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
               <span className="font-mono font-semibold">{a.tag}</span>
@@ -347,6 +346,6 @@ export const VinculosChamado: React.FC<VinculosChamadoProps> = ({ ticket, rascun
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 };

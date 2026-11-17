@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Ban, CheckCircle2, History, RotateCcw, Star, X } from 'lucide-react';
+import { Ban, CheckCircle2, History, RotateCcw, Star } from 'lucide-react';
+import { Janela } from '../ui/Janela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import type { CausaChamado, EventoChamado, MotivoCancelamento, Ticket, TipoSolucao } from '../../types/index.ts';
 import { formatDateTime } from '../../utils/formatters.ts';
@@ -31,35 +32,36 @@ export const BlocoResolucao: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   const quem = employees.find((e) => e.id === r.resolvidoPor)?.nome;
 
   return (
-    <section aria-label="Resolução" className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+    <section aria-label="Resolução" className="cartao p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">
-          <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+        <h3 className="secao-titulo flex items-center gap-1.5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
           Resolução
         </h3>
-        <p className="text-xs text-emerald-900">
+        <p className="text-xs text-slate-600">
           {ROTULO_CAUSA[r.causa]} · {ROTULO_TIPO_SOLUCAO[r.tipo]}
           {r.tempoMin !== undefined && ` · ${formatarTempo(r.tempoMin)}`}
           {quem && ` · ${quem}`}
           {r.resolvidoEm && `, ${formatDateTime(r.resolvidoEm)}`}
         </p>
       </div>
-      <p className="mt-2 text-[15px] leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{r.solucao}</p>
+      <p className="text-sm leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{r.solucao}</p>
       {r.proximoPasso && (
-        <p className="mt-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
-          <strong>Próximo passo:</strong> {r.proximoPasso}
+        <p className="text-xs text-slate-700">
+          <span className="selo selo-atencao mr-1.5">Próximo passo</span>
+          {r.proximoPasso}
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-emerald-200 pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
         <Avaliacao ticket={ticket} podeAvaliar={podeAvaliar(ticket, currentUser?.id)} onAvaliar={avaliarChamado} />
         {podeReabrirChamado(ticket, currentRole, currentUser?.id) && (
           <button
             type="button"
             onClick={() => setReabrindo(true)}
-            className="btn btn-secundario btn-sm"
+            className="btn btn-sm btn-secundario"
           >
-            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            <RotateCcw aria-hidden="true" />
             O problema voltou? Reabrir
           </button>
         )}
@@ -128,13 +130,13 @@ const Avaliacao: React.FC<{
             type="button"
             disabled={enviando}
             onClick={enviar}
-            className="btn btn-primario btn-sm"
+            className="btn btn-sm btn-primario"
           >
             Avaliar
           </button>
         </>
       )}
-      {erro && <span className="text-rose-700">{erro}</span>}
+      {erro && <span className="erro">{erro}</span>}
     </div>
   );
 };
@@ -154,13 +156,16 @@ export const BlocoCancelamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   if (!c) return null;
   const quem = employees.find((e) => e.id === c.canceladoPor)?.nome;
   return (
-    <section aria-label="Cancelamento" className="rounded-xl border border-slate-300 bg-slate-100 p-4 text-xs text-slate-700">
-      <p className="flex items-center gap-1.5 font-semibold text-slate-800">
-        <Ban className="w-4 h-4" aria-hidden="true" />
-        Cancelado: {ROTULO_MOTIVO_CANCELAMENTO[c.motivo]}
+    <section aria-label="Cancelamento" className="cartao p-4 space-y-3 text-xs text-slate-700">
+      <h3 className="secao-titulo flex items-center gap-1.5">
+        <Ban className="h-4 w-4" aria-hidden="true" />
+        Cancelamento
+      </h3>
+      <p className="font-medium text-slate-900">
+        {ROTULO_MOTIVO_CANCELAMENTO[c.motivo]}
         {quem && <span className="font-normal text-slate-600"> · por {quem}</span>}
       </p>
-      {c.detalhe && <p className="mt-1 whitespace-pre-wrap break-words">{c.detalhe}</p>}
+      {c.detalhe && <p className="whitespace-pre-wrap break-words">{c.detalhe}</p>}
     </section>
   );
 };
@@ -206,22 +211,20 @@ export const IconeHistorico = History;
 // Janelas: registrar solução, cancelar, reabrir
 // -----------------------------------------------------------------------------
 
-const Janela: React.FC<{ titulo: string; onClose: () => void; children: React.ReactNode }> = ({ titulo, onClose, children }) =>
+/** Janela pequena padrão por cima do chamado; o rodapé fica fora do <form> e usa o atributo form */
+const JanelaAcao: React.FC<{ titulo: string; onClose: () => void; idForm: string; rodape: React.ReactNode; children: React.ReactNode }> = ({
+  titulo,
+  onClose,
+  idForm,
+  rodape,
+  children,
+}) =>
   createPortal(
-    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-lg bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 my-0 sm:my-6">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50">
-          <h2 className="text-sm font-semibold text-slate-900">{titulo}</h2>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="btn-icone">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>,
+    <Janela tamanho="p" titulo={titulo} onFechar={onClose} rodape={rodape} idTitulo={`${idForm}-titulo`}>
+      {children}
+    </Janela>,
     document.body
   );
-
 const CAUSAS = Object.keys(ROTULO_CAUSA) as CausaChamado[];
 const MOTIVOS = Object.keys(ROTULO_MOTIVO_CANCELAMENTO) as MotivoCancelamento[];
 
@@ -256,8 +259,23 @@ export const FormResolucao: React.FC<{ ticket: Ticket; onClose: () => void }> = 
   };
 
   return (
-    <Janela titulo={`Registrar solução · ${ticket.codigo}`} onClose={onClose}>
-      <form onSubmit={enviar} className="p-5 space-y-4 text-xs">
+    <JanelaAcao
+      titulo={`Registrar solução · ${ticket.codigo}`}
+      onClose={onClose}
+      idForm={`${id}-form`}
+      rodape={
+        <>
+          <span />
+          <span className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+            <button type="submit" form={`${id}-form`} disabled={salvando} className="btn btn-primario">
+              {salvando ? 'Registrando…' : 'Registrar e encerrar'}
+            </button>
+          </span>
+        </>
+      }
+    >
+      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4 text-xs">
         <p className="text-slate-600">
           A solução fica registrada no chamado e encerra o atendimento. Quem abriu pode reabrir se o problema voltar.
         </p>
@@ -309,15 +327,9 @@ export const FormResolucao: React.FC<{ ticket: Ticket; onClose: () => void }> = 
           <label htmlFor={`${id}-tempo`} className={CLASSE_ROTULO}>Tempo gasto (min)</label>
           <input id={`${id}-tempo`} type="number" min={0} value={tempo} onChange={(e) => setTempo(e.target.value)} className={CLASSE_CAMPO} />
         </div>
-        {erro && <p role="alert" className="text-rose-700">{erro}</p>}
-        <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
-          <button type="submit" disabled={salvando} className="btn btn-primario">
-            {salvando ? 'Registrando…' : 'Registrar e encerrar'}
-          </button>
-        </div>
+        {erro && <p role="alert" className="erro">{erro}</p>}
       </form>
-    </Janela>
+    </JanelaAcao>
   );
 };
 
@@ -348,19 +360,27 @@ export const FormCancelamento: React.FC<{ ticket: Ticket; onClose: () => void }>
   const detalheObrigatorio = processo || motivo === 'outro';
 
   return (
-    <Janela
+    <JanelaAcao
       titulo={`Cancelar ${ticket.tipo === 'onboarding' ? 'admissão' : ticket.tipo === 'offboarding' ? 'desligamento' : 'chamado'} · ${ticket.codigo}`}
       onClose={onClose}
+      idForm={`${id}-form`}
+      rodape={
+        <>
+          <span />
+          <span className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+            <button type="submit" form={`${id}-form`} disabled={salvando} className="btn btn-perigo-cheio">
+              {salvando ? 'Cancelando…' : processo ? 'Cancelar processo' : 'Cancelar chamado'}
+            </button>
+          </span>
+        </>
+      }
     >
-      <form onSubmit={enviar} className="p-5 space-y-4 text-xs">
-        {processo && (
-          <p className="text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-            O processo fica registrado como cancelado, com o motivo, e não é reaberto.
-          </p>
-        )}
+      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4 text-xs">
+        {processo && <p className="ajuda">O processo fica registrado como cancelado, com o motivo, e não é reaberto.</p>}
         {aReverter.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2 text-amber-900">
-            <p className="font-semibold">Estes passos já foram feitos e não se desfazem sozinhos:</p>
+          <div className="space-y-2 text-slate-700">
+            <p className="font-semibold text-slate-900">Estes passos já foram feitos e não se desfazem sozinhos:</p>
             <ul className="list-disc pl-5">
               {aReverter.map((i) => (
                 <li key={i.id}>{i.titulo}</li>
@@ -388,15 +408,9 @@ export const FormCancelamento: React.FC<{ ticket: Ticket; onClose: () => void }>
           <label htmlFor={`${id}-detalhe`} className={CLASSE_ROTULO}>{processo ? 'Descreva o motivo *' : `Detalhe ${detalheObrigatorio ? '*' : '(opcional)'}`}</label>
           <textarea id={`${id}-detalhe`} rows={3} value={detalhe} onChange={(e) => setDetalhe(e.target.value)} className={CLASSE_CAMPO} />
         </div>
-        {erro && <p role="alert" className="text-rose-700">{erro}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
-          <button type="submit" disabled={salvando} className="btn btn-perigo-cheio">
-            {salvando ? 'Cancelando…' : processo ? 'Cancelar processo' : 'Cancelar chamado'}
-          </button>
-        </div>
+        {erro && <p role="alert" className="erro">{erro}</p>}
       </form>
-    </Janela>
+    </JanelaAcao>
   );
 };
 
@@ -418,20 +432,29 @@ const FormReabrir: React.FC<{ ticket: Ticket; onClose: () => void }> = ({ ticket
   };
 
   return (
-    <Janela titulo={`Reabrir chamado · ${ticket.codigo}`} onClose={onClose}>
-      <form onSubmit={enviar} className="p-5 space-y-4 text-xs">
+    <JanelaAcao
+      titulo={`Reabrir chamado · ${ticket.codigo}`}
+      onClose={onClose}
+      idForm={`${id}-form`}
+      rodape={
+        <>
+          <span />
+          <span className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
+            <button type="submit" form={`${id}-form`} disabled={salvando} className="btn btn-primario">
+              {salvando ? 'Reabrindo…' : 'Reabrir'}
+            </button>
+          </span>
+        </>
+      }
+    >
+      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4 text-xs">
         <div>
           <label htmlFor={`${id}-motivo`} className={CLASSE_ROTULO}>O que continua acontecendo? *</label>
           <textarea id={`${id}-motivo`} rows={4} value={motivo} onChange={(e) => setMotivo(e.target.value)} className={CLASSE_CAMPO} required />
         </div>
-        {erro && <p role="alert" className="text-rose-700">{erro}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn btn-secundario">Voltar</button>
-          <button type="submit" disabled={salvando} className="btn btn-primario">
-            {salvando ? 'Reabrindo…' : 'Reabrir'}
-          </button>
-        </div>
+        {erro && <p role="alert" className="erro">{erro}</p>}
       </form>
-    </Janela>
+    </JanelaAcao>
   );
 };

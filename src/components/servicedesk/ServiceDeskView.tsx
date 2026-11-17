@@ -5,14 +5,9 @@ import { chamadoEncerrado, ROTULO_CAUSA } from '../../utils/atendimento.ts';
 import { situacaoSla } from '../../utils/sla.ts';
 import { SeloSla } from './SeloSla.tsx';
 import { formatDate } from '../../utils/formatters.ts';
-import {
-  Search,
-  Plus,
-  User,
-  Laptop,
-  MessageSquare,
-  Key,
-} from 'lucide-react';
+import { Plus, User, MessageSquare } from 'lucide-react';
+import { Abas } from '../ui/Abas.tsx';
+import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
 interface ServiceDeskViewProps {
   onOpenNewTicketModal: () => void;
@@ -28,15 +23,12 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     currentUser,
     currentRole,
     setSelectedTicketIdForDetail,
-    setSelectedAssetIdFor360,
-    setSelectedSoftwareIdFor360,
     setSelectedEmployeeIdFor360,
   } = useApp();
 
   const isRH = currentRole === 'rh';
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('todos');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [priorityFilter, setPriorityFilter] = useState<string>('todos');
   // Seção 7: os chamados da própria T.I. ficam aqui (sem Meus chamados no menu), destacados e filtráveis
@@ -45,9 +37,9 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
   const abertoPelaTI = (t: Ticket) => papelDoSolicitante(t) === 'ti_admin' || papelDoSolicitante(t) === 'ti_suporte';
   const seloOrigem = (t: Ticket) =>
     t.solicitanteId === currentUser?.id
-      ? { r: 'Aberto por você', c: 'text-indigo-800 bg-indigo-50 border-indigo-200' }
+      ? { r: 'Aberto por você', cls: 'selo-info' }
       : abertoPelaTI(t)
-        ? { r: papelDoSolicitante(t) === 'ti_admin' ? 'Aberto pelo admin' : 'Aberto pela T.I.', c: 'text-slate-700 bg-slate-100 border-slate-200' }
+        ? { r: papelDoSolicitante(t) === 'ti_admin' ? 'Aberto pelo admin' : 'Aberto pela T.I.', cls: 'selo-neutro' }
         : null;
 
   // Admissões e desligamentos ficam na tela própria (com histórico); aqui só chamados de suporte.
@@ -65,7 +57,6 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
   };
 
   const filteredTickets = baseTickets.filter((tkt) => {
-    const matchesType = typeFilter === 'todos' || tkt.tipo === typeFilter;
     const matchesStatus = statusFilter === 'todos' || tkt.status === statusFilter;
     const matchesPriority = priorityFilter === 'todos' || tkt.prioridade === priorityFilter;
     const matchesOrigem =
@@ -87,7 +78,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
       .toLowerCase();
     const matchesSearch = !termo || textoBusca.includes(termo);
 
-    return naFila(tkt) && matchesType && matchesStatus && matchesPriority && matchesOrigem && matchesSearch;
+    return naFila(tkt) &&matchesStatus && matchesPriority && matchesOrigem && matchesSearch;
   });
   // Fase 10 C1: na fila de atendimento, o que vence primeiro vem antes
   if (fila === 'atendimento') {
@@ -95,114 +86,55 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     filteredTickets.sort((a, b) => vence(a) - vence(b));
   }
 
-  const getAsset = (assetId?: string) => {
-    return assets.find((a) => a.id === assetId);
-  };
-
   const statusBadges: Record<TicketStatus, { label: string; cls: string }> = {
-    aberto: { label: 'Aberto', cls: 'text-blue-700 bg-blue-50 border-blue-200' },
-    em_andamento: { label: 'Em atendimento', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
-    aguardando_terceiro: { label: 'Aguardando', cls: 'text-purple-700 bg-purple-50 border-purple-200' },
-    resolvido: { label: 'Encerrado', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-    cancelado: { label: 'Cancelado', cls: 'text-slate-500 bg-slate-100 border-slate-200' },
+    aberto: { label: 'Aberto', cls: 'selo-info' },
+    em_andamento: { label: 'Em atendimento', cls: 'selo-atencao' },
+    aguardando_terceiro: { label: 'Aguardando', cls: 'selo-atencao' },
+    resolvido: { label: 'Encerrado', cls: 'selo-ok' },
+    cancelado: { label: 'Cancelado', cls: 'selo-neutro' },
   };
 
   const priorityBadges: Record<TicketPriority, { label: string; cls: string }> = {
     baixa: { label: 'Baixa', cls: 'text-slate-500' },
     media: { label: 'Média', cls: 'text-blue-700' },
     alta: { label: 'Alta', cls: 'text-amber-700 font-semibold' },
-    critica: { label: 'Urgente', cls: 'text-rose-700 font-bold' },
+    critica: { label: 'Urgente', cls: 'text-red-700 font-bold' },
   };
 
-  // Só há um tipo aqui: sem abas de tipo
-  const tabsToDisplay: { id: string; label: string }[] = [];
-
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">
-            {isRH ? 'Chamados do RH' : 'Chamados'}
-          </h2>
-          <p className="text-xs text-slate-500">
-            {isRH
-              ? 'Acompanhe as requisições de admissão, desligamento e chamados técnicos abertos por você'
-              : 'Atendimento técnico consolidado com requisições de admissão e desligamento do RH'}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onOpenNewTicketModal}
-          className="btn btn-primario self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{isRH ? 'Solicitar Suporte Técnico' : 'Abrir Chamado'}</span>
-        </button>
-      </div>
-
-      {/* Fase 10: fila de atendimento × encerrados (histórico pesquisável) */}
-      <div role="tablist" aria-label="Filas" className="flex gap-2 border-b border-slate-200">
-        {(
-          [
-            ['atendimento', 'Em atendimento', qtdAtendimento],
-            ['encerrados', 'Encerrados', qtdEncerrados],
-          ] as const
-        ).map(([id, rotulo, qtd]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={fila === id}
-            onClick={() => trocarFila(id)}
-            className={`-mb-px px-3 py-2 text-sm font-medium border-b-2 ${
-              fila === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            {rotulo} <span className="text-xs text-slate-500">({qtd})</span>
+    <div className="space-y-4">
+      <CabecalhoTela
+        titulo={isRH ? 'Chamados do RH' : 'Chamados'}
+        subtitulo={
+          isRH
+            ? 'Acompanhe as requisições de admissão, desligamento e chamados técnicos abertos por você'
+            : 'Atendimento técnico consolidado com requisições de admissão e desligamento do RH'
+        }
+        acoes={
+          <button type="button" onClick={onOpenNewTicketModal} className="btn btn-primario">
+            <Plus /> {isRH ? 'Solicitar suporte técnico' : 'Novo chamado'}
           </button>
-        ))}
-      </div>
-
-      {/* Filtros e Busca */}
-      <div className="space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Tabs de Tipo */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start flex-wrap">
-            {tabsToDisplay.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setTypeFilter(tab.id)}
-                className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                  typeFilter === tab.id
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-full sm:w-auto">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={fila === 'encerrados' ? 'Buscar por equipamento, causa, solução…' : 'Buscar chamado, código ou solicitante…'}
-                className="campo campo-sm w-full sm:w-64 pl-8 pr-3"
-              />
-              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-            </div>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="campo campo-sm"
-            >
+        }
+        abas={
+          <Abas
+            rotulo="Filas de chamados"
+            ativa={fila}
+            onMudar={trocarFila}
+            itens={[
+              { id: 'atendimento', rotulo: 'Em atendimento', contador: qtdAtendimento },
+              { id: 'encerrados', rotulo: 'Encerrados', contador: qtdEncerrados },
+            ]}
+          />
+        }
+        filtros={
+          <>
+            <Busca
+              id="chamados-busca"
+              valor={searchTerm}
+              onMudar={setSearchTerm}
+              placeholder={fila === 'encerrados' ? 'Buscar por equipamento, causa, solução…' : 'Buscar chamado, código ou solicitante…'}
+            />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filtrar por situação" className="campo campo-sm">
               <option value="todos">Todas as situações</option>
               {fila === 'atendimento' ? (
                 <>
@@ -217,241 +149,144 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                 </>
               )}
             </select>
-
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="campo campo-sm"
-            >
-              <option value="todos">Todas Prioridades</option>
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} aria-label="Filtrar por prioridade" className="campo campo-sm">
+              <option value="todos">Todas as prioridades</option>
               <option value="baixa">Baixa</option>
               <option value="media">Média</option>
               <option value="alta">Alta</option>
               <option value="critica">Urgente</option>
             </select>
-
             {!isRH && (
-              <select
-                value={origemFiltro}
-                onChange={(e) => setOrigemFiltro(e.target.value as typeof origemFiltro)}
-                aria-label="Quem abriu"
-                className="campo campo-sm"
-              >
+              <select value={origemFiltro} onChange={(e) => setOrigemFiltro(e.target.value as typeof origemFiltro)} aria-label="Quem abriu" className="campo campo-sm">
                 <option value="todos">Todos os solicitantes</option>
                 <option value="meus">Abertos por mim</option>
                 <option value="ti">Abertos pela T.I. / admin</option>
               </select>
             )}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {/* Fila de Chamados */}
-      {/* Fila em cartões até 1279px; tabela só onde cabe sem rolagem */}
-      <ul className="xl:hidden space-y-2" aria-label="Fila de chamados">
-        {filteredTickets.length === 0 ? (
-          <li className="bg-white border border-slate-200 rounded-xl p-5 text-center text-sm text-slate-600">
-            Nenhum chamado encontrado com os filtros selecionados.
-          </li>
-        ) : (
-          filteredTickets.map((tkt) => {
-            const statusInfo = statusBadges[tkt.status];
-            const priorityInfo = priorityBadges[tkt.prioridade];
-            // Fase 9: vínculos em texto no cartão (os links ficam dentro do chamado)
-            const vinculos = [
-              assets.find((a) => a.id === tkt.ativoId)?.tag,
-              tkt.softwareNome,
-              tkt.tipo === 'suporte' && tkt.colaboradorId && tkt.colaboradorId !== tkt.solicitanteId
-                ? `Relacionado: ${employees.find((e) => e.id === tkt.colaboradorId)?.nome || 'colaborador'}`
-                : undefined,
-            ].filter(Boolean);
-            return (
-              <li key={tkt.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTicketIdForDetail(tkt.id)}
-                  className="w-full text-left bg-white border border-slate-200 rounded-xl p-4 space-y-1.5 active:bg-slate-50"
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs font-semibold text-slate-700">{tkt.codigo}</span>
-                    <span className="flex flex-wrap justify-end gap-1">
-                      <SeloSla tkt={tkt} />
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium border ${statusInfo.cls}`}>{statusInfo.label}</span>
-                    </span>
-                  </span>
-                  <span className="block text-sm font-semibold text-slate-900">{tkt.titulo}</span>
-                  <span className="flex flex-wrap items-center gap-x-2 text-xs text-slate-600">
-                    <span>{tkt.solicitanteNome}</span>
-                    {seloOrigem(tkt) && (
-                      <span className={`px-1.5 rounded border ${seloOrigem(tkt)!.c}`}>{seloOrigem(tkt)!.r}</span>
-                    )}
-                    <span aria-hidden="true">·</span>
-                    <span className={priorityInfo.cls}>{priorityInfo.label}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{formatDate(tkt.dataCriacao)}</span>
-                  </span>
-                  <span className="block text-xs text-slate-600">
-                    Técnico: {tkt.tecnicoResponsavelNome || 'pendente'}
-                  </span>
-                  {vinculos.length > 0 && (
-                    <span className="block text-xs text-slate-600 break-words">{vinculos.join(' · ')}</span>
-                  )}
-                </button>
-              </li>
-            );
-          })
-        )}
-      </ul>
+      {/* Fila de chamados: tabela que vira cartões no celular */}
+      <div className="cartao overflow-hidden">
+        <table className="tabela tabela-cartoes">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Título do chamado</th>
+              <th>Solicitante</th>
+              <th>Situação</th>
+              <th>Prioridade</th>
+              <th className="hidden 2xl:table-cell">Técnico T.I.</th>
+              <th>Abertura</th>
+              <th className="text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTickets.length > 0 ? (
+              filteredTickets.map((tkt) => {
+                const statusInfo = statusBadges[tkt.status];
+                const priorityInfo = priorityBadges[tkt.prioridade];
+                const origem = seloOrigem(tkt);
 
-      <div className="cartao hidden xl:block overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
-                <th className="py-3 px-4">Código</th>
-                <th className="py-3 px-4">Título do Chamado</th>
-                <th className="py-3 px-4">Solicitante</th>
-                <th className="hidden py-3 px-4">Ativo vinculado</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Prioridade</th>
-                <th className="hidden 2xl:table-cell py-3 px-4">Técnico TI</th>
-                <th className="py-3 px-4 text-right">Abertura</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredTickets.length > 0 ? (
-                filteredTickets.map((tkt) => {
-                  const asset = getAsset(tkt.ativoId);
-                  const statusInfo = statusBadges[tkt.status];
-                  const priorityInfo = priorityBadges[tkt.prioridade];
+                return (
+                  <tr key={tkt.id} onClick={() => setSelectedTicketIdForDetail(tkt.id)} className="hover:bg-slate-50/70 cursor-pointer">
+                    <td data-label="Código" className="font-mono font-bold text-slate-800">
+                      {tkt.codigo}
+                    </td>
 
-                  return (
-                    <tr
-                      key={tkt.id}
-                      onClick={() => setSelectedTicketIdForDetail(tkt.id)}
-                      className="hover:bg-slate-50/70 transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                        {tkt.codigo}
-                      </td>
+                    <td data-label="Título do chamado">
+                      <div className="max-w-xs md:max-w-sm">
+                        <span className="font-semibold text-slate-900 block truncate">{tkt.titulo}</span>
+                        <span className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                          <span className="capitalize">{tkt.categoria}</span>
+                          {tkt.mensagens.length > 1 && (
+                            <>
+                              <span>·</span>
+                              <span className="flex items-center gap-0.5">
+                                <MessageSquare className="w-3 h-3" />
+                                {tkt.mensagens.length}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </td>
 
-                      <td className="py-3 px-4">
-                        <div className="max-w-xs md:max-w-sm">
-                          <span className="font-semibold text-slate-900 block hover:text-blue-700 truncate">
-                            {tkt.titulo}
-                          </span>
-                          <span className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                            <span className="capitalize">{tkt.categoria}</span>
-                            {tkt.mensagens.length > 1 && (
-                              <>
-                                <span>·</span>
-                                <span className="flex items-center gap-0.5 text-slate-500">
-                                  <MessageSquare className="w-2.5 h-2.5" />
-                                  {tkt.mensagens.length}
-                                </span>
-                              </>
-                            )}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4">
+                    <td data-label="Solicitante">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEmployeeIdFor360(tkt.solicitanteId);
+                        }}
+                        className="link flex items-center gap-1"
+                      >
+                        <User className="w-3 h-3" />
+                        <span>{tkt.solicitanteNome}</span>
+                      </button>
+                      <span className="text-xs text-slate-500 block">{tkt.solicitanteSetorNome}</span>
+                      {origem && <span className={`selo ${origem.cls} mt-0.5`}>{origem.r}</span>}
+                      {tkt.tipo === 'suporte' && tkt.colaboradorId && tkt.colaboradorId !== tkt.solicitanteId && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedEmployeeIdFor360(tkt.solicitanteId);
+                            setSelectedEmployeeIdFor360(tkt.colaboradorId!);
                           }}
-                          className="font-medium text-slate-900 hover:text-blue-700 flex items-center gap-1"
+                          className="block text-xs text-slate-600 hover:text-blue-700"
                         >
-                          <User className="w-3 h-3 text-slate-500" />
-                          <span>{tkt.solicitanteNome}</span>
+                          Relacionado: {employees.find((e) => e.id === tkt.colaboradorId)?.nome || 'colaborador'}
                         </button>
-                        <span className="text-xs text-slate-500 block">{tkt.solicitanteSetorNome}</span>
-                        {seloOrigem(tkt) && (
-                          <span className={`inline-block mt-0.5 px-1.5 rounded border text-xs ${seloOrigem(tkt)!.c}`}>{seloOrigem(tkt)!.r}</span>
-                        )}
-                        {tkt.tipo === 'suporte' && tkt.colaboradorId && tkt.colaboradorId !== tkt.solicitanteId && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEmployeeIdFor360(tkt.colaboradorId!);
-                            }}
-                            className="text-xs text-slate-600 hover:text-blue-700"
-                          >
-                            Relacionado: {employees.find((e) => e.id === tkt.colaboradorId)?.nome || 'colaborador'}
-                          </button>
-                        )}
-                      </td>
+                      )}
+                    </td>
 
-                      {/* Ativo Físico ou Software com link contextual 360° */}
-                      <td className="hidden py-3 px-4">
-                        {asset ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedAssetIdFor360(asset.id);
-                            }}
-                            className="font-semibold text-blue-700 hover:underline flex items-center gap-1"
-                          >
-                            <Laptop className="w-3 h-3 text-blue-500" />
-                            <span>{asset.tag}</span>
-                            <span className="text-slate-600 font-normal">({asset.nome.slice(0, 16)}...)</span>
-                          </button>
-                        ) : tkt.softwareId ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedSoftwareIdFor360(tkt.softwareId!);
-                            }}
-                            className="font-semibold text-purple-700 hover:underline flex items-center gap-1"
-                          >
-                            <Key className="w-3 h-3 text-purple-600" />
-                            <span>{tkt.softwareNome || 'Software SaaS'}</span>
-                          </button>
-                        ) : (
-                          <span className="text-slate-500 text-xs">-</span>
-                        )}
-                      </td>
+                    <td data-label="Situação">
+                      <span className={`selo ${statusInfo.cls}`}>{statusInfo.label}</span>
+                      <span className="block mt-1">
+                        <SeloSla tkt={tkt} />
+                      </span>
+                    </td>
 
-                      <td className="py-3 px-4">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${statusInfo.cls}`}>
-                          {statusInfo.label}
-                        </span>
-                        <span className="block mt-1">
-                          <SeloSla tkt={tkt} />
-                        </span>
-                      </td>
+                    <td data-label="Prioridade">
+                      <span className={priorityInfo.cls}>{priorityInfo.label}</span>
+                    </td>
 
-                      <td className="py-3 px-4">
-                        <span className={`text-xs ${priorityInfo.cls}`}>
-                          {priorityInfo.label}
-                        </span>
-                      </td>
+                    <td data-label="Técnico T.I." className="hidden 2xl:table-cell text-slate-600">
+                      {tkt.tecnicoResponsavelNome || <span className="text-slate-500 italic">Pendente</span>}
+                    </td>
 
-                      <td className="hidden 2xl:table-cell py-3 px-4 text-slate-600">
-                        {tkt.tecnicoResponsavelNome || <span className="text-slate-500 italic">Pendente</span>}
-                      </td>
+                    <td data-label="Abertura" className="text-slate-500">
+                      {formatDate(tkt.dataCriacao)}
+                    </td>
 
-                      <td className="py-3 px-4 text-right text-slate-500">
-                        {formatDate(tkt.dataCriacao)}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500 text-xs">
-                    Nenhum chamado encontrado com os filtros selecionados.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    <td data-label="Ações" className="text-right">
+                      <span className="acoes-linha">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTicketIdForDetail(tkt.id);
+                          }}
+                          aria-label={`Abrir o chamado ${tkt.codigo}`}
+                          className="btn btn-sm btn-primario"
+                        >
+                          Abrir
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={8}>
+                  <Vazio>Nenhum chamado encontrado com os filtros selecionados.</Vazio>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

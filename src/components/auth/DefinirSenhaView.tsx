@@ -49,25 +49,25 @@ export const DefinirSenhaView: React.FC = () => {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
         <form onSubmit={handleSubmit} className="bg-white py-8 px-6 shadow-sm border border-slate-200/90 rounded-2xl sm:px-10 space-y-4">
           <div>
-            <label htmlFor="nova-senha" className="block text-xs font-semibold text-slate-700 mb-1">Nova senha</label>
+            <label htmlFor="nova-senha" className="rotulo">Nova senha</label>
             <input
               id="nova-senha"
               type="password"
               autoComplete="new-password"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              className="campo w-full"
+              className="campo"
             />
           </div>
           <div>
-            <label htmlFor="confirma-senha" className="block text-xs font-semibold text-slate-700 mb-1">Confirme a senha</label>
+            <label htmlFor="confirma-senha" className="rotulo">Confirme a senha</label>
             <input
               id="confirma-senha"
               type="password"
               autoComplete="new-password"
               value={confirmacao}
               onChange={(e) => setConfirmacao(e.target.value)}
-              className="campo w-full"
+              className="campo"
             />
           </div>
 
@@ -80,7 +80,7 @@ export const DefinirSenhaView: React.FC = () => {
           </ul>
 
           {erro && (
-            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">{erro}</div>
+            <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">{erro}</div>
           )}
 
           <button
@@ -88,9 +88,9 @@ export const DefinirSenhaView: React.FC = () => {
             disabled={salvando}
             className="btn btn-primario w-full"
           >
-            {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar senha e entrar'}
+            {salvando ? <Loader2 className="animate-spin" /> : 'Salvar senha e entrar'}
           </button>
-          <button type="button" onClick={logout} className="w-full text-xs text-slate-500 hover:text-slate-700">
+          <button type="button" onClick={logout} className="btn btn-secundario w-full">
             Cancelar e voltar ao login
           </button>
         </form>

@@ -56,7 +56,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
   const travada = (i: number) => tipo === 'devolucao' && !!linhasIniciais[i]?.condicao;
 
   return (
-    <div className="rounded-md border border-blue-200 bg-white p-2.5 space-y-2 text-xs">
+    <div className="cartao p-3 space-y-2 text-xs">
       <p className="font-semibold text-slate-800">
         Confira cada item{nomePessoa ? ` com ${nomePessoa}` : ''} antes de gerar
       </p>
@@ -104,7 +104,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
       </ul>
       {termoAnterior && (
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-0.5" htmlFor="conferencia-motivo">
+          <label className="rotulo" htmlFor="conferencia-motivo">
             Por que substituir o termo {termoAnterior.codigo}? *
           </label>
           <input
@@ -114,7 +114,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
             onChange={(e) => setMotivo(e.target.value)}
             placeholder="Ex.: patrimônio errado; faltou o carregador"
           />
-          <p className="text-slate-500 mt-0.5">O termo atual fica no histórico como substituído e perde a validade.</p>
+          <p className="ajuda">O termo atual fica no histórico como substituído e perde a validade.</p>
         </div>
       )}
       <label className="flex items-start gap-2 cursor-pointer">
@@ -122,7 +122,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
         <span>Conferi os itens, a condição e a situação de cada um.</span>
       </label>
       {erro && (
-        <p role="alert" className="font-medium text-red-700">
+        <p role="alert" className="erro">
           {erro}
         </p>
       )}

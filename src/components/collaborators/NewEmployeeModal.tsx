@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Employee, EmployeeStatus, UserRole } from '../../types/index.ts';
-import { X, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
+import { Janela } from '../ui/Janela.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
 
 /** Fase 10: dados que já vêm preenchidos (ex.: do chamado de admissão) */
@@ -118,234 +119,115 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
 
   // Em portal e acima das outras janelas: abre por cima do chamado sem ficar presa nele
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="cartao relative w-full max-w-5xl shadow-2xl overflow-hidden my-6">
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">
-              {editando ? `Editar dados de ${colaborador.nome}` : 'Novo colaborador'}
-            </h2>
-          </div>
-          <button
-            type="button"
-            aria-label="Fechar"
-            onClick={onClose}
-            className="btn-icone"
-          >
-            <X className="w-5 h-5" />
+    <Janela
+      tamanho="m"
+      icone={<UserPlus className="h-4 w-4" />}
+      titulo={editando ? `Editar dados de ${colaborador.nome}` : 'Novo colaborador'}
+      onFechar={onClose}
+      rodape={
+        <>
+          <button type="button" onClick={onClose} className="btn btn-secundario">
+            Cancelar
           </button>
+          <button type="submit" form="form-colaborador" disabled={salvando} className="btn btn-primario">
+            {editando
+              ? salvando
+                ? 'Salvando…'
+                : 'Salvar alterações'
+              : salvando
+                ? 'Cadastrando…'
+                : onCriado
+                  ? 'Cadastrar e concluir o passo'
+                  : 'Cadastrar colaborador'}
+          </button>
+        </>
+      }
+    >
+      <form id="form-colaborador" onSubmit={handleSubmit} className="space-y-4">
+        <div className="cartao space-y-2 p-4">
+          <h3 className="secao-titulo">Identificação e contato</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="md:col-span-2 xl:col-span-2">
+              <label htmlFor="colab-nome" className="rotulo">Nome completo *</label>
+              <input id="colab-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Amanda Silva Castro" className="campo" />
+            </div>
+            <div>
+              <label htmlFor="colab-matricula" className="rotulo">Matrícula funcional *</label>
+              <input id="colab-matricula" type="text" required value={matricula} disabled={editando} onChange={(e) => setMatricula(e.target.value)} className="campo font-mono" />
+            </div>
+            <div className="md:col-span-2 xl:col-span-2">
+              <label htmlFor="colab-email" className="rotulo">E-mail corporativo *</label>
+              <input id="colab-email" type="email" required value={email} disabled={!podeMudarEmail} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com.br" className="campo" />
+              {editando && temLogin && (
+                <p className="ajuda">Esta pessoa já tem login. Para trocar o e-mail de quem já tem login, use "Trocar login" — em breve.</p>
+              )}
+              {editando && !temLogin && !podeMudarEmail && <p className="ajuda">Só o administrador de T.I. altera o e-mail de perfis de gestão.</p>}
+              {emailMudou && (
+                <p className="mt-1 text-xs text-amber-800">Confira o novo e-mail: ele será usado quando a pessoa receber o acesso ao sistema.</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="colab-telefone" className="rotulo">Telefone / ramal</label>
+              <input id="colab-telefone" type="text" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 98765-0000" className="campo" />
+            </div>
+          </div>
         </div>
 
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:max-h-[85vh] sm:overflow-y-auto">
-          <div className="space-y-2">
-            <h3 className="secao-titulo">Identificação</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              <div className="md:col-span-2 xl:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nome Completo
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  placeholder="Ex: Amanda Silva Castro"
-                  className="campo w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Matrícula Funcional
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={matricula}
-                  disabled={editando}
-                  onChange={(e) => setMatricula(e.target.value)}
-                  className="campo w-full font-mono font-mono"
-                />
-              </div>
+        {/* Entradas dinâmicas estritas (setor e gestor) */}
+        <div className="cartao space-y-2 p-4">
+          <h3 className="secao-titulo">Vínculo e situação</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div>
+              <label htmlFor="colab-cargo" className="rotulo">Cargo / função *</label>
+              <input id="colab-cargo" type="text" required value={cargo} onChange={(e) => setCargo(e.target.value)} placeholder="Ex: Engenheiro(a) de Software" className="campo" />
             </div>
-          </div>
-
-          <div className="space-y-2 pt-3 border-t border-slate-100">
-            <h3 className="secao-titulo">Contato</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              <div className="md:col-span-2 xl:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  E-mail Corporativo
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  disabled={!podeMudarEmail}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nome@empresa.com.br"
-                  className="campo w-full"
-                />
-                {editando && temLogin && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    Esta pessoa já tem login. Para trocar o e-mail de quem já tem login, use "Trocar login" — em breve.
-                  </p>
-                )}
-                {editando && !temLogin && !podeMudarEmail && (
-                  <p className="text-xs text-slate-500 mt-1">Só o administrador de T.I. altera o e-mail de perfis de gestão.</p>
-                )}
-                {emailMudou && (
-                  <p className="text-xs text-amber-800 mt-1">
-                    Confira o novo e-mail: ele será usado quando a pessoa receber o acesso ao sistema.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Telefone / Ramal
-                </label>
-                <input
-                  type="text"
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                  placeholder="(11) 98765-0000"
-                  className="campo w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Entradas Dinâmicas Estritas (Setor & Gestor) */}
-          <div className="space-y-2 pt-3 border-t border-slate-100">
-            <h3 className="secao-titulo">Vínculo</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Cargo / Função
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={cargo}
-                  onChange={(e) => setCargo(e.target.value)}
-                  placeholder="Ex: Engenheiro(a) de Software"
-                  className="campo w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Setor / Departamento (Pré-cadastrado)
-                </label>
-                <select
-                  value={setorId}
-                  onChange={(e) => setSetorId(e.target.value)}
-                  required
-                  className="campo w-full"
-                >
-                  {departments
-                    .filter((d) => d.ativo)
-                    .map((dep) => (
-                      <option key={dep.id} value={dep.id}>
-                        {dep.nome} ({dep.codigo})
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Líder Imediato / Gestor (Ativo)
-                </label>
-                <select
-                  value={gestorId}
-                  onChange={(e) => setGestorId(e.target.value)}
-                  className="campo w-full"
-                >
-                  <option value="">Nenhum (Diretoria / Gestão Superior)</option>
-                  {activeEmployees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.nome} ({emp.cargo})
+            <div>
+              <label htmlFor="colab-setor" className="rotulo">Setor / departamento *</label>
+              <select id="colab-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} required className="campo">
+                {departments
+                  .filter((d) => d.ativo)
+                  .map((dep) => (
+                    <option key={dep.id} value={dep.id}>
+                      {dep.nome} ({dep.codigo})
                     </option>
                   ))}
-                </select>
-              </div>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="colab-gestor" className="rotulo">Líder imediato / gestor (ativo)</label>
+              <select id="colab-gestor" value={gestorId} onChange={(e) => setGestorId(e.target.value)} className="campo">
+                <option value="">Nenhum (Diretoria / Gestão Superior)</option>
+                {activeEmployees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.nome} ({emp.cargo})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="colab-status" className="rotulo">Status</label>
+              <select id="colab-status" value={status} disabled={!podeReativar} onChange={(e) => setStatus(e.target.value as EmployeeStatus)} className="campo">
+                <option value="ativo">{desligado ? 'Ativo (reativar)' : 'Ativo'}</option>
+                <option value="ferias">Férias</option>
+                {/* Na edição, desligar é pelo processo de desligamento (recolhe equipamentos e acessos) */}
+                {(!editando || desligado) && <option value="desligado">Desligado</option>}
+              </select>
+              {!podeReativar && <p className="ajuda">Só o administrador de T.I. reativa uma pessoa desligada.</p>}
+            </div>
+            <div>
+              <label htmlFor="colab-admissao" className="rotulo">Data de admissão</label>
+              <input id="colab-admissao" type="date" value={dataAdmissao} onChange={(e) => setDataAdmissao(e.target.value)} className="campo" />
             </div>
           </div>
+        </div>
 
-          <div className="space-y-2 pt-3 border-t border-slate-100">
-            <h3 className="secao-titulo">Situação</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={status}
-                  disabled={!podeReativar}
-                  onChange={(e) => setStatus(e.target.value as EmployeeStatus)}
-                  className="campo w-full"
-                >
-                  <option value="ativo">{desligado ? 'Ativo (reativar)' : 'Ativo'}</option>
-                  <option value="ferias">Férias</option>
-                  {/* Na edição, desligar é pelo processo de desligamento (recolhe equipamentos e acessos) */}
-                  {(!editando || desligado) && <option value="desligado">Desligado</option>}
-                </select>
-                {!podeReativar && (
-                  <p className="text-xs text-slate-500 mt-1">Só o administrador de T.I. reativa uma pessoa desligada.</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Data de Admissão
-                </label>
-                <input
-                  type="date"
-                  value={dataAdmissao}
-                  onChange={(e) => setDataAdmissao(e.target.value)}
-                  className="campo w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          {erro && (
-            <p role="alert" className="text-xs text-rose-700">
-              {erro}
-            </p>
-          )}
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-secundario"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={salvando}
-              className="btn btn-primario"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              {editando
-                ? salvando
-                  ? 'Salvando…'
-                  : 'Salvar alterações'
-                : salvando
-                  ? 'Cadastrando…'
-                  : onCriado
-                    ? 'Cadastrar e concluir o passo'
-                    : 'Cadastrar colaborador'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
+        {erro && (
+          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            {erro}
+          </p>
+        )}
+      </form>
+    </Janela>,
     document.body
   );
 };

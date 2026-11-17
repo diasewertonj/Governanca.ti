@@ -62,10 +62,10 @@ export const PrazosSettings: React.FC = () => {
   };
 
   return (
-    <div className="cartao p-6 space-y-4 text-xs">
+    <div className="cartao p-4 space-y-4 text-xs">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">Prazos de atendimento</h3>
-        <p className="text-slate-500 mt-0.5">
+        <h3 className="secao-titulo">Prazos de atendimento</h3>
+        <p className="ajuda">
           Em horas úteis: segunda a sexta, das {HORA_INICIO}h às {HORA_FIM}h ({MINUTOS_DIA_UTIL / 60} horas = 1 dia útil). "Aguardando"
           pausa o prazo de solução. Valem para chamados de suporte.
         </p>
@@ -100,7 +100,7 @@ export const PrazosSettings: React.FC = () => {
         </tbody>
       </table>
 
-      {erro && <p role="alert" className="text-rose-700">{erro}</p>}
+      {erro && <p role="alert" className="erro">{erro}</p>}
       {salvo && !alterado && <p className="text-emerald-700">Prazos salvos.</p>}
       {podeEditar && (
         <div className="flex flex-wrap gap-2">

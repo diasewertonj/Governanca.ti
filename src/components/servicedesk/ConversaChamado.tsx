@@ -4,6 +4,7 @@ import type { Asset, Ticket } from '../../types/index.ts';
 import { formatDateTime } from '../../utils/formatters.ts';
 import { inicial, mensagensDaConversa, ROTULO_PAPEL } from '../../utils/conversa.ts';
 import { HistoricoChamado } from './AtendimentoChamado.tsx';
+import { Abas, type ItemAba } from '../ui/Abas.tsx';
 
 interface ProblemaRelatadoProps {
   ticket: Ticket;
@@ -16,14 +17,14 @@ interface ProblemaRelatadoProps {
 
 /** Fase 10: o problema relatado em destaque, logo abaixo do título */
 export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titulo, ativo, onAbrirAnexo, erroArquivo }) => (
-  <section aria-labelledby={`problema-${ticket.id}`} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs">
+  <section aria-labelledby={`problema-${ticket.id}`} className="cartao p-4 space-y-3">
     <h3 id={`problema-${ticket.id}`} className="secao-titulo">
       {titulo || 'Problema relatado'}
     </h3>
-    <p className="mt-2 text-[15px] leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{ticket.descricao}</p>
+    <p className="text-sm leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{ticket.descricao}</p>
 
     {(ativo || ticket.softwareNome) && (
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
         {ativo && (
           <span className="inline-flex items-center gap-1">
             <Laptop className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
@@ -32,7 +33,7 @@ export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titu
         )}
         {ticket.softwareNome && (
           <span className="inline-flex items-center gap-1">
-            <Key className="w-3.5 h-3.5 text-purple-600" aria-hidden="true" />
+            <Key className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
             {ticket.softwareNome}
           </span>
         )}
@@ -40,17 +41,17 @@ export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titu
     )}
 
     {ticket.anexos && ticket.anexos.length > 0 && (
-      <div className="mt-3 space-y-1.5 text-xs">
-        {erroArquivo && <p className="text-rose-700">{erroArquivo}</p>}
+      <div className="space-y-1.5 text-xs">
+        {erroArquivo && <p className="erro">{erroArquivo}</p>}
         <div className="flex flex-wrap gap-2">
           {ticket.anexos.map((att) => (
             <button
               type="button"
               key={att.id}
               onClick={() => onAbrirAnexo(att.caminho || att.url)}
-              className="btn btn-secundario btn-sm"
+              className="btn btn-sm btn-secundario"
             >
-              <Paperclip className="w-3 h-3 text-slate-500" aria-hidden="true" />
+              <Paperclip aria-hidden="true" />
               <span className="break-all">{att.nome}</span>
               {att.tamanho && <span className="text-slate-500">({att.tamanho})</span>}
             </button>
@@ -61,19 +62,7 @@ export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titu
   </section>
 );
 
-const Aba: React.FC<{ ativa: boolean; onClick: () => void; rotulo: string; n?: number }> = ({ ativa, onClick, rotulo, n }) => (
-  <button
-    type="button"
-    role="tab"
-    aria-selected={ativa}
-    onClick={onClick}
-    className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-      ativa ? 'bg-white text-slate-900 shadow-2xs border border-slate-200' : 'text-slate-600 hover:text-slate-900'
-    }`}
-  >
-    {rotulo} {n !== undefined && <span className="text-slate-500">({n})</span>}
-  </button>
-);
+type AbaAtendimento = 'conversa' | 'notas' | 'historico';
 
 interface ConversaChamadoProps {
   ticket: Ticket;
@@ -89,23 +78,24 @@ interface ConversaChamadoProps {
  * aba separada. A descrição não se repete aqui (fica em "Problema relatado").
  */
 export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVerNotas, meuId, abaInicial }) => {
-  const [aba, setAba] = useState<'conversa' | 'notas' | 'historico'>(podeVerNotas && abaInicial === 'notas' ? 'notas' : 'conversa');
+  const [aba, setAba] = useState<AbaAtendimento>(podeVerNotas && abaInicial === 'notas' ? 'notas' : 'conversa');
   const todas = mensagensDaConversa(ticket, podeVerNotas);
   const conversa = todas.filter((m) => !m.ehNotaInterna);
   const notas = todas.filter((m) => m.ehNotaInterna);
   const lista = aba === 'notas' ? notas : conversa;
+  const itensAbas: ItemAba<AbaAtendimento>[] = [
+    { id: 'conversa', rotulo: 'Conversa', contador: conversa.length },
+    ...(podeVerNotas ? [{ id: 'notas' as const, rotulo: 'Notas internas', contador: notas.length }] : []),
+    { id: 'historico', rotulo: 'Histórico' },
+  ];
 
   return (
     <section aria-labelledby={`atendimento-${ticket.id}`} className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={`atendimento-${ticket.id}`} className="text-sm font-semibold text-slate-900">
+        <h3 id={`atendimento-${ticket.id}`} className="secao-titulo">
           Atendimento
         </h3>
-        <div role="tablist" aria-label="Atendimento" className="flex gap-1 p-0.5 rounded-lg bg-slate-100">
-          <Aba ativa={aba === 'conversa'} onClick={() => setAba('conversa')} rotulo="Conversa" n={conversa.length} />
-          {podeVerNotas && <Aba ativa={aba === 'notas'} onClick={() => setAba('notas')} rotulo="Notas internas" n={notas.length} />}
-          <Aba ativa={aba === 'historico'} onClick={() => setAba('historico')} rotulo="Histórico" />
-        </div>
+        <Abas<AbaAtendimento> rotulo="Atendimento" ativa={aba} onMudar={setAba} itens={itensAbas} />
       </div>
 
       {/* Fase 10: histórico automático de cada mudança */}

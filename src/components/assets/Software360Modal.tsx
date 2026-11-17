@@ -1,36 +1,95 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatCurrency, formatDate } from '../../utils/formatters.ts';
-import {
-  X,
-  Key,
-  Users,
-  ExternalLink,
-  Edit2,
-  UserPlus,
-  UserMinus,
-  CheckCircle2,
-  AlertCircle,
-  Plus,
-  Search,
-  Globe,
-} from 'lucide-react';
+import { Key, ExternalLink, Pencil, UserPlus, UserMinus, CheckCircle2, AlertCircle, Ban, ChevronRight } from 'lucide-react';
 import { FaturasSecao } from '../financeiro/FaturasSecao.tsx';
 import { chamadosDoSoftware } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
-import { History, Ban } from 'lucide-react';
 import { contratoQuePagaLicenca, nomeContrato } from '../../utils/contratos.ts';
 import { ROTULO_FORMA_COBRANCA, ROTULO_FORMA_PAGAMENTO, dataLimiteCancelamento, fonteCustoLicenca } from '../../utils/financeiro.ts';
 import { HistoricoAlteracoes } from '../comum/HistoricoAlteracoes.tsx';
 import { LembreteLicenca } from './LembreteLicenca.tsx';
 import { ContratoPorId } from '../financeiro/FinanceiroViews.tsx';
 import { historicoAssentos, licencaAtiva } from '../../utils/licencas.ts';
-import { confirmar } from '../ui/dialogo.tsx';
+import { avisar, confirmar, pedirTexto } from '../ui/dialogo.tsx';
+import { Janela, Dado } from '../ui/Janela.tsx';
+import { Abas, type ItemAba } from '../ui/Abas.tsx';
+import { Busca, Vazio } from '../ui/Tela.tsx';
+import type { DadosPagamento, SoftwareLicense } from '../../types/index.ts';
 
 interface Software360ModalProps {
   softwareId: string;
   onClose: () => void;
 }
+
+type AbaSoftware = 'resumo' | 'pessoas' | 'custo' | 'chamados' | 'historico';
+
+type FonteCusto = ReturnType<typeof fonteCustoLicenca>;
+
+/** Texto do botão some no celular (fica só o ícone, com o nome no title/aria-label) */
+const Rotulo: React.FC<{ texto: string }> = ({ texto }) => <span className="hidden sm:inline">{texto}</span>;
+
+/** Assentos usados/livres com a barra de ocupação */
+const BarraAssentos: React.FC<{ license: SoftwareLicense }> = ({ license }) => {
+  const livres = Math.max(0, license.assentosTotais - license.assentosAlocados);
+  const ocupacao = Math.round((license.assentosAlocados / (license.assentosTotais || 1)) * 100);
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-xs text-slate-600">
+          <span className="font-mono text-base font-semibold text-slate-900">
+            {license.assentosAlocados} / {license.assentosTotais}
+          </span>{' '}
+          assentos em uso ({ocupacao}%)
+        </p>
+        <span className={`selo ${livres === 0 ? 'selo-problema' : livres <= 3 ? 'selo-atencao' : 'selo-ok'}`}>
+          {livres} livre{livres === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-slate-100"
+        role="progressbar"
+        aria-label="Ocupação dos assentos"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.min(100, ocupacao)}
+      >
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${
+            ocupacao >= 100 ? 'bg-red-500' : ocupacao >= 85 ? 'bg-amber-500' : 'bg-blue-600'
+          }`}
+          style={{ width: `${Math.min(100, ocupacao)}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+/** Valor, por assento, renovação/fim e prazo para cancelar (fonte única do custo) */
+const ValoresCusto: React.FC<{ fonte: FonteCusto; license: SoftwareLicense; pg?: DadosPagamento; limite?: string }> = ({
+  fonte,
+  license,
+  pg,
+  limite,
+}) => (
+  <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <Dado rotulo="Valor">
+      <span className="font-mono">
+        {formatCurrency(fonte.valor)}
+        {fonte.periodicidade === 'anual' ? '/ano' : fonte.periodicidade === 'unico' ? ' (único)' : '/mês'}
+      </span>
+      <span className="block font-normal text-slate-500">{fonte.origem}</span>
+    </Dado>
+    <Dado rotulo="Por assento">
+      <span className="font-mono">{formatCurrency(license.assentosTotais > 0 ? fonte.mensal / license.assentosTotais : 0)}/mês</span>
+    </Dado>
+    <Dado rotulo={fonte.forma === 'contrato' ? 'Fim do contrato' : 'Renovação'}>
+      {fonte.renovacao ? formatDate(fonte.renovacao) : '—'}
+      {pg?.renovacaoAutomatica && <span className="block font-normal text-slate-500">renova sozinho</span>}
+    </Dado>
+    <Dado rotulo="Cancelar até">{limite ? formatDate(limite) : '—'}</Dado>
+  </dl>
+);
 
 export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, onClose }) => {
   const {
@@ -52,7 +111,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     mudarSituacaoLicenca,
     faturas,
   } = useApp();
-  const [motivoInativar, setMotivoInativar] = useState<string | null>(null);
+  const [aba, setAba] = useState<AbaSoftware>('resumo');
   // Seção 6: contrato aberto por cima da ficha (renovar, ver faturas)
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
 
@@ -75,17 +134,41 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   const ultimoContrato = contratos
     .filter((c) => c.itens.some((i) => i.licencaId === license.id))
     .sort((a, b) => (b.fim || '9999').localeCompare(a.fim || '9999'))[0];
+  // Seção 6: custo e renovação vêm da fonte única (contrato, licença ou sem custo)
+  const fonte = fonteCustoLicenca(license, contratos);
+  const pg = fonte.forma === 'contrato' ? fonte.contrato?.pagamento : license.pagamento;
+  const limite = dataLimiteCancelamento(fonte.renovacao, pg?.avisoCancelamentoDias);
+  const chamados = chamadosDoSoftware(tickets, license.id);
+  const responsavel = license.responsavelId ? employees.find((e) => e.id === license.responsavelId) : undefined;
+
   const onEditar = () => {
     setSoftwareToEdit(license);
     setSoftwareModalOpen(true);
   };
   const nomePessoa = (id: string) => employees.find((e) => e.id === id)?.nome || 'Pessoa removida';
 
+  // Lote 1 (L3): inativar com motivo (a licença fica no histórico); antes, liberar os assentos
   const inativar = async () => {
-    if (!motivoInativar) return;
-    const falha = await mudarSituacaoLicenca(license.id, false, motivoInativar);
+    const explicacao = 'A licença não é excluída: fica no histórico e sai das listas de atribuição.';
+    if (license.colaboradoresIds.length > 0) {
+      setAba('pessoas');
+      await avisar({
+        titulo: `Antes de inativar, libere os ${license.colaboradoresIds.length} assento(s) em uso.`,
+        mensagem: explicacao,
+      });
+      return;
+    }
+    const motivo = await pedirTexto({
+      titulo: `Inativar ${license.nome}?`,
+      mensagem: `${explicacao}\n\nEx.: contrato encerrado; trocado pelo Google Workspace.`,
+      rotulo: 'Motivo da inativação',
+      minimo: 3,
+      confirmar: 'Inativar',
+      perigo: true,
+    });
+    if (!motivo) return;
+    const falha = await mudarSituacaoLicenca(license.id, false, motivo);
     if (falha) return setFeedbackMsg({ text: falha, type: 'error' });
-    setMotivoInativar(null);
     setFeedbackMsg({ text: 'Licença inativada. Ela sai das listas de atribuição.', type: 'success' });
   };
   const reativar = async () => {
@@ -100,21 +183,17 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     void podeDescartarPendencias().then((ok) => ok && onClose());
   };
   const freeSeats = Math.max(0, license.assentosTotais - license.assentosAlocados);
-  const occupancyPercentage = Math.round((license.assentosAlocados / (license.assentosTotais || 1)) * 100);
 
   // Colaboradores ativos que NÃO possuem esta licença
-  const unassignedEmployees = employees.filter(
-    (emp) => emp.status === 'ativo' && !license.colaboradoresIds.includes(emp.id)
-  );
+  const unassignedEmployees = employees.filter((emp) => emp.status === 'ativo' && !license.colaboradoresIds.includes(emp.id));
 
   // Colaboradores que POSSUEM esta licença (filtrados por busca)
-  const assignedEmployees = employees.filter((emp) =>
-    license.colaboradoresIds.includes(emp.id)
-  ).filter((emp) =>
-    emp.nome.toLowerCase().includes(colabFilterSearch.toLowerCase()) ||
-    emp.email.toLowerCase().includes(colabFilterSearch.toLowerCase()) ||
-    emp.cargo.toLowerCase().includes(colabFilterSearch.toLowerCase())
-  );
+  const termo = colabFilterSearch.toLowerCase();
+  const assignedEmployees = employees
+    .filter((emp) => license.colaboradoresIds.includes(emp.id))
+    .filter(
+      (emp) => emp.nome.toLowerCase().includes(termo) || emp.email.toLowerCase().includes(termo) || emp.cargo.toLowerCase().includes(termo)
+    );
 
   const handleAllocate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +208,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
       return;
     }
 
-    const colab = employees.find((e) => e.id === selectedColabToAssign);
+    const colab = employees.find((emp) => emp.id === selectedColabToAssign);
     allocateLicense(license.id, selectedColabToAssign);
     setSelectedColabToAssign('');
     setFeedbackMsg({
@@ -169,57 +248,107 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setTimeout(() => setFeedbackMsg(null), 3000);
   };
 
+  const abas: ItemAba<AbaSoftware>[] = [
+    { id: 'resumo', rotulo: 'Resumo' },
+    { id: 'pessoas', rotulo: 'Pessoas e assentos', contador: license.colaboradoresIds.length },
+    { id: 'custo', rotulo: 'Custo e faturas' },
+    { id: 'chamados', rotulo: 'Chamados', contador: chamados.length },
+    ...(isTI ? [{ id: 'historico' as const, rotulo: 'Histórico' }] : []),
+  ];
+  const abaAtual = abas.some((a) => a.id === aba) ? aba : 'resumo';
+  // Painéis ficam montados (escondidos) para não perder o que está em digitação (ex.: fatura)
+  const painel = (id: AbaSoftware) => (abaAtual === id ? 'space-y-4' : 'hidden');
+
+  const linkContrato = (id: string, nome: string) => (
+    <button type="button" onClick={() => setContratoAberto(id)} className="link">
+      {nome}
+    </button>
+  );
+
+  // Seção 6: faturas no lugar certo — software pago por contrato mostra (e lança) as do contrato
+  const secaoFaturas = (() => {
+    if (fonte.forma === 'contrato' && fonte.contrato) {
+      return (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-600">Faturas do contrato {nomeContrato(fonte.contrato)} (que paga este software):</p>
+          <FaturasSecao alvo={{ contratoId: fonte.contrato.id }} periodicidade={fonte.contrato.periodicidade} valorPadrao={fonte.contrato.valor} />
+          {faturas.some((f) => f.licencaId === license.id) && (
+            <FaturasSecao alvo={{ licencaId: license.id }} bloqueioLancamento="Faturas antigas, de quando a cobrança era no próprio software." />
+          )}
+        </div>
+      );
+    }
+    if (fonte.forma === 'sem_custo' && !faturas.some((f) => f.licencaId === license.id)) return null;
+    return (
+      <FaturasSecao
+        alvo={{ licencaId: license.id }}
+        periodicidade={license.tipoCobranca || 'mensal'}
+        valorPadrao={license.valorMensal}
+        bloqueioLancamento={fonte.forma === 'sem_custo' ? 'Software sem custo: não recebe faturas novas.' : undefined}
+      />
+    );
+  })();
+
+  const avisoSemContrato = (
+    <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+      <p>Este software é pago por contrato, mas nenhum contrato vigente o cobre.</p>
+      {isTI && (
+        <div className="flex flex-wrap gap-2">
+          {ultimoContrato && (
+            <button type="button" onClick={() => setContratoAberto(ultimoContrato.id)} className="btn btn-sm btn-secundario">
+              Renovar o contrato {nomeContrato(ultimoContrato)}
+            </button>
+          )}
+          <button type="button" onClick={() => onEditar()} className="btn btn-sm btn-secundario">
+            Passar a cobrar no software
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const comoEPago = (
+    <>
+      {ROTULO_FORMA_COBRANCA[fonte.forma]}
+      {fonte.contrato && (
+        <>
+          {' · '}
+          {linkContrato(fonte.contrato.id, nomeContrato(fonte.contrato))}
+        </>
+      )}
+      {fonte.semContratoVigente && (
+        <span className="mt-1 block">
+          <span className="selo selo-problema">Sem contrato vigente</span>
+        </span>
+      )}
+    </>
+  );
+
   return (
-    <div className="janela-fundo modal-tela">
-      <div className="janela janela-m">
-        {/* Cabeçalho */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 shrink-0 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-              <Key className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-slate-900 leading-tight break-words">{license.nome}</h2>
-                {license.chaveContrato && (
-                  <span className="text-xs font-mono font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                    {license.chaveContrato}
-                  </span>
-                )}
-                {!ativa && (
-                  <span className="text-xs font-semibold text-slate-700 bg-slate-200 px-2 py-0.5 rounded">Inativa</span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {nomeFornecedor}
-                {contratoPagador && ` · paga pelo contrato ${nomeContrato(contratoPagador)}`}
-              </p>
-              {!ativa && (
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Inativada{license.inativadaEm ? ` em ${formatDate(license.inativadaEm)}` : ''}
-                  {license.inativadaPor ? ` por ${nomePessoa(license.inativadaPor)}` : ''}: {license.inativacaoMotivo || 'sem motivo'}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {license.urlPainel && (
-              <a
-                href={license.urlPainel}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-2xs"
-              >
-                <Globe className="w-3.5 h-3.5 text-blue-600" />
-                <span>Console Admin</span>
-                <ExternalLink className="w-3 h-3 text-slate-500" />
-              </a>
-            )}
-
+    <>
+      <Janela
+        tamanho="ficha"
+        icone={<Key className="h-4 w-4" />}
+        titulo={
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate">{license.nome}</span>
+            {!ativa && <span className="selo selo-neutro shrink-0">Inativa</span>}
+          </span>
+        }
+        subtitulo={
+          <>
+            {nomeFornecedor || 'Sem fornecedor'}
+            {contratoPagador && ` · paga pelo contrato ${nomeContrato(contratoPagador)}`}
+          </>
+        }
+        onFechar={fechar}
+        acoes={
+          <>
             {isTI && (
               <button
                 type="button"
+                title="Editar"
+                aria-label="Editar"
                 onClick={async () => {
                   // Fase 8: a ficha fecha; pergunta antes se há fatura em digitação
                   if (!(await podeDescartarPendencias())) return;
@@ -227,481 +356,384 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   setSoftwareModalOpen(true);
                   onClose();
                 }}
-                className="btn btn-secundario btn-sm"
+                className="btn btn-sm btn-secundario"
               >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Editar Dados</span>
+                <Pencil />
+                <Rotulo texto="Editar" />
               </button>
             )}
-
             {/* Lote 1 (L3): inativar com motivo; reativar só o administrador */}
-            {isTI && ativa && (
-              <button
-                type="button"
-                onClick={() => setMotivoInativar(motivoInativar === null ? '' : null)}
-                className="btn btn-secundario btn-sm"
-              >
-                <Ban className="w-3.5 h-3.5" />
-                <span>Inativar</span>
-              </button>
-            )}
             {currentRole === 'ti_admin' && !ativa && (
-              <button
-                type="button"
-                onClick={reativar}
-                className="btn btn-secundario btn-sm"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Reativar</span>
+              <button type="button" title="Reativar" aria-label="Reativar" onClick={reativar} className="btn btn-sm btn-secundario">
+                <CheckCircle2 />
+                <Rotulo texto="Reativar" />
               </button>
             )}
-
-            <button
-              type="button"
-              aria-label="Fechar"
-              onClick={fechar}
-              className="btn-icone ml-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {motivoInativar !== null && (
-          <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 text-xs space-y-2">
-            <p className="text-slate-700">
-              A licença não é excluída: fica no histórico e sai das listas de atribuição.
-              {license.colaboradoresIds.length > 0 &&
-                ` Antes, libere os ${license.colaboradoresIds.length} assento(s) em uso.`}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                aria-label="Motivo da inativação"
-                value={motivoInativar}
-                onChange={(e) => setMotivoInativar(e.target.value)}
-                placeholder="Motivo (ex.: contrato encerrado; trocado pelo Google Workspace)"
-                className="campo campo-sm flex-1 min-w-[16rem]"
-              />
-              <button
-                type="button"
-                onClick={inativar}
-                disabled={license.colaboradoresIds.length > 0}
-                className="px-3 py-1.5 font-semibold text-white bg-slate-700 rounded-md disabled:opacity-50"
-              >
-                Confirmar inativação
+            {isTI && ativa && (
+              <button type="button" title="Inativar" aria-label="Inativar" onClick={inativar} className="btn btn-sm btn-perigo">
+                <Ban />
+                <Rotulo texto="Inativar" />
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* Feedback visual */}
+            )}
+          </>
+        }
+        faixa={<Abas<AbaSoftware> rotulo="Seções da ficha do software" itens={abas} ativa={abaAtual} onMudar={setAba} />}
+      >
         {feedbackMsg && (
-          <div
-            className={`px-6 py-2.5 text-xs flex items-center gap-2 border-b animate-in fade-in ${
-              feedbackMsg.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : 'bg-rose-50 text-rose-800 border-rose-200'
+          <p
+            role="status"
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+              feedbackMsg.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'
             }`}
           >
-            {feedbackMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            )}
+            {feedbackMsg.type === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
             <span>{feedbackMsg.text}</span>
-          </div>
+          </p>
         )}
 
-        {/* Conteúdo em 2 seções */}
-        <div className="p-6 space-y-6 sm:max-h-[75vh] sm:overflow-y-auto">
-          {/* Card de Gestão de Capacidade & Assentos */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
-                  Capacidade
-                </span>
-                <div className="flex items-baseline gap-2 mt-0.5">
-                  <span className="text-xl font-bold font-mono text-slate-900">
-                    {license.assentosAlocados} / {license.assentosTotais}
-                  </span>
-                  <span className="text-xs text-slate-500">assentos alocados ({occupancyPercentage}%)</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
-                    Assentos Livres
-                  </span>
-                  <span
-                    className={`text-base font-bold font-mono ${
-                      freeSeats === 0 ? 'text-rose-600' : freeSeats <= 3 ? 'text-amber-600' : 'text-emerald-700'
-                    }`}
-                  >
-                    {freeSeats} disponível(is)
-                  </span>
-                </div>
-
-                {isTI && (
-                  <div className="pl-3 border-l border-slate-200">
-                    {isEditingSeats ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min={license.assentosAlocados}
-                          value={newTotalSeats}
-                          onChange={(e) => setNewTotalSeats(Number(e.target.value))}
-                          className="campo campo-sm w-16 font-mono font-mono font-bold"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleSaveTotalSeats}
-                          className="btn btn-primario btn-sm"
-                        >
-                          Salvar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingSeats(false)}
-                          className="btn btn-secundario btn-sm"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewTotalSeats(license.assentosTotais);
-                          setIsEditingSeats(true);
-                        }}
-                        className="text-xs text-blue-700 hover:underline flex items-center gap-1 font-medium"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        <span>Ajustar Assentos</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Barra de Progresso Visual */}
-            <div className="space-y-1">
-              <div className="w-full h-3 bg-white border border-slate-200 rounded-full overflow-hidden p-0.5">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    occupancyPercentage >= 100
-                      ? 'bg-rose-500'
-                      : occupancyPercentage >= 85
-                      ? 'bg-amber-500'
-                      : 'bg-blue-600'
-                  }`}
-                  style={{ width: `${Math.min(100, occupancyPercentage)}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Seção 6: custo e renovação vêm da fonte única (contrato, licença ou sem custo) */}
-          {(() => {
-            const fonte = fonteCustoLicenca(license, contratos);
-            const pg = fonte.forma === 'contrato' ? fonte.contrato?.pagamento : license.pagamento;
-            const limite = dataLimiteCancelamento(fonte.renovacao, pg?.avisoCancelamentoDias);
-            return (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs uppercase font-bold text-slate-500 tracking-wider">Custo e renovação</span>
-                  <span className="text-xs text-slate-600">
-                    {ROTULO_FORMA_COBRANCA[fonte.forma]}
-                    {fonte.contrato && (
-                      <>
-                        {' · '}
-                        <button type="button" onClick={() => setContratoAberto(fonte.contrato!.id)} className="text-blue-700 hover:underline">
-                          {nomeContrato(fonte.contrato)}
-                        </button>
-                      </>
-                    )}
-                  </span>
-                </div>
-                {fonte.semContratoVigente ? (
-                  <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
-                    <p>Este software é pago por contrato, mas nenhum contrato vigente o cobre.</p>
-                    {isTI && (
-                      <div className="flex flex-wrap gap-2">
-                        {ultimoContrato && (
-                          <button type="button" onClick={() => setContratoAberto(ultimoContrato.id)} className="btn btn-secundario btn-sm">
-                            Renovar o contrato {nomeContrato(ultimoContrato)}
-                          </button>
-                        )}
-                        <button type="button" onClick={() => onEditar()} className="btn btn-secundario btn-sm">
-                          Passar a cobrar no software
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : fonte.forma === 'sem_custo' ? (
-                  <p className="text-xs text-slate-600">Software sem custo.</p>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <div>
-                      <span className="text-xs text-slate-500 uppercase font-semibold block">Valor</span>
-                      <span className="font-semibold text-slate-900 font-mono">
-                        {formatCurrency(fonte.valor)}
-                        {fonte.periodicidade === 'anual' ? '/ano' : fonte.periodicidade === 'unico' ? ' (único)' : '/mês'}
-                      </span>
-                      <span className="block text-slate-500">{fonte.origem}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500 uppercase font-semibold block">Por assento</span>
-                      <span className="font-semibold text-slate-700 font-mono">
-                        {formatCurrency(license.assentosTotais > 0 ? fonte.mensal / license.assentosTotais : 0)}/mês
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500 uppercase font-semibold block">{fonte.forma === 'contrato' ? 'Fim do contrato' : 'Renovação'}</span>
-                      <span className="text-slate-800 font-medium">{fonte.renovacao ? formatDate(fonte.renovacao) : '—'}</span>
-                      {pg?.renovacaoAutomatica && <span className="block text-slate-500">renova sozinho</span>}
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500 uppercase font-semibold block">Cancelar até</span>
-                      <span className="text-slate-800 font-medium">{limite ? formatDate(limite) : '—'}</span>
-                    </div>
-                    {pg?.formaPagamento && (
-                      <div className="col-span-2">
-                        <span className="text-xs text-slate-500 uppercase font-semibold block">Pagamento</span>
-                        <span className="text-slate-800">
-                          {ROTULO_FORMA_PAGAMENTO[pg.formaPagamento]}
-                          {pg.cartaoFinal ? ` final ${pg.cartaoFinal}` : ''}
-                          {pg.titular ? ` · ${pg.titular}` : ''}
-                          {pg.moeda && pg.moeda !== 'BRL' && pg.valorMoeda != null ? ` · ${pg.moeda} ${pg.valorMoeda.toFixed(2)}` : ''}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* Seção 6: faturas no lugar certo — software pago por contrato mostra (e lança) as do contrato */}
-          {isTI && (() => {
-            const fonte = fonteCustoLicenca(license, contratos);
-            if (fonte.forma === 'contrato' && fonte.contrato) {
-              return (
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-600">Faturas do contrato {nomeContrato(fonte.contrato)} (que paga este software):</p>
-                  <FaturasSecao alvo={{ contratoId: fonte.contrato.id }} periodicidade={fonte.contrato.periodicidade} valorPadrao={fonte.contrato.valor} />
-                  {faturas.some((f) => f.licencaId === license.id) && (
-                    <FaturasSecao alvo={{ licencaId: license.id }} bloqueioLancamento="Faturas antigas, de quando a cobrança era no próprio software." />
-                  )}
-                </div>
-              );
-            }
-            if (fonte.forma === 'sem_custo' && !faturas.some((f) => f.licencaId === license.id)) return null;
-            return (
-              <FaturasSecao
-                alvo={{ licencaId: license.id }}
-                periodicidade={license.tipoCobranca || 'mensal'}
-                valorPadrao={license.valorMensal}
-                bloqueioLancamento={fonte.forma === 'sem_custo' ? 'Software sem custo: não recebe faturas novas.' : undefined}
-              />
-            );
-          })()}
-
-          {isTI && <LembreteLicenca licenca={license} />}
-          {isTI && <HistoricoAlteracoes entidade="licencas_software" registro={license.id} />}
-          {/* Lote 1 (L4): quem teve assento, de quando a quando */}
-          {isTI && (
-            <div className="border border-slate-200 rounded-xl p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-slate-600" aria-hidden="true" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Histórico de assentos</h3>
-              </div>
-              {historico.length === 0 ? (
-                <p className="text-xs text-slate-500">Nenhuma atribuição registrada ainda.</p>
-              ) : (
-                <ul className="divide-y divide-slate-100 text-xs">
-                  {historico.map((a) => (
-                    <li key={a.id} className="py-1.5 flex flex-wrap items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedEmployeeIdFor360(a.colaboradorId)}
-                        className="font-medium text-slate-900 hover:text-blue-700"
-                      >
-                        {nomePessoa(a.colaboradorId)}
-                      </button>
-                      <span className="text-slate-600">
-                        {a.inicio ? `desde ${formatDate(a.inicio)}` : 'antes do histórico'}
-                        {a.atribuidoPor ? ` (por ${nomePessoa(a.atribuidoPor)})` : ''}
-                        {a.fim
-                          ? ` · saiu em ${formatDate(a.fim)}${a.removidoPor ? ` (por ${nomePessoa(a.removidoPor)})` : ''}`
-                          : ' · em uso'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        {/* ---------------- Resumo ---------------- */}
+        <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
+          {!ativa && (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              Inativada{license.inativadaEm ? ` em ${formatDate(license.inativadaEm)}` : ''}
+              {license.inativadaPor ? ` por ${nomePessoa(license.inativadaPor)}` : ''}: {license.inativacaoMotivo || 'sem motivo'}
+            </p>
           )}
 
-          {/* Fase 9: chamados ligados a este software */}
-          <ChamadosVinculados
-            chamados={chamadosDoSoftware(tickets, license.id)}
-            vazio="Nenhum chamado ligado a este software."
-          />
+          <section className="cartao space-y-3 p-4">
+            <h3 className="secao-titulo">Dados do software</h3>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Dado rotulo="Situação">
+                <span className={`selo ${ativa ? 'selo-ok' : 'selo-neutro'}`}>{ativa ? 'Ativa' : 'Inativa'}</span>
+              </Dado>
+              <Dado rotulo="Fabricante">{license.fabricante || '—'}</Dado>
+              <Dado rotulo="Fornecedor">{nomeFornecedor || '—'}</Dado>
+              <Dado rotulo="Como é pago">{comoEPago}</Dado>
+              {isTI && (
+                <Dado rotulo="Chave / ID do contrato">
+                  {license.chaveContrato ? <span className="font-mono break-all">{license.chaveContrato}</span> : '—'}
+                </Dado>
+              )}
+              {responsavel && <Dado rotulo="Responsável">{responsavel.nome}</Dado>}
+              {license.urlPainel && (
+                <Dado rotulo="Painel de administração">
+                  <a href={license.urlPainel} target="_blank" rel="noreferrer" className="link inline-flex items-center gap-1">
+                    Abrir painel
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  </a>
+                </Dado>
+              )}
+            </dl>
+          </section>
+
+          <section className="cartao space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="secao-titulo">Assentos</h3>
+              <button type="button" onClick={() => setAba('pessoas')} className="btn btn-sm btn-discreto">
+                Ver pessoas
+                <ChevronRight />
+              </button>
+            </div>
+            <BarraAssentos license={license} />
+          </section>
+
+          <section className="cartao space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="secao-titulo">Custo</h3>
+              <button type="button" onClick={() => setAba('custo')} className="btn btn-sm btn-discreto">
+                Ver custo e faturas
+                <ChevronRight />
+              </button>
+            </div>
+            {fonte.semContratoVigente ? (
+              avisoSemContrato
+            ) : fonte.forma === 'sem_custo' ? (
+              <p className="text-xs text-slate-600">Software sem custo.</p>
+            ) : (
+              <ValoresCusto fonte={fonte} license={license} pg={pg} limite={limite} />
+            )}
+          </section>
 
           {license.observacoes && (
-            <div className="border border-slate-200 rounded-xl p-4 space-y-1">
-              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wider">
-                Observações
-              </span>
-              <p className="text-xs text-slate-700 whitespace-pre-line">{license.observacoes}</p>
-            </div>
+            <section className="cartao space-y-2 p-4">
+              <h3 className="secao-titulo">Observações</h3>
+              <p className="text-xs whitespace-pre-line text-slate-700">{license.observacoes}</p>
+            </section>
           )}
+        </div>
 
-          {/* Seção 2: Atribuição / Alocação de Assento (licença inativa não recebe assento) */}
-          {isTI && ativa && (
-            <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
-              <div className="flex items-center gap-1.5">
-                <UserPlus className="w-4 h-4 text-blue-700" />
-                <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wide">
-                  Alocar Novo Assento para Colaborador Ativo
-                </h3>
-              </div>
-
-              <form onSubmit={handleAllocate} className="flex flex-col sm:flex-row items-center gap-2">
-                <select
-                  value={selectedColabToAssign}
-                  onChange={(e) => setSelectedColabToAssign(e.target.value)}
-                  disabled={freeSeats <= 0}
-                  className="campo w-full sm:flex-1"
-                >
-                  <option value="">
-                    {freeSeats <= 0
-                      ? 'Nenhum assento livre (Limite atingido)'
-                      : 'Selecione um colaborador ativo sem esta licença...'}
-                  </option>
-                  {unassignedEmployees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.nome} ({emp.cargo} · {departments.find((d) => d.id === emp.setorId)?.nome || 'TI'})
-                    </option>
-                  ))}
-                </select>
-
+        {/* ---------------- Pessoas e assentos ---------------- */}
+        <div role="tabpanel" aria-label="Pessoas e assentos" className={painel('pessoas')}>
+          <section className="cartao space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="secao-titulo">Capacidade</h3>
+              {isTI && !isEditingSeats && (
                 <button
-                  type="submit"
-                  disabled={!selectedColabToAssign || freeSeats <= 0}
-                  className="btn btn-primario w-full sm:w-auto"
+                  type="button"
+                  onClick={() => {
+                    setNewTotalSeats(license.assentosTotais);
+                    setIsEditingSeats(true);
+                  }}
+                  className="btn btn-sm btn-secundario"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Alocar Assento</span>
+                  <Pencil />
+                  Ajustar total de assentos
+                </button>
+              )}
+            </div>
+
+            {isTI && isEditingSeats && (
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label htmlFor={`total-assentos-${license.id}`} className="rotulo">
+                    Total de assentos
+                  </label>
+                  <input
+                    id={`total-assentos-${license.id}`}
+                    type="number"
+                    min={license.assentosAlocados}
+                    value={newTotalSeats}
+                    onChange={(e) => setNewTotalSeats(Number(e.target.value))}
+                    className="campo campo-sm w-28 font-mono"
+                  />
+                </div>
+                <button type="button" onClick={handleSaveTotalSeats} className="btn btn-sm btn-primario">
+                  Salvar
+                </button>
+                <button type="button" onClick={() => setIsEditingSeats(false)} className="btn btn-sm btn-secundario">
+                  Cancelar
+                </button>
+                <p className="ajuda w-full">Não pode ser menor que os assentos em uso ({license.assentosAlocados}).</p>
+              </div>
+            )}
+
+            <BarraAssentos license={license} />
+
+            {/* Alocação de assento (licença inativa não recebe assento) */}
+            {isTI && ativa && (
+              <form onSubmit={handleAllocate} className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <label htmlFor={`alocar-assento-${license.id}`} className="rotulo">
+                    Alocar assento para
+                  </label>
+                  <select
+                    id={`alocar-assento-${license.id}`}
+                    value={selectedColabToAssign}
+                    onChange={(e) => setSelectedColabToAssign(e.target.value)}
+                    disabled={freeSeats <= 0}
+                    className="campo"
+                  >
+                    <option value="">
+                      {freeSeats <= 0 ? 'Nenhum assento livre (limite atingido)' : 'Selecione um colaborador ativo sem esta licença...'}
+                    </option>
+                    {unassignedEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.nome} ({emp.cargo} · {departments.find((d) => d.id === emp.setorId)?.nome || 'TI'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button type="submit" disabled={!selectedColabToAssign || freeSeats <= 0} className="btn btn-primario">
+                  <UserPlus />
+                  Alocar assento
                 </button>
               </form>
-            </div>
-          )}
+            )}
+          </section>
 
-          {/* Seção 3: Lista de Colaboradores com Assento Ativo */}
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <section className="space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-slate-600" />
-                  <span>Colaboradores com Assento em Uso ({license.colaboradoresIds.length})</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Libere o assento para disponibilizá-lo imediatamente no saldo livre da empresa
-                </p>
+                <h3 className="secao-titulo">Pessoas com assento em uso ({license.colaboradoresIds.length})</h3>
+                <p className="tela-subtitulo">Liberar o assento devolve a vaga ao saldo livre na hora.</p>
               </div>
-
-              {/* Busca na lista */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={colabFilterSearch}
-                  onChange={(e) => setColabFilterSearch(e.target.value)}
-                  placeholder="Buscar colaborador na licença..."
-                  className="campo campo-sm w-60 pl-7 pr-3"
-                />
-                <Search className="w-3 h-3 text-slate-500 absolute left-2.5 top-2.5" />
-              </div>
+              <Busca
+                id={`busca-assentos-${license.id}`}
+                valor={colabFilterSearch}
+                onMudar={setColabFilterSearch}
+                placeholder="Buscar pessoa neste software"
+              />
             </div>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+            {assignedEmployees.length === 0 ? (
+              <Vazio>
+                {colabFilterSearch
+                  ? 'Nenhum colaborador encontrado com os termos de busca.'
+                  : 'Nenhum colaborador alocado neste software no momento.'}
+              </Vazio>
+            ) : (
+              <div className="cartao overflow-hidden">
+                <table className="tabela tabela-cartoes">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
-                      <th className="py-2.5 px-4">Colaborador</th>
-                      <th className="py-2.5 px-4">E-mail Corporativo</th>
-                      <th className="py-2.5 px-4">Cargo & Setor</th>
-                      <th className="py-2.5 px-4 text-right">Ação</th>
+                    <tr>
+                      <th>Pessoa</th>
+                      <th>E-mail</th>
+                      <th>Cargo e setor</th>
+                      <th className="text-right">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {assignedEmployees.length > 0 ? (
-                      assignedEmployees.map((emp) => {
-                        const dep = departments.find((d) => d.id === emp.setorId);
-                        return (
-                          <tr key={emp.id} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="py-2.5 px-4">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedEmployeeIdFor360(emp.id)}
-                                className="font-semibold text-slate-900 hover:text-blue-700 flex items-center gap-2 group text-left"
-                              >
-                                <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">
-                                  {emp.nome.charAt(0)}
-                                </div>
-                                <span>{emp.nome}</span>
-                                <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </button>
-                            </td>
-
-                            <td className="py-2.5 px-4 text-slate-600 font-mono text-xs">
-                              {emp.email}
-                            </td>
-
-                            <td className="py-2.5 px-4 text-slate-600">
-                              <span className="block font-medium text-slate-800">{emp.cargo}</span>
-                              <span className="text-xs text-slate-500">{dep?.nome || '-'}</span>
-                            </td>
-
-                            <td className="py-2.5 px-4 text-right">
-                              {isTI ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRevoke(emp.id, emp.nome)}
-                                  className="btn btn-perigo btn-sm"
-                                >
-                                  <UserMinus className="w-3 h-3" />
-                                  <span>Liberar Assento</span>
+                  <tbody>
+                    {assignedEmployees.map((emp) => {
+                      const dep = departments.find((d) => d.id === emp.setorId);
+                      return (
+                        <tr key={emp.id}>
+                          <td data-label="Pessoa">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEmployeeIdFor360(emp.id)}
+                              className="link text-left"
+                            >
+                              {emp.nome}
+                            </button>
+                          </td>
+                          <td data-label="E-mail" className="font-mono break-all">
+                            {emp.email}
+                          </td>
+                          <td data-label="Cargo e setor">
+                            <span className="block font-medium text-slate-800">{emp.cargo}</span>
+                            <span className="text-slate-500">{dep?.nome || '-'}</span>
+                          </td>
+                          <td data-label="Ações" className="text-right">
+                            {isTI ? (
+                              <span className="acoes-linha">
+                                <button type="button" onClick={() => handleRevoke(emp.id, emp.nome)} className="btn btn-sm btn-perigo">
+                                  <UserMinus />
+                                  Liberar assento
                                 </button>
-                              ) : (
-                                <span className="text-slate-500 text-xs">Ativo</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="py-6 text-center text-slate-500 text-xs italic">
-                          {colabFilterSearch
-                            ? 'Nenhum colaborador encontrado com os termos de busca.'
-                            : 'Nenhum colaborador alocado neste software no momento.'}
-                        </td>
-                      </tr>
-                    )}
+                              </span>
+                            ) : (
+                              <span className="selo selo-ok">Ativo</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
+            )}
+          </section>
+
+          {/* Lote 1 (L4): quem teve assento, de quando a quando */}
+          {isTI && (
+            <section className="space-y-2">
+              <h3 className="secao-titulo">Histórico de assentos</h3>
+              {historico.length === 0 ? (
+                <Vazio>Nenhuma atribuição registrada ainda.</Vazio>
+              ) : (
+                <div className="cartao overflow-hidden">
+                  <table className="tabela tabela-cartoes">
+                    <thead>
+                      <tr>
+                        <th>Pessoa</th>
+                        <th>Entrou</th>
+                        <th>Saiu</th>
+                        <th className="text-right">Situação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historico.map((a) => (
+                        <tr key={a.id}>
+                          <td data-label="Pessoa">
+                            <button type="button" onClick={() => setSelectedEmployeeIdFor360(a.colaboradorId)} className="link text-left">
+                              {nomePessoa(a.colaboradorId)}
+                            </button>
+                          </td>
+                          <td data-label="Entrou">
+                            {a.inicio ? formatDate(a.inicio) : 'antes do histórico'}
+                            {a.atribuidoPor && <span className="block text-slate-500">por {nomePessoa(a.atribuidoPor)}</span>}
+                          </td>
+                          <td data-label="Saiu">
+                            {a.fim ? formatDate(a.fim) : '—'}
+                            {a.fim && a.removidoPor && <span className="block text-slate-500">por {nomePessoa(a.removidoPor)}</span>}
+                          </td>
+                          <td data-label="Situação" className="text-right">
+                            <span className={`selo ${a.fim ? 'selo-neutro' : 'selo-ok'}`}>{a.fim ? 'Encerrado' : 'Em uso'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
         </div>
-      </div>
+
+        {/* ---------------- Custo e faturas ---------------- */}
+        <div role="tabpanel" aria-label="Custo e faturas" className={painel('custo')}>
+          <section className="cartao space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="secao-titulo">Forma de cobrança</h3>
+              <span className={`selo ${fonte.semContratoVigente ? 'selo-problema' : fonte.forma === 'sem_custo' ? 'selo-neutro' : 'selo-info'}`}>
+                {ROTULO_FORMA_COBRANCA[fonte.forma]}
+              </span>
+            </div>
+            {fonte.contrato && (
+              <p className="text-xs text-slate-600">
+                Pago pelo contrato {linkContrato(fonte.contrato.id, nomeContrato(fonte.contrato))}
+                {fonte.contrato.fim ? `, vigente até ${formatDate(fonte.contrato.fim)}` : ''}.
+              </p>
+            )}
+            {fonte.semContratoVigente ? (
+              avisoSemContrato
+            ) : fonte.forma === 'sem_custo' ? (
+              <p className="text-xs text-slate-600">Software sem custo.</p>
+            ) : (
+              <ValoresCusto fonte={fonte} license={license} pg={pg} limite={limite} />
+            )}
+          </section>
+
+          {fonte.forma !== 'sem_custo' && !fonte.semContratoVigente && (
+            <section className="cartao space-y-3 p-4">
+              <h3 className="secao-titulo">Dados de pagamento</h3>
+              {pg?.formaPagamento || pg?.titular || pg?.avisoCancelamentoDias || (pg?.moeda && pg.moeda !== 'BRL') ? (
+                <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <Dado rotulo="Forma de pagamento">
+                    {pg?.formaPagamento ? ROTULO_FORMA_PAGAMENTO[pg.formaPagamento] : '—'}
+                    {pg?.cartaoFinal ? ` final ${pg.cartaoFinal}` : ''}
+                  </Dado>
+                  <Dado rotulo="Titular">{pg?.titular || '—'}</Dado>
+                  <Dado rotulo="Moeda">
+                    {pg?.moeda && pg.moeda !== 'BRL' && pg.valorMoeda != null ? (
+                      <span className="font-mono">
+                        {pg.moeda} {pg.valorMoeda.toFixed(2)}
+                      </span>
+                    ) : (
+                      pg?.moeda || 'BRL'
+                    )}
+                  </Dado>
+                  <Dado rotulo="Aviso para cancelar">
+                    {pg?.avisoCancelamentoDias ? `${pg.avisoCancelamentoDias} dias antes` : '—'}
+                    {pg?.renovacaoAutomatica && <span className="block font-normal text-slate-500">renova sozinho</span>}
+                  </Dado>
+                </dl>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  Nenhum dado de pagamento informado{fonte.forma === 'contrato' ? ' no contrato' : ''}.
+                </p>
+              )}
+            </section>
+          )}
+
+          {isTI && <LembreteLicenca licenca={license} />}
+          {isTI && secaoFaturas}
+        </div>
+
+        {/* ---------------- Chamados ---------------- */}
+        <div role="tabpanel" aria-label="Chamados" className={painel('chamados')}>
+          {/* Fase 9: chamados ligados a este software */}
+          <ChamadosVinculados chamados={chamados} vazio="Nenhum chamado ligado a este software." />
+        </div>
+
+        {/* ---------------- Histórico (só a T.I.; carrega ao abrir a aba) ---------------- */}
+        {isTI && abaAtual === 'historico' && (
+          <div role="tabpanel" aria-label="Histórico" className="space-y-4">
+            <HistoricoAlteracoes entidade="licencas_software" registro={license.id} semBotao />
+          </div>
+        )}
+      </Janela>
       {contratoAberto && <ContratoPorId id={contratoAberto} onClose={() => setContratoAberto(null)} />}
-    </div>
+    </>
   );
 };

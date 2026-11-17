@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { HistoricoProcessos } from './HistoricoProcessos.tsx';
+import { HistoricoProcessos, type FiltroSituacaoProcesso, type FiltroTipoProcesso } from './HistoricoProcessos.tsx';
+import { Busca, CabecalhoTela } from '../ui/Tela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { descricaoAdmissao } from '../../utils/admissao.ts';
@@ -34,6 +35,12 @@ export const RhProcessesView: React.FC = () => {
   // Abre no histórico; os formulários só aparecem em Nova admissão / Novo desligamento
   const [activeTab, setActiveTab] = useState<'lista' | 'offboarding' | 'onboarding'>('lista');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // Filtros do histórico (ficam no cabeçalho da tela)
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipoProcesso>('todos');
+  const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacaoProcesso>('andamento');
+  const [filtroBusca, setFiltroBusca] = useState('');
+  const processos = tickets.filter((t) => t.tipo === 'onboarding' || t.tipo === 'offboarding');
+  const qtdAndamento = processos.filter((t) => t.status !== 'resolvido' && t.status !== 'cancelado').length;
 
   // Estados do Offboarding
   const [selectedColabId, setSelectedColabId] = useState('');
@@ -201,53 +208,44 @@ export const RhProcessesView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="cartao flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">
-            {activeTab === 'lista' ? 'Admissões e desligamentos' : activeTab === 'onboarding' ? 'Nova admissão' : 'Novo desligamento'}
-          </h2>
-          <p className="text-xs text-slate-500">
-            {activeTab === 'lista' ? 'Histórico e andamento de todos os processos' : 'Preencha o pedido; a T.I. recebe e monta o checklist'}
-          </p>
-        </div>
-
-        {/* Ações: novo processo ou voltar ao histórico */}
-        <div className="flex flex-wrap items-center gap-2">
-          {activeTab !== 'lista' && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('lista')}
-              className="btn btn-secundario btn-sm"
-            >
-              Voltar ao histórico
+    <div className="space-y-4">
+      <CabecalhoTela
+        titulo={activeTab === 'lista' ? 'Admissões e desligamentos' : activeTab === 'onboarding' ? 'Nova admissão' : 'Novo desligamento'}
+        subtitulo={activeTab === 'lista' ? 'Histórico e andamento de todos os processos' : 'Preencha o pedido; a T.I. recebe e monta o checklist'}
+        filtros={
+          activeTab === 'lista' ? (
+            <>
+              <Busca id="processos-busca" valor={filtroBusca} onMudar={setFiltroBusca} placeholder="Buscar pessoa ou código..." />
+              <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value as FiltroTipoProcesso)} aria-label="Tipo" className="campo campo-sm">
+                <option value="todos">Admissões e desligamentos</option>
+                <option value="onboarding">Só admissões</option>
+                <option value="offboarding">Só desligamentos</option>
+              </select>
+              <select value={filtroSituacao} onChange={(e) => setFiltroSituacao(e.target.value as FiltroSituacaoProcesso)} aria-label="Situação" className="campo campo-sm">
+                <option value="andamento">Em andamento ({qtdAndamento})</option>
+                <option value="concluidos">Concluídos</option>
+                <option value="cancelados">Cancelados</option>
+                <option value="todos">Todos ({processos.length})</option>
+              </select>
+            </>
+          ) : undefined
+        }
+        acoes={
+          <>
+            {activeTab !== 'lista' && (
+              <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
+                Voltar ao histórico
+              </button>
+            )}
+            <button type="button" onClick={() => setActiveTab('offboarding')} className="btn btn-secundario">
+              <UserMinus /> Novo desligamento
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setActiveTab('offboarding')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-              activeTab === 'offboarding' ? 'bg-rose-50 text-rose-800 border-rose-300' : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
-            }`}
-          >
-            <UserMinus className="w-3.5 h-3.5 text-rose-600" />
-            <span>Novo desligamento</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('onboarding')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-              activeTab === 'onboarding' ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Nova admissão</span>
-          </button>
-        </div>
-      </div>
-
+            <button type="button" onClick={() => setActiveTab('onboarding')} className="btn btn-primario">
+              <UserPlus /> Nova admissão
+            </button>
+          </>
+        }
+      />
       {successMessage && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -255,15 +253,15 @@ export const RhProcessesView: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'lista' && <HistoricoProcessos />}
+      {activeTab === 'lista' && <HistoricoProcessos tipo={filtroTipo} situacao={filtroSituacao} busca={filtroBusca} />}
 
       {/* MÓDULO 1: OFFBOARDING INTELIGENTE & CONDICIONAL */}
       {activeTab === 'offboarding' && (
         <form onSubmit={handleOffboardingSubmit} className="space-y-6">
           <div className="cartao p-6 space-y-5">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <UserMinus className="w-4 h-4 text-rose-600" />
+              <h3 className="secao-titulo flex items-center gap-2">
+                <UserMinus className="w-4 h-4 text-red-700" />
                 Dados do Desligamento
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -273,7 +271,7 @@ export const RhProcessesView: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Colaborador a ser Desligado (Seleção Dinâmica)
                 </label>
                 <select
@@ -313,7 +311,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Data do Último Dia de Trabalho
                 </label>
                 <input
@@ -332,7 +330,7 @@ export const RhProcessesView: React.FC = () => {
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <Laptop className="w-4 h-4 text-blue-600" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                    <h4 className="secao-titulo">
                       Equipamentos e softwares com {selectedColaborador.nome} (a T.I. recolhe e desvincula)
                     </h4>
                   </div>
@@ -366,7 +364,7 @@ export const RhProcessesView: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedAssetIdFor360(asset.id)}
-                              className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
+                              className="link flex items-center gap-0.5"
                             >
                               Ver ficha
                               <ExternalLink className="w-2.5 h-2.5" />
@@ -436,7 +434,7 @@ export const RhProcessesView: React.FC = () => {
 
                 {redirecionarEmail && (
                   <div className="pl-6 pt-1">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                    <label className="rotulo">
                       Destinatário que receberá os e-mails (Colaborador Ativo)
                     </label>
                     <select
@@ -477,7 +475,7 @@ export const RhProcessesView: React.FC = () => {
 
                 {transferirDrive && (
                   <div className="pl-6 pt-1">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                    <label className="rotulo">
                       Destinatário que receberá a propriedade dos arquivos
                     </label>
                     <select
@@ -519,7 +517,7 @@ export const RhProcessesView: React.FC = () => {
 
               {/* Observações Livres */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Observações Operacionais do Desligamento
                 </label>
                 <textarea
@@ -532,14 +530,17 @@ export const RhProcessesView: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-slate-100">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
+                Cancelar
+              </button>
               <button
                 type="submit"
                 disabled={!selectedColaborador || !!desligamentoJaAberto}
-                className="btn btn-perigo-cheio"
+                className="btn btn-primario"
               >
-                <Send className="w-4 h-4" />
-                <span>Abrir Chamado de Desligamento com Checklist Técnico para T.I.</span>
+                <Send />
+                <span>Enviar pedido de desligamento</span>
               </button>
             </div>
           </div>
@@ -551,7 +552,7 @@ export const RhProcessesView: React.FC = () => {
         <form onSubmit={handleOnboardingSubmit} className="space-y-6">
           <div className="cartao p-6 space-y-5">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <h3 className="secao-titulo flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-blue-600" />
                 Solicitação de Admissão & Kit de Trabalho
               </h3>
@@ -564,7 +565,7 @@ export const RhProcessesView: React.FC = () => {
             <h4 className="secao-titulo">Dados do admitido</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Nome Completo do Novo Colaborador
                 </label>
                 <input
@@ -578,7 +579,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   E-mail Corporativo Sugerido
                 </label>
                 <input
@@ -592,7 +593,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Cargo / Função
                 </label>
                 <input
@@ -606,7 +607,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Setor / Departamento
                 </label>
                 <select
@@ -625,7 +626,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Líder Imediato / Gestor
                 </label>
                 <select
@@ -643,7 +644,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Data de Início Prevista
                 </label>
                 <input
@@ -661,7 +662,7 @@ export const RhProcessesView: React.FC = () => {
               <h4 className="secao-titulo">Equipamento</h4>
               {/* Ajuste da admissão: o RH não escolhe modelo; no máximo descreve uma necessidade */}
               <div>
-                <label htmlFor="onb-obs-equipamento" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="onb-obs-equipamento" className="rotulo">
                   Observação sobre o equipamento <span className="font-normal text-slate-500">(opcional)</span>
                 </label>
                 <input
@@ -677,7 +678,7 @@ export const RhProcessesView: React.FC = () => {
 
             {/* Fase 6: kit sugerido (catálogo da T.I.) */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Equipamentos e acessórios</label>
+              <label className="rotulo">Equipamentos e acessórios</label>
               <p className="text-xs text-slate-500 mb-2">
                 Sugestão padrão da T.I. — desmarque o que não precisa. A T.I. confirma o kit final.
               </p>
@@ -709,7 +710,7 @@ export const RhProcessesView: React.FC = () => {
             <div className="space-y-3 pt-3 border-t border-slate-100">
               <h4 className="secao-titulo">Acessos</h4>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Nível de Acesso Sugerido ao Sistema
                 </label>
                 <select
@@ -729,7 +730,7 @@ export const RhProcessesView: React.FC = () => {
 
             {/* Fase 6: contas (catálogo) + outros acessos + grupos de e-mail */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">Contas e acessos</label>
+              <label className="rotulo">Contas e acessos</label>
               <div className="flex flex-wrap gap-2">
                 {itensAcesso.map((c) => {
                   const selected = marcado(c);
@@ -741,7 +742,7 @@ export const RhProcessesView: React.FC = () => {
                       aria-pressed={selected}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                         selected
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                          ? 'bg-blue-50 text-blue-700 border-blue-300'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
@@ -753,7 +754,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Outros sistemas (opcional)</label>
+                  <label className="rotulo">Outros sistemas (opcional)</label>
                   <input
                     value={onbOutrosAcessos}
                     onChange={(e) => setOnbOutrosAcessos(e.target.value)}
@@ -762,7 +763,7 @@ export const RhProcessesView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="rotulo">
                     Grupos de e-mail sugeridos (opcional)
                   </label>
                   <input
@@ -777,7 +778,7 @@ export const RhProcessesView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="rotulo">
                 Instruções de Entrega / Modelo Híbrido
               </label>
               <textarea
@@ -789,13 +790,16 @@ export const RhProcessesView: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-slate-100">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
+                Cancelar
+              </button>
               <button
                 type="submit"
                 className="btn btn-primario"
               >
-                <Send className="w-4 h-4" />
-                <span>Enviar Solicitação de Onboarding para Equipe de T.I.</span>
+                <Send />
+                <span>Enviar pedido de admissão</span>
               </button>
             </div>
           </div>

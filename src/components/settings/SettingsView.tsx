@@ -5,6 +5,10 @@ import { AssetCategory, Employee, ModeloDocumento, UserRole } from '../../types/
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
+import { UnidadesLista } from '../fornecedores/UnidadesLista.tsx';
+import { Janela } from '../ui/Janela.tsx';
+import { NavLateral, type GrupoNav } from '../ui/Abas.tsx';
+import { CabecalhoTela } from '../ui/Tela.tsx';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO } from '../../utils/processos.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { mensagemDeErro } from '../../services/supabaseDb.ts';
@@ -48,16 +52,32 @@ const ROTULO_CAMPO_EMPRESA = {
 } as const;
 
 // Fase 7: abas com nomes do glossário (a chave interna não muda)
-type Aba = 'empresa' | 'documentos' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'banco';
-const ABAS: { id: Aba; rotulo: string }[] = [
-  { id: 'empresa', rotulo: 'Empresa' },
-  { id: 'documentos', rotulo: 'Documentos e termos' },
-  { id: 'setores', rotulo: 'Setores' },
-  { id: 'equipe', rotulo: 'Usuários e permissões' },
-  { id: 'catalogo', rotulo: 'Catálogo de admissão' },
-  { id: 'prazos', rotulo: 'Prazos de atendimento' },
-  { id: 'campos', rotulo: 'Campos dos ativos' },
-  { id: 'banco', rotulo: 'Conexão' },
+type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'banco';
+const GRUPOS: GrupoNav<Aba>[] = [
+  {
+    titulo: 'Empresa',
+    itens: [
+      { id: 'empresa', rotulo: 'Dados da empresa' },
+      { id: 'documentos', rotulo: 'Documentos e termos' },
+      { id: 'unidades', rotulo: 'Unidades' },
+    ],
+  },
+  {
+    titulo: 'Pessoas e acesso',
+    itens: [
+      { id: 'setores', rotulo: 'Setores' },
+      { id: 'equipe', rotulo: 'Usuários e permissões' },
+    ],
+  },
+  {
+    titulo: 'Atendimento',
+    itens: [
+      { id: 'catalogo', rotulo: 'Catálogo de admissão' },
+      { id: 'prazos', rotulo: 'Prazos de atendimento' },
+    ],
+  },
+  { titulo: 'Inventário', itens: [{ id: 'campos', rotulo: 'Campos dos ativos' }] },
+  { titulo: 'Sistema', itens: [{ id: 'banco', rotulo: 'Conexão' }] },
 ];
 
 export const SettingsView: React.FC = () => {
@@ -320,776 +340,542 @@ export const SettingsView: React.FC = () => {
     });
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="cartao p-4 space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">Configurações</h2>
-        </div>
+  const papeisSelo: Record<UserRole, string> = {
+    ti_admin: 'selo-info',
+    ti_suporte: 'selo-ok',
+    rh: 'selo-atencao',
+    colaborador: 'selo-neutro',
+  };
 
-        {/* Fase 7: abas com rolagem lateral no celular */}
-        <div role="tablist" aria-label="Seções das configurações" className="flex gap-1 p-1 bg-slate-100 rounded-lg flex-wrap">
-          {ABAS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === a.id}
-              onClick={() => setActiveTab(a.id)}
-              className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm rounded-md transition-colors ${
-                activeTab === a.id ? 'bg-white text-slate-900 font-semibold shadow-xs' : 'text-slate-700 hover:text-slate-900'
-              }`}
-            >
-              {a.id === 'banco' && <Database className="inline w-4 h-4 mr-1 -mt-0.5 text-slate-500" aria-hidden="true" />}
-              {a.rotulo}
-            </button>
-          ))}
-        </div>
-      </div>
+  const secao = (titulo: string, descricao?: string) => (
+    <div className="mb-3">
+      <h3 className="secao-titulo">{titulo}</h3>
+      {descricao && <p className="ajuda">{descricao}</p>}
+    </div>
+  );
+
+  const conexaoOk = isSupabaseConnected && supabaseHealth?.tablesExist;
+
+  return (
+    <div className="space-y-4">
+      <CabecalhoTela titulo="Configurações" subtitulo="Empresa, pessoas, atendimento, inventário e conexão" />
 
       {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-lg text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-2.5 rounded-lg text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-800">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* ABA 1: DADOS INSTITUCIONAIS & TERMOS */}
-      {(activeTab === 'empresa' || activeTab === 'documentos') && (
-        <form onSubmit={handleSaveCompanySettings} className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 space-y-6">
-          {activeTab === 'empresa' && (
-          <>
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-semibold text-slate-900">Identificação Jurídica e Contatos de TI</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Aparecem no cabeçalho dos termos e nas etiquetas
-            </p>
-          </div>
+      <div className="grid gap-4 md:grid-cols-[14rem_minmax(0,1fr)]">
+        <NavLateral rotulo="Seções das configurações" grupos={GRUPOS} ativa={activeTab} onMudar={setActiveTab} />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h4 className="col-span-full secao-titulo">
-              Identificação jurídica
-            </h4>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Razão Social</label>
-              <input
-                type="text"
-                required
-                value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value)}
-                className="campo w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Nome Fantasia</label>
-              <input
-                type="text"
-                required
-                value={nomeFantasia}
-                onChange={(e) => setNomeFantasia(e.target.value)}
-                className="campo w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">CNPJ</label>
-              <input
-                type="text"
-                required
-                value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
-                className="campo w-full font-mono font-mono"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <h4 className="col-span-full secao-titulo">Endereço</h4>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Endereço Completo</label>
-              <input
-                type="text"
-                required
-                value={endereco}
-                onChange={(e) => setEndereco(e.target.value)}
-                className="campo w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">CEP</label>
-              <input
-                type="text"
-                required
-                value={cep}
-                onChange={(e) => setCep(e.target.value)}
-                className="campo w-full font-mono font-mono"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Cidade / UF</label>
-              <input
-                type="text"
-                required
-                value={cidadeUF}
-                onChange={(e) => setCidadeUF(e.target.value)}
-                className="campo w-full"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <h4 className="col-span-full secao-titulo">
-              Contatos da T.I.
-            </h4>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">E-mail do Suporte de TI</label>
-              <input
-                type="email"
-                required
-                value={emailTI}
-                onChange={(e) => setEmailTI(e.target.value)}
-                className="campo w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Telefone / Ramal de TI</label>
-              <input
-                type="text"
-                required
-                value={telefoneTI}
-                onChange={(e) => setTelefoneTI(e.target.value)}
-                className="campo w-full"
-              />
-            </div>
-          </div>
-
-          {/* Fase 7: logo (link https) — aparece no cabeçalho do sistema */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <label className="block md:col-span-2">
-              <span className="block text-xs font-semibold text-slate-700 mb-1">Logo da empresa (link https)</span>
-              <input
-                type="url"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://www.suaempresa.com.br/logo.png"
-                aria-invalid={logoInvalido}
-                className="campo w-full"
-              />
-              {logoInvalido && <span className="block text-xs text-red-700 mt-1">Use um link que começa com https://</span>}
-            </label>
-            {logoUrl.trim() && !logoInvalido && (
-              <img
-                src={logoUrl.trim()}
-                alt="Prévia do logo"
-                className="h-12 w-auto max-w-[12rem] object-contain border border-slate-200 rounded-lg p-1 bg-white"
-                referrerPolicy="no-referrer"
-              />
-            )}
-          </div>
-          </>
-          )}
-
-          {activeTab === 'documentos' && (
-          <>
-          {/* Fase 6: documentos controlados (Qualidade) com o texto legal de cada um */}
-          <div className="space-y-4">
-            <p className="text-xs text-slate-500">
-              Código, versão e referência aparecem no cabeçalho dos termos. Mantenha igual à versão aprovada pela
-              Qualidade no POP.
-            </p>
-            {(
-              [
-                ['Termo de entrega', docEntrega, setDocEntrega, 'Texto legal do termo de entrega', textoTermoEntrega, setTextoTermoEntrega],
-                ['Recibo de devolução', docDevolucao, setDocDevolucao, 'Texto legal do termo de devolução e baixa patrimonial', textoTermoDevolucao, setTextoTermoDevolucao],
-              ] as const
-            ).map(([nome, doc, setDoc, rotuloTexto, texto, setTexto], idx) => (
-              <div key={nome} className={`space-y-3 ${idx > 0 ? 'pt-4 border-t border-slate-100' : ''}`}>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
-                <span className="col-span-2 md:col-span-6 text-xs font-semibold text-slate-700">{nome}</span>
-                {(
-                  [
-                    ['codigo', 'Código', 'md:col-span-1'],
-                    ['versao', 'Versão', 'md:col-span-1'],
-                    ['referencia', 'Referência (POP)', 'md:col-span-1'],
-                    ['titulo', 'Título', 'col-span-2 md:col-span-3'],
-                  ] as const
-                ).map(([chave, rotulo, cols]) => (
-                  <label key={chave} className={`block ${cols}`}>
-                    <span className="block text-xs text-slate-500 mb-0.5">{rotulo}</span>
-                    <input
-                      value={doc[chave]}
-                      onChange={(e) => setDoc({ ...doc, [chave]: e.target.value })}
-                      className="campo campo-sm w-full"
-                    />
-                  </label>
-                ))}
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">{rotuloTexto}</label>
-                <textarea
-                  rows={3}
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  className="campo w-full leading-relaxed"
-                />
-              </div>
-              </div>
-            ))}
-          </div>
-          </>
-          )}
-        </form>
-      )}
-
-      {/* ABA 2: GESTÃO DE SETORES COM PROTEÇÃO REFERENCIAL */}
-      {activeTab === 'setores' && (
-        <div className="space-y-6">
-          {/* Formulário de Novo Setor */}
-          <form onSubmit={handleAddDepartment} className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">Cadastrar Novo Setor / Departamento</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nome do Setor</label>
-                <input
-                  type="text"
-                  required
-                  value={novoSetorNome}
-                  onChange={(e) => setNovoSetorNome(e.target.value)}
-                  placeholder="Ex: Operações & Logística"
-                  className="campo w-full"
-                />
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Sigla / Código</label>
-                <input
-                  type="text"
-                  required
-                  maxLength={5}
-                  value={novoSetorCodigo}
-                  onChange={(e) => setNovoSetorCodigo(e.target.value)}
-                  placeholder="Ex: OPR"
-                  className="campo w-full font-mono font-mono"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Finalidade / Descrição</label>
-                <input
-                  type="text"
-                  value={novoSetorDesc}
-                  onChange={(e) => setNovoSetorDesc(e.target.value)}
-                  placeholder="Ex: Centro de distribuição e fretes"
-                  className="campo w-full"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primario md:col-span-1 self-end"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Adicionar Setor</span>
-              </button>
-            </div>
-          </form>
-
-          {/* Tabela de Setores Existentes */}
-          <div className="cartao overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Setores Cadastrados ({departments.length})</h3>
-                <p className="text-xs text-slate-500">
-                  Regra de integridade: setores com colaboradores vinculados não podem ser excluídos, apenas inativados
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
-                    <th className="py-3 px-4">Código</th>
-                    <th className="py-3 px-4">Nome do Setor</th>
-                    <th className="py-3 px-4">Descrição</th>
-                    <th className="py-3 px-4">Colaboradores Vinculados</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {departments.map((dep) => {
-                    const linkedCount = employees.filter((e) => e.setorId === dep.id).length;
-
-                    return (
-                      <tr key={dep.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{dep.codigo}</td>
-                        <td className="py-3 px-4 font-semibold text-slate-900">{dep.nome}</td>
-                        <td className="py-3 px-4 text-slate-500">{dep.descricao || '-'}</td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`font-semibold ${
-                              linkedCount > 0 ? 'text-blue-700' : 'text-slate-500'
-                            }`}
-                          >
-                            {linkedCount} colaborador(es)
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleDepartmentStatus(dep.id, setoresPendentes[dep.id] ?? dep.ativo)}
-                            className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer ${
-                              (setoresPendentes[dep.id] ?? dep.ativo)
-                                ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
-                                : 'text-slate-500 bg-slate-100 border border-slate-200'
-                            } ${dep.id in setoresPendentes ? 'ring-2 ring-amber-400' : ''}`}
-                          >
-                            {(setoresPendentes[dep.id] ?? dep.ativo) ? 'Ativo' : 'Inativo'}
-                            {dep.id in setoresPendentes && ' (não salvo)'}
-                          </button>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteDepartment(dep.id)}
-                            title={
-                              linkedCount > 0
-                                ? 'Setor protegido contra exclusão pois tem colaboradores vinculados'
-                                : 'Excluir setor'
-                            }
-                            className={`p-1.5 rounded transition-colors ${
-                              linkedCount > 0
-                                ? 'text-slate-300 cursor-not-allowed'
-                                : 'text-rose-500 hover:bg-rose-50 hover:text-rose-700'
-                            }`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ABA 3: CAMPOS PERSONALIZADOS POR CATEGORIA */}
-      {activeTab === 'campos' && (
-        <div className="space-y-6">
-          <form onSubmit={handleAddCustomField} className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">Novo campo</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Categoria de Ativo</label>
-                <select
-                  value={novoCampoCategoria}
-                  onChange={(e) => setNovoCampoCategoria(e.target.value as AssetCategory)}
-                  className="campo w-full"
-                >
-                  <option value="hardware">Hardware</option>
-                  <option value="periferico">Periféricos</option>
-                  <option value="telefonia">Telefonia</option>
-                  <option value="software">Software</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nome do campo</label>
-                <input
-                  type="text"
-                  required
-                  value={novoCampoLabel}
-                  onChange={(e) => setNovoCampoLabel(e.target.value)}
-                  placeholder="Ex: Versão do Firmware, Voltagem..."
-                  className="campo w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo de Dado</label>
-                <select
-                  value={novoCampoTipo}
-                  onChange={(e) => setNovoCampoTipo(e.target.value as 'text' | 'number' | 'date')}
-                  className="campo w-full"
-                >
-                  <option value="text">Texto Livre</option>
-                  <option value="number">Numérico</option>
-                  <option value="date">Data</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primario self-end"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Adicionar campo</span>
-              </button>
-            </div>
-          </form>
-
-          {/* Lista de Campos Cadastrados */}
-          <div className="cartao p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">Campos criados</h3>
-            {(Object.keys(ROTULO_CATEGORIA) as AssetCategory[]).map((cat) => {
-              const doGrupo = settings.camposPersonalizados.filter((cf) => cf.categoria === cat);
-              if (doGrupo.length === 0) return null;
-              return (
-                <div key={cat} className="space-y-2">
-                  <h4 className="secao-titulo">
-                    {ROTULO_CATEGORIA[cat]}
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {doGrupo.map((cf) => (
-                      <div
-                        key={cf.id}
-                        className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <span className="font-semibold text-slate-900 block">{cf.label}</span>
-                          <span className="text-xs text-slate-500 uppercase font-mono">
-                            {cf.categoria} · {cf.tipo}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCustomField(cf.id)}
-                          className="text-slate-500 hover:text-rose-600 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+        <div className="min-w-0 space-y-4">
+          {/* DADOS DA EMPRESA E DOCUMENTOS E TERMOS */}
+          {(activeTab === 'empresa' || activeTab === 'documentos') && (
+            <form onSubmit={handleSaveCompanySettings} className="space-y-4">
+              {activeTab === 'empresa' && (
+                <>
+                  <div className="cartao p-4">
+                    {secao('Identificação jurídica', 'Aparece no cabeçalho dos termos e nas etiquetas')}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                      <div className="xl:col-span-2">
+                        <label htmlFor="emp-razao" className="rotulo">Razão social</label>
+                        <input id="emp-razao" type="text" required value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)} className="campo" />
                       </div>
-                    ))}
+                      <div>
+                        <label htmlFor="emp-fantasia" className="rotulo">Nome fantasia</label>
+                        <input id="emp-fantasia" type="text" required value={nomeFantasia} onChange={(e) => setNomeFantasia(e.target.value)} className="campo" />
+                      </div>
+                      <div>
+                        <label htmlFor="emp-cnpj" className="rotulo">CNPJ</label>
+                        <input id="emp-cnpj" type="text" required value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="campo font-mono" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="cartao p-4">
+                    {secao('Endereço')}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                      <div className="md:col-span-3 xl:col-span-2">
+                        <label htmlFor="emp-endereco" className="rotulo">Endereço completo</label>
+                        <input id="emp-endereco" type="text" required value={endereco} onChange={(e) => setEndereco(e.target.value)} className="campo" />
+                      </div>
+                      <div>
+                        <label htmlFor="emp-cep" className="rotulo">CEP</label>
+                        <input id="emp-cep" type="text" required value={cep} onChange={(e) => setCep(e.target.value)} className="campo font-mono" />
+                      </div>
+                      <div>
+                        <label htmlFor="emp-cidade" className="rotulo">Cidade / UF</label>
+                        <input id="emp-cidade" type="text" required value={cidadeUF} onChange={(e) => setCidadeUF(e.target.value)} className="campo" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="cartao p-4">
+                    {secao('Contatos da T.I.')}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                      <div className="md:col-span-2">
+                        <label htmlFor="emp-email" className="rotulo">E-mail do suporte de TI</label>
+                        <input id="emp-email" type="email" required value={emailTI} onChange={(e) => setEmailTI(e.target.value)} className="campo" />
+                      </div>
+                      <div>
+                        <label htmlFor="emp-telefone" className="rotulo">Telefone / ramal de TI</label>
+                        <input id="emp-telefone" type="text" required value={telefoneTI} onChange={(e) => setTelefoneTI(e.target.value)} className="campo" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fase 7: logo (link https) — aparece no cabeçalho do sistema */}
+                  <div className="cartao p-4">
+                    {secao('Logo', 'Aparece no cabeçalho do sistema')}
+                    <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-3 xl:grid-cols-4">
+                      <div className="md:col-span-2 xl:col-span-2">
+                        <label htmlFor="emp-logo" className="rotulo">Logo da empresa (link https)</label>
+                        <input
+                          id="emp-logo"
+                          type="url"
+                          value={logoUrl}
+                          onChange={(e) => setLogoUrl(e.target.value)}
+                          placeholder="https://www.suaempresa.com.br/logo.png"
+                          aria-invalid={logoInvalido}
+                          className="campo"
+                        />
+                        {logoInvalido && <p className="erro">Use um link que começa com https://</p>}
+                      </div>
+                      {logoUrl.trim() && !logoInvalido && (
+                        <img
+                          src={logoUrl.trim()}
+                          alt="Prévia do logo"
+                          className="h-12 w-auto max-w-[12rem] rounded-lg border border-slate-200 bg-white object-contain p-1"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'documentos' && (
+                <>
+                  {/* Fase 6: documentos controlados (Qualidade) com o texto legal de cada um */}
+                  <p className="text-xs text-slate-500">
+                    Código, versão e referência aparecem no cabeçalho dos termos. Mantenha igual à versão aprovada pela
+                    Qualidade no POP.
+                  </p>
+                  {(
+                    [
+                      ['Termo de entrega', docEntrega, setDocEntrega, 'Texto legal do termo de entrega', textoTermoEntrega, setTextoTermoEntrega],
+                      ['Recibo de devolução', docDevolucao, setDocDevolucao, 'Texto legal do termo de devolução e baixa patrimonial', textoTermoDevolucao, setTextoTermoDevolucao],
+                    ] as const
+                  ).map(([nome, doc, setDoc, rotuloTexto, texto, setTexto]) => (
+                    <div key={nome} className="cartao p-4">
+                      {secao(nome)}
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                        {(
+                          [
+                            ['codigo', 'Código', ''],
+                            ['versao', 'Versão', ''],
+                            ['referencia', 'Referência (POP)', ''],
+                            ['titulo', 'Título', 'md:col-span-3 xl:col-span-4'],
+                          ] as const
+                        ).map(([chave, rotulo, cols]) => (
+                          <div key={chave} className={cols}>
+                            <label htmlFor={`doc-${nome}-${chave}`} className="rotulo">{rotulo}</label>
+                            <input id={`doc-${nome}-${chave}`} value={doc[chave]} onChange={(e) => setDoc({ ...doc, [chave]: e.target.value })} className="campo" />
+                          </div>
+                        ))}
+                        <div className="md:col-span-3 xl:col-span-4">
+                          <label htmlFor={`doc-${nome}-texto`} className="rotulo">{rotuloTexto}</label>
+                          <textarea id={`doc-${nome}-texto`} rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} className="campo leading-relaxed" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </form>
+          )}
+
+          {/* UNIDADES */}
+          {activeTab === 'unidades' && (
+            <div className="space-y-3">
+              {secao('Unidades', 'Locais da empresa (matriz, filiais) usados em equipamentos, contratos e fornecedores')}
+              <UnidadesLista />
+            </div>
+          )}
+
+          {/* SETORES COM PROTEÇÃO REFERENCIAL */}
+          {activeTab === 'setores' && (
+            <>
+              <form onSubmit={handleAddDepartment} className="cartao p-4">
+                {secao('Cadastrar novo setor / departamento')}
+                <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-4 xl:grid-cols-6">
+                  <div className="md:col-span-2">
+                    <label htmlFor="setor-nome" className="rotulo">Nome do setor</label>
+                    <input id="setor-nome" type="text" required value={novoSetorNome} onChange={(e) => setNovoSetorNome(e.target.value)} placeholder="Ex: Operações & Logística" className="campo" />
+                  </div>
+                  <div>
+                    <label htmlFor="setor-codigo" className="rotulo">Sigla / código</label>
+                    <input id="setor-codigo" type="text" required maxLength={5} value={novoSetorCodigo} onChange={(e) => setNovoSetorCodigo(e.target.value)} placeholder="Ex: OPR" className="campo font-mono" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label htmlFor="setor-desc" className="rotulo">Finalidade / descrição</label>
+                    <input id="setor-desc" type="text" value={novoSetorDesc} onChange={(e) => setNovoSetorDesc(e.target.value)} placeholder="Ex: Centro de distribuição e fretes" className="campo" />
+                  </div>
+                  <button type="submit" className="btn btn-primario">
+                    <Plus />
+                    <span>Adicionar setor</span>
+                  </button>
+                </div>
+              </form>
+
+              <div className="cartao overflow-hidden">
+                <div className="border-b border-slate-100 p-4">
+                  <h3 className="secao-titulo">Setores cadastrados ({departments.length})</h3>
+                  <p className="ajuda">Regra de integridade: setores com colaboradores vinculados não podem ser excluídos, apenas inativados</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="tabela tabela-cartoes">
+                    <thead>
+                      <tr>
+                        <th>Código</th>
+                        <th>Nome do setor</th>
+                        <th>Descrição</th>
+                        <th>Colaboradores vinculados</th>
+                        <th>Situação</th>
+                        <th className="text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {departments.map((dep) => {
+                        const linkedCount = employees.filter((e) => e.setorId === dep.id).length;
+                        const ativoExibido = setoresPendentes[dep.id] ?? dep.ativo;
+                        return (
+                          <tr key={dep.id}>
+                            <td data-label="Código" className="font-mono font-bold text-slate-900">{dep.codigo}</td>
+                            <td data-label="Nome do setor" className="font-semibold text-slate-900">{dep.nome}</td>
+                            <td data-label="Descrição" className="text-slate-500">{dep.descricao || '-'}</td>
+                            <td data-label="Colaboradores vinculados">{linkedCount} colaborador(es)</td>
+                            <td data-label="Situação">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleDepartmentStatus(dep.id, ativoExibido)}
+                                title="Ativar ou inativar (salvo pela barra de alterações)"
+                                className={`selo cursor-pointer ${ativoExibido ? 'selo-ok' : 'selo-neutro'} ${dep.id in setoresPendentes ? 'ring-2 ring-amber-400' : ''}`}
+                              >
+                                {ativoExibido ? 'Ativo' : 'Inativo'}
+                                {dep.id in setoresPendentes && ' (não salvo)'}
+                              </button>
+                            </td>
+                            <td data-label="Ações" className="text-right">
+                              <div className="acoes-linha">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDepartment(dep.id)}
+                                  title={linkedCount > 0 ? 'Setor protegido contra exclusão pois tem colaboradores vinculados' : 'Excluir setor'}
+                                  aria-label={`Excluir setor ${dep.nome}`}
+                                  className={`btn-icone btn-icone-perigo ${linkedCount > 0 ? 'opacity-40' : ''}`}
+                                >
+                                  <Trash2 />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* CAMPOS PERSONALIZADOS POR CATEGORIA */}
+          {activeTab === 'campos' && (
+            <>
+              <form onSubmit={handleAddCustomField} className="cartao p-4">
+                {secao('Novo campo')}
+                <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-4">
+                  <div>
+                    <label htmlFor="campo-categoria" className="rotulo">Categoria de ativo</label>
+                    <select id="campo-categoria" value={novoCampoCategoria} onChange={(e) => setNovoCampoCategoria(e.target.value as AssetCategory)} className="campo">
+                      <option value="hardware">Hardware</option>
+                      <option value="periferico">Periféricos</option>
+                      <option value="telefonia">Telefonia</option>
+                      <option value="software">Software</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="campo-nome" className="rotulo">Nome do campo</label>
+                    <input id="campo-nome" type="text" required value={novoCampoLabel} onChange={(e) => setNovoCampoLabel(e.target.value)} placeholder="Ex: Versão do Firmware, Voltagem..." className="campo" />
+                  </div>
+                  <div>
+                    <label htmlFor="campo-tipo" className="rotulo">Tipo de dado</label>
+                    <select id="campo-tipo" value={novoCampoTipo} onChange={(e) => setNovoCampoTipo(e.target.value as 'text' | 'number' | 'date')} className="campo">
+                      <option value="text">Texto livre</option>
+                      <option value="number">Numérico</option>
+                      <option value="date">Data</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="btn btn-primario">
+                    <Plus />
+                    <span>Adicionar campo</span>
+                  </button>
+                </div>
+              </form>
+
+              <div className="cartao space-y-4 p-4">
+                <h3 className="secao-titulo">Campos criados</h3>
+                {settings.camposPersonalizados.length === 0 && <p className="text-xs text-slate-500">Nenhum campo criado.</p>}
+                {(Object.keys(ROTULO_CATEGORIA) as AssetCategory[]).map((cat) => {
+                  const doGrupo = settings.camposPersonalizados.filter((cf) => cf.categoria === cat);
+                  if (doGrupo.length === 0) return null;
+                  return (
+                    <div key={cat} className="space-y-2">
+                      <h4 className="rotulo">{ROTULO_CATEGORIA[cat]}</h4>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {doGrupo.map((cf) => (
+                          <div key={cf.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                            <div>
+                              <span className="block font-semibold text-slate-900">{cf.label}</span>
+                              <span className="font-mono text-xs text-slate-500 uppercase">
+                                {cf.categoria} · {cf.tipo}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCustomField(cf.id)}
+                              title="Remover campo"
+                              aria-label={`Remover campo ${cf.label}`}
+                              className="btn-icone btn-icone-perigo"
+                            >
+                              <Trash2 />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {activeTab === 'catalogo' && <CatalogoSettings />}
+          {activeTab === 'prazos' && <PrazosSettings />}
+
+          {/* USUÁRIOS E PERMISSÕES: quem opera o sistema */}
+          {activeTab === 'equipe' && (
+            <>
+              <div className="cartao p-4">
+                <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div>
+                    <h3 className="secao-titulo flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-blue-600" />
+                      <span>Usuários e permissões</span>
+                    </h3>
+                    <p className="ajuda">O perfil define o que cada pessoa vê e faz no sistema</p>
+                  </div>
+                  <div className="barra-filtros">
+                    <div className="relative">
+                      <label htmlFor="equipe-busca" className="sr-only">Buscar colaborador</label>
+                      <input id="equipe-busca" type="text" value={equipeSearch} onChange={(e) => setEquipeSearch(e.target.value)} placeholder="Buscar colaborador..." className="campo campo-sm w-48 pl-7" />
+                      <Search className="absolute top-2.5 left-2.5 h-3 w-3 text-slate-500" />
+                    </div>
+                    <select
+                      value={equipeFilter}
+                      onChange={(e) => setEquipeFilter(e.target.value as 'todos' | 'operadores')}
+                      aria-label="Filtrar colaboradores"
+                      className="campo campo-sm"
+                    >
+                      <option value="todos">Todos os colaboradores</option>
+                      <option value="operadores">Apenas operadores (TI & RH)</option>
+                    </select>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
-      {activeTab === 'catalogo' && <CatalogoSettings />}
-      {activeTab === 'prazos' && <PrazosSettings />}
-
-      {/* ABA 4: EQUIPE TI & RH / DEFINIÇÃO DE QUEM OPERA O SISTEMA */}
-      {activeTab === 'equipe' && (
-        <div className="cartao p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-blue-600" />
-                <span>Usuários e permissões</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">O perfil define o que cada pessoa vê e faz no sistema</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={equipeSearch}
-                  onChange={(e) => setEquipeSearch(e.target.value)}
-                  placeholder="Buscar colaborador..."
-                  className="campo campo-sm w-48 pl-7 pr-3"
-                />
-                <Search className="w-3 h-3 text-slate-500 absolute left-2.5 top-2.5" />
-              </div>
-
-              <select
-                value={equipeFilter}
-                onChange={(e) => setEquipeFilter(e.target.value as 'todos' | 'operadores')}
-                className="campo campo-sm"
-              >
-                <option value="todos">Todos os Colaboradores</option>
-                <option value="operadores">Apenas Operadores (TI & RH)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Cards explicativos das 4 permissões */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-lg space-y-1">
-              <span className="font-bold text-blue-900 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                Admin de T.I.
-              </span>
-              <p className="text-xs text-blue-800 leading-tight">
-                Acesso integral: inventário 1:1, fila de chamados, configurações, termos, setores e gestão de operadores.
-              </p>
-            </div>
-
-            <div className="p-3 bg-cyan-50/60 border border-cyan-200 rounded-lg space-y-1">
-              <span className="font-bold text-cyan-900 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-cyan-600"></span>
-                Suporte de T.I.
-              </span>
-              <p className="text-xs text-cyan-800 leading-tight">
-                Atendimento da fila de chamados, movimentação de equipamentos, checklists técnicos e termos A4.
-              </p>
-            </div>
-
-            <div className="p-3 bg-purple-50/60 border border-purple-200 rounded-lg space-y-1">
-              <span className="font-bold text-purple-900 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
-                Recursos Humanos (RH)
-              </span>
-              <p className="text-xs text-purple-800 leading-tight">
-                Admissões, desligamentos e os próprios chamados.
-              </p>
-            </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-              <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                Colaborador (Solicitante)
-              </span>
-              <p className="text-xs text-slate-600 leading-tight">
-                Acesso restrito: visualiza apenas seus equipamentos sob custódia e abre chamados com filtro do seu ativo.
-              </p>
-            </div>
-          </div>
-
-          {/* Tabela de Atribuição de Papéis */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
-                    <th className="py-3 px-4">Colaborador</th>
-                    <th className="py-3 px-4">E-mail Corporativo</th>
-                    <th className="py-3 px-4">Setor / Cargo</th>
-                    <th className="py-3 px-4">Papel Atual</th>
-                    <th className="py-3 px-4 text-right">Alterar Nível de Acesso</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {employees
-                    .filter((emp) => {
-                      const role = emp.role || (emp.email.includes('admin.ti') ? 'ti_admin' : emp.email.includes('rh@') ? 'rh' : emp.email.includes('.ti@') ? 'ti_suporte' : 'colaborador');
-                      const matchesSearch =
-                        emp.nome.toLowerCase().includes(equipeSearch.toLowerCase()) ||
-                        emp.email.toLowerCase().includes(equipeSearch.toLowerCase()) ||
-                        emp.matricula.toLowerCase().includes(equipeSearch.toLowerCase());
-                      const matchesOperator = equipeFilter === 'todos' || role !== 'colaborador';
-                      return matchesSearch && matchesOperator;
-                    })
-                    .map((emp) => {
-                      const currentEmpRole: UserRole = papelAtual(emp);
-                      const papelPendente = papeisPendentes[emp.id];
-
-                      const roleBadgeStyles: Record<UserRole, string> = {
-                        ti_admin: 'text-blue-700 bg-blue-50 border-blue-200',
-                        ti_suporte: 'text-cyan-700 bg-cyan-50 border-cyan-200',
-                        rh: 'text-purple-700 bg-purple-50 border-purple-200',
-                        colaborador: 'text-slate-600 bg-slate-100 border-slate-200',
-                      };
-
-                      const roleLabelsText: Record<UserRole, string> = {
-                        ti_admin: 'Administrador de T.I.',
-                        ti_suporte: 'Suporte de T.I.',
-                        rh: 'Recursos Humanos',
-                        colaborador: 'Colaborador',
-                      };
-
-                      return (
-                        <tr key={emp.id} className={`transition-colors ${papelPendente ? 'bg-amber-50' : 'hover:bg-slate-50/70'}`}>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-800 font-bold flex items-center justify-center text-xs">
-                                {emp.nome.charAt(0)}
-                              </div>
-                              <div>
-                                <span className="font-semibold text-slate-900 block">{emp.nome}</span>
-                                <span className="font-mono text-xs text-slate-500">{emp.matricula}</span>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                            {emp.email}
-                          </td>
-
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span className="text-slate-800 block">{emp.cargo}</span>
-                            <span className="text-xs text-slate-500">
-                              {departments.find((d) => d.id === emp.setorId)?.nome || '-'}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${roleBadgeStyles[currentEmpRole]}`}>
-                              {roleLabelsText[currentEmpRole]}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <select
-                              value={papelPendente ?? currentEmpRole}
-                              onChange={(e) => alterarPapel(emp, e.target.value as UserRole)}
-                              aria-label={`Papel de ${emp.nome}`}
-                              className="campo campo-sm cursor-pointer"
-                            >
-                              <option value="ti_admin">Administrador de T.I.</option>
-                              <option value="ti_suporte">Suporte de T.I.</option>
-                              <option value="rh">Recursos Humanos (RH)</option>
-                              <option value="colaborador">Colaborador Padrão (Sem Acesso de Gestão)</option>
-                            </select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Aba: Banco de Dados & Conexão Supabase */}
-      {activeTab === 'banco' && (
-        <div className="space-y-6">
-          <div className="cartao p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-emerald-600" />
-                  Conexão com o banco de dados
-                </h3>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={isRefreshing}
-                  onClick={async () => {
-                    setIsRefreshing(true);
-                    await refreshSupabaseData();
-                    setIsRefreshing(false);
-                    setSuccessMsg('Verificação com o Supabase concluída.');
-                    setTimeout(() => setSuccessMsg(null), 3000);
-                  }}
-                  className="btn btn-secundario btn-sm"
-                  title="Testar conexão e recarregar dados do banco"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
-                  <span>{isRefreshing ? 'Verificando...' : 'Atualizar status'}</span>
-                </button>
-
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${
-                    isSupabaseConnected && supabaseHealth?.tablesExist
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      : isSupabaseConnected
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      isSupabaseConnected && supabaseHealth?.tablesExist
-                        ? 'bg-emerald-600 animate-pulse'
-                        : isSupabaseConnected
-                        ? 'bg-amber-500'
-                        : 'bg-slate-400'
-                    }`}
-                  />
-                  {isSupabaseConnected && supabaseHealth?.tablesExist
-                    ? 'Conectado'
-                    : isSupabaseConnected
-                    ? 'Conectado, mas sem as tabelas'
-                    : 'Sem conexão (modo demonstração)'}
-                </span>
-              </div>
-            </div>
-
-            {/* Fase 0: com Supabase conectado (produção), "Zerar" e "Restaurar demo" nem aparecem */}
-            {!isSupabaseConnected && (
-            <div className="border border-rose-200 bg-rose-50/40 rounded-xl p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
-                <div>
-                  <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wide">
-                    Zona de Produção: Zerar Dados de Exemplo
-                  </h4>
-                  <p className="text-xs text-rose-700 mt-0.5">
-                    Utilize esta opção para iniciar a operação real da sua empresa, limpando ativos fictícios, licenças e chamados de demonstração.
-                  </p>
+                {/* Explicação das 4 permissões */}
+                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                  {(
+                    [
+                      ['bg-blue-600', 'Admin de T.I.', 'Acesso integral: inventário 1:1, fila de chamados, configurações, termos, setores e gestão de operadores.'],
+                      ['bg-emerald-600', 'Suporte de T.I.', 'Atendimento da fila de chamados, movimentação de equipamentos, checklists técnicos e termos A4.'],
+                      ['bg-amber-500', 'Recursos Humanos (RH)', 'Admissões, desligamentos e os próprios chamados.'],
+                      ['bg-slate-400', 'Colaborador (solicitante)', 'Acesso restrito: visualiza apenas seus equipamentos sob custódia e abre chamados com filtro do seu ativo.'],
+                    ] as const
+                  ).map(([cor, titulo, texto]) => (
+                    <div key={titulo} className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <span className="flex items-center gap-1.5 font-semibold text-slate-900">
+                        <span className={`h-2 w-2 rounded-full ${cor}`} />
+                        {titulo}
+                      </span>
+                      <p className="text-xs leading-tight text-slate-600">{texto}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowResetModal(true)}
-                  className="btn btn-perigo-cheio cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Zerar Dados de Exemplo (Reset de Fábrica)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if ((await confirmar('Restaurar a base completa de demonstração fictícia?'))) {
-                      resetToInitialData();
-                      setSuccessMsg('Base de demonstração restaurada no navegador.');
-                      setTimeout(() => setSuccessMsg(null), 3000);
-                    }
-                  }}
-                  className="btn btn-secundario cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Restaurar Base de Demonstração</span>
-                </button>
+              <div className="cartao overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="tabela tabela-cartoes">
+                    <thead>
+                      <tr>
+                        <th>Colaborador</th>
+                        <th>E-mail corporativo</th>
+                        <th>Setor / cargo</th>
+                        <th>Papel atual</th>
+                        <th className="text-right">Alterar nível de acesso</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {employees
+                        .filter((emp) => {
+                          const role = emp.role || (emp.email.includes('admin.ti') ? 'ti_admin' : emp.email.includes('rh@') ? 'rh' : emp.email.includes('.ti@') ? 'ti_suporte' : 'colaborador');
+                          const matchesSearch =
+                            emp.nome.toLowerCase().includes(equipeSearch.toLowerCase()) ||
+                            emp.email.toLowerCase().includes(equipeSearch.toLowerCase()) ||
+                            emp.matricula.toLowerCase().includes(equipeSearch.toLowerCase());
+                          const matchesOperator = equipeFilter === 'todos' || role !== 'colaborador';
+                          return matchesSearch && matchesOperator;
+                        })
+                        .map((emp) => {
+                          const currentEmpRole: UserRole = papelAtual(emp);
+                          const papelPendente = papeisPendentes[emp.id];
+                          return (
+                            <tr key={emp.id} className={papelPendente ? 'bg-amber-50' : ''}>
+                              <td data-label="Colaborador">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-800">
+                                    {emp.nome.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <span className="block font-semibold text-slate-900">{emp.nome}</span>
+                                    <span className="font-mono text-xs text-slate-500">{emp.matricula}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td data-label="E-mail corporativo" className="whitespace-nowrap text-slate-600">{emp.email}</td>
+                              <td data-label="Setor / cargo" className="whitespace-nowrap">
+                                <span className="block text-slate-800">{emp.cargo}</span>
+                                <span className="text-xs text-slate-500">{departments.find((d) => d.id === emp.setorId)?.nome || '-'}</span>
+                              </td>
+                              <td data-label="Papel atual" className="whitespace-nowrap">
+                                <span className={`selo ${papeisSelo[currentEmpRole]}`}>{ROTULO_PAPEL[currentEmpRole]}</span>
+                              </td>
+                              <td data-label="Alterar nível de acesso" className="text-right whitespace-nowrap">
+                                <select
+                                  value={papelPendente ?? currentEmpRole}
+                                  onChange={(e) => alterarPapel(emp, e.target.value as UserRole)}
+                                  aria-label={`Papel de ${emp.nome}`}
+                                  className="campo campo-sm"
+                                >
+                                  <option value="ti_admin">Administrador de T.I.</option>
+                                  <option value="ti_suporte">Suporte de T.I.</option>
+                                  <option value="rh">Recursos Humanos (RH)</option>
+                                  <option value="colaborador">Colaborador Padrão (Sem Acesso de Gestão)</option>
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            </>
+          )}
+
+          {/* CONEXÃO COM O BANCO DE DADOS */}
+          {activeTab === 'banco' && (
+            <div className="cartao space-y-4 p-4">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <h3 className="secao-titulo flex items-center gap-2">
+                  <Database className="h-4 w-4 text-emerald-600" />
+                  Conexão com o banco de dados
+                </h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isRefreshing}
+                    onClick={async () => {
+                      setIsRefreshing(true);
+                      await refreshSupabaseData();
+                      setIsRefreshing(false);
+                      setSuccessMsg('Verificação com o Supabase concluída.');
+                      setTimeout(() => setSuccessMsg(null), 3000);
+                    }}
+                    className="btn btn-secundario btn-sm"
+                    title="Testar conexão e recarregar dados do banco"
+                  >
+                    <RefreshCw className={isRefreshing ? 'animate-spin' : ''} />
+                    <span>{isRefreshing ? 'Verificando...' : 'Atualizar status'}</span>
+                  </button>
+                  <span className={`selo ${conexaoOk ? 'selo-ok' : isSupabaseConnected ? 'selo-atencao' : 'selo-neutro'}`}>
+                    {conexaoOk ? 'Conectado' : isSupabaseConnected ? 'Conectado, mas sem as tabelas' : 'Sem conexão (modo demonstração)'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Fase 0: com Supabase conectado (produção), "Zerar" e "Restaurar demo" nem aparecem */}
+              {!isSupabaseConnected && (
+                <div className="space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+                    <div>
+                      <h4 className="text-xs font-bold tracking-wide text-red-900 uppercase">Zona de produção: zerar dados de exemplo</h4>
+                      <p className="mt-0.5 text-xs text-red-700">
+                        Utilize esta opção para iniciar a operação real da sua empresa, limpando ativos fictícios, licenças e chamados de demonstração.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <button type="button" onClick={() => setShowResetModal(true)} className="btn btn-perigo">
+                      <Trash2 />
+                      <span>Zerar dados de exemplo (reset de fábrica)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (await confirmar('Restaurar a base completa de demonstração fictícia?')) {
+                          resetToInitialData();
+                          setSuccessMsg('Base de demonstração restaurada no navegador.');
+                          setTimeout(() => setSuccessMsg(null), 3000);
+                        }
+                      }}
+                      className="btn btn-secundario"
+                    >
+                      <RotateCcw />
+                      <span>Restaurar base de demonstração</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Modal Seguro para Zerar Dados */}
+      {/* Confirmação segura para zerar os dados */}
       {showResetModal && !isSupabaseConnected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="cartao max-w-md w-full p-6 space-y-4 shadow-xl">
-            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            <div className="text-center">
-              <h3 className="text-sm font-bold text-slate-900">Confirmar Limpeza Completa da Base</h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Esta ação apagará todos os ativos, licenças e chamados de teste tanto do sistema quanto do Supabase (se conectado), deixando a plataforma zerada e pronta para seus dados reais.
-              </p>
-            </div>
-
-            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs space-y-2">
-              <label className="block text-xs font-semibold text-slate-700">
-                Digite <span className="font-mono font-bold text-rose-600">ZERAR</span> para liberar a limpeza:
-              </label>
-              <input
-                type="text"
-                autoFocus
-                value={resetConfirmText}
-                onChange={(e) => setResetConfirmText(e.target.value)}
-                placeholder="Digite ZERAR"
-                className="campo w-full font-mono text-center tracking-wider font-mono font-bold"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
+        <Janela
+          tamanho="p"
+          icone={<AlertTriangle className="h-4 w-4" />}
+          titulo="Confirmar limpeza completa da base"
+          onFechar={() => {
+            if (isResetting) return;
+            setShowResetModal(false);
+            setResetConfirmText('');
+          }}
+          rodape={
+            <>
               <button
                 type="button"
                 disabled={isResetting}
@@ -1119,20 +905,40 @@ export const SettingsView: React.FC = () => {
                     setIsResetting(false);
                   }
                 }}
-                className="btn btn-perigo-cheio cursor-pointer"
+                className="btn btn-perigo-cheio"
               >
                 {isResetting ? (
                   <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <RefreshCw className="animate-spin" />
                     <span>Limpando banco...</span>
                   </>
                 ) : (
-                  <span>Confirmar e Limpar Base</span>
+                  <span>Confirmar e limpar base</span>
                 )}
               </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-xs text-slate-600">
+              Esta ação apagará todos os ativos, licenças e chamados de teste tanto do sistema quanto do Supabase (se conectado), deixando a plataforma zerada e pronta para seus dados reais.
+            </p>
+            <div>
+              <label htmlFor="reset-confirmacao" className="rotulo">
+                Digite <span className="font-mono font-bold text-red-600">ZERAR</span> para liberar a limpeza
+              </label>
+              <input
+                id="reset-confirmacao"
+                type="text"
+                autoFocus
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="Digite ZERAR"
+                className="campo text-center font-mono font-bold tracking-wider"
+              />
             </div>
           </div>
-        </div>
+        </Janela>
       )}
 
       {/* Fase 5: papéis, setores e dados da empresa só são gravados aqui */}

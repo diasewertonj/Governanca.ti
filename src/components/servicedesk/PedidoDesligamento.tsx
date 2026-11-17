@@ -25,12 +25,12 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
   );
 
   return (
-    <section aria-label="Pedido do RH" className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-2xs space-y-2 text-xs">
-      <h3 className="flex items-center gap-1.5 font-semibold uppercase tracking-wide text-slate-500">
-        <UserMinus className="w-4 h-4" aria-hidden="true" />
+    <section aria-label="Pedido do RH" className="cartao p-4 space-y-3 text-xs">
+      <h3 className="secao-titulo flex items-center gap-1.5">
+        <UserMinus className="h-4 w-4" aria-hidden="true" />
         Pedido do RH
       </h3>
-      <div className="grid grid-cols-1 gap-y-1 text-[13px]">
+      <div className="grid grid-cols-1 gap-y-1.5">
         {linha('Quem sai', pessoa ? `${pessoa.nome} · ${pessoa.cargo}` : 'colaborador não encontrado')}
         {linha('Último dia', formatDate(off.dataDesligamento))}
         {linha('E-mail', off.redirecionarEmail ? `redirecionar/dar acesso para ${nome(off.redirecionarEmailParaId)}` : 'não redirecionar')}
@@ -40,18 +40,19 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
       </div>
 
       {/* Equipamentos e softwares como etiquetas que quebram linha; listas longas mostram as 12 primeiras */}
-      <div className="space-y-2 pt-2 border-t border-slate-100">
+      <div className="space-y-3">
         <ListaEtiquetas
           titulo={`Equipamentos com a pessoa (${equipamentos.length})`}
           itens={equipamentos.map((a) => ({ id: a.id, texto: `${a.tag} · ${a.nome}`, onClick: () => setSelectedAssetIdFor360(a.id) }))}
-          icone={<Laptop className="w-3 h-3 text-slate-500 shrink-0" aria-hidden="true" />}
+          icone={<Laptop aria-hidden="true" />}
         />
         <ListaEtiquetas
           titulo={`Softwares com a pessoa (${softwares.length})`}
           itens={softwares.map((l) => ({ id: l.id, texto: l.nome }))}
-          icone={<Key className="w-3 h-3 text-purple-600 shrink-0" aria-hidden="true" />}
+          icone={<Key aria-hidden="true" />}
         />
-      </div>      <p className="text-slate-500">A T.I. recolhe os equipamentos e desvincula contas e softwares pelo checklist.</p>
+      </div>
+      <p className="text-slate-500">A T.I. recolhe os equipamentos e desvincula contas e softwares pelo checklist.</p>
     </section>
   );
 };
@@ -85,13 +86,13 @@ const ListaEtiquetas: React.FC<{
                 {conteudo}
               </button>
             ) : (
-              <span key={i.id} title={i.texto} className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-800">
+              <span key={i.id} title={i.texto} className="selo selo-neutro">
                 {conteudo}
               </span>
             );
           })}
           {itens.length > LIMITE_ETIQUETAS && (
-            <button type="button" onClick={() => setTodas(!todas)} className="px-2 py-0.5 text-blue-700 hover:underline">
+            <button type="button" onClick={() => setTodas(!todas)} className="link px-2 py-0.5">
               {todas ? 'mostrar menos' : `mostrar todas (+${itens.length - LIMITE_ETIQUETAS})`}
             </button>
           )}

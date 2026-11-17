@@ -89,7 +89,7 @@ export const LoginView: React.FC = () => {
               className="btn btn-secundario w-full"
             >
               {googleLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                <Loader2 className="animate-spin" />
               ) : (
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path
@@ -123,9 +123,7 @@ export const LoginView: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                E-mail Corporativo
-              </label>
+              <label htmlFor="login-email" className="rotulo">E-mail corporativo</label>
               <div className="relative">
                 <input
                   type="email"
@@ -133,16 +131,14 @@ export const LoginView: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nome@empresa.com.br"
-                  className="campo w-full"
+                  className="campo"
                 />
                 <Mail className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Senha de Acesso Interno
-              </label>
+              <label htmlFor="login-senha" className="rotulo">Senha de acesso interno</label>
               <div className="relative">
                 <input
                   type="password"
@@ -150,14 +146,14 @@ export const LoginView: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="campo w-full"
+                  className="campo"
                 />
                 <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
             {(errorMessage || authError || erroLinkAuth) && (
-              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
+              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
                 {errorMessage ||
                   authError ||
                   `O link do e-mail não é mais válido (${erroLinkAuth}). Peça um novo em "Esqueci minha senha".`}
@@ -170,11 +166,11 @@ export const LoginView: React.FC = () => {
               className="btn btn-primario w-full"
             >
               {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="animate-spin" />
               ) : (
                 <>
                   <span>Acessar com E-mail</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight />
                 </>
               )}
             </button>
@@ -190,7 +186,7 @@ export const LoginView: React.FC = () => {
                     setModoRecuperar(true);
                     setMsgRecuperacao(null);
                   }}
-                  className="text-xs text-blue-700 hover:underline"
+                  className="link text-xs"
                 >
                   Esqueci minha senha
                 </button>
@@ -210,7 +206,7 @@ export const LoginView: React.FC = () => {
                     >
                       {enviandoRecuperacao ? 'Enviando...' : 'Enviar link de redefinição'}
                     </button>
-                    <button type="button" onClick={() => setModoRecuperar(false)} className="text-xs text-slate-500 hover:text-slate-700">
+                    <button type="button" onClick={() => setModoRecuperar(false)} className="btn btn-secundario btn-sm">
                       Voltar
                     </button>
                   </div>
@@ -221,7 +217,7 @@ export const LoginView: React.FC = () => {
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-500">
-          <button type="button" onClick={() => setMostrarPolitica(true)} className="underline hover:text-slate-600">
+          <button type="button" onClick={() => setMostrarPolitica(true)} className="link">
             Aviso de privacidade
           </button>
         </p>

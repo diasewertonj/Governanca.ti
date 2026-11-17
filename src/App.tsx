@@ -16,6 +16,7 @@ import { DefinirSenhaView } from './components/auth/DefinirSenhaView.tsx';
 // Fase 4: telas e modais carregam sob demanda (bundle inicial menor)
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.tsx').then((m) => ({ default: m.DashboardView })));
 const AssetsView = lazy(() => import('./components/assets/AssetsView.tsx').then((m) => ({ default: m.AssetsView })));
+const LinhasView = lazy(() => import('./components/fornecedores/LinhasView.tsx').then((m) => ({ default: m.LinhasView })));
 const FornecedoresView = lazy(() => import('./components/fornecedores/FornecedoresView.tsx').then((m) => ({ default: m.FornecedoresView })));
 const FinanceiroView = lazy(() => import('./components/financeiro/DespesasView.tsx').then((m) => ({ default: m.FinanceiroView })));
 const CollaboratorsView = lazy(() => import('./components/collaborators/CollaboratorsView.tsx').then((m) => ({ default: m.CollaboratorsView })));
@@ -129,13 +130,13 @@ function MainApp() {
       {dbErro && (
         <div
           role="alert"
-          className="fixed bottom-4 right-4 z-[60] max-w-md flex items-start gap-3 p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 shadow-lg"
+          className="selo-problema fixed bottom-4 right-4 z-[60] max-w-md flex items-start gap-3 p-3.5 rounded-xl border shadow-lg"
         >
           <span className="text-xs leading-relaxed flex-1">{dbErro}</span>
           <button
             type="button"
             onClick={limparDbErro}
-            className="text-xs font-semibold text-rose-700 hover:text-rose-900 shrink-0"
+            className="btn btn-sm btn-perigo shrink-0"
             aria-label="Fechar aviso de erro"
           >
             Fechar
@@ -159,6 +160,7 @@ function MainApp() {
             (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} />)}
           {currentView === 'assets' && <AssetsView key="hardware" modo="hardware" />}
           {currentView === 'softwares' && <AssetsView key="softwares" modo="softwares" />}
+          {currentView === 'linhas' && <LinhasView />}
           {currentView === 'fornecedores' && <FornecedoresView key="fornecedores" modo="fornecedores" />}
           {currentView === 'contratos' && <FornecedoresView key="contratos" modo="contratos" />}
           {currentView === 'financeiro' && <FinanceiroView />}

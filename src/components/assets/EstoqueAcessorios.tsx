@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { ArrowDownToLine, ArrowUpFromLine, History, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, History, Pencil, Plus, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
+import { MenuAcoes } from '../ui/MenuAcoes.tsx';
 import type { ItemEstoque, TipoAcessorio, TipoMovimentoEstoque } from '../../types/index.ts';
 import { CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import { confirmar } from '../ui/dialogo.tsx';
+import { Janela } from '../ui/Janela.tsx';
+import { Vazio } from '../ui/Tela.tsx';
 
 const ROTULO_TIPO: Record<TipoAcessorio, string> = {
   monitor: 'Monitor',
@@ -26,55 +29,68 @@ const ROTULO_MOV: Record<TipoMovimentoEstoque, string> = {
   ajuste: 'Ajuste',
 };
 
-const BOTAO = 'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border bg-white';
-
 /**
  * Seção 6 · Acessórios por quantidade (monitor, mouse, teclado, cabo…). O saldo só
  * muda por movimento (entrada, saída para uma pessoa, devolução, ajuste com motivo),
  * e cada movimento fica no histórico. Itens com patrimônio continuam em Equipamentos.
  */
-export const EstoqueAcessorios: React.FC = () => {
+export const EstoqueAcessorios: React.FC<{
+  /** Quando a tela dona (Hardware) controla o filtro e o botão "Novo acessório", a barra interna some */
+  mostrarInativos?: boolean;
+  novoAberto?: boolean;
+  onFecharNovo?: () => void;
+  busca?: string;
+}> = ({ mostrarInativos: inativosExterno, novoAberto = false, onFecharNovo, busca = '' }) => {
   const { currentRole, employees, fornecedores } = useApp();
   const { estoque, movimentos, salvarItemEstoque, excluirItemEstoque, movimentarEstoque } = useRecursos();
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
-  const [mostrarInativos, setMostrarInativos] = useState(false);
+  const [inativosInterno, setInativosInterno] = useState(false);
+  const controlado = inativosExterno !== undefined;
+  const mostrarInativos = controlado ? inativosExterno : inativosInterno;
   const [editando, setEditando] = useState<ItemEstoque | 'novo' | null>(null);
+  const fecharForm = () => {
+    setEditando(null);
+    onFecharNovo?.();
+  };
   const [movendo, setMovendo] = useState<{ item: ItemEstoque; tipo: TipoMovimentoEstoque } | null>(null);
   const [historico, setHistorico] = useState<string | null>(null);
   const [erro, setErro] = useState('');
 
   if (!isTI) return null;
-  const lista = estoque.filter((i) => mostrarInativos || i.ativo);
+  const termo = busca.trim().toLowerCase();
+  const lista = estoque
+    .filter((i) => mostrarInativos || i.ativo)
+    .filter((i) => !termo || `${i.nome} ${i.marca || ''} ${i.modelo || ''} ${ROTULO_TIPO[i.tipo]} ${i.localizacao || ''}`.toLowerCase().includes(termo));
   const nomePessoa = (id?: string) => employees.find((e) => e.id === id)?.nome || '';
+  const formAberto = editando !== null || novoAberto;
+  const itemEmEdicao = editando && editando !== 'novo' ? editando : undefined;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="inline-flex items-center gap-2 text-xs text-slate-700">
-          <input type="checkbox" checked={mostrarInativos} onChange={(e) => setMostrarInativos(e.target.checked)} />
-          Mostrar desativados
-        </label>
-        <button
-          type="button"
-          onClick={() => setEditando('novo')}
-          className="btn btn-primario"
-        >
-          <Plus className="w-3.5 h-3.5" /> Novo acessório
-        </button>
-      </div>
+      {!controlado && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+            <input type="checkbox" checked={mostrarInativos} onChange={(e) => setInativosInterno(e.target.checked)} />
+            Mostrar desativados
+          </label>
+          <button type="button" onClick={() => setEditando('novo')} className="btn btn-primario">
+            <Plus /> Novo acessório
+          </button>
+        </div>
+      )}
 
-      {editando && (
+      {formAberto && (
         <FormItem
-          item={editando === 'novo' ? undefined : editando}
+          item={itemEmEdicao}
           fornecedores={fornecedores.filter((f) => f.ativo)}
           onSalvar={async (dados) => {
             const r = await salvarItemEstoque(dados);
             if (r.erro && !r.item) return r.erro;
             if (r.erro) setErro(r.erro);
-            setEditando(null);
+            fecharForm();
             return null;
           }}
-          onCancelar={() => setEditando(null)}
+          onCancelar={fecharForm}
         />
       )}
 
@@ -94,85 +110,81 @@ export const EstoqueAcessorios: React.FC = () => {
       )}
 
       {erro && (
-        <p className="text-xs font-medium text-red-700" role="alert">
+        <p className="erro" role="alert">
           {erro}
         </p>
       )}
 
       {lista.length === 0 ? (
-        <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4">Nenhum acessório cadastrado.</p>
+        <Vazio>Nenhum acessório cadastrado.</Vazio>
       ) : (
         <div className="cartao overflow-hidden">
-          <table className="tabela-cartoes w-full text-left text-xs">
+          <table className="tabela tabela-cartoes">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
-                <th className="py-2 px-3">Acessório</th>
-                <th className="py-2 px-3">Tipo</th>
-                <th className="py-2 px-3">Em estoque</th>
-                <th className="hidden xl:table-cell py-2 px-3">Local</th>
-                <th className="py-2 px-3 text-right">Ações</th>
+              <tr>
+                <th>Acessório</th>
+                <th>Tipo</th>
+                <th>Em estoque</th>
+                <th className="hidden xl:table-cell">Local</th>
+                <th className="text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody>
               {lista.map((i) => {
                 const baixo = i.minimo > 0 && i.quantidade <= i.minimo;
                 return (
                   <React.Fragment key={i.id}>
                     <tr className={i.ativo ? '' : 'opacity-60'}>
-                      <td data-label="Acessório" className="py-2 px-3 font-semibold text-slate-900">
+                      <td data-label="Acessório" className="font-semibold text-slate-900">
                         {i.nome}
                         {(i.marca || i.modelo) && <span className="block font-normal text-slate-500">{[i.marca, i.modelo].filter(Boolean).join(' ')}</span>}
                       </td>
-                      <td data-label="Tipo" className="py-2 px-3">
+                      <td data-label="Tipo">
                         {ROTULO_TIPO[i.tipo]}
                       </td>
-                      <td data-label="Em estoque" className="py-2 px-3">
+                      <td data-label="Em estoque">
                         <span className={`font-mono font-semibold ${baixo ? 'text-red-700' : 'text-slate-900'}`}>{i.quantidade}</span>
                         {i.minimo > 0 && <span className="text-slate-500"> (mín. {i.minimo})</span>}
-                        {baixo && <span className="block text-red-700">Estoque baixo</span>}
+                        {baixo && <span className="selo selo-problema ml-1.5">Estoque baixo</span>}
                       </td>
-                      <td data-label="Local" className="hidden xl:table-cell py-2 px-3">
+                      <td data-label="Local" className="hidden xl:table-cell">
                         {i.localizacao || '-'}
                       </td>
-                      <td data-label="Ações" className="py-2 px-3 text-right">
-                        <span className="inline-flex flex-wrap justify-end gap-1.5">
-                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'entrada' })} className={`${BOTAO} text-emerald-700 border-emerald-200`}>
-                            <ArrowDownToLine className="w-3.5 h-3.5" /> Entrada
+                      <td data-label="Ações" className="text-right">
+                        <span className="acoes-linha">
+                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'saida' })} className="btn btn-sm btn-primario">
+                            <ArrowUpFromLine /> Entregar
                           </button>
-                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'saida' })} className={`${BOTAO} text-blue-700 border-blue-200`}>
-                            <ArrowUpFromLine className="w-3.5 h-3.5" /> Entregar
+                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'entrada' })} title="Entrada no estoque" aria-label={`Entrada de ${i.nome}`} className="btn-icone">
+                            <ArrowDownToLine />
                           </button>
-                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'devolucao' })} className={`${BOTAO} text-slate-700 border-slate-200`}>
-                            Devolução
+                          <button type="button" onClick={() => setEditando(i)} title="Editar" aria-label={`Editar ${i.nome}`} className="btn-icone">
+                            <Pencil />
                           </button>
-                          <button type="button" onClick={() => setMovendo({ item: i, tipo: 'ajuste' })} className={`${BOTAO} text-slate-700 border-slate-200`}>
-                            <SlidersHorizontal className="w-3.5 h-3.5" /> Ajuste
-                          </button>
-                          <button type="button" onClick={() => setHistorico(historico === i.id ? null : i.id)} className={`${BOTAO} text-slate-700 border-slate-200`}>
-                            <History className="w-3.5 h-3.5" /> Histórico
-                          </button>
-                          <button type="button" onClick={() => setEditando(i)} aria-label={`Editar ${i.nome}`} className={`${BOTAO} text-slate-700 border-slate-200`}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          {currentRole === 'ti_admin' && (
-                            <button
-                              type="button"
-                              aria-label={`Excluir ${i.nome}`}
-                              onClick={async () => {
-                                if (!(await confirmar(`Excluir ${i.nome}? Esta ação não pode ser desfeita.`))) return;
-                                setErro((await excluirItemEstoque(i.id)) || '');
-                              }}
-                              className="btn-icone btn-icone-perigo"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <MenuAcoes
+                            rotulo={`Mais ações de ${i.nome}`}
+                            acoes={[
+                              { rotulo: 'Devolução', icone: <Undo2 />, onClick: () => setMovendo({ item: i, tipo: 'devolucao' }) },
+                              { rotulo: 'Ajuste de saldo', icone: <SlidersHorizontal />, onClick: () => setMovendo({ item: i, tipo: 'ajuste' }) },
+                              { rotulo: historico === i.id ? 'Ocultar histórico' : 'Histórico', icone: <History />, onClick: () => setHistorico(historico === i.id ? null : i.id) },
+                              {
+                                rotulo: 'Excluir',
+                                icone: <Trash2 />,
+                                perigo: true,
+                                oculto: currentRole !== 'ti_admin',
+                                onClick: async () => {
+                                  if (!(await confirmar(`Excluir ${i.nome}?\n\nEsta ação não pode ser desfeita.`))) return;
+                                  setErro((await excluirItemEstoque(i.id)) || '');
+                                },
+                              },
+                            ]}
+                          />
                         </span>
                       </td>
                     </tr>
                     {historico === i.id && (
                       <tr>
-                        <td colSpan={5} className="py-2 px-3 bg-slate-50">
+                        <td colSpan={5} className="bg-slate-50">
                           {movimentos.filter((m) => m.itemId === i.id).length === 0 ? (
                             <p className="text-slate-500">Sem movimentos.</p>
                           ) : (
@@ -249,10 +261,23 @@ const FormItem: React.FC<{
   };
 
   return (
-    <form onSubmit={salvar} className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
-      <h3 className="text-xs font-bold text-blue-900">{item ? `Editar ${item.nome}` : 'Novo acessório'}</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
-        <div className="md:col-span-2 xl:col-span-2">
+    <Janela
+      tamanho="p"
+      titulo={item ? `Editar ${item.nome}` : 'Novo acessório'}
+      onFechar={onCancelar}
+      idTitulo="janela-acessorio"
+      rodape={
+        <div className="ml-auto flex gap-2">
+          <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
+          <button type="submit" form="form-acessorio" disabled={salvando} className="btn btn-primario">
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+        </div>
+      }
+    >
+    <form id="form-acessorio" onSubmit={salvar} className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
           <label htmlFor="est-nome" className={CLASSE_ROTULO}>Nome *</label>
           <input id="est-nome" required value={d.nome} onChange={(e) => set('nome', e.target.value)} className={CLASSE_CAMPO} placeholder='Ex.: Monitor 24" Dell P2422H' />
         </div>
@@ -299,7 +324,7 @@ const FormItem: React.FC<{
             ))}
           </select>
         </div>
-        <div className="md:col-span-3 xl:col-span-4">
+        <div className="sm:col-span-2">
           <label htmlFor="est-obs" className={CLASSE_ROTULO}>Observações</label>
           <textarea id="est-obs" rows={2} value={d.observacoes} onChange={(e) => set('observacoes', e.target.value)} className={CLASSE_CAMPO} />
         </div>
@@ -309,14 +334,9 @@ const FormItem: React.FC<{
           </label>
         )}
       </div>
-      {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
-        <button type="submit" disabled={salvando} className="btn btn-primario">
-          {salvando ? 'Salvando…' : 'Salvar'}
-        </button>
-      </div>
+      {erro && <p className="erro" role="alert">{erro}</p>}
     </form>
+    </Janela>
   );
 };
 
@@ -340,11 +360,21 @@ const FormMovimento: React.FC<{
   };
 
   return (
-    <form onSubmit={salvar} className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
-      <h3 className="text-xs font-bold text-blue-900">
-        {ROTULO_MOV[tipo]} · {item.nome} <span className="font-normal text-slate-600">(em estoque: {item.quantidade})</span>
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+    <Janela
+      tamanho="p"
+      titulo={`${ROTULO_MOV[tipo]} · ${item.nome}`}
+      subtitulo={`Em estoque: ${item.quantidade}`}
+      onFechar={onCancelar}
+      idTitulo="janela-movimento"
+      rodape={
+        <div className="ml-auto flex gap-2">
+          <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
+          <button type="submit" form="form-movimento" className="btn btn-primario">Confirmar</button>
+        </div>
+      }
+    >
+    <form id="form-movimento" onSubmit={salvar} className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="mov-qtd" className={CLASSE_ROTULO}>{tipo === 'ajuste' ? 'Diferença (+ ou −) *' : 'Quantidade *'}</label>
           <input id="mov-qtd" type="number" step={1} min={tipo === 'ajuste' ? undefined : 1} required value={quantidade} onChange={(e) => setQuantidade(e.target.value)} className={CLASSE_CAMPO} />
@@ -360,16 +390,13 @@ const FormMovimento: React.FC<{
             </select>
           </div>
         )}
-        <div className={comPessoa ? '' : 'md:col-span-2 xl:col-span-2'}>
+        <div className={comPessoa ? 'sm:col-span-2' : 'sm:col-span-2'}>
           <label htmlFor="mov-motivo" className={CLASSE_ROTULO}>{tipo === 'ajuste' ? 'Motivo *' : 'Observação'}</label>
           <input id="mov-motivo" value={motivo} required={tipo === 'ajuste'} onChange={(e) => setMotivo(e.target.value)} className={CLASSE_CAMPO} placeholder={tipo === 'ajuste' ? 'Ex.: contagem do inventário' : ''} />
         </div>
       </div>
-      {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
-        <button type="submit" className="btn btn-primario">Confirmar</button>
-      </div>
+      {erro && <p className="erro" role="alert">{erro}</p>}
     </form>
+    </Janela>
   );
 };
