@@ -47,6 +47,9 @@ describe('valores de chamado batem com o banco (CRIT-03 não pode voltar)', () =
       'suporte',
       'onboarding',
       'offboarding',
+      // Filtro "quem abriu" (só na tela; não vai para o banco)
+      'meus',
+      'ti',
     ]);
     const fora = usados.filter((v) => !aceitos.has(v));
     expect(fora).toEqual([]);

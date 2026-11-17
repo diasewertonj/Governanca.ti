@@ -66,14 +66,14 @@ export const CatalogoSettings: React.FC = () => {
     }
   };
 
-  const campo = 'w-full px-2 py-1 text-xs border border-slate-300 rounded-md bg-white';
+  const campo = 'campo';
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs">
-      <div className="p-6 space-y-5">
+    <div className="cartao">
+      <div className="p-4 space-y-4">
         <div className="border-b border-slate-100 pb-3">
-          <h3 className="text-sm font-semibold text-slate-900">Catálogo de admissão</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h3 className="secao-titulo">Catálogo de admissão</h3>
+          <p className="ajuda">
             O que o RH pode pedir e o que o checklist sugere. Itens <strong>sugeridos</strong> já vêm marcados; nada é
             obrigatório. Para tirar um item de uso, desmarque <strong>ativo</strong> (o histórico é mantido).
           </p>
@@ -83,7 +83,7 @@ export const CatalogoSettings: React.FC = () => {
           const doTipo = lista.filter((c) => c.tipo === tipo).sort((a, b) => a.ordem - b.ordem);
           return (
             <div key={tipo} className="space-y-1.5">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">{ROTULO_TIPO[tipo]}</h4>
+              <h4 className="rotulo">{ROTULO_TIPO[tipo]}</h4>
               {doTipo.length === 0 ? (
                 <p className="text-xs text-slate-500">Nenhum item.</p>
               ) : (
@@ -132,7 +132,7 @@ export const CatalogoSettings: React.FC = () => {
           <select
             value={novoTipo}
             onChange={(e) => setNovoTipo(e.target.value as TipoCatalogo)}
-            className="px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+            className="campo campo-sm"
             aria-label="Tipo do novo item"
           >
             {TIPOS.map((t) => (
@@ -151,17 +151,17 @@ export const CatalogoSettings: React.FC = () => {
               }
             }}
             placeholder="Nome do novo item"
-            className="flex-1 min-w-[12rem] px-2 py-1.5 text-xs border border-slate-300 rounded-md"
+            className="campo campo-sm flex-1 min-w-[12rem]"
           />
           <button
             type="button"
             onClick={incluir}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100"
+            className="btn btn-secundario btn-sm"
           >
-            <Plus className="w-3.5 h-3.5" /> Incluir
+            <Plus /> Incluir
           </button>
         </div>
-        {erro && <p className="text-xs font-medium text-red-700">{erro}</p>}
+        {erro && <p role="alert" className="erro">{erro}</p>}
       </div>
       <BarraAlteracoes
         itens={itensPendentes}

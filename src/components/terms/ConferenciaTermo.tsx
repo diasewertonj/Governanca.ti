@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { CondicaoItem, ItemTermo, ResponsibilityTerm } from '../../types/index.ts';
 import { erroCancelarTermo, erroConferenciaTermo } from '../../utils/termos.ts';
 
-const campo = 'w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+const campo = 'campo';
 
 interface Props {
   tipo: 'entrega' | 'devolucao';
@@ -56,7 +56,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
   const travada = (i: number) => tipo === 'devolucao' && !!linhasIniciais[i]?.condicao;
 
   return (
-    <div className="rounded-md border border-blue-200 bg-white p-2.5 space-y-2 text-xs">
+    <div className="cartao p-3 space-y-2 text-xs">
       <p className="font-semibold text-slate-800">
         Confira cada item{nomePessoa ? ` com ${nomePessoa}` : ''} antes de gerar
       </p>
@@ -104,7 +104,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
       </ul>
       {termoAnterior && (
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-0.5" htmlFor="conferencia-motivo">
+          <label className="rotulo" htmlFor="conferencia-motivo">
             Por que substituir o termo {termoAnterior.codigo}? *
           </label>
           <input
@@ -114,7 +114,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
             onChange={(e) => setMotivo(e.target.value)}
             placeholder="Ex.: patrimônio errado; faltou o carregador"
           />
-          <p className="text-slate-500 mt-0.5">O termo atual fica no histórico como substituído e perde a validade.</p>
+          <p className="ajuda">O termo atual fica no histórico como substituído e perde a validade.</p>
         </div>
       )}
       <label className="flex items-start gap-2 cursor-pointer">
@@ -122,7 +122,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
         <span>Conferi os itens, a condição e a situação de cada um.</span>
       </label>
       {erro && (
-        <p role="alert" className="font-medium text-red-700">
+        <p role="alert" className="erro">
           {erro}
         </p>
       )}
@@ -131,7 +131,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
           type="button"
           disabled={gravando}
           onClick={onVoltar}
-          className="px-3 py-1.5 font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+          className="btn btn-secundario btn-sm"
         >
           Voltar
         </button>
@@ -139,7 +139,7 @@ export const ConferenciaTermo: React.FC<Props> = ({
           type="button"
           disabled={gravando}
           onClick={confirmar}
-          className="px-3 py-1.5 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="btn btn-primario btn-sm"
         >
           {gravando ? 'Gerando…' : termoAnterior ? 'Gerar novo termo e substituir' : 'Gerar termo'}
         </button>

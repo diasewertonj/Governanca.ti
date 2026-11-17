@@ -1,13 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import {
   ArrowLeftRight,
   Bell,
   CalendarClock,
+  ChevronDown,
   FileSignature,
   GitMerge,
   KeyRound,
   PieChart,
+  Phone,
   Wallet,
   Briefcase,
   FileText,
@@ -42,6 +44,7 @@ const ICONES: Record<Icone, LucideIcon> = {
   contas_pagar: Wallet,
   despesas: PieChart,
   conciliar: GitMerge,
+  linhas: Phone,
   meus_equipamentos: Briefcase,
   meus_chamados: Ticket,
   configuracoes: Settings,
@@ -82,7 +85,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
   const emAberto = (s: string) => s === 'aberto' || s === 'em_andamento' || s === 'aguardando_terceiro';
   const contadores: Record<Contador, number> = {
     // A RLS já limita o que cada perfil enxerga (RH: os próprios e os de admissão/desligamento)
-    chamados: tickets.filter((t) => emAberto(t.status)).length,
+    chamados: tickets.filter((t) => t.tipo === 'suporte' && emAberto(t.status)).length,
+    processos: tickets.filter((t) => t.tipo !== 'suporte' && emAberto(t.status)).length,
     lembretes: lembretes.filter((l) => l.status === 'aberto' && l.venceEm <= hoje).length,
     meus_chamados: tickets.filter((t) => t.solicitanteId === currentUser?.id && emAberto(t.status)).length,
     // Lote 1: termo cancelado/substituído não conta (mesma regra de "Meus termos")
@@ -99,6 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     termos_para_assinar: 'bg-amber-100 text-amber-900',
     vencimentos: 'bg-amber-100 text-amber-900',
     conciliar: 'bg-amber-100 text-amber-900',
+    processos: 'bg-slate-100 text-slate-700',
   };
   const dicaContador: Record<Contador, string> = {
     chamados: 'chamados em aberto',
@@ -107,7 +112,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     termos_para_assinar: 'termos para você assinar',
     vencimentos: 'vencimentos nos próximos 30 dias ou pendências',
     conciliar: 'cadastros com fornecedor antigo em texto',
+    processos: 'admissões e desligamentos em andamento',
   };
+
+  // Grupos recolhidos ficam guardados neste navegador (só conveniência)
+  const [recolhidos, setRecolhidos] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("nexus_menu_recolhidos") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const alternarGrupo = (titulo: string) =>
+    setRecolhidos((prev) => {
+      const novo = prev.includes(titulo) ? prev.filter((x) => x !== titulo) : [...prev, titulo];
+      try {
+        localStorage.setItem("nexus_menu_recolhidos", JSON.stringify(novo));
+      } catch {
+        /* sem armazenamento: só não lembra */
+      }
+      return novo;
+    });
 
   const ir = (vista: string) => {
     onNavigate(vista);
@@ -136,24 +161,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
           </button>
         </div>
 
-        <div className="p-4 space-y-5 flex-1">
+        <div className="p-3 space-y-3 flex-1">
           <button
             type="button"
             onClick={() => {
               onOpenNewTicketModal();
               onFechar();
             }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className="btn btn-primario w-full"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Abrir chamado</span>
           </button>
 
-          <nav className="space-y-4">
-            {menuDoPapel(currentRole).map((grupo, gi) => (
+          <nav className="space-y-2">
+            {menuDoPapel(currentRole).map((grupo, gi) => {
+              // Grupos recolhíveis: o do item atual fica sempre aberto; recolhido mostra a soma dos contadores
+              const temAtual = grupo.itens.some((it) => it.vista === currentView);
+              const recolhido = !!grupo.titulo && !temAtual && recolhidos.includes(grupo.titulo);
+              const somaGrupo = grupo.itens.reduce((s, it) => s + (it.contador ? contadores[it.contador] : 0), 0);
+              return (
               <div key={grupo.titulo || gi} className="space-y-0.5">
-                {grupo.titulo && <p className="px-3 pb-1 text-xs font-medium text-slate-500">{grupo.titulo}</p>}
-                {grupo.itens.map((it) => {
+                {grupo.titulo && (
+                  <button
+                    type="button"
+                    onClick={() => alternarGrupo(grupo.titulo as string)}
+                    aria-expanded={!recolhido}
+                    className="w-full flex items-center gap-1 px-3 pb-0.5 text-xs font-medium text-slate-500 hover:text-slate-800"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${recolhido ? "-rotate-90" : ""}`} aria-hidden="true" />
+                    <span className="flex-1 text-left">{grupo.titulo}</span>
+                    {recolhido && somaGrupo > 0 && <span className="rounded-full bg-slate-100 px-1.5 text-slate-700">{somaGrupo}</span>}
+                  </button>
+                )}
+                {!recolhido && grupo.itens.map((it) => {
                   const Icon = ICONES[it.icone];
                   const ativo = currentView === it.vista;
                   const n = it.contador ? contadores[it.contador] : 0;
@@ -163,7 +204,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
                       type="button"
                       onClick={() => ir(it.vista)}
                       aria-current={ativo ? 'page' : undefined}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                         ativo ? 'bg-blue-50 text-blue-800 font-semibold' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
@@ -182,7 +223,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
                   );
                 })}
               </div>
-            ))}
+              );
+            })}
           </nav>
         </div>
       </aside>

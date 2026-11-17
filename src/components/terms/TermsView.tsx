@@ -1,21 +1,20 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
-import {
-  Search,
-  Printer,
-  CheckCircle2,
-  Clock,
-  User,
-  Ban,
-} from 'lucide-react';
-import { CLASSE_TOM, situacaoTermo } from '../../utils/termos.ts';
+import { Printer, CheckCircle2, Clock, User, Ban } from 'lucide-react';
+import { situacaoTermo } from '../../utils/termos.ts';
+import { Abas } from '../ui/Abas.tsx';
+import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
+
+const SELO_TOM: Record<string, string> = { ok: 'selo-ok', pendente: 'selo-atencao', neutro: 'selo-neutro', cancelado: 'selo-neutro' };
+
+type FiltroTipo = 'todos' | 'entrega' | 'devolucao';
 
 export const TermsView: React.FC = () => {
   const { terms, setSelectedTermForPrint, setSelectedEmployeeIdFor360 } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'todos' | 'entrega' | 'devolucao'>('todos');
+  const [typeFilter, setTypeFilter] = useState<FiltroTipo>('todos');
 
   const filteredTerms = terms.filter((term) => {
     const matchesType = typeFilter === 'todos' || term.tipo === typeFilter;
@@ -28,155 +27,117 @@ export const TermsView: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">
-            Termos de Responsabilidade & Devolução Patrimonial
-          </h2>
-          <p className="text-xs text-slate-500">
-            Documentos formais em padrão A4, prontos para impressão física, coleta de assinatura e compliance jurídico
-          </p>
-        </div>
-      </div>
-
-      {/* Filtros e Busca */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start flex-wrap">
-          {[
-            { id: 'todos', label: 'Todos os Termos' },
-            { id: 'entrega', label: 'Termos de Entrega' },
-            { id: 'devolucao', label: 'Termos de Devolução' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setTypeFilter(tab.id as 'todos' | 'entrega' | 'devolucao')}
-              className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                typeFilter === tab.id
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por código ou colaborador..."
-            className="w-full sm:w-72 text-sm sm:text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+    <div className="space-y-4">
+      <CabecalhoTela
+        titulo="Termos"
+        subtitulo="Termos de responsabilidade e devolução em padrão A4, prontos para impressão, coleta de assinatura e compliance jurídico"
+        abas={
+          <Abas
+            rotulo="Tipos de termo"
+            ativa={typeFilter}
+            onMudar={setTypeFilter}
+            itens={[
+              { id: 'todos', rotulo: 'Todos os termos' },
+              { id: 'entrega', rotulo: 'Termos de entrega' },
+              { id: 'devolucao', rotulo: 'Termos de devolução' },
+            ]}
           />
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-        </div>
-      </div>
+        }
+        filtros={<Busca id="termos-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar por código ou colaborador..." />}
+      />
 
-      {/* Tabela de Termos */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="tabela-cartoes w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs tracking-wider">
-                <th className="py-3 px-4">Código</th>
-                <th className="hidden xl:table-cell py-3 px-4">Tipo de Documento</th>
-                <th className="py-3 px-4">Colaborador</th>
-                <th className="hidden 2xl:table-cell py-3 px-4">Qtd. Equipamentos</th>
-                <th className="hidden xl:table-cell py-3 px-4">Data de Emissão</th>
-                <th className="hidden 2xl:table-cell py-3 px-4">Responsável T.I.</th>
-                <th className="py-3 px-4">Status da Assinatura</th>
-                <th className="py-3 px-4 text-right">Ação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredTerms.length > 0 ? (
-                filteredTerms.map((term) => (
-                  <tr
-                    key={term.id}
-                    onClick={() => setSelectedTermForPrint(term)}
-                    className="hover:bg-slate-50/70 transition-colors cursor-pointer"
-                  >
-                    <td data-label="Código" className="py-3 px-4 font-mono font-bold text-blue-700">
+      <div className="cartao overflow-hidden">
+        <table className="tabela tabela-cartoes">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th className="hidden xl:table-cell">Tipo de documento</th>
+              <th>Colaborador</th>
+              <th className="hidden 2xl:table-cell">Equipamentos</th>
+              <th className="hidden xl:table-cell">Emissão</th>
+              <th className="hidden 2xl:table-cell">Responsável T.I.</th>
+              <th>Assinatura</th>
+              <th className="text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTerms.length > 0 ? (
+              filteredTerms.map((term) => {
+                const s = situacaoTermo(term, false, terms.find((x) => x.id === term.substituidoPor)?.codigo);
+                const Icone = s.tom === 'ok' ? CheckCircle2 : s.tom === 'cancelado' ? Ban : Clock;
+                return (
+                  <tr key={term.id} onClick={() => setSelectedTermForPrint(term)} className="hover:bg-slate-50/70 cursor-pointer">
+                    <td data-label="Código" className="font-mono font-bold text-blue-700">
                       {term.codigo}
                     </td>
 
-                    <td data-label="Tipo de Documento" className="hidden xl:table-cell py-3 px-4 font-semibold text-slate-900 capitalize">
-                      Termo de {term.tipo === 'entrega' ? 'Entrega' : 'Devolução'}
+                    <td data-label="Tipo de documento" className="hidden xl:table-cell font-semibold text-slate-900">
+                      Termo de {term.tipo === 'entrega' ? 'entrega' : 'devolução'}
                     </td>
 
-                    <td data-label="Colaborador" className="py-3 px-4">
+                    <td data-label="Colaborador">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedEmployeeIdFor360(term.colaboradorId);
                         }}
-                        className="font-medium text-slate-900 hover:text-blue-700 flex items-center gap-1"
+                        className="link flex items-center gap-1"
                       >
-                        <User className="w-3 h-3 text-slate-500" />
+                        <User className="w-3 h-3" />
                         <span>{term.colaboradorNome}</span>
                       </button>
-                      <span className="text-xs text-slate-500 block font-mono">
+                      <span className="text-slate-500 block font-mono">
                         {term.colaboradorMatricula} · {term.colaboradorSetorNome}
                       </span>
                     </td>
 
-                    <td data-label="Qtd. Equipamentos" className="hidden 2xl:table-cell py-3 px-4">
-                      <span className="font-semibold text-slate-800">
-                        {term.ativoIds.length} item(ns)
-                      </span>
+                    <td data-label="Equipamentos" className="hidden 2xl:table-cell">
+                      <span className="font-semibold text-slate-800">{term.ativoIds.length} item(ns)</span>
                     </td>
 
-                    <td data-label="Data de Emissão" className="hidden xl:table-cell py-3 px-4 text-slate-600">
+                    <td data-label="Emissão" className="hidden xl:table-cell text-slate-600">
                       {formatDate(term.dataEmissao)}
                     </td>
 
-                    <td data-label="Responsável T.I." className="hidden 2xl:table-cell py-3 px-4 text-slate-600">
+                    <td data-label="Responsável T.I." className="hidden 2xl:table-cell text-slate-600">
                       {term.responsavelTINome}
                     </td>
 
-                    <td data-label="Status da Assinatura" className="py-3 px-4">
-                      {(() => {
-                        const s = situacaoTermo(term, false, terms.find((x) => x.id === term.substituidoPor)?.codigo);
-                        const Icone = s.tom === 'ok' ? CheckCircle2 : s.tom === 'cancelado' ? Ban : Clock;
-                        return (
-                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded border ${CLASSE_TOM[s.tom]}`}>
-                            <Icone className="w-3 h-3" />
-                            {s.rotulo}
-                          </span>
-                        );
-                      })()}
+                    <td data-label="Assinatura">
+                      <span className={`selo ${SELO_TOM[s.tom] || 'selo-neutro'}`}>
+                        <Icone />
+                        {s.rotulo}
+                      </span>
                     </td>
 
-                    <td data-label="Ação" className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTermForPrint(term);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors ml-auto"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Imprimir A4</span>
-                      </button>
+                    <td data-label="Ações" className="text-right">
+                      <span className="acoes-linha">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTermForPrint(term);
+                          }}
+                          aria-label={`Abrir o termo ${term.codigo}`}
+                          className="btn btn-sm btn-secundario"
+                        >
+                          <Printer /> Abrir termo
+                        </button>
+                      </span>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500 text-xs">
-                    Nenhum termo encontrado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={8}>
+                  <Vazio>Nenhum termo encontrado.</Vazio>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

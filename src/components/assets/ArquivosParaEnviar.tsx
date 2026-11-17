@@ -3,7 +3,7 @@ import { Paperclip, X } from 'lucide-react';
 import type { CategoriaAnexoAtivo } from '../../types/index.ts';
 import { TIPOS_ARQUIVO_ACEITOS, formatarTamanho, validarArquivo } from '../../services/supabaseDb.ts';
 import { ROTULO_CATEGORIA_ANEXO } from './AnexosAtivo.tsx';
-import { CLASSE_ARQUIVO, CLASSE_ROTULO } from '../comum/campos.ts';
+import { CLASSE_ARQUIVO } from '../comum/campos.ts';
 
 export interface ArquivoParaEnviar {
   chave: string;
@@ -61,7 +61,7 @@ export const ArquivosParaEnviar: React.FC<ArquivosParaEnviarProps> = ({ id, rotu
 
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className={CLASSE_ROTULO}>
+      <label htmlFor={id} className="rotulo">
         {rotulo}
       </label>
       <input
@@ -74,17 +74,14 @@ export const ArquivosParaEnviar: React.FC<ArquivosParaEnviarProps> = ({ id, rotu
         aria-describedby={`${id}-ajuda`}
         className={CLASSE_ARQUIVO}
       />
-      <p id={`${id}-ajuda`} className="text-xs text-slate-500">
+      <p id={`${id}-ajuda`} className="ajuda">
         PDF ou imagem, até 10 MB cada. Os arquivos sobem só depois de salvar.
       </p>
       {itens.length > 0 && (
-        <ul className="space-y-1.5">
+        <ul className="cartao divide-y divide-slate-100">
           {itens.map((i) => (
-            <li
-              key={i.chave}
-              className="flex flex-wrap items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs"
-            >
-              <Paperclip className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+            <li key={i.chave} className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
+              <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
               <span className="min-w-0 flex-1 break-all text-slate-800">
                 {i.arquivo.name} <span className="text-slate-500">· {formatarTamanho(i.arquivo.size)}</span>
               </span>
@@ -97,7 +94,7 @@ export const ArquivosParaEnviar: React.FC<ArquivosParaEnviarProps> = ({ id, rotu
                     id={`${id}-${i.chave}`}
                     value={i.categoria}
                     onChange={(e) => mudarCategoria(i.chave, e.target.value as CategoriaAnexoAtivo)}
-                    className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-md text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="campo campo-sm"
                   >
                     {categorias.map((c) => (
                       <option key={c} value={c}>
@@ -111,16 +108,17 @@ export const ArquivosParaEnviar: React.FC<ArquivosParaEnviarProps> = ({ id, rotu
                 type="button"
                 onClick={() => onChange(itens.filter((x) => x.chave !== i.chave))}
                 aria-label={`Retirar ${i.arquivo.name}`}
-                className="p-1 text-slate-600 hover:text-red-700 hover:bg-red-50 rounded-md"
+                title="Retirar"
+                className="btn-icone btn-icone-perigo"
               >
-                <X className="w-3.5 h-3.5" />
+                <X />
               </button>
             </li>
           ))}
         </ul>
       )}
       {erro && (
-        <p className="text-xs text-red-700" role="alert">
+        <p className="erro" role="alert">
           {erro}
         </p>
       )}

@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { DialogoHost } from './components/ui/dialogo.tsx';
 import { AppProvider, useApp } from './context/AppContext.tsx';
 import { RecursosProvider } from './context/RecursosContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
@@ -15,11 +16,9 @@ import { DefinirSenhaView } from './components/auth/DefinirSenhaView.tsx';
 // Fase 4: telas e modais carregam sob demanda (bundle inicial menor)
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.tsx').then((m) => ({ default: m.DashboardView })));
 const AssetsView = lazy(() => import('./components/assets/AssetsView.tsx').then((m) => ({ default: m.AssetsView })));
+const LinhasView = lazy(() => import('./components/fornecedores/LinhasView.tsx').then((m) => ({ default: m.LinhasView })));
 const FornecedoresView = lazy(() => import('./components/fornecedores/FornecedoresView.tsx').then((m) => ({ default: m.FornecedoresView })));
-const VencimentosView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.VencimentosView })));
-const ContasPagarView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.ContasPagarView })));
-const DespesasView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.DespesasView })));
-const ConciliarView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.ConciliarView })));
+const FinanceiroView = lazy(() => import('./components/financeiro/DespesasView.tsx').then((m) => ({ default: m.FinanceiroView })));
 const CollaboratorsView = lazy(() => import('./components/collaborators/CollaboratorsView.tsx').then((m) => ({ default: m.CollaboratorsView })));
 const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
 const RhProcessesView = lazy(() => import('./components/rh/RhProcessesView.tsx').then((m) => ({ default: m.RhProcessesView })));
@@ -73,13 +72,30 @@ function MainApp() {
   const [menuAberto, setMenuAberto] = useState(false);
   const fecharMenu = useCallback(() => setMenuAberto(false), []);
 
+  // Padrão: Esc fecha a janela de cima (pelo botão Fechar dela, que já avisa alterações não salvas)
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const janelas = [...document.querySelectorAll<HTMLElement>('.modal-tela')].filter((j) => j.offsetParent !== null || j.getClientRects().length);
+      const topo = janelas[janelas.length - 1];
+      const fechar = topo?.querySelector<HTMLButtonElement>('button[aria-label^="Fechar"], button[aria-label^="fechar"]');
+      if (fechar) {
+        e.preventDefault();
+        fechar.click();
+      }
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, []);
+
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
   const currentView = vistaPermitida(currentRole, viewSolicitada);
 
   // Fase 5: trocar de tela com alterações não salvas pede confirmação
   const navegar = (view: string) => {
-    if (view === currentView || podeDescartarPendencias()) setCurrentView(view);
+    if (view === currentView) return setCurrentView(view);
+    void podeDescartarPendencias().then((ok) => ok && setCurrentView(view));
   };
 
   if (authLoading) {
@@ -108,19 +124,19 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Barra Superior Corporativa (Zone Contract) */}
-      <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} />
+      <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} onNavigate={navegar} />
 
       {/* Fase 2 (CRIT-04): falha de gravação no banco nunca mais passa em silêncio */}
       {dbErro && (
         <div
           role="alert"
-          className="fixed bottom-4 right-4 z-[60] max-w-md flex items-start gap-3 p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 shadow-lg"
+          className="selo-problema fixed bottom-4 right-4 z-[60] max-w-md flex items-start gap-3 p-3.5 rounded-xl border shadow-lg"
         >
           <span className="text-xs leading-relaxed flex-1">{dbErro}</span>
           <button
             type="button"
             onClick={limparDbErro}
-            className="text-xs font-semibold text-rose-700 hover:text-rose-900 shrink-0"
+            className="btn btn-sm btn-perigo shrink-0"
             aria-label="Fechar aviso de erro"
           >
             Fechar
@@ -144,12 +160,10 @@ function MainApp() {
             (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} />)}
           {currentView === 'assets' && <AssetsView key="hardware" modo="hardware" />}
           {currentView === 'softwares' && <AssetsView key="softwares" modo="softwares" />}
+          {currentView === 'linhas' && <LinhasView />}
           {currentView === 'fornecedores' && <FornecedoresView key="fornecedores" modo="fornecedores" />}
           {currentView === 'contratos' && <FornecedoresView key="contratos" modo="contratos" />}
-          {currentView === 'vencimentos' && <VencimentosView />}
-          {currentView === 'contas_pagar' && <ContasPagarView />}
-          {currentView === 'despesas' && <DespesasView />}
-          {currentView === 'conciliar' && <ConciliarView />}
+          {currentView === 'financeiro' && <FinanceiroView />}
           {currentView === 'collaborators' && <CollaboratorsView />}
           {currentView === 'servicedesk' && (
             <ServiceDeskView onOpenNewTicketModal={() => setShowNewTicketModal(true)} />
@@ -228,6 +242,7 @@ function MainApp() {
         />
       )}
       </Suspense>
+      <DialogoHost />
     </div>
   );
 }

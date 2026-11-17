@@ -31,8 +31,8 @@ const ROTULO_FORMA: Record<string, string> = {
   dispensada: 'assinatura dispensada',
 };
 
-const campo = 'w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
-const rotulo = 'block text-xs font-semibold text-slate-600 mb-0.5';
+const campo = 'campo';
+const rotulo = 'rotulo';
 
 interface Props {
   item: ProcessoItem;
@@ -43,7 +43,7 @@ interface Props {
 /**
  * Registro de um passo do checklist pela T.I. Cada tipo pede só o necessário
  * (login criado, equipamento entregue, destino da conta, condição da devolução...).
- * Nada grava até clicar em "Marcar como feito" ou "Não se aplica"; o banco
+ * Nada grava até clicar em "Registrar" ou "Não se aplica"; o banco
  * valida de novo e aplica os efeitos no inventário numa transação.
  */
 export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) => {
@@ -345,7 +345,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
   const nomeDe = (id?: string) => employees.find((e) => e.id === id)?.nome || '—';
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/80 p-3 space-y-2.5">
+    <div className="space-y-3 border-t border-slate-100 p-3">
       {/* Campos de cada tipo */}
       {item.tipo === 'cadastro' && (
         <div className="space-y-2">
@@ -368,10 +368,10 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                   </option>
                 ))}
             </select>
-            <p className="text-xs text-slate-500 mt-0.5">Só pessoas ativas.</p>
+            <p className="ajuda">Só pessoas ativas.</p>
           </div>
           {emailDiferente(pessoaEscolhida) && (
-            <label className="flex items-start gap-2 cursor-pointer rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            <label className="flex cursor-pointer items-start gap-2 text-xs font-medium text-amber-900">
               <input
                 type="checkbox"
                 checked={confirmouOutraPessoa}
@@ -390,9 +390,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               type="button"
               disabled={gravando}
               onClick={() => setCadastrando(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="btn btn-sm btn-primario"
             >
-              <UserPlus className="w-3.5 h-3.5" /> Cadastrar {ob.nomeColaborador} (dados do RH, para conferir)
+              <UserPlus aria-hidden="true" /> Cadastrar {ob.nomeColaborador} (dados do RH, para conferir)
             </button>
           )}
           {cadastrando && ob && (
@@ -411,7 +411,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
             />
           )}
           {ob && colabPorEmail && colabPorEmail.status !== 'ativo' && (
-            <p className="text-xs text-amber-800">
+            <p className="ajuda">
               {colabPorEmail.nome} tem o e-mail do pedido, mas está {colabPorEmail.status === 'desligado' ? 'desligada' : 'de férias'}.
               Admissão só se liga a pessoa ativa; para recontratar, o administrador de T.I. reativa o cadastro antes.
             </p>
@@ -421,9 +421,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               type="button"
               disabled={gravando}
               onClick={() => registrar('feito', 'Pessoa já cadastrada com o e-mail informado pelo RH', colabPorEmail.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="btn btn-sm btn-primario"
             >
-              <UserPlus className="w-3.5 h-3.5" /> {colabPorEmail.nome} já está cadastrada: ligar e concluir
+              <UserPlus aria-hidden="true" /> {colabPorEmail.nome} já está cadastrada: ligar e concluir
             </button>
           )}
         </div>
@@ -431,20 +431,20 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
 
       {/* Ajustes da admissão: a conta de um software com licença cadastrada já ocupa o assento */}
       {item.tipo === 'conta' && licencaConta && (
-        <div className="rounded-md border border-purple-200 bg-purple-50/60 p-2.5 text-xs">
+        <div className="text-xs">
           {jaTemLicenca ? (
-            <p className="text-purple-900">{colab?.nome} já tem a licença {licencaConta.nome}.</p>
+            <p className="text-slate-700">{colab?.nome} já tem a licença {licencaConta.nome}.</p>
           ) : !colabId ? (
-            <p className="text-purple-900">
+            <p className="text-slate-700">
               Licença {licencaConta.nome}: será possível atribuir depois do passo "Cadastrar colaborador".
             </p>
           ) : livresConta === 0 ? (
-            <p className="text-amber-800">
+            <p className="ajuda">
               {licencaConta.nome} está sem assento livre ({licencaConta.assentosAlocados} de {licencaConta.assentosTotais} em uso). A conta
               será registrada; atribua a licença depois, na ficha do software.
             </p>
           ) : (
-            <label className="flex items-start gap-2 cursor-pointer text-purple-900">
+            <label className="flex items-start gap-2 cursor-pointer text-slate-700">
               <input type="checkbox" checked={atribuirLicenca} onChange={(e) => setAtribuirLicenca(e.target.checked)} className="mt-0.5" />
               <span>
                 Atribuir a licença <strong>{licencaConta.nome}</strong> a {colab?.nome.split(' ')[0]} ({licencaConta.assentosAlocados} de{' '}
@@ -480,7 +480,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
             ))}
           </select>
           {ativosLivres.length === 0 && (
-            <p className="text-xs text-amber-700 mt-1">Nenhum ativo disponível no estoque. Cadastre ou libere um em Ativos.</p>
+            <p className="ajuda">Nenhum ativo disponível no estoque. Cadastre ou libere um em Ativos.</p>
           )}
         </div>
       )}
@@ -511,7 +511,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               </option>
             ))}
           </select>
-          {linhasLivres.length === 0 && <p className="text-xs text-amber-700 mt-1">Nenhuma linha livre. Cadastre em Contratos › Linhas telefônicas.</p>}
+          {linhasLivres.length === 0 && <p className="ajuda">Nenhuma linha livre. Cadastre em Contratos › Linhas telefônicas.</p>}
         </div>
       )}
 
@@ -555,8 +555,8 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
 
       {/* Ajustes do desligamento: desvincular de verdade (painel do fornecedor) e no sistema */}
       {desvincula && (
-        <div className="rounded-md border border-rose-200 bg-rose-50/60 p-2.5 text-xs space-y-1.5">
-          <label className="flex items-start gap-2 cursor-pointer text-rose-900">
+        <div className="space-y-1.5 text-xs">
+          <label className="flex items-start gap-2 cursor-pointer text-slate-700">
             <input type="checkbox" checked={confirmouExterno} onChange={(e) => setConfirmouExterno(e.target.checked)} className="mt-0.5" />
             <span>
               {item.tipo === 'liberar_linha'
@@ -567,11 +567,11 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
             </span>
           </label>
           {licencaDoItem?.urlPainel && (
-            <a href={licencaDoItem.urlPainel} target="_blank" rel="noopener noreferrer" className="inline-block font-medium text-blue-700 hover:underline">
+            <a href={licencaDoItem.urlPainel} target="_blank" rel="noopener noreferrer" className="link inline-block">
               Abrir o painel de {licencaDoItem.nome} ↗
             </a>
           )}
-          <p className="text-rose-800">
+          <p className="ajuda">
             {item.tipo === 'liberar_licenca'
               ? 'Ao concluir, o assento também é liberado aqui no sistema.'
               : 'Ao concluir, a conta sai do inventário da pessoa aqui no sistema.'}
@@ -627,7 +627,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       {item.tipo === 'acesso_nexus' && (
         <div className="space-y-2">
           {senha ? (
-            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-md space-y-1.5">
+            <div className="space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
               <p className="text-xs font-semibold text-emerald-900">Acesso pronto. A senha aparece só agora:</p>
               <p className="text-xs text-slate-700">
                 Login: <span className="font-mono">{senha.email}</span>
@@ -639,9 +639,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard?.writeText(senha.senha)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100"
+                  className="btn btn-sm btn-secundario"
                 >
-                  <Copy className="w-3 h-3" /> Copiar
+                  <Copy aria-hidden="true" /> Copiar
                 </button>
               </div>
               <p className="text-xs text-emerald-800">
@@ -659,16 +659,16 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                   type="button"
                   disabled={gravando || !colabId}
                   onClick={() => gerarAcesso('criar')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                  className="btn btn-sm btn-primario"
                 >
-                  <KeyRound className="w-3.5 h-3.5" /> Criar login e gerar senha
+                  <KeyRound aria-hidden="true" /> Criar login e gerar senha
                 </button>
                 {podeRedefinir && (
                   <button
                     type="button"
                     disabled={gravando}
                     onClick={() => gerarAcesso('redefinir')}
-                    className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50"
+                    className="btn btn-sm btn-secundario"
                   >
                     Gerar nova senha provisória
                   </button>
@@ -690,7 +690,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               <button
                 type="button"
                 onClick={() => setSelectedTermForPrint(termo)}
-                className="px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
+                className="btn btn-sm btn-secundario"
               >
                 Abrir termo
               </button>
@@ -699,7 +699,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                   type="button"
                   disabled={gravando}
                   onClick={abrirConferencia}
-                  className="px-2 py-1 text-xs font-semibold text-rose-700 bg-white border border-rose-200 rounded hover:bg-rose-50"
+                  className="btn btn-sm btn-perigo"
                 >
                   Substituir termo
                 </button>
@@ -711,7 +711,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
                 type="button"
                 disabled={gravando}
                 onClick={abrirConferencia}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="btn btn-sm btn-primario"
               >
                 Conferir itens e gerar {ticket.tipo === 'onboarding' ? 'termo de entrega' : 'recibo de devolução'}
               </button>
@@ -723,7 +723,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               {termosCancelados.map((t, i) => (
                 <React.Fragment key={t.id}>
                   {i > 0 && ', '}
-                  <button type="button" onClick={() => setSelectedTermForPrint(t)} className="underline hover:text-slate-700">
+                  <button type="button" onClick={() => setSelectedTermForPrint(t)} className="link">
                     {t.codigo}
                   </button>{' '}
                   ({t.substituidoPor ? 'substituído' : 'cancelado'}: {t.cancelamentoMotivo})
@@ -743,7 +743,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
             />
           )}
           {!termoOk && (
-            <p className="text-xs text-slate-500">
+            <p className="ajuda">
               O processo pode ser concluído com o termo pendente: o sistema cria um lembrete para coletar a assinatura.
             </p>
           )}
@@ -779,15 +779,10 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
       </div>
 
       {aviso && <p className="text-xs text-emerald-700">{aviso}</p>}
-      {erro && <p className="text-xs font-medium text-red-700">{erro}</p>}
+      {erro && <p role="alert" className="erro">{erro}</p>}
 
-      <div className="flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          onClick={onFechar}
-          disabled={gravando}
-          className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
-        >
+      <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
+        <button type="button" onClick={onFechar} disabled={gravando} className="btn btn-sm btn-secundario">
           {senha ? 'Fechar' : 'Cancelar'}
         </button>
         {!senha && (
@@ -796,7 +791,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               type="button"
               onClick={() => registrar('nao_se_aplica')}
               disabled={gravando}
-              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50"
+              className="btn btn-sm btn-secundario"
             >
               Não se aplica
             </button>
@@ -810,9 +805,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar }) =>
               }
               disabled={gravando || (item.tipo === 'termo' && !termoOk)}
               title={item.tipo === 'termo' && !termoOk ? 'Disponível quando o termo estiver assinado ou dispensado' : undefined}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+              className="btn btn-sm btn-primario"
             >
-              {gravando ? 'Gravando...' : 'Marcar como feito'}
+              {gravando ? 'Registrando...' : 'Registrar'}
             </button>
           </>
         )}

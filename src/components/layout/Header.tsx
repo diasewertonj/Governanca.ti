@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { MeusDadosModal } from '../lgpd/MeusDadosModal.tsx';
-import { Shield, LogOut, ChevronDown, Menu } from 'lucide-react';
+import { Shield, LogOut, ChevronDown, Menu, Briefcase } from 'lucide-react';
+import { termoAberto } from '../../utils/termos.ts';
 import { TITULO_VISTA, type Vista } from '../../utils/navegacao.ts';
 
 interface HeaderProps {
@@ -9,13 +10,15 @@ interface HeaderProps {
   /** Fase 7: abre o menu (gaveta) no celular/tablet */
   onAbrirMenu: () => void;
   menuAberto: boolean;
+  /** Seção 7: abre Meus equipamentos pelo menu da conta (T.I./admin) */
+  onNavigate?: (view: string) => void;
 }
 
 const ROTULO_PAPEL: Record<string, { label: string; badgeClass: string }> = {
-  ti_admin: { label: 'Admin T.I.', badgeClass: 'text-blue-800 bg-blue-50 border-blue-200' },
-  ti_suporte: { label: 'Suporte T.I.', badgeClass: 'text-cyan-800 bg-cyan-50 border-cyan-200' },
-  rh: { label: 'Recursos Humanos', badgeClass: 'text-purple-800 bg-purple-50 border-purple-200' },
-  colaborador: { label: 'Colaborador', badgeClass: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
+  ti_admin: { label: 'Admin T.I.', badgeClass: 'selo-info' },
+  ti_suporte: { label: 'Suporte T.I.', badgeClass: 'selo-info' },
+  rh: { label: 'Recursos Humanos', badgeClass: 'selo-neutro' },
+  colaborador: { label: 'Colaborador', badgeClass: 'selo-neutro' },
 };
 
 /** Logo da empresa (Configurações › Empresa) ou as iniciais do nome fantasia */
@@ -48,8 +51,11 @@ export const LogoEmpresa: React.FC<{ tamanho?: string }> = ({ tamanho = 'w-8 h-8
   );
 };
 
-export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAberto }) => {
-  const { currentUser, currentRole, supabaseUser, logout, podeDescartarPendencias, settings } = useApp();
+export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAberto, onNavigate }) => {
+  const { currentUser, currentRole, supabaseUser, logout, podeDescartarPendencias, settings, terms } = useApp();
+  // T.I./admin não têm Minha área no menu: Meus equipamentos fica aqui, com o aviso de termo a assinar
+  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const termosParaAssinar = terms.filter((t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm).length;
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showMeusDados, setShowMeusDados] = useState(false);
 
@@ -112,6 +118,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
             </p>
             <span className="text-xs text-slate-600 leading-none mt-1 block">{papel.label}</span>
           </div>
+          {isTI && termosParaAssinar > 0 && (
+            <span className="text-xs font-semibold rounded-full px-1.5 bg-amber-100 text-amber-900" title={`${termosParaAssinar} termo(s) para você assinar`}>
+              {termosParaAssinar}
+            </span>
+          )}
           <ChevronDown className="w-4 h-4 text-slate-500" aria-hidden="true" />
           <span className="sr-only">Abrir menu da conta</span>
         </button>
@@ -119,16 +130,33 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
         {showSwitchMenu && (
           <div
             role="menu"
-            className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50"
+            className="cartao absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-1.5rem)] shadow-lg py-2 z-50"
           >
             <div className="px-3.5 py-2.5 border-b border-slate-100">
               <p className="font-semibold text-slate-900 text-sm truncate">{currentUser?.nome || supabaseUser?.nome}</p>
               <p className="text-xs text-slate-600 truncate mt-0.5">{currentUser?.email || supabaseUser?.email}</p>
-              <span className={`inline-block mt-2 text-xs px-2 py-0.5 rounded border font-medium ${papel.badgeClass}`}>
+              <span className={`selo mt-2 ${papel.badgeClass}`}>
                 {papel.label}
               </span>
             </div>
             <div className="pt-1 px-1">
+              {isTI && onNavigate && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowSwitchMenu(false);
+                    onNavigate('my_assets');
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <Briefcase className="w-4 h-4 text-slate-500" aria-hidden="true" />
+                  <span className="flex-1">Meus equipamentos</span>
+                  {termosParaAssinar > 0 && (
+                    <span className="text-xs font-semibold rounded-full px-2 py-0.5 bg-amber-100 text-amber-900">{termosParaAssinar} a assinar</span>
+                  )}
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -146,9 +174,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
                 role="menuitem"
                 onClick={() => {
                   setShowSwitchMenu(false);
-                  if (podeDescartarPendencias()) logout();
+                  void podeDescartarPendencias().then((ok) => ok && logout());
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-rose-700 hover:bg-rose-50 transition-colors text-left"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-red-700 hover:bg-red-50 transition-colors text-left"
               >
                 <LogOut className="w-4 h-4" aria-hidden="true" />
                 <span>Sair</span>

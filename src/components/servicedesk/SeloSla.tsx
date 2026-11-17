@@ -1,9 +1,36 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
-import type { Ticket } from '../../types/index.ts';
+import type { Ticket, TicketPriority, TicketStatus } from '../../types/index.ts';
 import { formatDateTime } from '../../utils/formatters.ts';
-import { COR_ESTADO_SLA, ROTULO_ESTADO_SLA, seloSla, situacaoSla } from '../../utils/sla.ts';
+import { ROTULO_ESTADO_SLA, seloSla, situacaoSla, type EstadoSla } from '../../utils/sla.ts';
+
+/** Situação do chamado → selo padrão (aberto: info; em atendimento/aguardando: atenção; resolvido: ok; cancelado: neutro) */
+export const SELO_STATUS_CHAMADO: Record<TicketStatus, string> = {
+  aberto: 'selo selo-info',
+  em_andamento: 'selo selo-atencao',
+  aguardando_terceiro: 'selo selo-atencao',
+  resolvido: 'selo selo-ok',
+  cancelado: 'selo selo-neutro',
+};
+
+/** Prioridade → selo padrão (urgente: problema; alta: atenção) */
+export const SELO_PRIORIDADE_CHAMADO: Record<TicketPriority, string> = {
+  baixa: 'selo selo-neutro',
+  media: 'selo selo-info',
+  alta: 'selo selo-atencao',
+  critica: 'selo selo-problema',
+};
+
+/** Estado do prazo (SLA) → selo padrão */
+const SELO_ESTADO_SLA: Record<EstadoSla, string> = {
+  no_prazo: 'selo selo-neutro',
+  vence_logo: 'selo selo-atencao',
+  atrasado: 'selo selo-problema',
+  pausado: 'selo selo-neutro',
+  cumprido: 'selo selo-ok',
+  fora_do_prazo: 'selo selo-problema',
+};
 
 /** Fase 10 C1: selo do prazo (vence em…, atrasado, no prazo) — só chamados de suporte */
 export const SeloSla: React.FC<{ tkt: Ticket }> = ({ tkt }) => {
@@ -13,9 +40,9 @@ export const SeloSla: React.FC<{ tkt: Ticket }> = ({ tkt }) => {
   return (
     <span
       title={`Solução até ${formatDateTime(s.solucao.vence.toISOString())} (horário comercial)`}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${COR_ESTADO_SLA[s.solucao.estado]}`}
+      className={SELO_ESTADO_SLA[s.solucao.estado]}
     >
-      <Clock className="w-3 h-3" aria-hidden="true" />
+      <Clock aria-hidden="true" />
       {seloSla(s)}
     </span>
   );
@@ -28,11 +55,11 @@ export const PrazosChamado: React.FC<{ tkt: Ticket }> = ({ tkt }) => {
   if (!s) return null;
   const { resposta, solucao } = s;
   return (
-    <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2 text-xs">
-      <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">Prazos</span>
+    <section aria-label="Prazos" className="cartao p-4 space-y-3 text-xs">
+      <h3 className="secao-titulo">Prazos</h3>
       <div className="flex items-center justify-between gap-2">
         <span className="text-slate-600">1ª resposta</span>
-        <span className={resposta.atrasada ? 'font-semibold text-rose-700' : 'font-medium text-slate-800'}>
+        <span className={resposta.atrasada ? 'font-semibold text-red-700' : 'font-medium text-slate-900'}>
           {resposta.respondidaEm
             ? `${resposta.atrasada ? 'Fora do prazo' : 'No prazo'} (${formatDateTime(resposta.respondidaEm.toISOString())})`
             : `${resposta.atrasada ? 'Atrasada' : 'Até'} ${formatDateTime(resposta.vence.toISOString())}`}
@@ -40,7 +67,7 @@ export const PrazosChamado: React.FC<{ tkt: Ticket }> = ({ tkt }) => {
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className="text-slate-600">Solução</span>
-        <span className={`px-2 py-0.5 rounded border font-medium ${COR_ESTADO_SLA[solucao.estado]}`}>
+        <span className={SELO_ESTADO_SLA[solucao.estado]}>
           {solucao.estado === 'cumprido' || solucao.estado === 'fora_do_prazo' || solucao.estado === 'pausado'
             ? ROTULO_ESTADO_SLA[solucao.estado]
             : seloSla(s)}
@@ -49,6 +76,6 @@ export const PrazosChamado: React.FC<{ tkt: Ticket }> = ({ tkt }) => {
       {solucao.estado !== 'cumprido' && solucao.estado !== 'fora_do_prazo' && (
         <p className="text-slate-500">Até {formatDateTime(solucao.vence.toISOString())} · horário comercial; "aguardando" pausa o prazo.</p>
       )}
-    </div>
+    </section>
   );
 };

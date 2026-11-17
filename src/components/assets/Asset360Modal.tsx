@@ -1,14 +1,11 @@
+import { avisar } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatCurrency, formatDate, formatChaveNFe } from '../../utils/formatters.ts';
 import { contratosQueCobrem, garantiaEfetiva, nomeContrato } from '../../utils/contratos.ts';
 import {
-  X,
   QrCode,
   FileText,
-  User,
-  Clock,
-  Receipt,
   Wrench,
   Pencil,
   ShieldAlert,
@@ -16,10 +13,13 @@ import {
   Copy,
   Check,
   ArrowRightLeft,
-  ExternalLink,
-  Edit2,
   Lock,
   Archive,
+  Laptop,
+  Mouse,
+  Smartphone,
+  Package,
+  ChevronRight,
 } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 import { AnexosAtivo } from './AnexosAtivo.tsx';
@@ -28,15 +28,97 @@ import { ManutencoesAtivo } from './ManutencoesAtivo.tsx';
 import { FormManutencao } from './FormManutencao.tsx';
 import { FormBaixa } from './FormBaixa.tsx';
 import { BaixaPatrimonial } from './BaixaPatrimonial.tsx';
-import { podeEnviarParaManutencao } from '../../utils/cicloVida.ts';
+import { ROTULO_MOTIVO_BAIXA, ROTULO_TIPO_MANUTENCAO, baixaVigente, podeEnviarParaManutencao } from '../../utils/cicloVida.ts';
 import { chamadosDoAtivo } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
+import { ContratoPorId } from '../financeiro/FinanceiroViews.tsx';
+import { Janela, Dado } from '../ui/Janela.tsx';
+import { Abas, type ItemAba } from '../ui/Abas.tsx';
+import { Vazio } from '../ui/Tela.tsx';
+import type { Asset, AssetCategory, AssetStatus } from '../../types/index.ts';
 
 interface Asset360ModalProps {
   assetId: string;
   /** Fase 9: aberta pelo chamado já com "Enviar para manutenção" ligado a ele */
   manutencaoDoChamado?: string;
   onClose: () => void;
+}
+
+type AbaAtivo = 'resumo' | 'custodia' | 'garantia' | 'manutencoes' | 'documentos' | 'chamados' | 'historico';
+
+const SITUACAO: Record<AssetStatus, { rotulo: string; selo: string }> = {
+  disponivel: { rotulo: 'Disponível em estoque', selo: 'selo-ok' },
+  em_uso: { rotulo: 'Em uso', selo: 'selo-info' },
+  manutencao: { rotulo: 'Em manutenção', selo: 'selo-atencao' },
+  descartado: { rotulo: 'Baixado', selo: 'selo-neutro' },
+};
+
+const ICONE_CATEGORIA: Record<AssetCategory, React.ReactNode> = {
+  hardware: <Laptop className="h-4 w-4" />,
+  periferico: <Mouse className="h-4 w-4" />,
+  telefonia: <Smartphone className="h-4 w-4" />,
+  software: <Package className="h-4 w-4" />,
+};
+
+/** Texto do botão some no celular (fica só o ícone, com o nome no title/aria-label) */
+const Rotulo: React.FC<{ texto: string }> = ({ texto }) => <span className="hidden sm:inline">{texto}</span>;
+
+interface EventoAtivo {
+  id: string;
+  data: string;
+  rotulo: string;
+  selo: string;
+  texto: string;
+  detalhe?: string;
+}
+
+/** Linha do tempo do equipamento: compra, entregas/devoluções, manutenções e baixas */
+function eventosDoAtivo(asset: Asset, nomeFornecedor?: string): EventoAtivo[] {
+  const ev: EventoAtivo[] = [];
+  if (asset.fiscal?.dataAquisicao) {
+    ev.push({
+      id: 'compra',
+      data: asset.fiscal.dataAquisicao,
+      rotulo: 'Compra',
+      selo: 'selo-info',
+      texto: `Comprado${nomeFornecedor ? ` de ${nomeFornecedor}` : ''}${asset.fiscal.numeroNF ? ` · NF ${asset.fiscal.numeroNF}` : ''}`,
+    });
+  }
+  for (const h of asset.historicoCustodia || []) {
+    if (h.dataEntrega) ev.push({ id: `${h.id}-e`, data: h.dataEntrega, rotulo: 'Entrega', selo: 'selo-info', texto: `Entregue a ${h.colaboradorNome}` });
+    if (h.dataDevolucao) {
+      ev.push({
+        id: `${h.id}-d`,
+        data: h.dataDevolucao,
+        rotulo: 'Devolução',
+        selo: 'selo-neutro',
+        texto: `Devolvido por ${h.colaboradorNome}`,
+        detalhe: h.motivoDevolucao,
+      });
+    }
+  }
+  for (const m of asset.historicoManutencao || []) {
+    ev.push({
+      id: `${m.id}-a`,
+      data: m.abertaEm,
+      rotulo: 'Manutenção',
+      selo: 'selo-atencao',
+      texto: `${ROTULO_TIPO_MANUTENCAO[m.tipo]} aberta: ${m.descricao}`,
+    });
+    if (m.status === 'concluida' && m.concluidaEm) {
+      ev.push({ id: `${m.id}-c`, data: m.concluidaEm, rotulo: 'Manutenção', selo: 'selo-ok', texto: `Manutenção concluída: ${m.descricao}` });
+    }
+    if (m.status === 'cancelada' && m.encerradoEm) {
+      ev.push({ id: `${m.id}-x`, data: m.encerradoEm, rotulo: 'Manutenção', selo: 'selo-neutro', texto: `Manutenção cancelada: ${m.descricao}` });
+    }
+  }
+  for (const b of asset.baixas || []) {
+    ev.push({ id: `${b.id}-b`, data: b.dataBaixa, rotulo: 'Baixa', selo: 'selo-problema', texto: `Baixa patrimonial: ${ROTULO_MOTIVO_BAIXA[b.motivo]}` });
+    if (b.estornadaEm) {
+      ev.push({ id: `${b.id}-e`, data: b.estornadaEm, rotulo: 'Estorno', selo: 'selo-neutro', texto: 'Baixa estornada', detalhe: b.motivoEstorno });
+    }
+  }
+  return ev.sort((a, b) => b.data.localeCompare(a.data));
 }
 
 export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutencaoDoChamado, onClose }) => {
@@ -57,6 +139,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
     fornecedores,
   } = useApp();
 
+  const [aba, setAba] = useState<AbaAtivo>(manutencaoDoChamado ? 'manutencoes' : 'resumo');
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedBitlocker, setCopiedBitlocker] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -66,6 +149,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
   const [editando, setEditando] = useState(false);
   const [enviandoManutencao, setEnviandoManutencao] = useState(Boolean(manutencaoDoChamado));
   const [dandoBaixa, setDandoBaixa] = useState(false);
+  const [contratoAberto, setContratoAberto] = useState<string | null>(null);
   const [tempSO, setTempSO] = useState('');
   const [tempBitlocker, setTempBitlocker] = useState('');
 
@@ -77,9 +161,15 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
   const department = departments.find((d) => d.id === asset.setorId);
   // Fase 8: a garantia considera os contratos de suporte/garantia estendida que cobrem o ativo
   const warranty = garantiaEfetiva(asset, contratos);
-  const contratoCobertura = contratosQueCobrem(asset.id, contratos)[0];
+  const contratosCobertura = contratosQueCobrem(asset.id, contratos);
   const nomeFornecedor = fornecedores.find((f) => f.id === asset.fornecedorId)?.nome || asset.fiscal?.fornecedor;
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const descartado = asset.status === 'descartado';
+  const situacao = SITUACAO[asset.status];
+  const baixa = baixaVigente(asset);
+  const chamados = chamadosDoAtivo(tickets, asset.id);
+  const seloGarantia =
+    warranty.status === 'valida' ? 'selo-ok' : warranty.status === 'expirando' ? 'selo-atencao' : 'selo-neutro';
 
   const handleCopyKey = () => {
     if (asset.fiscal?.chaveAcesso44) {
@@ -105,19 +195,26 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
     setIsEditingSecurity(false);
   };
 
+  // AUDITORIA RBAC: colaborador comum não abre o cadastro de outros colaboradores
+  const podeVerPessoa = (empId: string) => !(currentRole === 'colaborador' && empId !== currentUser?.id);
+
   const handleOpenCustodian = (empId: string) => {
-    // AUDITORIA RBAC: Colaborador comum não pode abrir perfis de outros colaboradores
-    if (currentRole === 'colaborador' && empId !== currentUser?.id) {
-      alert('Acesso restrito: Colaboradores não têm permissão para acessar o cadastro de outros colaboradores.');
+    if (!podeVerPessoa(empId)) {
+      void avisar('Acesso restrito: Colaboradores não têm permissão para acessar o cadastro de outros colaboradores.');
       return;
     }
     // Fase 9: abre por cima; fechar a ficha da pessoa volta para este equipamento
     setSelectedEmployeeIdFor360(empId);
   };
 
-  const handleOpenQrCode = () => {
-    setSelectedAssetForQrCode(asset);
-  };
+  const pessoa = (id: string, nome: string) =>
+    podeVerPessoa(id) ? (
+      <button type="button" onClick={() => handleOpenCustodian(id)} className="link text-left">
+        {nome}
+      </button>
+    ) : (
+      <span className="font-medium text-slate-900">{nome}</span>
+    );
 
   const handleExecuteTransfer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,246 +228,150 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
   const handleViewTerm = (termoId?: string) => {
     if (!termoId) return;
     const term = terms.find((t) => t.id === termoId);
-    if (term) {
-      setSelectedTermForPrint(term);
-    }
+    if (term) setSelectedTermForPrint(term);
   };
 
-  const statusConfig = {
-    disponivel: { label: 'Disponível em Estoque', textClass: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-    em_uso: { label: 'Em Uso / Alocado', textClass: 'text-blue-700 bg-blue-50 border-blue-200' },
-    manutencao: { label: 'Em Manutenção', textClass: 'text-amber-700 bg-amber-50 border-amber-200' },
-    descartado: { label: 'Baixado', textClass: 'text-slate-500 bg-slate-100 border-slate-200' },
-  }[asset.status];
+  const abrirTransferencia = () => {
+    setAba('custodia');
+    setShowTransferModal(true);
+  };
+
+  const abas: ItemAba<AbaAtivo>[] = [
+    { id: 'resumo', rotulo: 'Resumo' },
+    { id: 'custodia', rotulo: 'Custódia e histórico' },
+    { id: 'garantia', rotulo: 'Garantia e contrato' },
+    ...(isTI ? [{ id: 'manutencoes' as const, rotulo: 'Manutenções', contador: (asset.historicoManutencao || []).length }] : []),
+    { id: 'documentos', rotulo: 'Documentos', contador: isTI ? (asset.anexos || []).length : undefined },
+    { id: 'chamados', rotulo: 'Chamados', contador: chamados.length },
+  ];
+  const abaAtual = abas.some((a) => a.id === aba) ? aba : 'resumo';
+  // Painéis ficam montados (escondidos): o que está em digitação não se perde ao trocar de aba
+  const painel = (id: AbaAtivo) => (abaAtual === id ? 'space-y-4' : 'hidden');
+  const eventos = eventosDoAtivo(asset, nomeFornecedor);
+  const temEspecificacoes = asset.categoria === 'hardware' || (asset.customFields && Object.keys(asset.customFields).length > 0);
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
-        {/* Cabeçalho */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="font-mono text-sm font-bold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-md border border-blue-200">
-              {asset.tag}
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold text-slate-900 leading-tight break-words">{asset.nome}</h2>
-              <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500 mt-0.5">
-                <span>{asset.marca} {asset.modelo}</span>
-                <span aria-hidden="true">·</span>
-                <span className="capitalize">{asset.categoria}</span>
-                <span aria-hidden="true">·</span>
-                <span className="font-mono break-all">S/N: {asset.serialNumber}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {isTI && asset.status !== 'descartado' && (
+      <Janela
+        tamanho="ficha"
+        icone={ICONE_CATEGORIA[asset.categoria] || <Package className="h-4 w-4" />}
+        titulo={
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 font-mono text-blue-700">{asset.tag}</span>
+            <span className="truncate">{asset.nome}</span>
+            <span className={`selo ${situacao.selo} shrink-0`}>{situacao.rotulo}</span>
+          </span>
+        }
+        subtitulo={
+          <>
+            {[asset.marca, asset.modelo].filter(Boolean).join(' ')}
+            {' · '}
+            <span className="capitalize">{asset.categoria}</span>
+            {' · S/N '}
+            <span className="font-mono">{asset.serialNumber}</span>
+          </>
+        }
+        onFechar={onClose}
+        acoes={
+          <>
+            {isTI && !descartado && (
+              <button type="button" title="Editar" aria-label="Editar" onClick={() => setEditando(true)} className="btn btn-sm btn-secundario">
+                <Pencil />
+                <Rotulo texto="Editar" />
+              </button>
+            )}
+            {isTI && !descartado && (
               <button
                 type="button"
-                onClick={() => setEditando(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
+                title="Transferir custódia"
+                aria-label="Transferir custódia"
+                onClick={abrirTransferencia}
+                className="btn btn-sm btn-secundario"
               >
-                <Pencil className="w-3.5 h-3.5 text-slate-600" />
-                Editar
+                <ArrowRightLeft />
+                <Rotulo texto="Transferir custódia" />
               </button>
             )}
             {isTI && podeEnviarParaManutencao(asset) && (
               <button
                 type="button"
+                title={asset.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
+                aria-label={asset.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
                 onClick={() => setEnviandoManutencao(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors shadow-2xs"
+                className="btn btn-sm btn-secundario"
               >
-                <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
-                {asset.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
+                <Wrench aria-hidden="true" />
+                <Rotulo texto={asset.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'} />
               </button>
             )}
             <button
               type="button"
-              onClick={handleOpenQrCode}
+              onClick={() => setSelectedAssetForQrCode(asset)}
               title="Gerar etiqueta física com QR Code"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
+              aria-label="Gerar etiqueta física com QR Code"
+              className="btn btn-sm btn-secundario"
             >
-              <QrCode className="w-3.5 h-3.5 text-slate-600" />
-              Etiqueta QR Code
+              <QrCode />
+              <Rotulo texto="Etiqueta QR" />
             </button>
-
-            {isTI && asset.status !== 'descartado' && (
-              <button
-                type="button"
-                onClick={() => setShowTransferModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors shadow-2xs"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5" />
-                Mudar Custódia
+            {currentRole === 'ti_admin' && !descartado && (
+              <button type="button" title="Dar baixa" aria-label="Dar baixa" onClick={() => setDandoBaixa(true)} className="btn btn-sm btn-perigo">
+                <Archive aria-hidden="true" />
+                <Rotulo texto="Dar baixa" />
               </button>
             )}
-
-            {currentRole === 'ti_admin' && asset.status !== 'descartado' && (
-              <button
-                type="button"
-                onClick={() => setDandoBaixa(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors shadow-2xs"
-              >
-                <Archive className="w-3.5 h-3.5" aria-hidden="true" />
-                Dar baixa
+          </>
+        }
+        faixa={<Abas<AbaAtivo> rotulo="Seções da ficha do equipamento" itens={abas} ativa={abaAtual} onMudar={setAba} />}
+      >
+        {/* ---------------- Resumo ---------------- */}
+        <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
+          {isTI && baixa && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+              <span>
+                Baixa patrimonial em {formatDate(baixa.dataBaixa)}: {ROTULO_MOTIVO_BAIXA[baixa.motivo]}.
+              </span>
+              <button type="button" onClick={() => setAba('custodia')} className="btn btn-sm btn-secundario">
+                Ver baixa
+                <ChevronRight />
               </button>
-            )}
-
-            <button
-              type="button"
-              aria-label="Fechar"
-              onClick={onClose}
-              className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors ml-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Modal interno de Transferência de Custódia */}
-        {showTransferModal && (
-          <div className="bg-blue-50/70 border-b border-blue-200 p-4 animate-in slide-in-from-top-2 duration-150">
-            <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <ArrowRightLeft className="w-3.5 h-3.5" />
-              Transferência / Devolução de Custódia 1:1
-            </h4>
-            <form onSubmit={handleExecuteTransfer} className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">
-                    Novo Destino do Equipamento
-                  </label>
-                  <select
-                    value={selectedNewUser}
-                    onChange={(e) => setSelectedNewUser(e.target.value)}
-                    required
-                    className="w-full text-xs bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="">Selecione um colaborador ou estoque...</option>
-                    <option value="estoque">📦 Devolver para Almoxarifado / Estoque de T.I.</option>
-                    <optgroup label="Colaboradores Ativos">
-                      {employees
-                        .filter((e) => e.status === 'ativo' && e.id !== asset.custodianteId)
-                        .map((emp) => (
-                          <option key={emp.id} value={emp.id}>
-                            {emp.nome} ({emp.cargo})
-                          </option>
-                        ))}
-                    </optgroup>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">
-                    Motivo da Movimentação
-                  </label>
-                  <input
-                    type="text"
-                    value={motivoDevolucao}
-                    onChange={(e) => setMotivoDevolucao(e.target.value)}
-                    placeholder="Ex: Substituição, upgrade ou desligamento..."
-                    required
-                    className="w-full text-xs bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowTransferModal(false)}
-                  className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200/50 rounded-md"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                >
-                  Confirmar Transferência
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Conteúdo com scroll */}
-        <div className="p-6 space-y-6 sm:max-h-[75vh] sm:overflow-y-auto">
-          {/* Card de Status & Custódia Atual (Rastreabilidade 360°) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-              <span className="text-xs uppercase font-semibold text-slate-500 block">Status do Ativo</span>
-              <div className="mt-1 flex items-center gap-2">
-                <span className={`inline-block px-2.5 py-0.5 text-xs font-medium rounded-md border ${statusConfig.textClass}`}>
-                  {statusConfig.label}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Localização: <span className="font-medium text-slate-700">{asset.localizacaoFisica}</span>
-              </p>
             </div>
+          )}
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg col-span-2">
-              <span className="text-xs uppercase font-semibold text-slate-500 block">Custodiante Atual</span>
-              {currentCustodian ? (
-                <div className="mt-1 flex items-center justify-between">
-                  <div>
-                    {currentRole === 'colaborador' && currentCustodian.id !== currentUser?.id ? (
-                      <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-                        <User className="w-4 h-4 text-slate-500" />
-                        {currentCustodian.nome}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenCustodian(currentCustodian.id)}
-                        className="text-sm font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1.5"
-                      >
-                        <User className="w-4 h-4 text-blue-600" />
-                        {currentCustodian.nome}
-                        <ExternalLink className="w-3 h-3 text-blue-500" />
-                      </button>
-                    )}
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      {currentCustodian.cargo} · {department?.nome || 'Setor'}
-                    </p>
-                  </div>
-                  <div className="text-right text-xs text-slate-500">
-                    <span>Em posse desde</span>
-                    <p className="font-medium text-slate-700">{formatDate(asset.dataEntregaAtual)}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-1">
-                  <p className="text-xs font-medium text-slate-700">Nenhum colaborador alocado no momento</p>
-                  <p className="text-xs text-slate-500">O item está no estoque e pronto para empréstimo.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Fase 8: baixa patrimonial vigente e estornadas (só TI) */}
-          {isTI && <BaixaPatrimonial asset={asset} />}
+          <section className="cartao space-y-3 p-4">
+            <h3 className="secao-titulo">Dados do equipamento</h3>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Dado rotulo="Situação">
+                <span className={`selo ${situacao.selo}`}>{situacao.rotulo}</span>
+              </Dado>
+              <Dado rotulo="Patrimônio">
+                <span className="font-mono">{asset.tag}</span>
+              </Dado>
+              <Dado rotulo="Marca e modelo">{[asset.marca, asset.modelo].filter(Boolean).join(' ') || '—'}</Dado>
+              <Dado rotulo="Número de série">
+                <span className="font-mono break-all">{asset.serialNumber || '—'}</span>
+              </Dado>
+              <Dado rotulo="Com quem está">
+                {currentCustodian ? pessoa(currentCustodian.id, currentCustodian.nome) : 'Em estoque'}
+              </Dado>
+              <Dado rotulo="Setor">{department?.nome || '—'}</Dado>
+              <Dado rotulo="Localização">{asset.localizacaoFisica || '—'}</Dado>
+              <Dado rotulo="Garantia">
+                <span className={`selo ${seloGarantia}`}>{warranty.label}</span>
+              </Dado>
+              <Dado rotulo="Fornecedor">{nomeFornecedor || '—'}</Dado>
+              <Dado rotulo="Categoria">
+                <span className="capitalize">{asset.categoria}</span>
+              </Dado>
+            </dl>
+          </section>
 
           {/* Especificações técnicas: SO/BitLocker (hardware) + atributos personalizados */}
-          {(asset.categoria === 'hardware' ||
-            (asset.customFields && Object.keys(asset.customFields).length > 0)) && (
-          <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-white">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-100">
-            Especificações técnicas
-          </h3>
-          {asset.categoria === 'hardware' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                    Sistema Operacional & Segurança de Disco (BitLocker)
-                  </h3>
-                </div>
-                {isTI && asset.status !== 'descartado' && !isEditingSecurity && (
+          {temEspecificacoes && (
+            <section className="cartao space-y-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="secao-titulo">Especificações técnicas</h3>
+                {asset.categoria === 'hardware' && isTI && !descartado && !isEditingSecurity && (
                   <button
                     type="button"
                     onClick={() => {
@@ -378,347 +379,361 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                       setTempBitlocker(asset.bitlockerKey || '');
                       setIsEditingSecurity(true);
                     }}
-                    className="text-xs text-blue-700 hover:underline flex items-center gap-1 font-medium"
+                    className="btn btn-sm btn-secundario"
                   >
-                    <Edit2 className="w-3 h-3" />
-                    <span>Editar SO / BitLocker</span>
+                    <Pencil />
+                    Editar SO / BitLocker
                   </button>
                 )}
               </div>
 
-              {isEditingSecurity ? (
-                <div className="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Sistema Operacional
-                      </label>
-                      <select
-                        value={tempSO}
-                        onChange={(e) => setTempSO(e.target.value)}
-                        className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
-                      >
-                        <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
-                        <option value="Windows 11 Home">Windows 11 Home</option>
-                        <option value="Windows 10 Pro 64-bit">Windows 10 Pro (64-bit)</option>
-                        <option value="macOS Sequoia 15.x">macOS Sequoia (Apple Silicon / Intel)</option>
-                        <option value="macOS Sonoma 14.x">macOS Sonoma (Apple Silicon)</option>
-                        <option value="Ubuntu Linux 24.04 LTS">Ubuntu Linux 24.04 LTS</option>
-                        <option value="Outro Sistema">Outro Sistema</option>
-                      </select>
+              {asset.categoria === 'hardware' &&
+                (isEditingSecurity ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div>
+                        <label htmlFor={`so-${asset.id}`} className="rotulo">
+                          Sistema operacional
+                        </label>
+                        <select id={`so-${asset.id}`} value={tempSO} onChange={(e) => setTempSO(e.target.value)} className="campo">
+                          <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
+                          <option value="Windows 11 Home">Windows 11 Home</option>
+                          <option value="Windows 10 Pro 64-bit">Windows 10 Pro (64-bit)</option>
+                          <option value="macOS Sequoia 15.x">macOS Sequoia (Apple Silicon / Intel)</option>
+                          <option value="macOS Sonoma 14.x">macOS Sonoma (Apple Silicon)</option>
+                          <option value="Ubuntu Linux 24.04 LTS">Ubuntu Linux 24.04 LTS</option>
+                          <option value="Outro Sistema">Outro Sistema</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor={`bitlocker-${asset.id}`} className="rotulo">
+                          Chave de recuperação BitLocker (48 dígitos)
+                        </label>
+                        <input
+                          id={`bitlocker-${asset.id}`}
+                          type="text"
+                          value={tempBitlocker}
+                          onChange={(e) => setTempBitlocker(e.target.value)}
+                          placeholder="Ex: 419204-183029-482019-582019-..."
+                          className="campo font-mono"
+                        />
+                      </div>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Chave de Recuperação BitLocker (48 dígitos)
-                      </label>
-                      <input
-                        type="text"
-                        value={tempBitlocker}
-                        onChange={(e) => setTempBitlocker(e.target.value)}
-                        placeholder="Ex: 419204-183029-482019-582019-..."
-                        className="w-full text-xs font-mono px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
-                      />
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => setIsEditingSecurity(false)} className="btn btn-sm btn-secundario">
+                        Cancelar
+                      </button>
+                      <button type="button" onClick={handleSaveSecurity} className="btn btn-sm btn-primario">
+                        Salvar segurança
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingSecurity(false)}
-                      className="px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 rounded"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveSecurity}
-                      className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded"
-                    >
-                      Salvar Segurança
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2.5 text-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-slate-50/80 rounded-lg border border-slate-100">
-                    <div>
-                      <span className="text-xs uppercase font-semibold text-slate-500 block">
-                        Sistema Operacional Instalado
-                      </span>
-                      <span className="font-semibold text-slate-900">
-                        {asset.sistemaOperacional || 'Windows 11 Pro 64-bit (Padrão Corporativo)'}
-                      </span>
-                    </div>
-                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 self-start sm:self-auto">
-                      Licenciado OEM/Volume
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-slate-50/80 rounded-lg border border-slate-100 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs uppercase font-semibold text-slate-500">
-                        Chave de Recuperação BitLocker / Criptografia
-                      </span>
-                      {isTI && asset.bitlockerKey && (
-                        <button
-                          type="button"
-                          onClick={handleCopyBitlocker}
-                          className="flex items-center gap-1 px-2 py-1 text-xs text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors"
-                        >
-                          {copiedBitlocker ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              <span className="text-emerald-700 font-medium">Chave Copiada!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5 text-slate-500" />
-                              <span>Copiar Chave BitLocker</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-
-                    {isTI ? (
-                      asset.bitlockerKey ? (
-                        <p className="font-mono text-xs font-medium text-slate-800 bg-white p-2 rounded border border-slate-200 tracking-wider break-all select-all">
-                          {asset.bitlockerKey}
-                        </p>
+                ) : (
+                  <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <Dado rotulo="Sistema operacional" className="col-span-2">
+                      {asset.sistemaOperacional || 'Windows 11 Pro 64-bit (Padrão Corporativo)'}{' '}
+                      <span className="selo selo-info ml-1">Licenciado OEM/Volume</span>
+                    </Dado>
+                    <Dado rotulo="Chave de recuperação BitLocker" className="col-span-2">
+                      {isTI ? (
+                        asset.bitlockerKey ? (
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono tracking-wider break-all select-all">{asset.bitlockerKey}</span>
+                            <button type="button" onClick={handleCopyBitlocker} className="btn btn-sm btn-secundario">
+                              {copiedBitlocker ? <Check /> : <Copy />}
+                              {copiedBitlocker ? 'Chave copiada' : 'Copiar chave'}
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="font-normal text-slate-500">Nenhuma chave de recuperação BitLocker registrada para este equipamento.</span>
+                        )
                       ) : (
-                        <p className="text-xs text-slate-500 italic">
-                          Nenhuma chave de recuperação BitLocker registrada para este equipamento.
-                        </p>
-                      )
-                    ) : (
-                      <p className="text-xs text-slate-500 italic flex items-center gap-1.5 py-1">
-                        <Lock className="w-3.5 h-3.5 text-slate-500" />
-                        Chave confidencial de criptografia de disco (acesso restrito à equipe de TI).
-                      </p>
-                    )}
-                  </div>
-                </div>
+                        <span className="flex items-center gap-1.5 font-normal text-slate-500">
+                          <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                          Chave confidencial de criptografia de disco (acesso restrito à equipe de TI).
+                        </span>
+                      )}
+                    </Dado>
+                  </dl>
+                ))}
+
+              {asset.customFields && Object.keys(asset.customFields).length > 0 && (
+                <dl className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 lg:grid-cols-4">
+                  {Object.entries(asset.customFields).map(([key, value]) => (
+                    <Dado key={key} rotulo={key}>
+                      {value}
+                    </Dado>
+                  ))}
+                </dl>
+              )}
+            </section>
+          )}
+
+          {asset.observacoes && (
+            <section className="cartao space-y-2 p-4">
+              <h3 className="secao-titulo">Observações</h3>
+              <p className="text-xs break-words whitespace-pre-wrap text-slate-700">{asset.observacoes}</p>
+            </section>
+          )}
+        </div>
+
+        {/* ---------------- Custódia ---------------- */}
+        <div role="tabpanel" aria-label="Custódia" className={painel('custodia')}>
+          <section className="cartao space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="secao-titulo">Com quem está</h3>
+              {isTI && !descartado && !showTransferModal && (
+                <button type="button" onClick={() => setShowTransferModal(true)} className="btn btn-sm btn-secundario">
+                  <ArrowRightLeft />
+                  Transferir custódia
+                </button>
               )}
             </div>
-          )}
-
-          {asset.customFields && Object.keys(asset.customFields).length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-              {Object.entries(asset.customFields).map(([key, value]) => (
-                <div key={key} className="bg-slate-50/70 p-2 rounded border border-slate-100">
-                  <span className="text-xs text-slate-500 uppercase font-semibold block">{key}</span>
-                  <span className="font-medium text-slate-800">{value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          </div>
-          )}
-
-          {/* Dados Fiscais e Garantia com Alerta Visual */}
-          <div className="border border-slate-200 rounded-lg p-4 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-slate-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Dados fiscais, financeiros e garantia
-                </h3>
-              </div>
-              {/* Badge de Garantia */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-slate-500">
-                  <span className="uppercase font-semibold">Garantia de fábrica:</span>{' '}
-                  <span className="font-medium text-slate-800">{formatDate(asset.fiscal?.dataGarantia)}</span>
-                </span>
-                {warranty.status === 'valida' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md border border-emerald-200">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    {warranty.label}
-                  </span>
-                )}
-                {warranty.status === 'expirando' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-amber-700 bg-amber-50 rounded-md border border-amber-200">
-                    <ShieldAlert className="w-3.5 h-3.5" />
-                    {warranty.label}
-                  </span>
-                )}
-                {(warranty.status === 'expirada' || warranty.status === 'sem_data') && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-md border border-slate-200">
-                    <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
-                    {warranty.label}
-                  </span>
-                )}
-                {(warranty.status === 'expirando' || warranty.status === 'expirada') && asset.status !== 'descartado' && (
-                  <LembreteGarantia asset={asset} />
-                )}
-              </div>
-            </div>
-
-            {contratoCobertura?.fim && (
-              <p className="flex items-start gap-1.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 break-words">
-                  Coberto pelo contrato <span className="font-semibold">{nomeContrato(contratoCobertura)}</span> até{' '}
-                  {formatDate(contratoCobertura.fim)}
-                </span>
+            {currentCustodian ? (
+              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Dado rotulo="Pessoa">{pessoa(currentCustodian.id, currentCustodian.nome)}</Dado>
+                <Dado rotulo="Cargo">{currentCustodian.cargo || '—'}</Dado>
+                <Dado rotulo="Setor">{department?.nome || '—'}</Dado>
+                <Dado rotulo="Em posse desde">{formatDate(asset.dataEntregaAtual)}</Dado>
+              </dl>
+            ) : (
+              <p className="text-xs text-slate-600">
+                Nenhum colaborador alocado no momento. O item está no estoque e pronto para empréstimo.
               </p>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Nota Fiscal (NF-e)</span>
-                <p className="font-semibold text-slate-900">Nº {asset.fiscal?.numeroNF || 'S/N'}</p>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Valor de Aquisição</span>
-                <p className="font-semibold text-slate-900">{formatCurrency(asset.fiscal?.valorCompra || 0)}</p>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Fornecedor</span>
-                <p className="text-slate-800 break-words">{nomeFornecedor || '-'}</p>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Data de Compra</span>
-                <p className="text-slate-800">{formatDate(asset.fiscal?.dataAquisicao)}</p>
-              </div>
-            </div>
-
-            {/* Chave de Acesso NF-e (44 Dígitos) com botão de cópia */}
-            {asset.fiscal?.chaveAcesso44 && (
-              <div className="bg-slate-50 p-2.5 rounded-md border border-slate-200 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="text-xs uppercase font-semibold text-slate-500 block">
-                    Chave de Acesso NF-e (44 dígitos)
-                  </span>
-                  <p className="font-mono text-xs text-slate-700 truncate tracking-tight">
-                    {formatChaveNFe(asset.fiscal.chaveAcesso44)}
-                  </p>
+            {/* Transferência / devolução de custódia 1:1 */}
+            {showTransferModal && (
+              <form onSubmit={handleExecuteTransfer} className="space-y-3 border-t border-slate-100 pt-3">
+                <h4 className="text-xs font-semibold text-slate-900">Transferência / devolução de custódia</h4>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div>
+                    <label htmlFor={`destino-${asset.id}`} className="rotulo">
+                      Novo destino do equipamento *
+                    </label>
+                    <select
+                      id={`destino-${asset.id}`}
+                      value={selectedNewUser}
+                      onChange={(e) => setSelectedNewUser(e.target.value)}
+                      required
+                      className="campo"
+                    >
+                      <option value="">Selecione um colaborador ou estoque...</option>
+                      <option value="estoque">Devolver para almoxarifado / estoque de T.I.</option>
+                      <optgroup label="Colaboradores ativos">
+                        {employees
+                          .filter((e) => e.status === 'ativo' && e.id !== asset.custodianteId)
+                          .map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.nome} ({emp.cargo})
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={`motivo-${asset.id}`} className="rotulo">
+                      Motivo da movimentação *
+                    </label>
+                    <input
+                      id={`motivo-${asset.id}`}
+                      type="text"
+                      value={motivoDevolucao}
+                      onChange={(e) => setMotivoDevolucao(e.target.value)}
+                      placeholder="Ex: Substituição, upgrade ou desligamento..."
+                      required
+                      className="campo"
+                    />
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCopyKey}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors shrink-0"
-                >
-                  {copiedKey ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-700">Copiado</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copiar Chave</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowTransferModal(false)} className="btn btn-sm btn-secundario">
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-sm btn-primario">
+                    Confirmar transferência
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="secao-titulo">Histórico de custódia ({asset.historicoCustodia.length})</h3>
+            {asset.historicoCustodia.length === 0 ? (
+              <Vazio>Nenhum histórico anterior registrado.</Vazio>
+            ) : (
+              <div className="cartao overflow-hidden">
+                <table className="tabela tabela-cartoes">
+                  <thead>
+                    <tr>
+                      <th>Pessoa</th>
+                      <th>Entrega</th>
+                      <th>Devolução</th>
+                      <th>Motivo</th>
+                      <th className="text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {asset.historicoCustodia.map((entry) => (
+                      <tr key={entry.id}>
+                        <td data-label="Pessoa">{pessoa(entry.colaboradorId, entry.colaboradorNome)}</td>
+                        <td data-label="Entrega">{formatDate(entry.dataEntrega)}</td>
+                        <td data-label="Devolução">
+                          {entry.dataDevolucao ? formatDate(entry.dataDevolucao) : <span className="selo selo-info">Custódia ativa</span>}
+                        </td>
+                        <td data-label="Motivo" className="break-words">
+                          {entry.motivoDevolucao || '—'}
+                        </td>
+                        <td data-label="Ações" className="text-right">
+                          {entry.termoId && (
+                            <span className="acoes-linha">
+                              <button type="button" onClick={() => handleViewTerm(entry.termoId)} className="btn btn-sm btn-secundario">
+                                <FileText />
+                                Ver termo
+                              </button>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
+          </section>
+        </div>
 
-            {asset.fiscal?.suporteContato && (
-              <p className="text-xs text-slate-500">
-                <span className="font-semibold text-slate-700">Canais de Suporte Fabricante:</span> {asset.fiscal.suporteContato}
-              </p>
-            )}
-          </div>
-
-          {/* Histórico Cronológico de Custódia (Rastreabilidade 360°) */}
-          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Histórico Cronológico de Custódia
-                </h3>
-              </div>
-              <span className="text-xs text-slate-500">
-                {asset.historicoCustodia.length} registro(s)
-              </span>
+        {/* ---------------- Garantia e contrato ---------------- */}
+        <div role="tabpanel" aria-label="Garantia e contrato" className={painel('garantia')}>
+          <section className="cartao space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="secao-titulo">Garantia</h3>
+              {(warranty.status === 'expirando' || warranty.status === 'expirada') && !descartado && <LembreteGarantia asset={asset} />}
             </div>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Dado rotulo="Situação">
+                <span className={`selo ${seloGarantia}`}>
+                  {warranty.status === 'valida' ? <ShieldCheck aria-hidden="true" /> : <ShieldAlert aria-hidden="true" />}
+                  {warranty.label}
+                </span>
+              </Dado>
+              <Dado rotulo="Garantia de fábrica até">{formatDate(asset.fiscal?.dataGarantia)}</Dado>
+              <Dado rotulo="Cobertura efetiva até">{formatDate(warranty.fim)}</Dado>
+              <Dado rotulo="Suporte do fabricante">{asset.fiscal?.suporteContato || '—'}</Dado>
+            </dl>
+          </section>
 
-            {asset.historicoCustodia.length > 0 ? (
-              <div className="divide-y divide-slate-100">
-                {asset.historicoCustodia.map((entry) => (
-                  <div key={entry.id} className="py-2.5 flex items-start justify-between text-xs">
-                    <div>
-                      {currentRole === 'colaborador' && entry.colaboradorId !== currentUser?.id ? (
-                        <span className="font-semibold text-slate-800">
-                          {entry.colaboradorNome}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCustodian(entry.colaboradorId)}
-                          className="font-semibold text-blue-700 hover:underline flex items-center gap-1"
-                        >
-                          {entry.colaboradorNome}
-                          <ExternalLink className="w-3 h-3 text-blue-500" />
-                        </button>
-                      )}
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Entrega: {formatDate(entry.dataEntrega)}
-                        {entry.dataDevolucao ? ` · Devolução: ${formatDate(entry.dataDevolucao)}` : ' · (Custódia Ativa)'}
-                      </p>
-                      {entry.motivoDevolucao && (
-                        <p className="text-xs text-slate-600 italic mt-0.5">
-                          Motivo: {entry.motivoDevolucao}
-                        </p>
-                      )}
-                    </div>
-
-                    {entry.termoId && (
-                      <button
-                        type="button"
-                        onClick={() => handleViewTerm(entry.termoId)}
-                        className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-blue-700 bg-slate-50 px-2 py-1 rounded border border-slate-200"
-                      >
-                        <FileText className="w-3 h-3" />
-                        Ver Termo A4
+          <section className="space-y-2">
+            <h3 className="secao-titulo">Contrato que cobre</h3>
+            {contratosCobertura.length === 0 ? (
+              <Vazio>Nenhum contrato vigente de suporte ou garantia estendida cobre este equipamento.</Vazio>
+            ) : (
+              contratosCobertura.map((c) => (
+                <div key={c.id} className="cartao space-y-3 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-slate-900">
+                      <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-emerald-700" aria-hidden="true" />
+                      Coberto pelo contrato {nomeContrato(c)} até {formatDate(c.fim)}
+                    </p>
+                    {isTI && (
+                      <button type="button" onClick={() => setContratoAberto(c.id)} className="btn btn-sm btn-secundario">
+                        Abrir contrato
                       </button>
                     )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 py-2">Nenhum histórico anterior registrado.</p>
+                  <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <Dado rotulo="Fornecedor">{fornecedores.find((f) => f.id === c.fornecedorId)?.nome || '—'}</Dado>
+                    <Dado rotulo="Vigência">
+                      {formatDate(c.inicio)} a {formatDate(c.fim)}
+                    </Dado>
+                    <Dado rotulo="SLA">{c.sla || '—'}</Dado>
+                    <Dado rotulo="Contato de suporte">{c.contatoSuporte || '—'}</Dado>
+                  </dl>
+                </div>
+              ))
             )}
-          </div>
-
-          {/* Fase 9: chamados ligados a este equipamento (cada perfil vê os que o banco libera) */}
-          <ChamadosVinculados
-            chamados={chamadosDoAtivo(tickets, asset.id)}
-            vazio="Nenhum chamado ligado a este equipamento."
-          />
-
-          {/* Fase 8: manutenções com custos (só TI; o colaborador vê só o status) */}
-          {isTI && <ManutencoesAtivo asset={asset} podeEditar={asset.status !== 'descartado'} />}
-
-          {/* Fase 8: arquivos (só TI) e observações (todos que veem o ativo) */}
-          {isTI && <AnexosAtivo asset={asset} podeEditar={asset.status !== 'descartado'} />}
-
-          {asset.observacoes && (
-            <div className="border border-slate-200 rounded-lg p-4 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-100">
-                Observações
-              </h3>
-              <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">{asset.observacoes}</p>
-            </div>
-          )}
+          </section>
         </div>
-      </div>
-    </div>
-    {/* Fora da janela da ficha: o fundo desfocado (backdrop-filter) prenderia a janela nova na
-        rolagem da ficha, e no celular ela abriria fora da tela */}
-    {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
-    {enviandoManutencao && isTI && podeEnviarParaManutencao(asset) && (
-      <FormManutencao
-        asset={asset}
-        modo="abrir"
-        chamadoInicial={manutencaoDoChamado}
-        onClose={() => setEnviandoManutencao(false)}
-      />
-    )}
-    {dandoBaixa && <FormBaixa asset={asset} onClose={() => setDandoBaixa(false)} />}
+
+        {/* ---------------- Manutenções (só a T.I.; o colaborador vê só o status) ---------------- */}
+        {isTI && (
+          <div role="tabpanel" aria-label="Manutenções" className={painel('manutencoes')}>
+            <ManutencoesAtivo asset={asset} podeEditar={!descartado} />
+          </div>
+        )}
+
+        {/* ---------------- Documentos ---------------- */}
+        <div role="tabpanel" aria-label="Documentos" className={painel('documentos')}>
+          <section className="cartao space-y-3 p-4">
+            <h3 className="secao-titulo">Nota fiscal e compra</h3>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Dado rotulo="Nota fiscal (NF-e)">Nº {asset.fiscal?.numeroNF || 'S/N'}</Dado>
+              <Dado rotulo="Valor de aquisição">
+                <span className="font-mono">{formatCurrency(asset.fiscal?.valorCompra || 0)}</span>
+              </Dado>
+              <Dado rotulo="Fornecedor">{nomeFornecedor || '—'}</Dado>
+              <Dado rotulo="Data de compra">{formatDate(asset.fiscal?.dataAquisicao)}</Dado>
+            </dl>
+            {asset.fiscal?.chaveAcesso44 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                <dl className="min-w-0 flex-1">
+                  <Dado rotulo="Chave de acesso NF-e (44 dígitos)">
+                    <span className="font-mono tracking-tight break-all">{formatChaveNFe(asset.fiscal.chaveAcesso44)}</span>
+                  </Dado>
+                </dl>
+                <button type="button" onClick={handleCopyKey} className="btn btn-sm btn-secundario shrink-0">
+                  {copiedKey ? <Check /> : <Copy />}
+                  {copiedKey ? 'Copiado' : 'Copiar chave'}
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* Fase 8: arquivos (só TI) */}
+          {isTI && <AnexosAtivo asset={asset} podeEditar={!descartado} />}
+        </div>
+
+        {/* ---------------- Chamados ---------------- */}
+        <div role="tabpanel" aria-label="Chamados" className={painel('chamados')}>
+          {/* Fase 9: chamados ligados a este equipamento (cada perfil vê os que o banco libera) */}
+          <ChamadosVinculados chamados={chamados} vazio="Nenhum chamado ligado a este equipamento." />
+        </div>
+
+        {/* ---------------- Histórico ---------------- */}
+        <div role="tabpanel" aria-label="Histórico" className={painel('custodia')}>
+          {/* Fase 8: baixa patrimonial vigente e estornadas (só TI) */}
+          {isTI && <BaixaPatrimonial asset={asset} />}
+
+          <section className="space-y-2">
+            <h3 className="secao-titulo">Linha do tempo</h3>
+            {eventos.length === 0 ? (
+              <Vazio>Nenhum evento registrado.</Vazio>
+            ) : (
+              <ol className="cartao divide-y divide-slate-100">
+                {eventos.map((ev) => (
+                  <li key={ev.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-2.5 text-xs">
+                    <span className="w-20 shrink-0 font-mono text-slate-500">{formatDate(ev.data)}</span>
+                    <span className={`selo ${ev.selo} shrink-0`}>{ev.rotulo}</span>
+                    <span className="min-w-0 flex-1 break-words text-slate-800">
+                      {ev.texto}
+                      {ev.detalhe && <span className="block text-slate-500">Motivo: {ev.detalhe}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+      </Janela>
+      {/* Fora da janela da ficha: o fundo desfocado (backdrop-filter) prenderia a janela nova na
+          rolagem da ficha, e no celular ela abriria fora da tela */}
+      {editando && <NewAssetModal ativo={asset} onClose={() => setEditando(false)} />}
+      {enviandoManutencao && isTI && podeEnviarParaManutencao(asset) && (
+        <FormManutencao asset={asset} modo="abrir" chamadoInicial={manutencaoDoChamado} onClose={() => setEnviandoManutencao(false)} />
+      )}
+      {dandoBaixa && <FormBaixa asset={asset} onClose={() => setDandoBaixa(false)} />}
+      {contratoAberto && <ContratoPorId id={contratoAberto} onClose={() => setContratoAberto(null)} />}
     </>
   );
 };

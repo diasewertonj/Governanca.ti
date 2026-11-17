@@ -13,7 +13,7 @@ export const IndicadoresAtendimento: React.FC = () => {
 
   const cartoes: { rotulo: string; valor: string; destaque?: string }[] = [
     { rotulo: 'Em atendimento', valor: String(i.abertos) },
-    { rotulo: 'Atrasados', valor: String(i.atrasados), destaque: i.atrasados ? 'text-rose-700' : undefined },
+    { rotulo: 'Atrasados', valor: String(i.atrasados), destaque: i.atrasados ? 'text-red-700' : undefined },
     { rotulo: 'Encerrados no mês', valor: String(i.encerradosNoMes) },
     { rotulo: 'No prazo', valor: i.pctNoPrazo === undefined ? traco : `${i.pctNoPrazo}%` },
     { rotulo: '1ª resposta (média)', valor: i.mediaPrimeiraRespostaMin === undefined ? traco : duracaoUtil(i.mediaPrimeiraRespostaMin) },
@@ -26,10 +26,10 @@ export const IndicadoresAtendimento: React.FC = () => {
   ];
 
   return (
-    <section aria-labelledby="indicadores-atendimento" className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+    <section aria-labelledby="indicadores-atendimento" className="cartao p-5 space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="indicadores-atendimento" className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-          <Clock className="w-4 h-4 text-blue-600" aria-hidden="true" />
+        <h3 id="indicadores-atendimento" className="secao-titulo flex items-center gap-1.5">
+          <Clock className="w-4 h-4" aria-hidden="true" />
           Atendimento
         </h3>
         <span className="text-xs text-slate-500">Chamados de suporte · médias e rankings dos últimos {JANELA_DIAS} dias · horas úteis</span>
@@ -37,7 +37,7 @@ export const IndicadoresAtendimento: React.FC = () => {
 
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {cartoes.map((c) => (
-          <div key={c.rotulo} className="rounded-lg border border-slate-200 p-3">
+          <div key={c.rotulo} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
             <dt className="text-xs text-slate-500">{c.rotulo}</dt>
             <dd className={`mt-0.5 text-lg font-semibold ${c.destaque || 'text-slate-900'}`}>{c.valor}</dd>
           </div>
@@ -73,7 +73,7 @@ export const IndicadoresAtendimento: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedAssetIdFor360(e.ativoId)}
-                      className="min-w-0 truncate text-left text-blue-700 hover:underline"
+                      className="link min-w-0 truncate text-left"
                     >
                       {a ? `${a.tag} · ${a.nome}` : 'Equipamento removido'}
                     </button>

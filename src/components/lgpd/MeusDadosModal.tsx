@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { X, Download, FileText, ShieldCheck, Send, CheckCircle2 } from 'lucide-react';
+import { Download, FileText, ShieldCheck, Send, CheckCircle2 } from 'lucide-react';
+import { Janela } from '../ui/Janela.tsx';
 import { PoliticaPrivacidadeModal } from './PoliticaPrivacidadeModal.tsx';
 
 interface Props {
@@ -100,57 +101,51 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-slate-900/50 overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl border border-slate-200 my-6">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-blue-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Meus dados (LGPD)</h2>
-          </div>
-          <button onClick={onClose} aria-label="Fechar" className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="px-6 py-5 space-y-5 text-xs text-slate-700">
+    <>
+      <Janela
+        tamanho="m"
+        icone={<ShieldCheck className="h-4 w-4" />}
+        titulo="Meus dados (LGPD)"
+        subtitulo="Cópia dos seus dados e pedidos do titular"
+        onFechar={onClose}
+      >
+        <div className="space-y-4 text-xs text-slate-700">
           <div>
-            <button type="button" onClick={() => setMostrarPolitica(true)} className="inline-flex items-center gap-1.5 text-blue-700 hover:underline">
-              <FileText className="w-3.5 h-3.5" /> Ler o aviso de privacidade
+            <button type="button" onClick={() => setMostrarPolitica(true)} className="link inline-flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Ler o aviso de privacidade
             </button>
           </div>
 
-          <div className="space-y-2 border-t border-slate-100 pt-4">
-            <h3 className="font-semibold text-slate-900">Cópia dos seus dados</h3>
+          <div className="cartao space-y-2 p-4">
+            <h3 className="secao-titulo">Cópia dos seus dados</h3>
             <p>Baixe um arquivo com seu cadastro, equipamentos, licenças, chamados e termos.</p>
-            <button
-              type="button"
-              onClick={handleBaixar}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
-            >
-              <Download className="w-3.5 h-3.5" /> Baixar meus dados (.json)
+            <button type="button" onClick={handleBaixar} className="btn btn-primario btn-sm">
+              <Download /> Baixar meus dados (.json)
             </button>
           </div>
 
-          <div className="space-y-2 border-t border-slate-100 pt-4">
-            <h3 className="font-semibold text-slate-900">Fazer um pedido</h3>
+          <div className="cartao space-y-2 p-4">
+            <h3 className="secao-titulo">Fazer um pedido</h3>
             {protocolo && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
                 Pedido registrado no chamado {protocolo}. A T.I. responde por lá.
               </div>
             )}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                aria-pressed={pedido === 'correcao'}
                 onClick={() => setPedido('correcao')}
-                className={`px-3 py-1.5 rounded-lg border ${pedido === 'correcao' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
+                className={`btn btn-sm ${pedido === 'correcao' ? 'btn-primario' : 'btn-secundario'}`}
               >
                 Corrigir meus dados
               </button>
               <button
                 type="button"
+                aria-pressed={pedido === 'eliminacao'}
                 onClick={() => setPedido('eliminacao')}
-                className={`px-3 py-1.5 rounded-lg border ${pedido === 'eliminacao' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-300 hover:bg-slate-50'}`}
+                className={`btn btn-sm ${pedido === 'eliminacao' ? 'btn-primario' : 'btn-secundario'}`}
               >
                 Anonimizar / eliminar
               </button>
@@ -158,32 +153,37 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
             {pedido && (
               <div className="space-y-2">
                 {pedido === 'eliminacao' && (
-                  <p className="text-xs text-slate-500">
+                  <p className="ajuda">
                     Enquanto houver vínculo ou obrigação legal (termos de equipamentos, por exemplo), os dados são mantidos. Quando
                     cabível, a T.I. anonimiza o cadastro e preserva o histórico sem identificar você.
                   </p>
                 )}
+                <label htmlFor="lgpd-detalhe" className="sr-only">
+                  Detalhes do pedido
+                </label>
                 <textarea
+                  id="lgpd-detalhe"
                   value={detalhe}
                   onChange={(e) => setDetalhe(e.target.value)}
                   rows={3}
                   placeholder={pedido === 'correcao' ? 'O que está errado e qual o valor correto?' : 'Algum detalhe para a T.I.? (opcional)'}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                  className="campo"
                 />
                 <button
                   type="button"
                   onClick={handleEnviarPedido}
                   disabled={enviando || (pedido === 'correcao' && !detalhe.trim())}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 font-medium text-white bg-slate-800 hover:bg-slate-900 rounded-lg disabled:opacity-50"
+                  className="btn btn-secundario btn-sm"
                 >
-                  <Send className="w-3.5 h-3.5" /> {enviando ? 'Registrando...' : 'Registrar pedido'}
+                  <Send /> {enviando ? 'Registrando...' : 'Registrar pedido'}
                 </button>
               </div>
             )}
           </div>
         </div>
-      </div>
+      </Janela>
       {mostrarPolitica && <PoliticaPrivacidadeModal settings={settings} onClose={() => setMostrarPolitica(false)} />}
-    </div>
+    </>
   );
 };
+

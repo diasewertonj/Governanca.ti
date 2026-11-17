@@ -11,7 +11,7 @@ import { VinculosChamado } from './VinculosChamado.tsx';
 import { NewEmployeeModal } from '../collaborators/NewEmployeeModal.tsx';
 import { BlocoCancelamento, BlocoResolucao, FormCancelamento, FormResolucao } from './AtendimentoChamado.tsx';
 import { imprimirRelatorio } from './relatorioChamado.ts';
-import { PrazosChamado } from './SeloSla.tsx';
+import { PrazosChamado, SELO_PRIORIDADE_CHAMADO, SELO_STATUS_CHAMADO } from './SeloSla.tsx';
 import { situacaoSla } from '../../utils/sla.ts';
 import { PedidoDesligamento } from './PedidoDesligamento.tsx';
 import { chamadoEncerrado, podeCancelar, rotuloSituacao, ROTULO_AGUARDANDO } from '../../utils/atendimento.ts';
@@ -30,6 +30,7 @@ import {
   UserPlus,
   ShieldCheck,
 } from 'lucide-react';
+import { confirmar } from '../ui/dialogo.tsx';
 
 interface TicketDetailModalProps {
   ticketId: string;
@@ -55,7 +56,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   } = useApp();
 
   const [newMessageText, setNewMessageText] = useState('');
-  const [isInternalNote, setIsInternalNote] = useState(false);
+  // T.I.: a caixa ao lado é, por padrão, o caderno de anotações do atendimento (nota interna)
+  const [isInternalNote, setIsInternalNote] = useState(currentRole === 'ti_admin' || currentRole === 'ti_suporte');
   const [erroArquivo, setErroArquivo] = useState<string | null>(null);
   const [concluindoOffboarding, setConcluindoOffboarding] = useState(false);
   const [resumoOffboarding, setResumoOffboarding] = useState<string | null>(null);
@@ -147,7 +149,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   };
 
   const fechar = () => {
-    if (confirmarDescarte(itensPendentes)) onClose();
+    void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
   };
 
   // Fase 3: anexos privados abrem por link temporário (5 min).
@@ -173,13 +175,13 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
   const handleConcluirOffboarding = async () => {
     if (!colaboradorDesligado) return;
-    const ok = window.confirm(
+    const ok = (await confirmar(
       `Concluir o desligamento de ${colaboradorDesligado.nome}?\n\n` +
         '• Todos os equipamentos voltam ao estoque (custódia fechada hoje)\n' +
         '• Todas as licenças são liberadas\n' +
         '• O acesso ao sistema é encerrado (status "desligado")\n' +
         '• O chamado é resolvido\n\nEssa ação é registrada e não pode ser desfeita pela tela.'
-    );
+    ));
     if (!ok) return;
     setConcluindoOffboarding(true);
     const resumo = await concluirOffboarding(ticket.id);
@@ -217,36 +219,37 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   const handleStatusChange = (newStatus: TicketStatus) => setRascStatus(newStatus);
   const handleTechnicianChange = (techId: string) => setRascTecnico(techId);
 
-  const statusColors = {
-    aberto: 'text-blue-700 bg-blue-50 border-blue-200',
-    em_andamento: 'text-amber-700 bg-amber-50 border-amber-200',
-    aguardando_terceiro: 'text-purple-700 bg-purple-50 border-purple-200',
-    resolvido: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-    cancelado: 'text-slate-500 bg-slate-100 border-slate-200',
-  }[ticket.status];
+  const papelSugerido =
+    ticket.onboarding?.papelAcessoSugerido === 'ti_admin'
+      ? 'Admin de T.I.'
+      : ticket.onboarding?.papelAcessoSugerido === 'ti_suporte'
+        ? 'Suporte de T.I.'
+        : ticket.onboarding?.papelAcessoSugerido === 'rh'
+          ? 'Recursos Humanos (RH)'
+          : 'Colaborador Padrão';
 
-  const priorityColors = {
-    baixa: 'text-slate-600 bg-slate-100',
-    media: 'text-blue-700 bg-blue-50',
-    alta: 'text-amber-700 bg-amber-50',
-    critica: 'text-rose-700 bg-rose-50 font-bold',
-  }[ticket.prioridade];
+  /** Linha "rótulo à esquerda, valor à direita" (igual ao Pedido do RH do desligamento) */
+  const linha = (rotulo: string, valor: React.ReactNode) => (
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
+      <span className="text-slate-500">{rotulo}</span>
+      <span className="break-words text-slate-900">{valor}</span>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-4xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
-        {/* Barra Superior */}
-        {/* Fase 7: no celular o cabeçalho quebra em duas linhas (etiquetas em cima, título embaixo) */}
-        {/* Fase 10: o título é a manchete; código, tipo e categoria numa linha pequena acima */}
-        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-3 pb-4 border-b border-slate-200 bg-slate-50">
+    <div className="janela-fundo modal-tela">
+      <div role="dialog" aria-modal="true" aria-labelledby={`chamado-titulo-${ticket.id}`} className="janela janela-ficha">
+        {/* Cabeçalho fixo: código, tipo, situação, prioridade e título; abaixo, a faixa de ações do atendimento */}
+        <div className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs font-semibold text-slate-700">{ticket.codigo}</span>
             <span className="text-xs text-slate-500">
               · {ROTULO_TIPO_CHAMADO[ticket.tipo]} · {ticket.categoria}
             </span>
             <span className="flex-1" />
-            <span className={`text-xs px-2.5 py-0.5 rounded-md font-medium border ${statusColors}`}>
-              {rotuloSituacao(ticket)}
+            <span className={SELO_STATUS_CHAMADO[ticket.status]}>{rotuloSituacao(ticket)}</span>
+            <span className={SELO_PRIORIDADE_CHAMADO[ticket.prioridade]}>
+              Prioridade {rotuloPrioridade(ticket.prioridade).toLowerCase()}
             </span>
             <button
               type="button"
@@ -254,91 +257,169 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla))
               }
               title="Relatório do chamado (imprimir ou salvar em PDF)"
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-md hover:bg-slate-100"
+              className="btn btn-sm btn-secundario"
             >
-              <Printer className="w-3.5 h-3.5" aria-hidden="true" />
+              <Printer aria-hidden="true" />
               <span className="hidden sm:inline">Relatório</span>
             </button>
-            <span className={`text-xs px-2 py-0.5 rounded-md ${priorityColors}`}>
-              Prioridade {rotuloPrioridade(ticket.prioridade).toLowerCase()}
-            </span>
-            <button
-              type="button"
-              onClick={fechar}
-              aria-label="Fechar chamado"
-              className="p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
+            <button type="button" onClick={fechar} aria-label="Fechar chamado" title="Fechar" className="btn-icone">
+              <X className="!h-5 !w-5" />
             </button>
           </div>
-          <h2 className="mt-1.5 text-xl sm:text-2xl font-bold text-slate-900 leading-tight break-words">{ticket.titulo}</h2>
-          <p className="text-xs text-slate-600 mt-1">
+          <h2 id={`chamado-titulo-${ticket.id}`} className="tela-titulo mt-1 break-words">
+            {ticket.titulo}
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-600">
             Aberto por {ticket.solicitanteNome} em {formatDateTime(ticket.dataCriacao)} · Técnico:{' '}
             {ticket.tecnicoResponsavelNome || 'não atribuído'}
           </p>
+          {/* Ações do atendimento numa faixa compacta do cabeçalho */}
+          {isTI && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              {encerrado ? (
+                <span className="text-slate-600">
+                  {ticket.tipo === 'suporte'
+                    ? `Chamado ${ticket.status === 'cancelado' ? 'cancelado' : 'encerrado com solução registrada'}. Para continuar, reabra o chamado.`
+                    : `Processo ${ticket.status === 'cancelado' ? 'cancelado' : 'concluído'}. Se faltou algo, abra um chamado novo.`}
+                </span>
+              ) : (
+                <>
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-slate-600">Situação</span>
+                    <select
+                      value={statusExibido}
+                      onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
+                      className="campo campo-sm w-auto"
+                    >
+                      <option value="aberto">Aberto (na fila)</option>
+                      <option value="em_andamento">Em atendimento</option>
+                      <option value="aguardando_terceiro">Aguardando…</option>
+                    </select>
+                  </label>
+                  {statusExibido === 'aguardando_terceiro' && (
+                    <select
+                      aria-label="Aguardando o quê"
+                      value={rascAguardando ?? (ticket.aguardandoMotivo || '')}
+                      onChange={(e) => setRascAguardando(e.target.value as AguardandoMotivo | '')}
+                      className="campo campo-sm w-auto"
+                    >
+                      <option value="">Aguardando o quê?</option>
+                      <option value="peca">Peça</option>
+                      <option value="fornecedor">Fornecedor</option>
+                      <option value="solicitante">Resposta do solicitante</option>
+                    </select>
+                  )}
+                </>
+              )}
+              <label className="flex items-center gap-1.5">
+                <span className="text-slate-600">Técnico</span>
+                <select
+                  value={tecnicoExibido}
+                  onChange={(e) => handleTechnicianChange(e.target.value)}
+                  className="campo campo-sm w-auto max-w-56"
+                >
+                  <option value="">Não atribuído...</option>
+                  {tecnicosTI.map((tech) => (
+                    <option key={tech.id} value={tech.id}>
+                      {tech.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!encerrado && (
+                <span className="flex flex-wrap gap-2 sm:ml-auto">
+                  {/* Padrão dos rodapés: destrutiva à esquerda, principal (azul) por último */}
+                  <button type="button" onClick={() => setCancelando(true)} className="btn btn-sm btn-perigo">
+                    {ticket.tipo === 'suporte' ? 'Cancelar chamado' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
+                  </button>
+                  {ticket.tipo === 'suporte' && (
+                    <button type="button" onClick={() => setResolvendo(true)} className="btn btn-sm btn-primario">
+                      <CheckCircle2 aria-hidden="true" />
+                      Registrar solução
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="sm:max-h-[75vh] sm:overflow-y-auto">
-        {/* Fase 10: o problema relatado logo abaixo do título, em destaque */}
-        <div className="px-4 sm:px-6 pt-4 sm:pt-5">
-          {/* Admissão: o "Pedido do RH" (painel organizado) substitui o texto montado */}
-          {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
-          {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
-          {ticket.tipo === 'suporte' && (
-            <ProblemaRelatado
+        <div className="sm:max-h-[85vh] sm:overflow-y-auto">
+          {/* Solicitante, prazos e vínculos numa faixa acima do conteúdo */}
+          <div className="grid grid-cols-1 items-start gap-3 px-4 pt-3 sm:px-5 md:grid-cols-3">
+            <section aria-label="Solicitante" className="cartao space-y-3 p-4 text-xs">
+              <h3 className="secao-titulo">Solicitante</h3>
+              <div className="space-y-0.5">
+                {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
+                  <span className="block font-semibold text-slate-900">{ticket.solicitanteNome}</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)}
+                    className="link inline-flex items-center gap-1 text-left"
+                  >
+                    {ticket.solicitanteNome}
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  </button>
+                )}
+                <p className="text-slate-600">{[ticket.solicitanteCargo, ticket.solicitanteSetorNome].filter(Boolean).join(' · ')}</p>
+                <p className="break-all text-slate-500">{ticket.solicitanteEmail}</p>
+                <p className="text-slate-500">Atualizado em {formatDate(ticket.dataAtualizacao)}</p>
+              </div>
+            </section>
+            <PrazosChamado tkt={ticket} />
+            <VinculosChamado
+              key={salvamentos}
               ticket={ticket}
-              ativo={assets.find((a) => a.id === ticket.ativoId)}
-              onAbrirAnexo={abrirAnexo}
-              erroArquivo={erroArquivo}
+              rascunho={rascVinculos}
+              onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
             />
-          )}
-          {/* Fase 10: a solução (ou o cancelamento) logo depois do problema */}
-          {ticket.status === 'resolvido' && ticket.resolucao && (
-            <div className="mt-4">
-              <BlocoResolucao ticket={ticket} />
-            </div>
-          )}
-          {ticket.status === 'cancelado' && ticket.cancelamento && (
-            <div className="mt-4">
-              <BlocoCancelamento ticket={ticket} />
-            </div>
-          )}
-          {!isTI && podeCancelar(ticket, currentRole, currentUser?.id) && (
-            <div className="mt-2 text-right">
-              <button type="button" onClick={() => setCancelando(true)} className="text-xs text-slate-600 hover:text-rose-700 hover:underline">
-                Não precisa mais? Cancelar chamado
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
 
-        {/* Corpo do Chamado em 2 Colunas */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
-          {/* Coluna Principal: Conversas e Linha do Tempo */}
-          <div className="lg:col-span-2 p-4 sm:p-6 space-y-6 flex flex-col justify-between">
-            <div className="space-y-5">
-              {/* Checklist Interativo Técnico para Offboarding */}
+          {/* O pedido, o checklist e a solução ocupam 2/3; anotações e conversa ficam ao lado (1/3) */}
+          <div className="mt-3 grid grid-cols-1 gap-0 divide-y divide-slate-200 border-t border-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
+            <div className="min-w-0 space-y-3 p-4 sm:p-5">
+              {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
+              {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
+              {ticket.tipo === 'suporte' && (
+                <ProblemaRelatado
+                  ticket={ticket}
+                  ativo={assets.find((a) => a.id === ticket.ativoId)}
+                  onAbrirAnexo={abrirAnexo}
+                  erroArquivo={erroArquivo}
+                />
+              )}
+              {/* A solução (ou o cancelamento) logo depois do problema */}
+              {ticket.status === 'resolvido' && ticket.resolucao && <BlocoResolucao ticket={ticket} />}
+              {ticket.status === 'cancelado' && ticket.cancelamento && <BlocoCancelamento ticket={ticket} />}
+              {!isTI && podeCancelar(ticket, currentRole, currentUser?.id) && (
+                <div className="text-right">
+                  <button type="button" onClick={() => setCancelando(true)} className="btn btn-sm btn-perigo">
+                    Não precisa mais? Cancelar chamado
+                  </button>
+                </div>
+              )}
+
+              {/* Checklist interativo (chamados antigos de desligamento) */}
               {usaChecklistLegado && ticket.offboarding && (
-                <div className="border border-amber-200 bg-amber-50/40 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-amber-200">
-                    <div className="flex items-center gap-1.5">
-                      <FileCheck className="w-4 h-4 text-amber-700" />
-                      <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wide">
-                        Checklist Operacional de Desligamento (Persistido)
-                      </h4>
-                    </div>
-                    <span className="text-xs font-semibold text-amber-800">
-                      {ticket.offboarding.checklist.filter((c) => concluidoExibido(c)).length}/
-                      {ticket.offboarding.checklist.length} concluídos
+                <section aria-label="Checklist operacional de desligamento" className="cartao space-y-3 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="secao-titulo flex items-center gap-1.5">
+                      <FileCheck className="h-4 w-4" aria-hidden="true" />
+                      Checklist operacional de desligamento
+                    </h3>
+                    <span className="text-xs font-semibold whitespace-nowrap text-slate-700">
+                      {ticket.offboarding.checklist.filter((c) => concluidoExibido(c)).length}/{ticket.offboarding.checklist.length}{' '}
+                      concluídos
                     </span>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {ticket.offboarding.checklist.map((item) => (
                       <label
                         key={item.id}
-                        className={`flex items-start gap-2.5 p-2 rounded cursor-pointer transition-colors text-xs ${
-                          concluidoExibido(item) ? 'bg-amber-100/60 line-through text-slate-500' : 'bg-white text-slate-800 hover:bg-amber-50'
+                        className={`flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-2.5 text-xs transition-colors hover:bg-slate-50 ${
+                          concluidoExibido(item) ? 'text-slate-500 line-through' : 'text-slate-900'
                         }`}
                       >
                         <input
@@ -354,60 +435,56 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   </div>
 
                   {ticket.offboarding.recolhimentoInstrucoes && (
-                    <div className="text-xs text-amber-900 bg-white/80 p-2 rounded border border-amber-200">
+                    <p className="text-xs text-slate-700">
                       <span className="font-semibold">Logística:</span> {ticket.offboarding.recolhimentoInstrucoes}
-                    </div>
+                    </p>
                   )}
 
                   {/* Fase 3: conclusão automática (devolve ativos, libera licenças, desliga, resolve) */}
                   {resumoOffboarding && (
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>{resumoOffboarding}</span>
-                    </div>
+                    <span className="selo selo-ok whitespace-normal">
+                      <CheckCircle2 aria-hidden="true" />
+                      {resumoOffboarding}
+                    </span>
                   )}
-                  {isTI && ticket.status !== 'resolvido' && (
-                    colaboradorDesligado ? (
+                  {isTI &&
+                    ticket.status !== 'resolvido' &&
+                    (colaboradorDesligado ? (
                       <button
                         type="button"
                         onClick={handleConcluirOffboarding}
                         disabled={concluindoOffboarding}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors disabled:opacity-50"
+                        className="btn btn-sm btn-primario"
                       >
-                        <ShieldCheck className="w-4 h-4" />
-                        {concluindoOffboarding
-                          ? 'Concluindo desligamento...'
-                          : `Concluir desligamento de ${colaboradorDesligado.nome}`}
+                        <ShieldCheck aria-hidden="true" />
+                        {concluindoOffboarding ? 'Concluindo desligamento...' : `Concluir desligamento de ${colaboradorDesligado.nome}`}
                       </button>
                     ) : (
-                      <p className="text-xs text-amber-800">
-                        Este chamado foi aberto antes da automação e não identifica o colaborador. Ligue a pessoa em
-                        "Vínculos" para poder concluir o desligamento.
+                      <p className="ajuda">
+                        Este chamado foi aberto antes da automação e não identifica o colaborador. Ligue a pessoa em "Vínculos" para poder
+                        concluir o desligamento.
                       </p>
-                    )
-                  )}
-                </div>
+                    ))}
+                </section>
               )}
 
-              {/* Painel Estruturado de Onboarding (Kit de Entrada Solicitado pelo RH) */}
+              {/* Admissão: o "Pedido do RH" (kit de entrada solicitado), no mesmo formato do desligamento */}
               {ticket.tipo === 'onboarding' && ticket.onboarding && (
-                <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-blue-200">
-                    <div className="flex items-center gap-1.5">
-                      <UserPlus className="w-4 h-4 text-blue-700" />
-                      <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wide">
-                        Pedido do RH
-                      </h4>
-                    </div>
+                <section aria-label="Pedido do RH" className="cartao space-y-3 p-4 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="secao-titulo flex items-center gap-1.5">
+                      <UserPlus className="h-4 w-4" aria-hidden="true" />
+                      Pedido do RH
+                    </h3>
                     {isColaboradorJaCadastrado && colaboradorDoEmail?.status !== 'ativo' ? (
                       // Lote 1 (1.13): admissão só se liga a pessoa ativa (mesma regra do banco)
-                      <span className="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                      <span className="selo selo-atencao">
                         E-mail de pessoa {colaboradorDoEmail?.status === 'desligado' ? 'desligada' : 'de férias'}
                       </span>
                     ) : isColaboradorJaCadastrado ? (
                       <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span className="selo selo-ok">
+                          <CheckCircle2 aria-hidden="true" />
                           Cadastrado no Sistema
                         </span>
                         {/* Fase 10: cadastrado por fora, mas ainda não ligado a este chamado */}
@@ -415,7 +492,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                           <button
                             type="button"
                             onClick={() => salvarAlteracoesChamado(ticket.id, { colaboradorId: colaboradorDoEmail.id })}
-                            className="text-xs font-medium text-blue-700 hover:underline"
+                            className="link text-xs"
                           >
                             Ligar a este chamado
                           </button>
@@ -424,301 +501,115 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     ) : isTI && !temChecklistGuiado ? (
                       // Chamados antigos (sem checklist): cadastra a pessoa daqui, com os dados do RH.
                       // Com checklist, o cadastro é o passo "Cadastrar colaborador".
-                      <button
-                        type="button"
-                        onClick={() => setCadastrandoAdmitido(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                      <button type="button" onClick={() => setCadastrandoAdmitido(true)} className="btn btn-sm btn-primario">
+                        <UserPlus aria-hidden="true" />
                         Cadastrar colaborador
                       </button>
                     ) : (
-                      <span className="text-xs font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded">
-                        Ainda não cadastrado
-                      </span>
+                      <span className="selo selo-info">Ainda não cadastrado</span>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-white p-3 rounded border border-blue-200/80">
-                    <div>
-                      <span className="text-xs uppercase font-bold text-slate-500 block">Novo Colaborador</span>
-                      <span className="font-semibold text-slate-900 block">{ticket.onboarding.nomeColaborador}</span>
-                      <span className="text-slate-600 text-xs block">{ticket.onboarding.cargo}</span>
-                      <span className="text-slate-500 font-mono text-xs block">{ticket.onboarding.emailColaborador}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-xs uppercase font-bold text-slate-500 block">Setor & Início</span>
-                      <span className="text-slate-800 font-medium block">
-                        Setor: {departments.find((d) => d.id === ticket.onboarding?.setorId)?.nome || 'Não definido'}
+                  <div className="grid grid-cols-1 gap-y-1.5">
+                    {linha('Novo colaborador', ticket.onboarding.nomeColaborador)}
+                    {linha('Cargo', ticket.onboarding.cargo)}
+                    {linha('E-mail', <span className="font-mono">{ticket.onboarding.emailColaborador}</span>)}
+                    {linha('Setor', departments.find((d) => d.id === ticket.onboarding?.setorId)?.nome || 'Não definido')}
+                    {linha('Início', formatDate(ticket.onboarding.dataAdmissao))}
+                    {linha(
+                      'Acesso sugerido',
+                      <span className="inline-flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+                        {papelSugerido}
                       </span>
-                      <span className="text-slate-600 text-xs block">
-                        Início: {formatDate(ticket.onboarding.dataAdmissao)}
-                      </span>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                        <span className="text-xs font-semibold text-blue-900">
-                          Acesso sugerido: {
-                            ticket.onboarding.papelAcessoSugerido === 'ti_admin'
-                              ? 'Admin de T.I.'
-                              : ticket.onboarding.papelAcessoSugerido === 'ti_suporte'
-                              ? 'Suporte de T.I.'
-                              : ticket.onboarding.papelAcessoSugerido === 'rh'
-                              ? 'Recursos Humanos (RH)'
-                              : 'Colaborador Padrão'
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                    )}
                     {/* Só o que o RH escreveu (chamados antigos: o perfil escolhido vira observação) */}
-                    {ticket.onboarding.tipoComputador?.trim() && (
-                      <div className="bg-white p-2.5 rounded border border-slate-200">
-                        <span className="font-semibold text-slate-800 block text-xs">Observação sobre o equipamento:</span>
-                        <span className="text-slate-800">{ticket.onboarding.tipoComputador}</span>
-                      </div>
-                    )}
-
-                    {ticket.onboarding.perifericos.length > 0 && (
-                      <div className="bg-white p-2.5 rounded border border-slate-200">
-                        <span className="font-semibold text-slate-800 block text-xs mb-1">
-                          Periféricos Solicitados:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
+                    {ticket.onboarding.tipoComputador?.trim() && linha('Equipamento', ticket.onboarding.tipoComputador)}
+                    {ticket.onboarding.perifericos.length > 0 &&
+                      linha(
+                        'Periféricos',
+                        <span className="flex flex-wrap gap-1.5">
                           {ticket.onboarding.perifericos.map((p, idx) => (
-                            <span key={idx} className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs">
+                            <span key={idx} className="selo selo-neutro">
                               {p}
                             </span>
                           ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {ticket.onboarding.acessosSoftwares.length > 0 && (
-                      <div className="bg-white p-2.5 rounded border border-slate-200">
-                        <span className="font-semibold text-slate-800 block text-xs mb-1">
-                          Acessos e Licenças Requeridos:
                         </span>
-                        <div className="flex flex-wrap gap-1.5">
+                      )}
+                    {ticket.onboarding.acessosSoftwares.length > 0 &&
+                      linha(
+                        'Acessos e licenças',
+                        <span className="flex flex-wrap gap-1.5">
                           {ticket.onboarding.acessosSoftwares.map((a, idx) => (
-                            <span key={idx} className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-xs">
+                            <span key={idx} className="selo selo-neutro">
                               {a}
                             </span>
                           ))}
-                        </div>
-                      </div>
-                    )}
+                        </span>
+                      )}
+                    {ticket.onboarding.observacoes?.trim() &&
+                      linha('Observações', <span className="whitespace-pre-wrap">{ticket.onboarding.observacoes}</span>)}
                   </div>
-
-                  {ticket.onboarding.observacoes?.trim() && (
-                    <div className="bg-white p-2.5 rounded border border-slate-200 text-xs">
-                      <span className="font-semibold text-slate-800 block">Observações do RH:</span>
-                      <p className="text-slate-800 whitespace-pre-wrap break-words">{ticket.onboarding.observacoes}</p>
-                    </div>
-                  )}
-                </div>
+                </section>
               )}
 
               {/* Fase 6: checklist guiado (admissão e desligamento) */}
               {(ticket.tipo === 'onboarding' || (ticket.tipo === 'offboarding' && !usaChecklistLegado)) && (
                 <ChecklistProcesso ticket={ticket} />
               )}
-
-              {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
-              <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} />
             </div>
 
-            {/* Caixa de Resposta */}
-            {encerrado ? (
-              <p className="pt-4 border-t border-slate-200 text-xs text-slate-500">
-                Chamado {ticket.status === 'cancelado' ? 'cancelado' : 'encerrado'}: a conversa fica registrada como está.
-                {ticket.status === 'resolvido' && ticket.tipo === 'suporte' && ' Se o problema voltar, reabra o chamado.'}
-              </p>
-            ) : (
-            <form onSubmit={handleSendMessage} className="pt-4 border-t border-slate-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor={`resposta-${ticket.id}`} className="text-xs font-medium text-slate-700">
-                  Responder
-                </label>
-                {isTI && (
-                  <label className="flex items-center gap-1.5 text-xs text-amber-800 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={isInternalNote}
-                      onChange={(e) => setIsInternalNote(e.target.checked)}
-                      className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                    />
-                    <Lock className="w-3 h-3 text-amber-700" />
-                    <span>Nota interna (só a T.I. vê)</span>
-                  </label>
-                )}
+            <div className="flex min-w-0 flex-col gap-4 p-4 sm:p-5">
+              <div className="flex-1">
+                {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
+                <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} abaInicial={isTI ? 'notas' : 'conversa'} />
               </div>
 
-              <div className="relative">
-                <textarea
-                  id={`resposta-${ticket.id}`}
-                  rows={3}
-                  value={newMessageText}
-                  onChange={(e) => setNewMessageText(e.target.value)}
-                  placeholder={isInternalNote ? 'Escreva uma nota para a equipe de T.I.…' : 'Escreva uma resposta…'}
-                  className={`w-full text-xs p-3 rounded-lg border focus:outline-hidden focus:ring-1 ${
-                    isInternalNote
-                      ? 'border-amber-300 bg-amber-50/40 text-amber-950 focus:ring-amber-500'
-                      : 'border-slate-300 bg-white text-slate-900 focus:ring-blue-500'
-                  }`}
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={!newMessageText.trim()}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg text-white transition-colors ${
-                    isInternalNote
-                      ? 'bg-amber-600 hover:bg-amber-700'
-                      : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50'
-                  }`}
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  {isInternalNote ? 'Salvar nota' : 'Enviar'}
-                </button>
-              </div>
-            </form>
-            )}
-          </div>
-
-          {/* Coluna Lateral: Dados Relacionais e Controles */}
-          <div className="order-first lg:order-none p-6 space-y-6 bg-slate-50/50 text-xs">
-            {/* Controles de Status (para TI) */}
-            {isTI && (
-              <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
-                <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
-                  Gerenciamento de Atendimento
-                </span>
-
-                {encerrado ? (
-                  <p className="text-xs text-slate-600">
-                    {ticket.tipo === 'suporte'
-                      ? `Chamado ${ticket.status === 'cancelado' ? 'cancelado' : 'encerrado com solução registrada'}. Para continuar o atendimento, reabra o chamado.`
-                      : `Processo ${ticket.status === 'cancelado' ? 'cancelado' : 'concluído'}. Processo encerrado não é reaberto; se faltou algo, abra um chamado novo.`}
-                  </p>
-                ) : (
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Situação</label>
-                  <select
-                    value={statusExibido}
-                    onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
-                  >
-                    <option value="aberto">Aberto (na fila)</option>
-                    <option value="em_andamento">Em atendimento</option>
-                    <option value="aguardando_terceiro">Aguardando…</option>
-                    {/* Encerrar: suporte por "Registrar solução"; processos por "Concluir" no checklist; ambos por "Cancelar" */}
-                  </select>
-                  {statusExibido === 'aguardando_terceiro' && (
-                    <select
-                      aria-label="Aguardando o quê"
-                      value={rascAguardando ?? (ticket.aguardandoMotivo || '')}
-                      onChange={(e) => setRascAguardando(e.target.value as AguardandoMotivo | '')}
-                      className="mt-2 w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
-                    >
-                      <option value="">Aguardando o quê?</option>
-                      <option value="peca">Peça</option>
-                      <option value="fornecedor">Fornecedor</option>
-                      <option value="solicitante">Resposta do solicitante</option>
-                    </select>
-                  )}
-                </div>
-                )}
-
-                {/* Fase 10: encerrar é registrar a solução; cancelar pede motivo */}
-                {!encerrado && (
-                  <div className="flex flex-wrap gap-2">
-                    {ticket.tipo === 'suporte' && (
-                      <button
-                        type="button"
-                        onClick={() => setResolvendo(true)}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                        Registrar solução
-                      </button>
+              {/* Caixa de resposta */}
+              {encerrado ? (
+                <p className="ajuda border-t border-slate-200 pt-4">
+                  Chamado {ticket.status === 'cancelado' ? 'cancelado' : 'encerrado'}: a conversa fica registrada como está.
+                  {ticket.status === 'resolvido' && ticket.tipo === 'suporte' && ' Se o problema voltar, reabra o chamado.'}
+                </p>
+              ) : (
+                <form onSubmit={handleSendMessage} className="space-y-2 border-t border-slate-200 pt-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor={`resposta-${ticket.id}`} className="rotulo !mb-0">
+                      Responder
+                    </label>
+                    {isTI && (
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={isInternalNote}
+                          onChange={(e) => setIsInternalNote(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <Lock className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+                        <span>Nota interna (só a T.I. vê)</span>
+                      </label>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setCancelando(true)}
-                      className="px-3 py-2 text-xs font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50"
-                    >
-                      {ticket.tipo === 'suporte' ? 'Cancelar' : ticket.tipo === 'onboarding' ? 'Cancelar admissão' : 'Cancelar desligamento'}
+                  </div>
+
+                  <textarea
+                    id={`resposta-${ticket.id}`}
+                    rows={3}
+                    value={newMessageText}
+                    onChange={(e) => setNewMessageText(e.target.value)}
+                    placeholder={isInternalNote ? 'Escreva uma nota para a equipe de T.I.…' : 'Escreva uma resposta…'}
+                    className="campo"
+                  />
+
+                  <div className="flex justify-end">
+                    <button type="submit" disabled={!newMessageText.trim()} className="btn btn-primario">
+                      <Send aria-hidden="true" />
+                      {isInternalNote ? 'Salvar nota' : 'Enviar'}
                     </button>
                   </div>
-                )}
-
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Técnico Responsável</label>
-                  <select
-                    value={tecnicoExibido}
-                    onChange={(e) => handleTechnicianChange(e.target.value)}
-                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
-                  >
-                    <option value="">Não atribuído...</option>
-                    {tecnicosTI
-                      .map((tech) => (
-                        <option key={tech.id} value={tech.id}>
-                          {tech.nome} ({tech.cargo})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* Fase 10 C1: prazos de 1ª resposta e de solução */}
-            <PrazosChamado tkt={ticket} />
-
-            {/* Fase 9: equipamento, software e colaborador relacionado (abrem a ficha por cima) */}
-            <VinculosChamado
-              key={salvamentos}
-              ticket={ticket}
-              rascunho={rascVinculos}
-              onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
-            />
-
-            {/* Solicitante do Chamado */}
-            <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-              <span className="text-xs uppercase font-bold text-slate-500 block tracking-wide">
-                Solicitante
-              </span>
-              <div>
-                {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
-                  <span className="font-bold text-slate-900 block">
-                    {ticket.solicitanteNome}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedEmployeeIdFor360(ticket.solicitanteId)}
-                    className="font-bold text-slate-900 hover:text-blue-700 flex items-center gap-1"
-                  >
-                    {ticket.solicitanteNome}
-                    <ExternalLink className="w-3 h-3 text-slate-500" />
-                  </button>
-                )}
-                <p className="text-xs text-slate-600 mt-0.5">{ticket.solicitanteCargo}</p>
-                <p className="text-xs text-slate-500">{ticket.solicitanteSetorNome}</p>
-                <p className="text-xs text-slate-500 mt-1">{ticket.solicitanteEmail}</p>
-              </div>
-              <div className="pt-2 mt-1 border-t border-slate-100 space-y-0.5 text-xs">
-                <div className="flex justify-between gap-2">
-                  <span className="text-slate-500">Última atualização:</span>
-                  <span className="font-medium text-slate-800">{formatDate(ticket.dataAtualizacao)}</span>
-                </div>
-              </div>
+                </form>
+              )}
             </div>
           </div>
-        </div>
         </div>
         <BarraAlteracoes itens={itensPendentes} onCancelar={descartarRascunho} onSalvar={salvarRascunho} />
       </div>

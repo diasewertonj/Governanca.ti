@@ -292,7 +292,7 @@ interface AppContextType {
 
   // Fase 5: alterações não salvas
   registrarPendencias: (origem: string, itens: string[]) => void;
-  podeDescartarPendencias: () => boolean;
+  podeDescartarPendencias: () => Promise<boolean>;
 
   // Ações de Termos
   // Assíncrono: o código (#TR-AAAA-NNNN) vem do banco. Devolve null se falhar.
@@ -753,8 +753,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pilhaFichas, setPilhaFichas] = useState<FichaAberta[]>([]);
   const abrirFicha = (ficha: FichaAberta) => {
     // Voltar a uma ficha que está mais abaixo fecha as de cima: confirma se houver rascunho
-    if (voltarFechaOutras(pilhaFichas, ficha) && !podeDescartarPendencias()) return;
-    setPilhaFichas((p) => empilharFicha(p, ficha));
+    if (!voltarFechaOutras(pilhaFichas, ficha)) return setPilhaFichas((p) => empilharFicha(p, ficha));
+    void podeDescartarPendencias().then((ok) => ok && setPilhaFichas((p) => empilharFicha(p, ficha)));
   };
   const fecharFicha = (posicao: number) => setPilhaFichas((p) => fecharFichaNaPosicao(p, posicao));
   const abrirOuFechar = (tipo: TipoFicha) => (id: string | null) => {

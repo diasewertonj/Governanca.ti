@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+import { Janela } from '../ui/Janela.tsx';
 import { CompanySettings } from '../../types/index.ts';
 
 interface Props {
@@ -11,19 +12,8 @@ interface Props {
 // ATENÇÃO: texto-base técnico. Deve ser revisado pelo jurídico / encarregado (DPO)
 // antes de ser considerado a política oficial da empresa.
 export const PoliticaPrivacidadeModal: React.FC<Props> = ({ settings, onClose }) => (
-  <div className="fixed inset-0 z-[70] flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 overflow-y-auto overscroll-contain modal-tela">
-    <div className="relative w-full max-w-2xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 my-0 sm:my-6">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-blue-600" />
-          <h2 className="text-sm font-semibold text-slate-900">Aviso de privacidade · Nexus IT & HR</h2>
-        </div>
-        <button onClick={onClose} aria-label="Fechar" className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="px-6 py-5 space-y-4 text-xs text-slate-700 leading-relaxed">
+  <Janela tamanho="m" icone={<ShieldCheck className="h-4 w-4" />} titulo="Aviso de privacidade · Nexus IT & HR" idTitulo="politica-titulo" onFechar={onClose}>
+      <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
         <p>
           <strong>Controlador:</strong> {settings.razaoSocial} (CNPJ {settings.cnpj}). Contato para assuntos de dados pessoais:{' '}
           <strong>{settings.emailTI}</strong>.
@@ -77,6 +67,5 @@ export const PoliticaPrivacidadeModal: React.FC<Props> = ({ settings, onClose })
           Texto-base preparado para revisão do jurídico / encarregado de dados da empresa.
         </p>
       </div>
-    </div>
-  </div>
+  </Janela>
 );

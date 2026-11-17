@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { HistoricoProcessos, type FiltroSituacaoProcesso, type FiltroTipoProcesso } from './HistoricoProcessos.tsx';
+import { Busca, CabecalhoTela } from '../ui/Tela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { descricaoAdmissao } from '../../utils/admissao.ts';
@@ -30,8 +32,15 @@ export const RhProcessesView: React.FC = () => {
     setSelectedAssetIdFor360,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'offboarding' | 'onboarding'>('offboarding');
+  // Abre no histórico; os formulários só aparecem em Nova admissão / Novo desligamento
+  const [activeTab, setActiveTab] = useState<'lista' | 'offboarding' | 'onboarding'>('lista');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // Filtros do histórico (ficam no cabeçalho da tela)
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipoProcesso>('todos');
+  const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacaoProcesso>('andamento');
+  const [filtroBusca, setFiltroBusca] = useState('');
+  const processos = tickets.filter((t) => t.tipo === 'onboarding' || t.tipo === 'offboarding');
+  const qtdAndamento = processos.filter((t) => t.status !== 'resolvido' && t.status !== 'cancelado').length;
 
   // Estados do Offboarding
   const [selectedColabId, setSelectedColabId] = useState('');
@@ -193,48 +202,52 @@ export const RhProcessesView: React.FC = () => {
     setOnbOutrosAcessos('');
     setTimeout(() => {
       setSuccessMessage(null);
+      setActiveTab('lista');
       setSelectedTicketIdForDetail(ticket.id);
     }, 1500);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">Admissões e desligamentos</h2>
-        </div>
-
-        {/* Tabs de Seleção */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
-          <button
-            type="button"
-            onClick={() => setActiveTab('offboarding')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'offboarding'
-                ? 'bg-white text-rose-700 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <UserMinus className="w-3.5 h-3.5 text-rose-600" />
-            <span>Offboarding Inteligente</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('onboarding')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'onboarding'
-                ? 'bg-white text-blue-700 font-semibold shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5 text-blue-600" />
-            <span>Solicitar Onboarding</span>
-          </button>
-        </div>
-      </div>
-
+    <div className="space-y-4">
+      <CabecalhoTela
+        titulo={activeTab === 'lista' ? 'Admissões e desligamentos' : activeTab === 'onboarding' ? 'Nova admissão' : 'Novo desligamento'}
+        subtitulo={activeTab === 'lista' ? 'Histórico e andamento de todos os processos' : 'Preencha o pedido; a T.I. recebe e monta o checklist'}
+        filtros={
+          activeTab === 'lista' ? (
+            <>
+              <Busca id="processos-busca" valor={filtroBusca} onMudar={setFiltroBusca} placeholder="Buscar pessoa ou código..." />
+              <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value as FiltroTipoProcesso)} aria-label="Tipo" className="campo campo-sm">
+                <option value="todos">Admissões e desligamentos</option>
+                <option value="onboarding">Só admissões</option>
+                <option value="offboarding">Só desligamentos</option>
+              </select>
+              <select value={filtroSituacao} onChange={(e) => setFiltroSituacao(e.target.value as FiltroSituacaoProcesso)} aria-label="Situação" className="campo campo-sm">
+                <option value="andamento">Em andamento ({qtdAndamento})</option>
+                <option value="concluidos">Concluídos</option>
+                <option value="cancelados">Cancelados</option>
+                <option value="todos">Todos ({processos.length})</option>
+              </select>
+            </>
+          ) : undefined
+        }
+        acoes={
+          // Com um formulário aberto, só o caminho de volta (o envio fica no rodapé do formulário)
+          activeTab !== 'lista' ? (
+            <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
+              Voltar ao histórico
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={() => setActiveTab('offboarding')} className="btn btn-secundario">
+                <UserMinus /> Novo desligamento
+              </button>
+              <button type="button" onClick={() => setActiveTab('onboarding')} className="btn btn-primario">
+                <UserPlus /> Nova admissão
+              </button>
+            </>
+          )
+        }
+      />
       {successMessage && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -242,13 +255,15 @@ export const RhProcessesView: React.FC = () => {
         </div>
       )}
 
+      {activeTab === 'lista' && <HistoricoProcessos tipo={filtroTipo} situacao={filtroSituacao} busca={filtroBusca} />}
+
       {/* MÓDULO 1: OFFBOARDING INTELIGENTE & CONDICIONAL */}
       {activeTab === 'offboarding' && (
         <form onSubmit={handleOffboardingSubmit} className="space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-6 space-y-5">
+          <div className="cartao p-6 space-y-5">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <UserMinus className="w-4 h-4 text-rose-600" />
+              <h3 className="secao-titulo flex items-center gap-2">
+                <UserMinus className="w-4 h-4 text-red-700" />
                 Dados do Desligamento
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -258,7 +273,7 @@ export const RhProcessesView: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Colaborador a ser Desligado (Seleção Dinâmica)
                 </label>
                 <select
@@ -273,7 +288,7 @@ export const RhProcessesView: React.FC = () => {
                     }
                   }}
                   required
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 >
                   <option value="">Selecione um colaborador ativo...</option>
                   {activeEmployees.map((emp) => (
@@ -298,7 +313,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Data do Último Dia de Trabalho
                 </label>
                 <input
@@ -306,7 +321,7 @@ export const RhProcessesView: React.FC = () => {
                   required
                   value={dataDesligamento}
                   onChange={(e) => setDataDesligamento(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  className="campo w-full"
                 />
               </div>
             </div>
@@ -317,7 +332,7 @@ export const RhProcessesView: React.FC = () => {
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <Laptop className="w-4 h-4 text-blue-600" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                    <h4 className="secao-titulo">
                       Equipamentos e softwares com {selectedColaborador.nome} (a T.I. recolhe e desvincula)
                     </h4>
                   </div>
@@ -351,7 +366,7 @@ export const RhProcessesView: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedAssetIdFor360(asset.id)}
-                              className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
+                              className="link flex items-center gap-0.5"
                             >
                               Ver ficha
                               <ExternalLink className="w-2.5 h-2.5" />
@@ -397,7 +412,7 @@ export const RhProcessesView: React.FC = () => {
 
             {/* REGRAS CONDICIONAIS COM DROPDOWNS DINÂMICOS */}
             <div className="space-y-4 pt-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <h4 className="secao-titulo">
                 Regras de Transição e Continuidade Operacional
               </h4>
 
@@ -421,14 +436,14 @@ export const RhProcessesView: React.FC = () => {
 
                 {redirecionarEmail && (
                   <div className="pl-6 pt-1">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                    <label className="rotulo">
                       Destinatário que receberá os e-mails (Colaborador Ativo)
                     </label>
                     <select
                       value={destinatarioEmailId}
                       onChange={(e) => setDestinatarioEmailId(e.target.value)}
                       required={redirecionarEmail}
-                      className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                      className="campo campo-sm w-full"
                     >
                       <option value="">Selecione o destinatário...</option>
                       {activeEmployees
@@ -462,14 +477,14 @@ export const RhProcessesView: React.FC = () => {
 
                 {transferirDrive && (
                   <div className="pl-6 pt-1">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                    <label className="rotulo">
                       Destinatário que receberá a propriedade dos arquivos
                     </label>
                     <select
                       value={destinatarioDriveId}
                       onChange={(e) => setDestinatarioDriveId(e.target.value)}
                       required={transferirDrive}
-                      className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                      className="campo campo-sm w-full"
                     >
                       <option value="">Selecione o destinatário...</option>
                       {activeEmployees
@@ -498,13 +513,13 @@ export const RhProcessesView: React.FC = () => {
                   value={recolhimentoInstrucoes}
                   onChange={(e) => setRecolhimentoInstrucoes(e.target.value)}
                   placeholder="Ex: Entrega presencial ao gestor, portaria central ou código reverso dos Correios"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
 
               {/* Observações Livres */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Observações Operacionais do Desligamento
                 </label>
                 <textarea
@@ -512,19 +527,22 @@ export const RhProcessesView: React.FC = () => {
                   value={observacoesOff}
                   onChange={(e) => setObservacoesOff(e.target.value)}
                   placeholder="Particularidades do encerramento contratual, data de corte de acesso ou prazos..."
-                  className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-slate-100">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
+                Cancelar
+              </button>
               <button
                 type="submit"
                 disabled={!selectedColaborador || !!desligamentoJaAberto}
-                className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg shadow-xs transition-colors"
+                className="btn btn-primario"
               >
-                <Send className="w-4 h-4" />
-                <span>Abrir Chamado de Desligamento com Checklist Técnico para T.I.</span>
+                <Send />
+                <span>Enviar pedido de desligamento</span>
               </button>
             </div>
           </div>
@@ -534,9 +552,9 @@ export const RhProcessesView: React.FC = () => {
       {/* MÓDULO 2: SOLICITAÇÃO DE ONBOARDING */}
       {activeTab === 'onboarding' && (
         <form onSubmit={handleOnboardingSubmit} className="space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-6 space-y-5">
+          <div className="cartao p-6 space-y-5">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <h3 className="secao-titulo flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-blue-600" />
                 Solicitação de Admissão & Kit de Trabalho
               </h3>
@@ -546,10 +564,10 @@ export const RhProcessesView: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Dados do admitido</h4>
+            <h4 className="secao-titulo">Dados do admitido</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Nome Completo do Novo Colaborador
                 </label>
                 <input
@@ -558,12 +576,12 @@ export const RhProcessesView: React.FC = () => {
                   value={onbNome}
                   onChange={(e) => setOnbNome(e.target.value)}
                   placeholder="Ex: Gustavo Henrique Ribeiro"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   E-mail Corporativo Sugerido
                 </label>
                 <input
@@ -572,12 +590,12 @@ export const RhProcessesView: React.FC = () => {
                   value={onbEmail}
                   onChange={(e) => setOnbEmail(e.target.value)}
                   placeholder="nome@empresa.com.br"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Cargo / Função
                 </label>
                 <input
@@ -586,18 +604,18 @@ export const RhProcessesView: React.FC = () => {
                   value={onbCargo}
                   onChange={(e) => setOnbCargo(e.target.value)}
                   placeholder="Ex: Desenvolvedor Front-end"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Setor / Departamento
                 </label>
                 <select
                   value={onbSetorId}
                   onChange={(e) => setOnbSetorId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 >
                   {departments
                     .filter((d) => d.ativo)
@@ -610,13 +628,13 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Líder Imediato / Gestor
                 </label>
                 <select
                   value={onbGestorId}
                   onChange={(e) => setOnbGestorId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 >
                   <option value="">Selecione o gestor...</option>
                   {activeEmployees.map((emp) => (
@@ -628,7 +646,7 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Data de Início Prevista
                 </label>
                 <input
@@ -636,17 +654,17 @@ export const RhProcessesView: React.FC = () => {
                   required
                   value={onbDataInicio}
                   onChange={(e) => setOnbDataInicio(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
               </div>
             </div>
             </div>
 
             <div className="space-y-3 pt-3 border-t border-slate-100">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipamento</h4>
+              <h4 className="secao-titulo">Equipamento</h4>
               {/* Ajuste da admissão: o RH não escolhe modelo; no máximo descreve uma necessidade */}
               <div>
-                <label htmlFor="onb-obs-equipamento" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="onb-obs-equipamento" className="rotulo">
                   Observação sobre o equipamento <span className="font-normal text-slate-500">(opcional)</span>
                 </label>
                 <input
@@ -655,14 +673,14 @@ export const RhProcessesView: React.FC = () => {
                   value={onbTipoComputador}
                   onChange={(e) => setOnbTipoComputador(e.target.value)}
                   placeholder="Ex.: precisa de dois monitores; trabalha com edição de vídeo"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 />
                 <span className="text-xs text-slate-500 mt-0.5 block">A T.I. escolhe o equipamento no estoque.</span>
               </div>
 
             {/* Fase 6: kit sugerido (catálogo da T.I.) */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Equipamentos e acessórios</label>
+              <label className="rotulo">Equipamentos e acessórios</label>
               <p className="text-xs text-slate-500 mb-2">
                 Sugestão padrão da T.I. — desmarque o que não precisa. A T.I. confirma o kit final.
               </p>
@@ -692,15 +710,15 @@ export const RhProcessesView: React.FC = () => {
             </div>
 
             <div className="space-y-3 pt-3 border-t border-slate-100">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Acessos</h4>
+              <h4 className="secao-titulo">Acessos</h4>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="rotulo">
                   Nível de Acesso Sugerido ao Sistema
                 </label>
                 <select
                   value={onbPapelAcesso}
                   onChange={(e) => setOnbPapelAcesso(e.target.value as 'colaborador' | 'rh' | 'ti_suporte' | 'ti_admin')}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                  className="campo w-full"
                 >
                   <option value="colaborador">Colaborador Padrão (Solicitante)</option>
                   <option value="rh">Recursos Humanos (admissões e desligamentos)</option>
@@ -714,7 +732,7 @@ export const RhProcessesView: React.FC = () => {
 
             {/* Fase 6: contas (catálogo) + outros acessos + grupos de e-mail */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">Contas e acessos</label>
+              <label className="rotulo">Contas e acessos</label>
               <div className="flex flex-wrap gap-2">
                 {itensAcesso.map((c) => {
                   const selected = marcado(c);
@@ -726,7 +744,7 @@ export const RhProcessesView: React.FC = () => {
                       aria-pressed={selected}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                         selected
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                          ? 'bg-blue-50 text-blue-700 border-blue-300'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
@@ -738,23 +756,23 @@ export const RhProcessesView: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Outros sistemas (opcional)</label>
+                  <label className="rotulo">Outros sistemas (opcional)</label>
                   <input
                     value={onbOutrosAcessos}
                     onChange={(e) => setOnbOutrosAcessos(e.target.value)}
                     placeholder="Ex.: Figma, VPN, ERP (separe por vírgula)"
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                    className="campo w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="rotulo">
                     Grupos de e-mail sugeridos (opcional)
                   </label>
                   <input
                     value={onbGruposEmail}
                     onChange={(e) => setOnbGruposEmail(e.target.value)}
                     placeholder="Ex.: comercial@empresa.com.br, todos@..."
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                    className="campo w-full"
                   />
                 </div>
               </div>
@@ -762,7 +780,7 @@ export const RhProcessesView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="rotulo">
                 Instruções de Entrega / Modelo Híbrido
               </label>
               <textarea
@@ -770,17 +788,20 @@ export const RhProcessesView: React.FC = () => {
                 value={onbObservacoes}
                 onChange={(e) => setOnbObservacoes(e.target.value)}
                 placeholder="Endereço de envio residencial ou retirada no primeiro dia no escritório..."
-                className="w-full text-xs p-3 bg-white border border-slate-300 rounded-lg text-slate-900"
+                className="campo w-full"
               />
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-slate-100">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setActiveTab('lista')} className="btn btn-secundario">
+                Cancelar
+              </button>
               <button
                 type="submit"
-                className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors"
+                className="btn btn-primario"
               >
-                <Send className="w-4 h-4" />
-                <span>Enviar Solicitação de Onboarding para Equipe de T.I.</span>
+                <Send />
+                <span>Enviar pedido de admissão</span>
               </button>
             </div>
           </div>

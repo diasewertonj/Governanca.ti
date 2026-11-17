@@ -17,6 +17,7 @@ import {
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { FormItemProcesso } from './FormItemProcesso.tsx';
+import { confirmar } from '../ui/dialogo.tsx';
 
 const TIPOS_LIVRES_ONB: TipoItemProcesso[] = ['conta', 'grupo_email', 'licenca', 'equipamento', 'acessorio', 'tarefa'];
 const TIPOS_LIVRES_OFF: TipoItemProcesso[] = ['tarefa', 'dados_drive', 'email'];
@@ -96,7 +97,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   };
 
   const remover = async (item: ProcessoItem) => {
-    if (!window.confirm(`Remover o passo "${item.titulo}" do checklist?`)) return;
+    if (!(await confirmar(`Remover o passo "${item.titulo}" do checklist?`))) return;
     await removerItemProcesso(item.id);
   };
 
@@ -111,7 +112,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     const termo = prog.termoPendente
       ? '\n\nO termo ainda não foi assinado: será criado um lembrete para coletar a assinatura.'
       : '';
-    if (!window.confirm(`Concluir ${acao}? O chamado será encerrado.${efeitos}${termo}`)) return;
+    if (!(await confirmar(`Concluir ${acao}? O chamado será encerrado.${efeitos}${termo}`))) return;
     setConcluindo(true);
     const erro = await concluirProcesso(ticket.id);
     setConcluindo(false);
@@ -124,37 +125,31 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   })).filter((g) => g.itens.length > 0);
 
   return (
-    <div className="border border-indigo-200 bg-indigo-50/30 rounded-lg p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2 pb-2 border-b border-indigo-200">
-        <div className="flex items-center gap-1.5">
-          <ClipboardList className="w-4 h-4 text-indigo-700" />
-          <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wide">
-            {ehOnb ? 'Checklist de admissão' : 'Checklist de desligamento'}
-            {colab ? ` · ${colab.nome}` : ''}
-          </h4>
-        </div>
+    <section aria-label={ehOnb ? 'Checklist de admissão' : 'Checklist de desligamento'} className="cartao p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="secao-titulo flex items-center gap-1.5">
+          <ClipboardList className="h-4 w-4" aria-hidden="true" />
+          {ehOnb ? 'Checklist de admissão' : 'Checklist de desligamento'}
+          {colab ? ` · ${colab.nome}` : ''}
+        </h3>
         {itens.length > 0 && (
-          <span className="text-xs font-semibold text-indigo-800 whitespace-nowrap">
+          <span className="text-xs font-semibold whitespace-nowrap text-slate-700">
             {prog.feitos + prog.naoSeAplica}/{prog.total} · {prog.percentual}%
           </span>
         )}
       </div>
 
       {itens.length > 0 && (
-        <div className="h-1.5 bg-indigo-100 rounded-full overflow-hidden" aria-hidden>
-          <div className="h-full bg-indigo-600 transition-all" style={{ width: `${prog.percentual}%` }} />
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+          <div className="h-full bg-blue-600 transition-all" style={{ width: `${prog.percentual}%` }} />
         </div>
       )}
 
       {mensagem && (
-        <div
-          className={`flex items-start justify-between gap-2 p-2.5 rounded text-xs border ${
-            mensagem.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-          }`}
-        >
-          <span>{mensagem.texto}</span>
-          <button type="button" onClick={() => setMensagem(null)} aria-label="Fechar aviso">
-            <X className="w-3.5 h-3.5" />
+        <div className="flex items-start justify-between gap-2">
+          <span className={mensagem.ok ? 'selo selo-ok whitespace-normal' : 'selo selo-problema whitespace-normal'}>{mensagem.texto}</span>
+          <button type="button" onClick={() => setMensagem(null)} title="Fechar aviso" aria-label="Fechar aviso" className="btn-icone">
+            <X />
           </button>
         </div>
       )}
@@ -162,7 +157,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
       {itens.length === 0 && !rascunho && (
         podeEditar ? (
           !ehOnb && !colabId ? (
-            <p className="text-xs text-amber-800">
+            <p className="ajuda">
               Este chamado não identifica o colaborador que sai. Peça ao RH para abrir o desligamento pela tela de Processos de RH.
             </p>
           ) : (
@@ -171,12 +166,8 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
                 A sugestão vem {ehOnb ? 'do catálogo e do que o RH pediu' : 'de tudo que está vinculado ao colaborador (contas, grupos, equipamentos, acessórios e licenças)'}.
                 Revise antes de salvar: nada é obrigatório.
               </p>
-              <button
-                type="button"
-                onClick={montarSugestao}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-              >
-                <ClipboardList className="w-3.5 h-3.5" /> Montar checklist sugerido
+              <button type="button" onClick={montarSugestao} className="btn btn-primario">
+                <ClipboardList aria-hidden="true" /> Montar checklist sugerido
               </button>
             </div>
           )
@@ -189,9 +180,11 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
         )
       )}
 
+      {/* Etapas empilhadas: o checklist fica na coluna do pedido, ao lado do atendimento */}
+      <div className="grid grid-cols-1 gap-y-3">
       {grupos.map((g) => (
         <div key={g.etapa} className="space-y-1.5">
-          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.etapa}</h5>
+          <h4 className="secao-titulo">{g.etapa}</h4>
           {g.itens.map((item) => (
             <LinhaItem
               key={item.id}
@@ -208,6 +201,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
           ))}
         </div>
       ))}
+      </div>
 
       {rascunho && (
         <Montagem rascunho={rascunho} setRascunho={setRascunho} ehOnb={ehOnb} existentes={itens.length} />
@@ -225,18 +219,14 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
       {podeEditar && itens.length > 0 && !rascunho && (
         <div className="space-y-1.5 pt-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setRascunho([])}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50"
-            >
-              <Plus className="w-3.5 h-3.5" /> Adicionar passos
+            <button type="button" onClick={() => setRascunho([])} className="btn btn-sm btn-secundario">
+              <Plus aria-hidden="true" /> Adicionar passos
             </button>
             <button
               type="button"
               onClick={concluir}
               disabled={!prog.podeConcluir || concluindo}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+              className="btn btn-sm btn-primario"
             >
               {concluindo ? 'Concluindo...' : ehOnb ? 'Concluir admissão' : 'Concluir desligamento'}
             </button>
@@ -250,7 +240,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
       )}
 
       {itens.length > 0 && <TrilhaAuditoria chamadoId={ticket.id} nomeDe={nomeDe} />}
-    </div>
+    </section>
   );
 };
 
@@ -270,11 +260,11 @@ const LinhaItem: React.FC<{
   const cadastrada = item.tipo === 'cadastro' ? employees.find((e) => e.id === ticket.colaboradorId) : undefined;
   const icone =
     item.status === 'feito' ? (
-      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
     ) : item.status === 'nao_se_aplica' ? (
       <MinusCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
     ) : (
-      <Circle className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
+      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
     );
   const registro = [
     item.identificador,
@@ -283,71 +273,73 @@ const LinhaItem: React.FC<{
     item.condicao ? `condição: ${item.condicao}` : undefined,
     item.lembreteEm ? `lembrete ${item.lembreteEm.split('-').reverse().join('/')}` : undefined,
   ].filter(Boolean);
-  const clicavel = podeEditar && item.status === 'pendente' && !aberto;
+  const pendenteEditavel = podeEditar && item.status === 'pendente' && !aberto;
 
   return (
-    <div
-      className={`rounded-md border text-xs ${
-        item.status === 'feito'
-          ? 'bg-emerald-50/50 border-emerald-200'
-          : item.status === 'nao_se_aplica'
-            ? 'bg-slate-50 border-slate-200'
-            : 'bg-white border-slate-200'
-      }`}
-    >
-      <div className="flex items-start gap-2 p-2">
+    <div className="rounded-lg border border-slate-200 bg-white text-xs">
+      <div className="flex items-start gap-2 p-2.5">
         {icone}
-        <button
-          type="button"
-          onClick={clicavel ? onAbrir : undefined}
-          className={`flex-1 min-w-0 text-left ${clicavel ? 'cursor-pointer' : 'cursor-default'}`}
-          aria-expanded={aberto}
-        >
+        <div className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs uppercase font-semibold text-slate-500">{ACAO_DO_TIPO[item.tipo]}</span>
-            {item.sugeridoPor === 'rh' && (
-              <span className="text-xs px-1.5 rounded bg-blue-50 text-blue-700 border border-blue-200">pedido do RH</span>
-            )}
+            <span className="text-xs font-semibold text-slate-500">{ACAO_DO_TIPO[item.tipo]}</span>
+            {item.sugeridoPor === 'rh' && <span className="selo selo-info">pedido do RH</span>}
           </span>
-          <span
-            className={`block font-medium ${item.status === 'nao_se_aplica' ? 'text-slate-500 line-through' : 'text-slate-800'}`}
-          >
+          <span className={`block font-medium ${item.status === 'nao_se_aplica' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
             {item.titulo}
           </span>
           {/* Cadastro concluído: mostra a pessoa como foi cadastrada (o pedido do RH pode ter sido corrigido) */}
           {item.tipo === 'cadastro' && item.status === 'feito' && cadastrada ? (
-            <span className="block text-xs text-slate-500">
+            <span className="block text-slate-500">
               {cadastrada.nome} · {cadastrada.email}
             </span>
           ) : (
-            item.detalhe && <span className="block text-xs text-slate-500">{item.detalhe}</span>
+            item.detalhe && <span className="block text-slate-500">{item.detalhe}</span>
           )}
           {item.status !== 'pendente' && (
-            <span className="block text-xs text-slate-500 mt-0.5">
+            <span className="mt-0.5 block text-slate-500">
               {registro.length > 0 && <>{registro.join(' · ')} · </>}
               {item.observacao && <>“{item.observacao}” · </>}
               {nomeDe(item.concluidoPor) || 'T.I.'}
               {item.concluidoEm ? ` em ${formatDateTime(item.concluidoEm)}` : ''}
             </span>
           )}
-          {clicavel && <span className="block text-xs text-indigo-600 mt-0.5">Registrar este passo</span>}
-        </button>
-        {podeEditar && item.status === 'pendente' && !aberto && (
-          <button type="button" onClick={onRemover} title="Remover passo" className="p-1 text-slate-500 hover:text-red-600">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        )}
-        {podeEditar && podeReabrir(item) && (
-          <button type="button" onClick={onReabrir} title="Voltar para pendente" className="p-1 text-slate-500 hover:text-indigo-600">
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+        </div>
+        {(pendenteEditavel || (podeEditar && podeReabrir(item))) && (
+          <span className="acoes-linha shrink-0">
+            {pendenteEditavel && (
+              <>
+                <button type="button" onClick={onAbrir} aria-expanded={aberto} className="btn btn-sm btn-secundario">
+                  Registrar
+                </button>
+                <button
+                  type="button"
+                  onClick={onRemover}
+                  title="Remover passo"
+                  aria-label={`Remover o passo ${item.titulo}`}
+                  className="btn-icone btn-icone-perigo"
+                >
+                  <Trash2 />
+                </button>
+              </>
+            )}
+            {podeEditar && podeReabrir(item) && (
+              <button
+                type="button"
+                onClick={onReabrir}
+                title="Voltar para pendente"
+                aria-label={`Voltar o passo ${item.titulo} para pendente`}
+                className="btn-icone"
+              >
+                <RotateCcw />
+              </button>
+            )}
+          </span>
         )}
       </div>
       {aberto && <FormItemProcesso item={item} ticket={ticket} onFechar={onFechar} />}
     </div>
   );
 };
-
 // -----------------------------------------------------------------------------
 const Montagem: React.FC<{
   rascunho: ProcessoItemRascunho[];
@@ -389,41 +381,42 @@ const Montagem: React.FC<{
   };
 
   return (
-    <div className="rounded-md border-2 border-dashed border-indigo-300 bg-white p-3 space-y-2">
-      <p className="text-xs font-semibold text-indigo-900">
+    <div className="space-y-3 rounded-lg border border-dashed border-slate-300 p-3">
+      <p className="text-xs font-semibold text-slate-900">
         {existentes > 0 ? 'Novos passos (rascunho)' : 'Checklist sugerido (rascunho)'} — tire o que não se aplica e acrescente o
         que faltar.
       </p>
-      {rascunho.length === 0 && <p className="text-xs text-slate-500">Nenhum passo ainda.</p>}
+      {rascunho.length === 0 && <p className="ajuda">Nenhum passo ainda.</p>}
       <ul className="space-y-1">
         {rascunho.map((r) => (
-          <li key={r.chave} className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1">
-            <span className="text-xs uppercase font-semibold text-slate-500 w-28 shrink-0 truncate">
+          <li key={r.chave} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs">
+            <span className="w-28 shrink-0 truncate text-xs font-semibold text-slate-500">
               {ACAO_DO_TIPO[r.tipo]}
             </span>
             <span className="flex-1 min-w-0 truncate">
               {r.titulo}
               {r.detalhe && <span className="text-slate-500"> · {r.detalhe}</span>}
             </span>
-            {r.sugeridoPor === 'rh' && <span className="text-xs text-blue-700">RH</span>}
+            {r.sugeridoPor === 'rh' && <span className="selo selo-info">RH</span>}
             <button
               type="button"
               onClick={() => setRascunho(rascunho.filter((x) => x.chave !== r.chave))}
               title="Tirar do checklist"
-              className="p-0.5 text-slate-500 hover:text-red-600"
+              aria-label={`Tirar ${r.titulo} do checklist`}
+              className="btn-icone btn-icone-perigo"
             >
-              <X className="w-3.5 h-3.5" />
+              <X />
             </button>
           </li>
         ))}
       </ul>
 
-      <div className="flex flex-wrap items-end gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2">
         {ehOnb && (
           <select
             value={doCatalogo}
             onChange={(e) => incluirCatalogo(e.target.value)}
-            className="px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+            className="campo campo-sm w-auto"
             aria-label="Adicionar do catálogo"
           >
             <option value="">+ Do catálogo...</option>
@@ -439,7 +432,7 @@ const Montagem: React.FC<{
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value as TipoItemProcesso)}
-          className="px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+          className="campo campo-sm w-auto"
           aria-label="Tipo do passo"
         >
           {tipos.map((t) => (
@@ -458,13 +451,9 @@ const Montagem: React.FC<{
             }
           }}
           placeholder="Nome (ex.: VPN, grupo financeiro@...)"
-          className="flex-1 min-w-[10rem] px-2 py-1.5 text-xs border border-slate-300 rounded-md"
+          className="campo campo-sm w-auto min-w-[10rem] flex-1"
         />
-        <button
-          type="button"
-          onClick={incluirLivre}
-          className="px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100"
-        >
+        <button type="button" onClick={incluirLivre} className="btn btn-sm btn-secundario">
           Incluir
         </button>
       </div>
@@ -494,17 +483,17 @@ const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string) => st
       <button
         type="button"
         onClick={carregar}
-        className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-700"
+        className="btn btn-sm btn-discreto"
       >
-        <History className="w-3.5 h-3.5" /> Ver histórico
-        {erro && <span className="text-red-600"> · {erro}</span>}
+        <History aria-hidden="true" /> Ver histórico
+        {erro && <span className="erro"> · {erro}</span>}
       </button>
     );
   }
   return (
     <div className="space-y-1">
       <p className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-        <History className="w-3.5 h-3.5" /> Histórico
+        <History className="h-3.5 w-3.5" aria-hidden="true" /> Histórico
       </p>
       {eventos.length === 0 ? (
         <p className="text-xs text-slate-500">Sem eventos registrados (no modo demonstração a trilha fica no banco).</p>

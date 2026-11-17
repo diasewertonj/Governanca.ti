@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Pencil, Plus, Trash2 } from 'lucide-react';
+import { History, Pencil, Plus, Trash2, Phone } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { LinhaTelefonica } from '../../types/index.ts';
@@ -8,20 +8,39 @@ import { formatCurrency, formatDate } from '../../utils/formatters.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
 import { TIPOS_COM_LINHAS } from '../../utils/financeiro.ts';
 import { normalizar } from '../../utils/processos.ts';
+import { confirmar } from '../ui/dialogo.tsx';
+import { Janela } from '../ui/Janela.tsx';
+import { Vazio } from '../ui/Tela.tsx';
 
 const ROTULO_STATUS: Record<LinhaTelefonica['status'], string> = { ativa: 'Ativa', suspensa: 'Suspensa', cancelada: 'Cancelada' };
+const SELO_STATUS: Record<LinhaTelefonica['status'], string> = { ativa: 'selo-ok', suspensa: 'selo-atencao', cancelada: 'selo-neutro' };
 
 /**
  * Seção 6 · Linhas de celular/fixo, tratadas como assentos: pessoa, aparelho,
  * contrato e histórico de quem usou. `contratoId` filtra (dentro do contrato).
  */
-export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({ busca = '', contratoId }) => {
+export const LinhasLista: React.FC<{
+  busca?: string;
+  contratoId?: string;
+  /** Quando a tela dona controla o filtro e o botão "Nova linha" (LinhasView), a barra interna some */
+  mostrarCanceladas?: boolean;
+  novaAberta?: boolean;
+  onFecharNova?: () => void;
+}> = ({ busca = '', contratoId, mostrarCanceladas: canceladasExterno, novaAberta = false, onFecharNova }) => {
   const { employees, assets, contratos, currentRole, abrirFicha } = useApp();
   const { linhas, atribuicoesLinha, salvarLinha, excluirLinha } = useRecursos();
   const [editando, setEditando] = useState<LinhaTelefonica | 'nova' | null>(null);
   const [historico, setHistorico] = useState<string | null>(null);
-  const [mostrarCanceladas, setMostrarCanceladas] = useState(false);
+  const [canceladasInterno, setCanceladasInterno] = useState(false);
+  const controlada = canceladasExterno !== undefined;
+  const mostrarCanceladas = controlada ? canceladasExterno : canceladasInterno;
   const [erro, setErro] = useState('');
+  const fecharForm = () => {
+    setEditando(null);
+    onFecharNova?.();
+  };
+  const formAberto = editando !== null || novaAberta;
+  const linhaEmEdicao = editando && editando !== 'nova' ? editando : undefined;
 
   const nomePessoa = (id?: string) => employees.find((e) => e.id === id)?.nome || '';
   const lista = linhas
@@ -35,50 +54,48 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="inline-flex items-center gap-2 text-xs text-slate-700">
-          <input type="checkbox" checked={mostrarCanceladas} onChange={(e) => setMostrarCanceladas(e.target.checked)} /> Mostrar canceladas
-        </label>
-        <button
-          type="button"
-          onClick={() => setEditando('nova')}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
-        >
-          <Plus className="w-3.5 h-3.5" /> Nova linha
-        </button>
-      </div>
+      {!controlada && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+            <input type="checkbox" checked={mostrarCanceladas} onChange={(e) => setCanceladasInterno(e.target.checked)} /> Mostrar canceladas
+          </label>
+          <button type="button" onClick={() => setEditando('nova')} className="btn btn-secundario">
+            <Plus /> Nova linha
+          </button>
+        </div>
+      )}
 
-      {editando && (
+      {formAberto && (
         <FormLinha
-          linha={editando === 'nova' ? undefined : editando}
+          linha={linhaEmEdicao}
           contratoFixo={contratoId}
           onSalvar={async (dados) => {
             const r = await salvarLinha(dados);
             if (r.erro) return r.erro;
-            setEditando(null);
+            fecharForm();
             return null;
           }}
-          onCancelar={() => setEditando(null)}
+          onCancelar={fecharForm}
         />
       )}
-      {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
+      {erro && <p className="erro" role="alert">{erro}</p>}
 
       {lista.length === 0 ? (
-        <p className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4">Nenhuma linha cadastrada.</p>
+        <Vazio>Nenhuma linha cadastrada.</Vazio>
       ) : (
-        <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden">
-          <table className="tabela-cartoes w-full text-left text-xs">
+        <div className="cartao overflow-hidden">
+          <table className="tabela tabela-cartoes">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
-                <th className="py-2 px-3">Número</th>
-                <th className="py-2 px-3">Pessoa</th>
-                <th className="hidden xl:table-cell py-2 px-3">Aparelho</th>
-                {!contratoId && <th className="py-2 px-3">Contrato</th>}
-                <th className="py-2 px-3">Situação</th>
-                <th className="py-2 px-3 text-right">Ações</th>
+              <tr>
+                <th>Número</th>
+                <th>Pessoa</th>
+                <th className="hidden xl:table-cell">Aparelho</th>
+                {!contratoId && <th>Contrato</th>}
+                <th>Situação</th>
+                <th className="text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody>
               {lista.map((l) => {
                 const aparelho = assets.find((a) => a.id === l.ativoId);
                 const contrato = contratos.find((c) => c.id === l.contratoId);
@@ -86,11 +103,11 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
                 return (
                   <React.Fragment key={l.id}>
                     <tr className={l.status === 'cancelada' ? 'opacity-60' : ''}>
-                      <td data-label="Número" className="py-2 px-3 font-mono font-semibold text-slate-900">
+                      <td data-label="Número" className="font-mono font-semibold text-slate-900">
                         {l.numero}
                         {(l.plano || l.franquia) && <span className="block font-sans font-normal text-slate-500">{[l.plano, l.franquia].filter(Boolean).join(' · ')}</span>}
                       </td>
-                      <td data-label="Pessoa" className="py-2 px-3">
+                      <td data-label="Pessoa">
                         {pessoa ? (
                           <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: pessoa.id })} className="text-blue-700 hover:underline">
                             {pessoa.nome}
@@ -100,7 +117,7 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
                         )}
                         {pessoa?.status === 'desligado' && <span className="block text-red-700">Pessoa desligada</span>}
                       </td>
-                      <td data-label="Aparelho" className="hidden xl:table-cell py-2 px-3">
+                      <td data-label="Aparelho" className="hidden xl:table-cell">
                         {aparelho ? (
                           <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: aparelho.id })} className="text-blue-700 hover:underline">
                             {aparelho.tag}
@@ -110,29 +127,38 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
                         )}
                       </td>
                       {!contratoId && (
-                        <td data-label="Contrato" className="py-2 px-3">
+                        <td data-label="Contrato">
                           {contrato ? nomeContrato(contrato) : l.valorMensal ? `Avulsa · ${formatCurrency(l.valorMensal)}/mês` : '-'}
                         </td>
                       )}
-                      <td data-label="Situação" className="py-2 px-3">{ROTULO_STATUS[l.status]}</td>
-                      <td data-label="Ações" className="py-2 px-3 text-right">
-                        <span className="inline-flex flex-wrap justify-end gap-1.5">
-                          <button type="button" onClick={() => setHistorico(historico === l.id ? null : l.id)} className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md">
-                            <History className="w-3.5 h-3.5" /> Histórico
+                      <td data-label="Situação">
+                        <span className={`selo ${SELO_STATUS[l.status]}`}>{ROTULO_STATUS[l.status]}</span>
+                      </td>
+                      <td data-label="Ações" className="text-right">
+                        <span className="acoes-linha">
+                          <button type="button" onClick={() => setEditando(l)} aria-label={`Editar ${l.numero}`} className="btn btn-sm btn-secundario">
+                            <Pencil /> Editar
                           </button>
-                          <button type="button" onClick={() => setEditando(l)} aria-label={`Editar ${l.numero}`} className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md">
-                            <Pencil className="w-3.5 h-3.5" /> Editar
+                          <button
+                            type="button"
+                            onClick={() => setHistorico(historico === l.id ? null : l.id)}
+                            title="Histórico de uso"
+                            aria-label={`Histórico de uso de ${l.numero}`}
+                            className="btn-icone"
+                          >
+                            <History />
                           </button>
                           {currentRole === 'ti_admin' && (
                             <button
                               type="button"
+                              title="Excluir"
                               aria-label={`Excluir ${l.numero}`}
                               onClick={async () => {
-                                if (window.confirm(`Excluir a linha ${l.numero}? Esta ação não pode ser desfeita.`)) setErro((await excluirLinha(l.id)) || '');
+                                if ((await confirmar(`Excluir a linha ${l.numero}? Esta ação não pode ser desfeita.`))) setErro((await excluirLinha(l.id)) || '');
                               }}
-                              className="p-1.5 text-red-700 hover:bg-red-50 rounded-md"
+                              className="btn-icone btn-icone-perigo"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 />
                             </button>
                           )}
                         </span>
@@ -140,7 +166,7 @@ export const LinhasLista: React.FC<{ busca?: string; contratoId?: string }> = ({
                     </tr>
                     {historico === l.id && (
                       <tr>
-                        <td colSpan={6} className="py-2 px-3 bg-slate-50">
+                        <td colSpan={6} className="bg-slate-50">
                           {atribuicoesLinha.filter((a) => a.linhaId === l.id).length === 0 ? (
                             <p className="text-slate-500">Sem histórico de uso.</p>
                           ) : (
@@ -225,9 +251,22 @@ const FormLinha: React.FC<{
   };
 
   return (
-    <form onSubmit={salvar} className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-3">
-      <h3 className="text-xs font-bold text-blue-900">{linha ? `Editar linha ${linha.numero}` : 'Nova linha'}</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <Janela
+      tamanho="p"
+      titulo={linha ? `Editar linha ${linha.numero}` : 'Nova linha'}
+      subtitulo="Número, plano, aparelho e pessoa"
+      icone={<Phone className="h-4 w-4" />}
+      onFechar={onCancelar}
+      idTitulo="janela-linha"
+      rodape={
+        <div className="ml-auto flex gap-2">
+          <button type="button" onClick={onCancelar} className="btn btn-secundario">Cancelar</button>
+          <button type="submit" form="form-linha" className="btn btn-primario">Salvar</button>
+        </div>
+      }
+    >
+    <form id="form-linha" onSubmit={salvar} className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="ln-num" className={CLASSE_ROTULO}>Número *</label>
           <input id="ln-num" required value={d.numero} onChange={(e) => set('numero', e.target.value)} className={`${CLASSE_CAMPO} font-mono`} placeholder="(11) 99999-0000" />
@@ -248,7 +287,7 @@ const FormLinha: React.FC<{
           </select>
         </div>
         {!contratoFixo && (
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2">
             <label htmlFor="ln-ctr" className={CLASSE_ROTULO}>Contrato da operadora</label>
             <select id="ln-ctr" value={d.contratoId} onChange={(e) => set('contratoId', e.target.value)} className={CLASSE_CAMPO}>
               <option value="">Sem contrato (linha avulsa)</option>
@@ -284,7 +323,7 @@ const FormLinha: React.FC<{
               <option key={a.id} value={a.id}>{a.tag} · {a.nome}</option>
             ))}
           </select>
-          {aparelhoEmUso && <p className="text-xs text-amber-800 mt-1">Este aparelho já tem outra linha ativa.</p>}
+          {aparelhoEmUso && <p className="ajuda text-amber-800">Este aparelho já tem outra linha ativa.</p>}
         </div>
         <div>
           <label htmlFor="ln-pessoa" className={CLASSE_ROTULO}>Pessoa</label>
@@ -301,16 +340,13 @@ const FormLinha: React.FC<{
           <label htmlFor="ln-cc" className={CLASSE_ROTULO}>Área / centro de custo</label>
           <input id="ln-cc" value={d.centroCusto} onChange={(e) => set('centroCusto', e.target.value)} className={CLASSE_CAMPO} />
         </div>
-        <div className="md:col-span-3">
+        <div className="sm:col-span-2">
           <label htmlFor="ln-obs" className={CLASSE_ROTULO}>Observações</label>
           <textarea id="ln-obs" rows={2} value={d.observacoes} onChange={(e) => set('observacoes', e.target.value)} className={CLASSE_CAMPO} />
         </div>
       </div>
-      {erro && <p className="text-xs font-medium text-red-700" role="alert">{erro}</p>}
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancelar} className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">Cancelar</button>
-        <button type="submit" className="px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Salvar linha</button>
-      </div>
+      {erro && <p className="erro" role="alert">{erro}</p>}
     </form>
+    </Janela>
   );
 };

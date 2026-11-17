@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { Asset, AssetCategory } from '../../types/index.ts';
-import { X, Plus, Save } from 'lucide-react';
+import { Package, Plus } from 'lucide-react';
+import { Janela } from '../ui/Janela.tsx';
+import { Abas } from '../ui/Abas.tsx';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
@@ -22,6 +24,14 @@ const CATEGORIA_LABEL: Record<string, string> = {
   telefonia: 'Telefonia',
 };
 
+type AbaAtivo = 'ident' | 'tecnico' | 'custodia' | 'fiscal';
+const ABAS_ATIVO: [AbaAtivo, string][] = [
+  ['ident', 'Identificação'],
+  ['tecnico', 'Técnico'],
+  ['custodia', 'Custódia'],
+  ['fiscal', 'Fiscal e garantia'],
+];
+
 export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) => {
   const {
     assets,
@@ -39,6 +49,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   const defaultTag = proximaTag(assets);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [aba, setAba] = useState<AbaAtivo>('ident');
+  const [abasComErro, setAbasComErro] = useState<AbaAtivo[]>([]);
   const fiscalAtual = ativo?.fiscal;
 
   const [tag, setTag] = useState(ativo?.tag ?? defaultTag);
@@ -96,7 +108,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   useRegistrarPendencias(ativo ? `ativo:${ativo.id}` : 'novo-ativo', itensPendentes);
 
   const fechar = () => {
-    if (confirmarDescarte(itensPendentes)) onClose();
+    void confirmarDescarte(itensPendentes).then((ok) => ok && onClose());
   };
 
   const escolherNotaFiscal = (arquivo: File | undefined) => {
@@ -109,15 +121,29 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
   // Lote 1: só fecha depois do banco confirmar; se recusar, o erro aparece aqui e nada se perde
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !marca.trim() || !serialNumber.trim() || salvando) return;
+    if (salvando) return;
+    // Campos obrigatórios por etapa (etapas ocultas não bloqueiam o envio do navegador)
+    const faltas: AbaAtivo[] = [];
+    if (!nome.trim() || !tag.trim() || !marca.trim() || !serialNumber.trim()) faltas.push('ident');
+    if (!custodianteId && !localizacaoFisica.trim()) faltas.push('custodia');
+    if (faltas.length) {
+      setAbasComErro(faltas);
+      setAba(faltas[0]);
+      return setErroSalvar('Preencha os campos obrigatórios (*) das etapas marcadas.');
+    }
     const duplicado = erroDuplicadoAtivo(
       assets,
       !ativo || tag.trim() !== ativo.tag ? tag : '',
       !ativo || serialNumber.trim() !== ativo.serialNumber ? serialNumber : '',
       ativo?.id
     );
-    if (duplicado) return setErroSalvar(duplicado);
+    if (duplicado) {
+      setAbasComErro(['ident']);
+      setAba('ident');
+      return setErroSalvar(duplicado);
+    }
     setErroSalvar(null);
+    setAbasComErro([]);
 
     const fiscal = {
       ...(fiscalAtual || {}),
@@ -202,165 +228,131 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
     setSelectedAssetIdFor360(created.id);
   };
 
+  const painel = (id: AbaAtivo) => (aba === id ? 'space-y-4' : 'hidden');
+  const grade = 'grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto overscroll-contain modal-tela">
-      <div className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-xl min-h-[100dvh] sm:min-h-0 shadow-2xl border border-slate-200 sm:overflow-hidden my-0 sm:my-6">
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">
-              {ativo ? `Editar ativo ${ativo.tag}` : 'Novo Ativo Patrimonial de T.I.'}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {ativo
-                ? 'Corrija os dados do ativo. A custódia muda pelo botão "Transferir" da ficha.'
-                : 'Controle de patrimônio, gestão fiscal e rastreabilidade 1:1'}
+    <>
+      <Janela
+        tamanho="g"
+        icone={<Package className="h-4 w-4" />}
+        titulo={ativo ? `Editar ativo ${ativo.tag}` : 'Novo ativo patrimonial de T.I.'}
+        subtitulo={
+          ativo
+            ? 'Corrija os dados do ativo. A custódia muda pelo botão "Transferir" da ficha.'
+            : 'Controle de patrimônio, gestão fiscal e rastreabilidade 1:1'
+        }
+        onFechar={fechar}
+        faixa={
+          <Abas
+            rotulo="Etapas do cadastro"
+            ativa={aba}
+            onMudar={setAba}
+            itens={ABAS_ATIVO.map(([id, rotulo]) => ({
+              id,
+              rotulo,
+              icone: abasComErro.includes(id) ? <span role="img" aria-label="com erro" className="h-2 w-2 rounded-full bg-red-600" /> : undefined,
+            }))}
+          />
+        }
+        rodape={
+          <>
+            <button type="button" onClick={fechar} className="btn btn-secundario">
+              Cancelar
+            </button>
+            <button type="submit" form="form-ativo" disabled={salvando} className="btn btn-primario">
+              {salvando ? 'Salvando…' : ativo ? 'Salvar alterações' : 'Cadastrar ativo'}
+            </button>
+          </>
+        }
+      >
+        <form id="form-ativo" noValidate onSubmit={handleSubmit} className="space-y-4">
+          {erroSalvar && (
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
+              {erroSalvar}
             </p>
-          </div>
-          <button
-            type="button"
-            aria-label="Fechar"
-            onClick={fechar}
-            className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          )}
 
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 sm:max-h-[75vh] sm:overflow-y-auto">
-          {/* Seção 1: Identificação */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              1. Identificação
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nome / Descrição
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  placeholder="Ex: Notebook Dell Latitude 5430"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tag de Patrimônio (Asset Tag)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={tag}
-                  onChange={(e) => setTag(e.target.value)}
-                  className="w-full text-xs font-mono font-bold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-blue-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Categoria
-                </label>
-                <select
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value as AssetCategory)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="hardware">Hardware (Notebooks, Workstations, Servidores)</option>
-                  <option value="periferico">Periféricos (Monitores, Teclados, Mouses, Docks)</option>
-                  <option value="telefonia">Telefonia & Redes (Smartphones, Roteadores)</option>
-                  <option value="software">Software / Licença Contratada</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Marca / Fabricante
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={marca}
-                  onChange={(e) => setMarca(e.target.value)}
-                  placeholder="Ex: Dell, Lenovo, Apple"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Modelo Específico
-                </label>
-                <input
-                  type="text"
-                  value={modelo}
-                  onChange={(e) => setModelo(e.target.value)}
-                  placeholder="Ex: Latitude 5430 Core i7"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Número de Série / Service Tag
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder="Ex: CN084920M12"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
+          {/* Etapa 1 · Identificação */}
+          <div className={painel('ident')}>
+            <div className="cartao space-y-3 p-4">
+              <h3 className="secao-titulo">Identificação</h3>
+              <div className={grade}>
+                <div className="md:col-span-2 xl:col-span-2">
+                  <label htmlFor="ativo-nome" className="rotulo">Nome / descrição *</label>
+                  <input id="ativo-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Notebook Dell Latitude 5430" className="campo" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-tag" className="rotulo">Tag de patrimônio (Asset Tag) *</label>
+                  <input id="ativo-tag" type="text" required value={tag} onChange={(e) => setTag(e.target.value)} className="campo font-mono font-bold" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-categoria" className="rotulo">Categoria</label>
+                  <select id="ativo-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value as AssetCategory)} className="campo">
+                    <option value="hardware">Hardware (Notebooks, Workstations, Servidores)</option>
+                    <option value="periferico">Periféricos (Monitores, Teclados, Mouses, Docks)</option>
+                    <option value="telefonia">Telefonia & Redes (Smartphones, Roteadores)</option>
+                    <option value="software">Software / Licença Contratada</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="ativo-marca" className="rotulo">Marca / fabricante *</label>
+                  <input id="ativo-marca" type="text" required value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ex: Dell, Lenovo, Apple" className="campo" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-modelo" className="rotulo">Modelo específico</label>
+                  <input id="ativo-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ex: Latitude 5430 Core i7" className="campo" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-serie" className="rotulo">Número de série / Service Tag *</label>
+                  <input id="ativo-serie" type="text" required value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Ex: CN084920M12" className="campo font-mono" />
+                </div>
+                {/* Fase 8: observações visíveis a quem vê o ativo */}
+                <div className="md:col-span-3 xl:col-span-4">
+                  <label htmlFor="ativo-observacoes" className="rotulo">Observações</label>
+                  <textarea
+                    id="ativo-observacoes"
+                    rows={3}
+                    value={observacoes}
+                    onChange={(e) => setObservacoes(e.target.value)}
+                    placeholder="Ex.: tecla Enter com folga; acompanha carregador original."
+                    className="campo"
+                  />
+                  <p className="ajuda">Visível para quem vê o ativo, inclusive o colaborador que está com ele.</p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Seção 2: Especificações técnicas */}
-          {(availableCustomFields.length > 0 || categoria === 'hardware') && (
-            <div className="space-y-3 pt-3 border-t border-slate-100">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                2. Especificações técnicas ({CATEGORIA_LABEL[categoria] ?? categoria})
-              </h3>
-
+          {/* Etapa 2 · Técnico */}
+          <div className={painel('tecnico')}>
+            <div className="cartao space-y-3 p-4">
+              <h3 className="secao-titulo">Especificações técnicas ({CATEGORIA_LABEL[categoria] ?? categoria})</h3>
+              {availableCustomFields.length === 0 && categoria !== 'hardware' && (
+                <p className="text-xs text-slate-500">Esta categoria não tem especificações técnicas para preencher.</p>
+              )}
               {availableCustomFields.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className={grade}>
                   {availableCustomFields.map((cf) => (
                     <div key={cf.id}>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        {cf.label}
-                      </label>
+                      <label htmlFor={`ativo-cf-${cf.id}`} className="rotulo">{cf.label}</label>
                       <input
+                        id={`ativo-cf-${cf.id}`}
                         type="text"
                         value={customFields[cf.key] || ''}
-                        onChange={(e) =>
-                          setCustomFields({ ...customFields, [cf.key]: e.target.value })
-                        }
+                        onChange={(e) => setCustomFields({ ...customFields, [cf.key]: e.target.value })}
                         placeholder={`Informe ${cf.label.toLowerCase()}...`}
-                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                        className="campo"
                       />
                     </div>
                   ))}
                 </div>
               )}
-
               {categoria === 'hardware' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Sistema Operacional da Máquina
-                    </label>
-                    <select
-                      value={sistemaOperacional}
-                      onChange={(e) => setSistemaOperacional(e.target.value)}
-                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                    >
+                    <label htmlFor="ativo-so" className="rotulo">Sistema operacional da máquina</label>
+                    <select id="ativo-so" value={sistemaOperacional} onChange={(e) => setSistemaOperacional(e.target.value)} className="campo">
                       <option value="Windows 11 Pro 64-bit">Windows 11 Pro (64-bit)</option>
                       <option value="Windows 11 Home">Windows 11 Home</option>
                       <option value="Windows 10 Pro 64-bit">Windows 10 Pro (64-bit)</option>
@@ -370,290 +362,134 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo }) 
                       <option value="Outro Sistema">Outro Sistema Operacional</option>
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Chave de Recuperação BitLocker / FileVault (Opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={bitlockerKey}
-                      onChange={(e) => setBitlockerKey(e.target.value)}
-                      placeholder="Ex: 419204-183029-482019-582019-..."
-                      className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                    />
-                    <span className="text-xs text-slate-500 mt-0.5 block">
-                      Chave numérica/alfanumérica para desbloqueio emergencial de disco criptografado
-                    </span>
+                  <div className="md:col-span-2 xl:col-span-2">
+                    <label htmlFor="ativo-bitlocker" className="rotulo">Chave de recuperação BitLocker / FileVault (opcional)</label>
+                    <input id="ativo-bitlocker" type="text" value={bitlockerKey} onChange={(e) => setBitlockerKey(e.target.value)} placeholder="Ex: 419204-183029-482019-582019-..." className="campo font-mono" />
+                    <p className="ajuda">Chave numérica/alfanumérica para desbloqueio emergencial de disco criptografado</p>
                   </div>
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Seção 3: Custódia e alocação */}
-          <div className="space-y-3 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              3. Custódia e alocação
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {!ativo && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Alocação Inicial (1:1)
-                </label>
-                <select
-                  value={custodianteId}
-                  onChange={(e) => setCustodianteId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">Manter Disponível no Almoxarifado / Estoque de T.I.</option>
-                  <optgroup label="Entregar Imediatamente a um Colaborador">
-                    {employees
-                      .filter((e) => e.status === 'ativo')
-                      .map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.nome} ({emp.cargo})
+          {/* Etapa 3 · Custódia */}
+          <div className={painel('custodia')}>
+            <div className="cartao space-y-3 p-4">
+              <h3 className="secao-titulo">Custódia e alocação</h3>
+              <div className={grade}>
+                {!ativo && (
+                  <div className="md:col-span-2 xl:col-span-2">
+                    <label htmlFor="ativo-alocacao" className="rotulo">Alocação inicial (1:1)</label>
+                    <select id="ativo-alocacao" value={custodianteId} onChange={(e) => setCustodianteId(e.target.value)} className="campo">
+                      <option value="">Manter Disponível no Almoxarifado / Estoque de T.I.</option>
+                      <optgroup label="Entregar Imediatamente a um Colaborador">
+                        {employees
+                          .filter((e) => e.status === 'ativo')
+                          .map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.nome} ({emp.cargo})
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="ativo-setor" className="rotulo">Setor / centro de custo vinculado</label>
+                  <select id="ativo-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} className="campo">
+                    {departments
+                      .filter((d) => d.ativo)
+                      .map((dep) => (
+                        <option key={dep.id} value={dep.id}>
+                          {dep.nome} ({dep.codigo})
                         </option>
                       ))}
-                  </optgroup>
-                </select>
-              </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Setor / Centro de Custo Vinculado
-                </label>
-                <select
-                  value={setorId}
-                  onChange={(e) => setSetorId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  {departments
-                    .filter((d) => d.ativo)
-                    .map((dep) => (
-                      <option key={dep.id} value={dep.id}>
-                        {dep.nome} ({dep.codigo})
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              {/* Fase 4: o campo existia no estado, mas não havia como preenchê-lo */}
-              {!custodianteId && (
-                <div>
-                  <label htmlFor="ativo-localizacao" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Localização física no estoque
-                  </label>
-                  <input
-                    id="ativo-localizacao"
-                    type="text"
-                    required
-                    value={localizacaoFisica}
-                    onChange={(e) => setLocalizacaoFisica(e.target.value)}
-                    placeholder="Ex.: Almoxarifado T.I. - Armário B3"
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Seção 4: Dados fiscais e garantia */}
-          <div className="space-y-3 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              4. Dados fiscais e garantia
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Número da Nota Fiscal (NF-e)
-                </label>
-                <input
-                  type="text"
-                  value={numeroNF}
-                  onChange={(e) => setNumeroNF(e.target.value)}
-                  placeholder="Ex: 004821"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Valor de Compra (R$)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={valorCompra || ''}
-                  onChange={(e) => setValorCompra(parseFloat(e.target.value))}
-                  placeholder="6850.00"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="ativo-fornecedor" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Fornecedor
-                </label>
-                {/* Lote 1 (L1): fornecedor só do cadastro, com "+ Novo" na hora */}
-                <div className="flex gap-2">
-                  <select
-                    id="ativo-fornecedor"
-                    value={fornecedorId}
-                    onChange={(e) => setFornecedorId(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="">Não informado</option>
-                    {opcoesFornecedor.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.nome}
-                        {f.ativo ? '' : ' (inativo)'}
-                      </option>
-                    ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => setNovoFornecedor(true)}
-                    className="shrink-0 flex items-center gap-1 px-2.5 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Novo
-                  </button>
                 </div>
-                {!fornecedorId && fornecedor && (
-                  <p className="text-xs text-amber-800 mt-1">
-                    Registro antigo: "{fornecedor}" (texto). Escolha o fornecedor do cadastro para vincular.
-                  </p>
-                )}
-              </div>
-              {novoFornecedor && (
-                <FornecedorFormModal onClose={() => setNovoFornecedor(false)} onSalvo={(f) => setFornecedorId(f.id)} />
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Data de Aquisição
-                </label>
-                <input
-                  type="date"
-                  value={dataAquisicao}
-                  onChange={(e) => setDataAquisicao(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Fim da Garantia
-                </label>
-                <input
-                  type="date"
-                  value={dataGarantia}
-                  onChange={(e) => setDataGarantia(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Contato de Suporte / Contrato Fabricante
-                </label>
-                <input
-                  type="text"
-                  value={suporteContato}
-                  onChange={(e) => setSuporteContato(e.target.value)}
-                  placeholder="Ex: 0800 970 3355 (Dell ProSupport 24x7)"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="md:col-span-3">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Chave de Acesso NF-e (44 dígitos)
-                </label>
-                <input
-                  type="text"
-                  maxLength={54}
-                  value={chaveAcesso44}
-                  onChange={(e) => setChaveAcesso44(e.target.value)}
-                  placeholder="35240112345678000190550010000048211002938475"
-                  className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Fase 8: arquivo da NF (PDF ou foto), enviado só ao salvar */}
-              <div className="md:col-span-3">
-                <label htmlFor="ativo-nf-arquivo" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Arquivo da nota fiscal (PDF ou foto)
-                </label>
-                <input
-                  id="ativo-nf-arquivo"
-                  type="file"
-                  accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
-                  onChange={(e) => escolherNotaFiscal(e.target.files?.[0])}
-                  className="block w-full max-w-full text-xs text-slate-700 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 file:text-xs file:font-semibold"
-                />
-                {erroArquivo ? (
-                  <p className="mt-1 text-xs text-red-700" role="alert">{erroArquivo}</p>
-                ) : (
-                  <p className="mt-1 text-xs text-slate-500">
-                    {ativo?.anexos?.some((a) => a.categoria === 'nota_fiscal')
-                      ? 'Este ativo já tem nota fiscal anexada; um novo arquivo fica junto dos anteriores.'
-                      : 'Até 10 MB. O arquivo fica no armazenamento privado e só a T.I. abre.'}
-                  </p>
+                {/* Fase 4: o campo existia no estado, mas não havia como preenchê-lo */}
+                {!custodianteId && (
+                  <div className="md:col-span-2 xl:col-span-2">
+                    <label htmlFor="ativo-localizacao" className="rotulo">Localização física no estoque *</label>
+                    <input id="ativo-localizacao" type="text" required value={localizacaoFisica} onChange={(e) => setLocalizacaoFisica(e.target.value)} placeholder="Ex.: Almoxarifado T.I. - Armário B3" className="campo" />
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Seção 5: Observações */}
-          <div className="space-y-3 pt-3 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">5. Observações</h3>
-            <div>
-              <label htmlFor="ativo-observacoes" className="sr-only">
-                Observações do ativo
-              </label>
-              <textarea
-                id="ativo-observacoes"
-                rows={3}
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Ex.: tecla Enter com folga; acompanha carregador original."
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Visível para quem vê o ativo, inclusive o colaborador que está com ele.
-              </p>
+          {/* Etapa 4 · Fiscal e garantia */}
+          <div className={painel('fiscal')}>
+            <div className="cartao space-y-3 p-4">
+              <h3 className="secao-titulo">Dados fiscais e garantia</h3>
+              <div className={grade}>
+                <div>
+                  <label htmlFor="ativo-nf" className="rotulo">Número da nota fiscal (NF-e)</label>
+                  <input id="ativo-nf" type="text" value={numeroNF} onChange={(e) => setNumeroNF(e.target.value)} placeholder="Ex: 004821" className="campo" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-valor" className="rotulo">Valor de compra (R$)</label>
+                  <input id="ativo-valor" type="number" step="0.01" value={valorCompra || ''} onChange={(e) => setValorCompra(parseFloat(e.target.value))} placeholder="6850.00" className="campo font-mono" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-fornecedor" className="rotulo">Fornecedor</label>
+                  {/* Lote 1 (L1): fornecedor só do cadastro, com "+ Novo" na hora */}
+                  <div className="flex gap-2">
+                    <select id="ativo-fornecedor" value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} className="campo">
+                      <option value="">Não informado</option>
+                      {opcoesFornecedor.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.nome}
+                          {f.ativo ? '' : ' (inativo)'}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => setNovoFornecedor(true)} className="btn btn-secundario shrink-0">
+                      <Plus /> Novo
+                    </button>
+                  </div>
+                  {!fornecedorId && fornecedor && (
+                    <p className="mt-1 text-xs text-amber-800">
+                      Registro antigo: "{fornecedor}" (texto). Escolha o fornecedor do cadastro para vincular.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor="ativo-aquisicao" className="rotulo">Data de aquisição</label>
+                  <input id="ativo-aquisicao" type="date" value={dataAquisicao} onChange={(e) => setDataAquisicao(e.target.value)} className="campo" />
+                </div>
+                <div>
+                  <label htmlFor="ativo-garantia" className="rotulo">Fim da garantia</label>
+                  <input id="ativo-garantia" type="date" value={dataGarantia} onChange={(e) => setDataGarantia(e.target.value)} className="campo" />
+                </div>
+                <div className="md:col-span-2 xl:col-span-2">
+                  <label htmlFor="ativo-suporte" className="rotulo">Contato de suporte / contrato do fabricante</label>
+                  <input id="ativo-suporte" type="text" value={suporteContato} onChange={(e) => setSuporteContato(e.target.value)} placeholder="Ex: 0800 970 3355 (Dell ProSupport 24x7)" className="campo" />
+                </div>
+                <div className="md:col-span-3 xl:col-span-4">
+                  <label htmlFor="ativo-chave-nfe" className="rotulo">Chave de acesso NF-e (44 dígitos)</label>
+                  <input id="ativo-chave-nfe" type="text" maxLength={54} value={chaveAcesso44} onChange={(e) => setChaveAcesso44(e.target.value)} placeholder="35240112345678000190550010000048211002938475" className="campo font-mono" />
+                </div>
+                {/* Fase 8: arquivo da NF (PDF ou foto), enviado só ao salvar */}
+                <div className="md:col-span-3 xl:col-span-4">
+                  <label htmlFor="ativo-nf-arquivo" className="rotulo">Arquivo da nota fiscal (PDF ou foto)</label>
+                  <input id="ativo-nf-arquivo" type="file" accept={TIPOS_ARQUIVO_ACEITOS.join(',')} onChange={(e) => escolherNotaFiscal(e.target.files?.[0])} className="campo" />
+                  {erroArquivo ? (
+                    <p className="erro" role="alert">{erroArquivo}</p>
+                  ) : (
+                    <p className="ajuda">
+                      {ativo?.anexos?.some((a) => a.categoria === 'nota_fiscal')
+                        ? 'Este ativo já tem nota fiscal anexada; um novo arquivo fica junto dos anteriores.'
+                        : 'Até 10 MB. O arquivo fica no armazenamento privado e só a T.I. abre.'}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-
-          {erroSalvar && (
-            <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
-              {erroSalvar}
-            </p>
-          )}
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={fechar}
-              className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={salvando}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
-            >
-              {ativo ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-              {salvando ? 'Salvando…' : ativo ? 'Salvar alterações' : 'Cadastrar Ativo Patrimonial'}
-            </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Janela>
+
+      {novoFornecedor && <FornecedorFormModal onClose={() => setNovoFornecedor(false)} onSalvo={(f) => setFornecedorId(f.id)} />}
+    </>
   );
 };

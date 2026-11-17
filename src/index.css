@@ -18,6 +18,197 @@
   }
 }
 
+/* =============================================================================
+   Padrão visual único (NEXUS-DOCUMENTACAO.md, seção 8). Toda tela usa estas
+   classes: nada de botão, campo, aba, cartão ou selo montado à mão.
+   Cor: azul = ação principal; cinza = secundária; vermelho = destrutiva;
+   verde/âmbar/vermelho só em selos de situação.
+   Cantos: 8px (botão, campo, aba) e 12px (cartão, janela). Ícones: 16px em
+   botões, 14px em ações de linha e selos.
+   ============================================================================= */
+@layer components {
+  /* Botões */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn svg {
+    @apply h-4 w-4 shrink-0;
+  }
+  .btn-sm {
+    @apply gap-1 px-2.5 py-1.5;
+  }
+  .btn-sm svg {
+    @apply h-3.5 w-3.5;
+  }
+  .btn-primario {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+  .btn-secundario {
+    @apply border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+  }
+  .btn-perigo {
+    @apply border-red-200 bg-white text-red-700 hover:bg-red-50;
+  }
+  .btn-perigo-cheio {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+  .btn-discreto {
+    @apply text-blue-700 hover:bg-blue-50;
+  }
+  .btn-icone {
+    @apply inline-flex items-center justify-center rounded-md p-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50;
+  }
+  .btn-icone svg {
+    @apply h-3.5 w-3.5;
+  }
+  .btn-icone-perigo {
+    @apply text-red-700 hover:bg-red-50 hover:text-red-800;
+  }
+  .link {
+    @apply font-medium text-blue-700 hover:underline;
+  }
+
+  /* Campos */
+  .campo {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500;
+  }
+  .campo-sm {
+    @apply px-2.5 py-1.5;
+  }
+  .rotulo {
+    @apply mb-1 block text-xs font-semibold text-slate-700;
+  }
+  .ajuda {
+    @apply mt-1 text-xs text-slate-500;
+  }
+  .erro {
+    @apply mt-1 text-xs font-medium text-red-700;
+  }
+
+  /* Cartões, seções e cabeçalho de tela */
+  .cartao {
+    @apply rounded-xl border border-slate-200 bg-white shadow-2xs;
+  }
+  .secao-titulo {
+    @apply text-xs font-bold tracking-wider text-slate-500 uppercase;
+  }
+  .tela-cabecalho {
+    @apply flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs sm:flex-row sm:items-center;
+  }
+  .tela-titulo {
+    @apply text-base font-semibold text-slate-900;
+  }
+  .tela-subtitulo {
+    @apply text-xs text-slate-500;
+  }
+  .barra-filtros {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  /* Nos filtros, seletores e datas têm a largura do conteúdo (a busca tem largura própria) */
+  .barra-filtros select.campo,
+  .barra-filtros input.campo:not([type='search']) {
+    @apply w-auto px-2.5 py-1.5;
+  }
+
+  /* Abas: sempre numa linha (rola na horizontal se faltar espaço, nunca quebra) */
+  .abas {
+    @apply inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1;
+  }
+  .aba {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap text-slate-600 transition-colors hover:text-slate-900;
+  }
+  .aba[aria-selected='true'] {
+    @apply bg-white font-semibold text-slate-900 shadow-2xs;
+  }
+  .aba-contador {
+    @apply rounded-full bg-slate-200 px-1.5 text-xs font-semibold text-slate-700;
+  }
+
+  /* Selos de situação: ok / atenção / problema / informação / neutro */
+  .selo {
+    @apply inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+  .selo svg {
+    @apply h-3.5 w-3.5;
+  }
+  .selo-ok {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-800;
+  }
+  .selo-atencao {
+    @apply border-amber-200 bg-amber-50 text-amber-900;
+  }
+  .selo-problema {
+    @apply border-red-200 bg-red-50 text-red-800;
+  }
+  .selo-info {
+    @apply border-blue-200 bg-blue-50 text-blue-800;
+  }
+  .selo-neutro {
+    @apply border-slate-200 bg-slate-100 text-slate-700;
+  }
+
+  /* Tabela padrão (no celular vira cartões com .tabela-cartoes) */
+  .tabela {
+    @apply w-full border-collapse text-left text-xs;
+  }
+  .tabela thead tr {
+    @apply border-b border-slate-200 bg-slate-50;
+  }
+  .tabela th {
+    @apply px-3 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase;
+  }
+  .tabela td {
+    @apply px-3 py-2 align-middle text-slate-700;
+  }
+  .tabela tbody tr {
+    @apply border-b border-slate-100 last:border-b-0;
+  }
+  .acoes-linha {
+    @apply inline-flex flex-nowrap items-center justify-end gap-0.5;
+  }
+
+  /* Janelas: fundo, 4 larguras, cabeçalho, corpo e rodapé iguais em todas */
+  .janela-fundo {
+    @apply fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-900/50 p-0 backdrop-blur-xs sm:items-center sm:p-4;
+  }
+  .janela {
+    @apply relative my-0 min-h-[100dvh] w-full border border-slate-200 bg-white shadow-2xl sm:my-6 sm:min-h-0 sm:overflow-hidden sm:rounded-xl;
+  }
+  .janela-p {
+    @apply sm:max-w-lg;
+  }
+  .janela-m {
+    @apply sm:max-w-3xl;
+  }
+  .janela-g {
+    @apply sm:max-w-5xl;
+  }
+  .janela-ficha {
+    @apply sm:max-w-6xl;
+  }
+  .janela-cabecalho {
+    @apply flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3;
+  }
+  .janela-corpo {
+    @apply space-y-4 p-5 sm:max-h-[78vh] sm:overflow-y-auto;
+  }
+  /* Fichas e formulários em etapas: altura estável ao trocar de aba (a janela não pula) */
+  .janela-ficha .janela-corpo {
+    @apply sm:h-[72vh] sm:max-h-[72vh];
+  }
+  .janela-g .janela-corpo {
+    @apply sm:min-h-[60vh];
+  }
+  .janela-rodape {
+    @apply flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3;
+  }
+
+  /* Estado vazio */
+  .vazio {
+    @apply rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500;
+  }
+}
+
 /* Janela aberta: a página de trás não rola (inclusive no iPhone) */
 body:has(.modal-tela) {
   overflow: hidden;
@@ -118,6 +309,15 @@ body:has(.modal-tela) {
 
   .no-print {
     display: none !important;
+  }
+
+  /* Janelas de impressão: só o conteúdo (sem cabeçalho, faixa e rodapé da janela) */
+  .janela-cabecalho,
+  .janela-rodape {
+    display: none !important;
+  }
+  .janela {
+    border: none !important;
   }
 
   /* Janelas (termo A4, etiqueta): na impressão deixam de ser janela, sem rolagem nem altura máxima */

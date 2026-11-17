@@ -9,12 +9,14 @@ export type Vista =
   | 'dashboard'
   | 'assets'
   | 'softwares'
+  | 'linhas'
   | 'fornecedores'
   | 'contratos'
   | 'vencimentos'
   | 'contas_pagar'
   | 'despesas'
   | 'conciliar'
+  | 'financeiro'
   | 'collaborators'
   | 'servicedesk'
   | 'rh_processes'
@@ -29,12 +31,14 @@ export const TITULO_VISTA: Record<Vista, string> = {
   dashboard: 'Início',
   assets: 'Hardware',
   softwares: 'Softwares e licenças',
+  linhas: 'Linhas telefônicas',
   fornecedores: 'Fornecedores',
   contratos: 'Contratos',
   vencimentos: 'Vencimentos',
   contas_pagar: 'Contas a pagar',
   despesas: 'Despesas',
   conciliar: 'Conciliar fornecedores',
+  financeiro: 'Financeiro',
   collaborators: 'Colaboradores',
   servicedesk: 'Chamados',
   rh_processes: 'Admissões e desligamentos',
@@ -45,7 +49,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   my_tickets: 'Meus chamados',
 };
 
-export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar';
+export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar' | 'processos';
 
 export type Icone =
   | 'inicio'
@@ -57,6 +61,7 @@ export type Icone =
   | 'ativos'
   | 'fornecedores'
   | 'softwares'
+  | 'linhas'
   | 'contratos'
   | 'vencimentos'
   | 'contas_pagar'
@@ -100,30 +105,29 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
   if (papel === 'rh') {
     return [
       { itens: [item('dashboard', 'inicio')] },
+      // Os chamados do RH ficam em Minha área › Meus chamados; processos têm tela própria
       {
         titulo: 'Pessoas',
-        itens: [item('rh_processes', 'admissoes'), item('collaborators', 'colaboradores'), item('terms', 'termos')],
+        itens: [item('rh_processes', 'admissoes', 'processos'), item('collaborators', 'colaboradores')],
       },
-      { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados', 'Chamados do RH')] },
       MINHA_AREA,
     ];
   }
 
   const grupos: GrupoMenu[] = [
-    { itens: [item('dashboard', 'inicio')] },
+    // Início traz o Precisa de atenção (vencimentos, termos a assinar): o contador fica aqui
+    { itens: [item('dashboard', 'inicio', 'vencimentos')] },
     { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados'), item('lembretes', 'lembretes', 'lembretes')] },
-    {
-      titulo: 'Pessoas',
-      itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes'), item('terms', 'termos')],
-    },
+    { titulo: 'Pessoas', itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes', 'processos')] },
     // Seção 6: inventário separado de fornecedores/contratos; Financeiro centraliza as despesas
-    { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares')] },
+    { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares'), item('linhas', 'linhas')] },
     {
       titulo: 'Fornecedores e contratos',
-      itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos'), item('vencimentos', 'vencimentos', 'vencimentos')],
+      itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],
     },
-    { titulo: 'Financeiro', itens: [item('contas_pagar', 'contas_pagar'), item('despesas', 'despesas')] },
-    MINHA_AREA,
+    // Item único: sem título de grupo repetindo o nome
+    { itens: [item('financeiro', 'contas_pagar')] },
+    // T.I./admin: sem Minha área — Meus equipamentos fica no menu da conta; os próprios chamados, em Chamados
   ];
   if (papel === 'ti_admin')
     grupos.push({
@@ -135,5 +139,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
 
 /** Telas que o perfil pode abrir (as que aparecem no menu dele) */
 export function vistasDoPapel(papel: UserRole): Vista[] {
-  return menuDoPapel(papel).flatMap((g) => g.itens.map((i) => i.vista));
+  const doMenu = menuDoPapel(papel).flatMap((g) => g.itens.map((i) => i.vista));
+  // Meus equipamentos abre pelo menu da conta (cabeçalho) para quem não tem Minha área no menu
+  return doMenu.includes('my_assets') ? doMenu : [...doMenu, 'my_assets'];
 }

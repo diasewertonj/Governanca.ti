@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Key, Laptop, UserMinus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Ticket } from '../../types/index.ts';
@@ -18,19 +18,19 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
   const equipamentos = pessoa ? assets.filter((a) => a.custodianteId === pessoa.id) : [];
   const softwares = pessoa ? licenses.filter((l) => l.colaboradoresIds.includes(pessoa.id)) : [];
   const linha = (rotulo: string, valor: React.ReactNode) => (
-    <div className="flex flex-col sm:flex-row sm:gap-2">
-      <span className="text-slate-500 sm:w-40 shrink-0">{rotulo}</span>
-      <span className="text-slate-900">{valor}</span>
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
+      <span className="text-slate-500">{rotulo}</span>
+      <span className="text-slate-900 break-words">{valor}</span>
     </div>
   );
 
   return (
-    <section aria-label="Pedido do RH" className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-3 text-xs">
-      <h3 className="flex items-center gap-1.5 font-semibold uppercase tracking-wide text-slate-500">
-        <UserMinus className="w-4 h-4" aria-hidden="true" />
+    <section aria-label="Pedido do RH" className="cartao p-4 space-y-3 text-xs">
+      <h3 className="secao-titulo flex items-center gap-1.5">
+        <UserMinus className="h-4 w-4" aria-hidden="true" />
         Pedido do RH
       </h3>
-      <div className="space-y-1.5 text-[13px]">
+      <div className="grid grid-cols-1 gap-y-1.5">
         {linha('Quem sai', pessoa ? `${pessoa.nome} · ${pessoa.cargo}` : 'colaborador não encontrado')}
         {linha('Último dia', formatDate(off.dataDesligamento))}
         {linha('E-mail', off.redirecionarEmail ? `redirecionar/dar acesso para ${nome(off.redirecionarEmailParaId)}` : 'não redirecionar')}
@@ -39,41 +39,65 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
         {off.observacoes?.trim() && linha('Observações', <span className="whitespace-pre-wrap">{off.observacoes}</span>)}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-        <div>
-          <p className="font-semibold text-slate-700 mb-1">Equipamentos com a pessoa ({equipamentos.length})</p>
-          {equipamentos.length === 0 ? (
-            <p className="text-slate-500">Nenhum.</p>
-          ) : (
-            <ul className="space-y-1">
-              {equipamentos.map((a) => (
-                <li key={a.id} className="flex items-center gap-1.5">
-                  <Laptop className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
-                  <button type="button" onClick={() => setSelectedAssetIdFor360(a.id)} className="text-left text-blue-700 hover:underline">
-                    {a.tag} · {a.nome}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <p className="font-semibold text-slate-700 mb-1">Softwares com a pessoa ({softwares.length})</p>
-          {softwares.length === 0 ? (
-            <p className="text-slate-500">Nenhum.</p>
-          ) : (
-            <ul className="space-y-1">
-              {softwares.map((l) => (
-                <li key={l.id} className="flex items-center gap-1.5 text-slate-800">
-                  <Key className="w-3.5 h-3.5 text-purple-600 shrink-0" aria-hidden="true" />
-                  {l.nome}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      {/* Equipamentos e softwares como etiquetas que quebram linha; listas longas mostram as 12 primeiras */}
+      <div className="space-y-3">
+        <ListaEtiquetas
+          titulo={`Equipamentos com a pessoa (${equipamentos.length})`}
+          itens={equipamentos.map((a) => ({ id: a.id, texto: `${a.tag} · ${a.nome}`, onClick: () => setSelectedAssetIdFor360(a.id) }))}
+          icone={<Laptop aria-hidden="true" />}
+        />
+        <ListaEtiquetas
+          titulo={`Softwares com a pessoa (${softwares.length})`}
+          itens={softwares.map((l) => ({ id: l.id, texto: l.nome }))}
+          icone={<Key aria-hidden="true" />}
+        />
       </div>
       <p className="text-slate-500">A T.I. recolhe os equipamentos e desvincula contas e softwares pelo checklist.</p>
     </section>
+  );
+};
+
+const LIMITE_ETIQUETAS = 12;
+
+/** Etiquetas lado a lado (quebram linha); acima de 12, "mostrar todas" */
+const ListaEtiquetas: React.FC<{
+  titulo: string;
+  itens: { id: string; texto: string; onClick?: () => void }[];
+  icone: React.ReactNode;
+}> = ({ titulo, itens, icone }) => {
+  const [todas, setTodas] = useState(false);
+  const visiveis = todas ? itens : itens.slice(0, LIMITE_ETIQUETAS);
+  return (
+    <div>
+      <p className="font-semibold text-slate-700 mb-1">{titulo}</p>
+      {itens.length === 0 ? (
+        <p className="text-slate-500">Nenhum.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {visiveis.map((i) => {
+            const conteudo = (
+              <>
+                {icone}
+                <span className="truncate max-w-[16rem]">{i.texto}</span>
+              </>
+            );
+            return i.onClick ? (
+              <button key={i.id} type="button" onClick={i.onClick} title={i.texto} className="btn btn-secundario btn-sm">
+                {conteudo}
+              </button>
+            ) : (
+              <span key={i.id} title={i.texto} className="selo selo-neutro">
+                {conteudo}
+              </span>
+            );
+          })}
+          {itens.length > LIMITE_ETIQUETAS && (
+            <button type="button" onClick={() => setTodas(!todas)} className="link px-2 py-0.5">
+              {todas ? 'mostrar menos' : `mostrar todas (+${itens.length - LIMITE_ETIQUETAS})`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
