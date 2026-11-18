@@ -25,12 +25,14 @@ select harness.rodar('estrutura', 'E6 rls_auto_enable não executável por anon'
 -- Colaborador
 select harness.rodar('colaborador', 'C1 vê só a própria linha em colaboradores', 'ok', :'colab', 'authenticated',
   $q$select harness.espera($s$select 1 from public.colaboradores$s$, 1)$q$);
-select harness.rodar('colaborador', 'C2 vê só o ativo sob sua custódia', 'ok', :'colab', 'authenticated',
-  $q$select harness.espera($s$select 1 from public.ativos$s$, 1)$q$);
+select harness.rodar('colaborador', 'C2 vê só o ativo sob sua custódia (pela função, sem dados fiscais)', 'ok', :'colab', 'authenticated',
+  $q$do $x$ begin perform harness.espera($s$select 1 from public.ativos_visiveis() where fiscal = '{}'::jsonb$s$, 1);
+     perform harness.espera($s$select 1 from public.ativos$s$, 0); end $x$$q$);
 select harness.rodar('colaborador', 'C3 não vê chave BitLocker', 'ok', :'colab', 'authenticated',
   $q$select harness.espera($s$select 1 from public.ativos_segredos$s$, 0)$q$);
-select harness.rodar('colaborador', 'C4 vê catálogo de licenças, sem chave', 'ok', :'colab', 'authenticated',
-  $q$do $x$ begin perform harness.espera($s$select 1 from public.licencas_software$s$, 1);
+select harness.rodar('colaborador', 'C4 não lê a tabela de licenças nem chaves; pela função, só as dele', 'ok', :'colab', 'authenticated',
+  $q$do $x$ begin perform harness.espera($s$select 1 from public.licencas_software$s$, 0);
+     perform harness.espera($s$select 1 from public.licencas_visiveis()$s$, 0);
      perform harness.espera($s$select 1 from public.licencas_segredos$s$, 0); end $x$$q$);
 select harness.rodar('colaborador', 'C5 vê só o próprio chamado', 'ok', :'colab', 'authenticated',
   $q$select harness.espera($s$select 1 from public.chamados$s$, 1)$q$);
@@ -73,7 +75,8 @@ select harness.rodar('colaborador', 'C16 cria colaborador', 'bloqueado', :'colab
 -- RH
 select harness.rodar('rh', 'R1 vê todos os colaboradores e ativos, sem segredos', 'ok', :'rh', 'authenticated',
   $q$do $x$ begin perform harness.espera($s$select 1 from public.colaboradores$s$, 6);
-     perform harness.espera($s$select 1 from public.ativos$s$, 2);
+     perform harness.espera($s$select 1 from public.ativos$s$, 0);
+     perform harness.espera($s$select 1 from public.ativos_visiveis() where fiscal = '{}'::jsonb$s$, 2);
      perform harness.espera($s$select 1 from public.ativos_segredos$s$, 0); end $x$$q$);
 select harness.rodar('rh', 'R2 vê só chamados de on/offboarding e os próprios', 'ok', :'rh', 'authenticated',
   $q$select harness.espera($s$select 1 from public.chamados$s$, 1)$q$);

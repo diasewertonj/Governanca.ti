@@ -31,10 +31,39 @@ export function usePassoProcesso(ticket: Ticket) {
   const { linhas, salvarLinha, movimentarEstoque } = useRecursos();
 
   const registrar = async (item: ProcessoItem, status: StatusItemProcesso, op: OpcoesRegistro = {}): Promise<string | null> => {
-    const falha = await registrarItemProcesso(item.id, status, op.observacao, op.dados || {});
-    if (falha) return falha;
-    if (status !== 'feito') return null;
     const colab = op.colaboradorId || op.dados?.colaborador_id || ticket.colaboradorId || ticket.offboarding?.colaboradorId;
+
+    // Acessório: a saída do estoque vem ANTES de marcar o passo. Se não houver saldo (ou o banco
+    // recusar), o passo continua pendente; se o passo não gravar, a saída é devolvida ao estoque.
+    const saidaEstoque = status === 'feito' && colab && item.tipo === 'acessorio' && op.estoque?.itemId ? op.estoque : null;
+    if (saidaEstoque) {
+      const motivo = [item.titulo, saidaEstoque.justificativa ? `justificativa: ${saidaEstoque.justificativa}` : ''].filter(Boolean).join(' — ');
+      const falhaEst = await movimentarEstoque({
+        itemId: saidaEstoque.itemId,
+        tipo: 'saida',
+        quantidade: saidaEstoque.quantidade,
+        colaboradorId: colab,
+        chamadoId: ticket.id,
+        motivo,
+      });
+      if (falhaEst) return `O passo não foi marcado: ${falhaEst}`;
+    }
+
+    const falha = await registrarItemProcesso(item.id, status, op.observacao, op.dados || {});
+    if (falha) {
+      if (saidaEstoque) {
+        await movimentarEstoque({
+          itemId: saidaEstoque.itemId,
+          tipo: 'devolucao',
+          quantidade: saidaEstoque.quantidade,
+          colaboradorId: colab,
+          chamadoId: ticket.id,
+          motivo: `Estorno: o passo "${item.titulo}" não foi gravado`,
+        });
+      }
+      return falha;
+    }
+    if (status !== 'feito') return null;
     if (!colab) return null;
 
     if (op.licencaContaId) {
@@ -58,18 +87,6 @@ export function usePassoProcesso(ticket: Ticket) {
         });
         if (r.erro) return `Passo registrado, mas a linha não foi atualizada: ${r.erro}`;
       }
-    }
-    if (item.tipo === 'acessorio' && op.estoque?.itemId) {
-      const motivo = [item.titulo, op.estoque.justificativa ? `justificativa: ${op.estoque.justificativa}` : ''].filter(Boolean).join(' — ');
-      const falhaEst = await movimentarEstoque({
-        itemId: op.estoque.itemId,
-        tipo: 'saida',
-        quantidade: op.estoque.quantidade,
-        colaboradorId: colab,
-        chamadoId: ticket.id,
-        motivo,
-      });
-      if (falhaEst) return `Passo registrado, mas o estoque não baixou: ${falhaEst}`;
     }
     return null;
   };

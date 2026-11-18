@@ -108,7 +108,8 @@ export const RecursosProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     ]);
   }, [demo, isTI]);
 
-  const aplicar = (r: Awaited<ReturnType<typeof buscar>>) => {
+  // Lista que falhou na leitura vem como null: a tela mantém o que já mostrava
+  const aplicar = useCallback((r: Awaited<ReturnType<typeof buscar>>) => {
     if (!r) return;
     const [u, a, l, al, e, m] = r;
     if (u) setUnidades(u);
@@ -117,7 +118,7 @@ export const RecursosProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (al) setAtribuicoesLinha(al);
     if (e) setEstoque(e);
     if (m) setMovimentos(m);
-  };
+  }, []);
 
   const recarregarRecursos = async () => aplicar(await buscar());
 
@@ -130,7 +131,7 @@ export const RecursosProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => {
       vivo = false;
     };
-  }, [currentUser, buscar]);
+  }, [currentUser, buscar, aplicar]);
 
   const noBanco = async (op: () => Promise<unknown>): Promise<string | null> => {
     try {
@@ -222,6 +223,12 @@ export const RecursosProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (erro) return erro;
     setMovimentos((prev) => [mov, ...prev]);
     setEstoque((prev) => prev.map((i) => (i.id === item.id ? { ...i, quantidade: i.quantidade + delta } : i)));
+    // O saldo real é do banco (outra pessoa pode ter mexido no mesmo item): relê sem travar a tela
+    if (!demo) {
+      fetchEstoqueFromDb().then((lista) => {
+        if (lista) setEstoque(lista);
+      });
+    }
     return null;
   };
 

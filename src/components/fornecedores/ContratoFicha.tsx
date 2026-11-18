@@ -62,7 +62,7 @@ const SecaoResumo: React.FC<{ titulo: string; children: React.ReactNode }> = ({ 
 export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }> = ({ contratoId, onClose }) => {
   const { contratos, fornecedores, faturas, assets, licenses, employees, currentRole, encerrarContrato, reabrirContrato, renovarContrato, abrirFicha, podeDescartarPendencias } =
     useApp();
-  const { linhas, unidades, anexosContrato, anexarContrato, removerAnexoContrato } = useRecursos();
+  const { linhas, unidades, anexosContrato, anexarContrato, removerAnexoContrato, recarregarRecursos } = useRecursos();
   // Renovar leva à ficha do contrato novo; "Renovação de" volta ao anterior
   const [idAtual, setIdAtual] = useState(contratoId);
   const [aba, setAba] = useState<AbaFicha>('resumo');
@@ -152,6 +152,8 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
     const r = await renovarContrato(contrato.id, renovacao.inicio, renovacao.fim || undefined, valor, renovacao.numero.trim() || undefined);
     setRenovando(false);
     if (r.erro) return setErroRenovacao(r.erro);
+    // O banco move as linhas telefônicas para o contrato novo: relê para a ficha já mostrá-las
+    await recarregarRecursos();
     setRenovacao(null);
     if (r.item) irPara(r.item.id, `Contrato renovado. Esta é a ficha do contrato novo; o anterior (${nomeContrato(contrato)}) ficou no histórico.`);
   };
