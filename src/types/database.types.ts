@@ -1058,6 +1058,7 @@ export type Database = {
           valor_moeda: number | null
           forma_pagamento: string | null
           estorno_motivo: string | null
+          valor_pago: number | null
           arquivo_caminho: string | null
           competencia: string
           contrato_id: string | null
@@ -1077,6 +1078,7 @@ export type Database = {
           valor_moeda?: number | null
           forma_pagamento?: string | null
           estorno_motivo?: string | null
+          valor_pago?: number | null
           arquivo_caminho?: string | null
           competencia: string
           contrato_id?: string | null
@@ -1096,6 +1098,7 @@ export type Database = {
           valor_moeda?: number | null
           forma_pagamento?: string | null
           estorno_motivo?: string | null
+          valor_pago?: number | null
           arquivo_caminho?: string | null
           competencia?: string
           contrato_id?: string | null

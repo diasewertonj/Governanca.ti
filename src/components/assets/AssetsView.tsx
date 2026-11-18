@@ -205,7 +205,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                             const fonte = fonteCustoLicenca(lic, contratos);
                             if (fonte.forma === 'sem_custo') return 'Sem custo';
                             if (fonte.semContratoVigente) return 'Sem contrato vigente';
-                            return `${formatCurrency(fonte.mensal)}/mês`;
+                            return `${formatCurrency(fonte.mensalDaLicenca)}/mês`;
                           })()}
                         </span>
                         <span className="text-xs text-slate-500 block mt-0.5">{origemCurta(lic, contratos)}</span>

@@ -1101,6 +1101,8 @@ const linhaFatura = (f: Fatura): TablesInsert<'faturas'> => ({
   moeda: f.moeda || 'BRL',
   valor_moeda: f.moeda && f.moeda !== 'BRL' ? f.valorMoeda ?? null : null,
   forma_pagamento: f.formaPagamento || null,
+  // Só vai quando existe (assim o lançamento funciona mesmo antes da coluna existir no banco)
+  ...(f.status === 'paga' && f.valorPago != null ? { valor_pago: f.valorPago } : {}),
 });
 
 export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
@@ -1125,6 +1127,7 @@ export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
     valorMoeda: l.valor_moeda != null ? Number(l.valor_moeda) : undefined,
     formaPagamento: (l.forma_pagamento || undefined) as FormaPagamento | undefined,
     estornoMotivo: l.estorno_motivo || undefined,
+    valorPago: l.valor_pago != null ? Number(l.valor_pago) : undefined,
   }));
 }
 

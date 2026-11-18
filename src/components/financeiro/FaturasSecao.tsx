@@ -23,7 +23,7 @@ import {
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
-import { formaCobrancaDe, ROTULO_FORMA_PAGAMENTO } from '../../utils/financeiro.ts';
+import { formaCobrancaDe, ROTULO_FORMA_PAGAMENTO, valorDaFatura } from '../../utils/financeiro.ts';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { CampoMoeda } from '../ui/Campos.tsx';
 import { Janela } from '../ui/Janela.tsx';
@@ -202,7 +202,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                       {rotuloCompetencia(f.competencia)}
                     </td>
                     <td data-label="Valor" className="text-right font-mono text-slate-800">
-                      {formatCurrency(f.valor)}
+                      {valorDaFatura(f)}
                       {f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null && (
                         <span className="block text-slate-500">
                           {f.moeda} {f.valorMoeda.toFixed(2)}
@@ -446,7 +446,8 @@ const JanelaPagamento: React.FC<{
       status: 'paga',
       pagoEm: data,
       formaPagamento: forma as Fatura['formaPagamento'],
-      valor,
+      // O valor da fatura fica como foi lançado; o pago (com juros, multa ou desconto) vai à parte
+      valorPago: valorMudou ? valor : undefined,
       numeroDocumento: documento.trim() || undefined,
       observacoes: notas || undefined,
     });
@@ -635,6 +636,30 @@ const FormFatura: React.FC<{
     if (!editando && status === 'paga' && pagoEm && pagoEm > isoLocal(new Date())) return setErro('A data do pagamento não pode ser no futuro.');
     const problema = validarFatura({ id: editando?.id || '', ...dados }, doMesmoAlvo.filter((f) => f.id !== editando?.id));
     if (problema) return setErro(problema);
+    // Mesmo mês já lançado do outro lado (na licença e no contrato que a paga): seria contado em dobro
+    if (!editando) {
+      const mesmoMes = (f: Fatura) => f.status !== 'cancelada' && f.competencia === dados.competencia;
+      const contrato = alvo.contratoId ? contratos.find((c) => c.id === alvo.contratoId) : undefined;
+      const cobertas = new Set((contrato?.itens || []).map((i) => i.licencaId).filter(Boolean));
+      const pagadores = new Set(
+        alvo.licencaId ? contratos.filter((c) => c.itens.some((i) => i.licencaId === alvo.licencaId)).map((c) => c.id) : []
+      );
+      const repetidas = faturas.filter(
+        (f) => mesmoMes(f) && ((f.licencaId && cobertas.has(f.licencaId)) || (f.contratoId && pagadores.has(f.contratoId)))
+      );
+      if (repetidas.length) {
+        const onde = repetidas
+          .map((f) => (f.contratoId ? nomeContrato(contratos.find((c) => c.id === f.contratoId) || { descricao: 'contrato' }) : licenses.find((l) => l.id === f.licencaId)?.nome || 'licença'))
+          .join(', ');
+        const ok = await confirmar({
+          titulo: 'Este mês já tem fatura lançada',
+          mensagem: `${rotuloCompetencia(dados.competencia)} já tem fatura em ${onde}, que cobre o mesmo software. Lançar de novo conta o gasto em dobro nas despesas. Lance só se forem cobranças diferentes.`,
+          confirmar: 'Lançar assim mesmo',
+          cancelar: 'Voltar',
+        });
+        if (!ok) return;
+      }
+    }
     setErro('');
     setSalvando(true);
     if (editando) {

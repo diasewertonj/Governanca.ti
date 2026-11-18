@@ -1843,7 +1843,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (motivo.trim().length < 5) return 'Informe o motivo (mínimo 5 caracteres).';
     const erro = await confirmarNoBanco(() => desfazerPagamentoDb(faturaId, motivo), 'Desfazer pagamento');
     if (erro) return erro;
-    setFaturas((prev) => trocar(prev, { ...antes, status: 'a_pagar', pagoEm: undefined, estornoMotivo: motivo.trim() }));
+    setFaturas((prev) => trocar(prev, { ...antes, status: 'a_pagar', pagoEm: undefined, valorPago: undefined, estornoMotivo: motivo.trim() }));
     return null;
   };
 

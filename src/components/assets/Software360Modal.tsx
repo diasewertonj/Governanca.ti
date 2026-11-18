@@ -82,7 +82,12 @@ const ValoresCusto: React.FC<{ fonte: FonteCusto; license: SoftwareLicense; pg?:
       <span className="block font-normal text-slate-500">{fonte.origem}</span>
     </Dado>
     <Dado rotulo="Por assento">
-      <span className="font-mono">{formatCurrency(license.assentosTotais > 0 ? fonte.mensal / license.assentosTotais : 0)}/mês</span>
+      <span className="font-mono">{formatCurrency(license.assentosTotais > 0 ? fonte.mensalDaLicenca / license.assentosTotais : 0)}/mês</span>
+      {(fonte.licencasNoContrato || 0) > 1 && (
+        <span className="block font-normal text-slate-500">
+          {formatCurrency(fonte.mensalDaLicenca)}/mês deste software (contrato dividido entre {fonte.licencasNoContrato} softwares)
+        </span>
+      )}
     </Dado>
     <Dado rotulo={fonte.forma === 'contrato' ? 'Fim do contrato' : 'Renovação'}>
       {fonte.renovacao ? formatDate(fonte.renovacao) : '—'}
