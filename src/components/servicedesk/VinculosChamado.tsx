@@ -1,6 +1,7 @@
 import React, { useId, useState } from 'react';
-import { ExternalLink, Key, Laptop, User, Wrench } from 'lucide-react';
+import { ExternalLink, Key, Laptop, Phone, User, Wrench } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
+import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { Ticket } from '../../types/index.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
@@ -38,7 +39,14 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
   const ativoId = rascunho.ativoId ?? (ticket.ativoId || '');
   const softwareId = rascunho.softwareId ?? (ticket.softwareId || '');
   const colaboradorId = rascunho.colaboradorId ?? (ticket.colaboradorId || '');
-  const mexeu = rascunho.ativoId !== null || rascunho.softwareId !== null || rascunho.colaboradorId !== null;
+  const linhaId = rascunho.linhaId ?? (ticket.linhaId || '');
+  const mexeu = rascunho.ativoId !== null || rascunho.softwareId !== null || rascunho.colaboradorId !== null || rascunho.linhaId !== null;
+  // Linhas telefônicas: só a T.I. tem a lista (as demais pessoas veem o número guardado no vínculo)
+  const { linhas } = useRecursos();
+  const linha = linhas.find((l) => l.id === linhaId);
+  const opcoesLinha = linhas
+    .filter((l) => l.status !== 'cancelada' || l.id === linhaId)
+    .sort((a, b) => Number(b.colaboradorId === (rascunho.colaboradorId ?? ticket.colaboradorId ?? ticket.solicitanteId)) - Number(a.colaboradorId === (rascunho.colaboradorId ?? ticket.colaboradorId ?? ticket.solicitanteId)));
   const processo = ticket.tipo !== 'suporte';
 
   const ativo = assets.find((a) => a.id === ativoId);
@@ -90,7 +98,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
   const demaisComOutros = opcoesAtivo.demais.filter((a) => a.custodianteId);
 
   const vazio =
-    !ativo && !nomeSoftware && !colaborador && manutencoes.length === 0 && !ativosEntregues.length && !licencasEntregues.length;
+    !ativo && !nomeSoftware && !colaborador && !linhaId && manutencoes.length === 0 && !ativosEntregues.length && !licencasEntregues.length;
   if (vazio && !isTI) return null;
 
   return (
@@ -196,6 +204,22 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
               </optgroup>
             </select>
           </div>
+          {opcoesLinha.length > 0 && (
+            <div>
+              <label htmlFor={`${id}-linha`} className="rotulo">
+                Linha telefônica
+              </label>
+              <select id={`${id}-linha`} value={linhaId} onChange={(e) => onMudar('linhaId', e.target.value)} className="campo">
+                <option value="">— nenhuma —</option>
+                {opcoesLinha.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.numero}
+                    {l.colaboradorId ? ` · ${employees.find((e) => e.id === l.colaboradorId)?.nome || 'com alguém'}` : ' · sem pessoa'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <p className={embutido ? 'ajuda md:col-span-3' : 'ajuda'}>As mudanças são gravadas em “Salvar alterações”.</p>
         </div>
       )}
@@ -323,6 +347,23 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
                 ) : (
                   'Sem contrato vigente cadastrado.'
                 )}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {linhaId && (
+        <div className="flex items-start gap-2">
+          <Phone className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <span className="text-xs text-slate-500 block">Linha telefônica</span>
+            <span className="font-medium text-slate-900">{linha?.numero || 'Linha vinculada'}</span>
+            {isTI && linha && (
+              <p className="text-xs text-slate-600">
+                {[linha.plano, linha.tipo === 'fixa' ? 'fixa' : 'móvel', linha.status !== 'ativa' ? linha.status : '']
+                  .filter(Boolean)
+                  .join(' · ')}
               </p>
             )}
           </div>

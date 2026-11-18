@@ -103,15 +103,19 @@ export interface SituacaoSla {
 
 /** Situação do prazo do chamado (só chamados de suporte não cancelados) */
 export function situacaoSla(
-  t: Pick<Ticket, 'tipo' | 'status' | 'prioridade' | 'dataCriacao' | 'primeiraRespostaEm' | 'resolucao'>,
+  t: Pick<Ticket, 'tipo' | 'status' | 'prioridade' | 'dataCriacao' | 'primeiraRespostaEm' | 'resolucao'> & Partial<Pick<Ticket, 'dataResolucao'>>,
   eventos: Pick<EventoChamado, 'tipo' | 'de' | 'para' | 'criadoEm'>[],
   prazos: PrazosSla,
   agora: Date = new Date()
 ): SituacaoSla | null {
   if (t.tipo !== 'suporte' || t.status === 'cancelado') return null;
+  // Encerrado antes da Fase 10 (sem a data da solução registrada): usa a data de resolução
+  // antiga; sem nenhuma das duas, não há como medir — fica sem prazo (não "fora do prazo")
+  const encerradoEm = t.status === 'resolvido' ? t.resolucao?.resolvidoEm || t.dataResolucao : undefined;
+  if (t.status === 'resolvido' && !encerradoEm) return null;
   const criado = new Date(t.dataCriacao);
   const prazo = prazos[t.prioridade];
-  const fimDaConta = t.status === 'resolvido' && t.resolucao?.resolvidoEm ? new Date(t.resolucao.resolvidoEm) : agora;
+  const fimDaConta = encerradoEm ? new Date(encerradoEm) : agora;
 
   const respondidaEm = t.primeiraRespostaEm ? new Date(t.primeiraRespostaEm) : undefined;
   const venceResposta = somarMinutosUteis(criado, prazo.resposta);

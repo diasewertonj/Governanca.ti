@@ -110,18 +110,20 @@ export interface RascunhoVinculos {
   ativoId: string | null;
   softwareId: string | null;
   colaboradorId: string | null;
+  linhaId: string | null;
 }
 export type CampoVinculo = keyof RascunhoVinculos;
-export const RASCUNHO_VAZIO: RascunhoVinculos = { ativoId: null, softwareId: null, colaboradorId: null };
+export const RASCUNHO_VAZIO: RascunhoVinculos = { ativoId: null, softwareId: null, colaboradorId: null, linhaId: null };
 export const ROTULO_VINCULO: Record<CampoVinculo, string> = {
   ativoId: 'Equipamento',
   softwareId: 'Software',
   colaboradorId: 'Colaborador relacionado',
+  linhaId: 'Linha telefônica',
 };
 
 /** Campos do rascunho que de fato mudam o chamado (a pessoa de admissão/desligamento não muda) */
 export function mudancasVinculos(
-  ticket: Pick<Ticket, 'tipo' | 'ativoId' | 'softwareId' | 'colaboradorId'>,
+  ticket: Pick<Ticket, 'tipo' | 'ativoId' | 'softwareId' | 'colaboradorId' | 'linhaId'>,
   rascunho: RascunhoVinculos
 ): CampoVinculo[] {
   return (Object.keys(rascunho) as CampoVinculo[]).filter(

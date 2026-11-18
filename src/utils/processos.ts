@@ -181,12 +181,26 @@ export function montarOnboarding(
   doCatalogo('equipamento', 'equipamento');
   doCatalogo('acessorio', 'acessorio');
 
-  // Periféricos pedidos pelo RH fora do catálogo: acessório livre
+  // Periféricos pedidos pelo RH fora do catálogo: acessório livre. Celular é equipamento
+  // (com patrimônio) e, junto com "linha" ou "chip", gera o passo de entregar a linha.
+  let pediuLinha = false;
   for (const nome of ob?.perifericos || []) {
     const n = normalizar(nome);
+    const aparelho = /celular|smartphone/.test(n);
+    const linha = aparelho || /linha|chip/.test(n);
+    pediuLinha ||= linha;
     if (atendidos.has(n)) continue;
     atendidos.add(n);
-    itens.push(item('acessorio', nome, { sugeridoPor: 'rh' }));
+    if (aparelho) itens.push(item('equipamento', nome, { sugeridoPor: 'rh' }));
+    else if (!linha) itens.push(item('acessorio', nome, { sugeridoPor: 'rh' }));
+  }
+  // Celular descrito no campo do equipamento: o aparelho vira passo próprio (além do computador)
+  const celularNoPedido = /celular|smartphone/.test(normalizar(ob?.tipoComputador || ''));
+  if (celularNoPedido && !itens.some((i) => i.tipo === 'equipamento' && /celular|smartphone/.test(normalizar(i.titulo)))) {
+    itens.push(item('equipamento', 'Celular corporativo', { sugeridoPor: 'rh', detalhe: `Pedido do RH: ${ob?.tipoComputador}` }));
+  }
+  if (pediuLinha || celularNoPedido || /linha|chip/.test(normalizar(ob?.tipoComputador || ''))) {
+    itens.push(item('entregar_linha', 'Entregar linha de celular', { sugeridoPor: 'rh' }));
   }
 
   for (const t of ativos.filter((x) => x.tipo === 'tarefa' && x.sugeridoOnboarding)) {

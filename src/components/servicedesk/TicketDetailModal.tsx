@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { TicketStatus } from '../../types/index.ts';
+import { TicketStatus, type TicketPriority } from '../../types/index.ts';
+import { useRecursos } from '../../context/RecursosContext.tsx';
 import { formatDateTime, formatDate, rotuloStatus, rotuloPrioridade } from '../../utils/formatters.ts';
 import { linkTemporarioDb, mensagemDeErro } from '../../services/supabaseDb.ts';
 import { AlteracoesChamado } from '../../context/AppContext.tsx';
@@ -14,7 +15,7 @@ import { imprimirRelatorio } from './relatorioChamado.ts';
 import { PrazosChamado, SELO_PRIORIDADE_CHAMADO, SELO_STATUS_CHAMADO } from './SeloSla.tsx';
 import { situacaoSla } from '../../utils/sla.ts';
 import { PedidoDesligamento } from './PedidoDesligamento.tsx';
-import { chamadoEncerrado, podeCancelar, rotuloSituacao, ROTULO_AGUARDANDO } from '../../utils/atendimento.ts';
+import { CATEGORIAS_CHAMADO, chamadoEncerrado, podeCancelar, rotuloSituacao, ROTULO_AGUARDANDO } from '../../utils/atendimento.ts';
 import type { AguardandoMotivo } from '../../types/index.ts';
 import { Printer } from 'lucide-react';
 import { ConversaChamado, ProblemaRelatado } from './ConversaChamado.tsx';
@@ -76,6 +77,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
   const [rascAguardando, setRascAguardando] = useState<AguardandoMotivo | '' | null>(null);
   const [resolvendo, setResolvendo] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  // Entrega A: correção de título, categoria e prioridade pela T.I. (rascunho)
+  const [rascDados, setRascDados] = useState<{ titulo: string; categoria: string; prioridade: TicketPriority } | null>(null);
+  const { linhas } = useRecursos();
 
   const ticket = tickets.find((t) => t.id === ticketId);
 
@@ -102,11 +106,18 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     if (rascAguardando !== null && rascAguardando !== (ticket.aguardandoMotivo || '')) {
       itensPendentes.push(`Aguardando: ${rascAguardando ? ROTULO_AGUARDANDO[rascAguardando] : 'sem motivo'}`);
     }
+    if (rascDados) {
+      if (rascDados.titulo.trim() && rascDados.titulo.trim() !== ticket.titulo) itensPendentes.push(`Título: ${rascDados.titulo.trim()}`);
+      if (rascDados.categoria !== ticket.categoria) itensPendentes.push(`Categoria: ${ticket.categoria} → ${rascDados.categoria}`);
+      if (rascDados.prioridade !== ticket.prioridade)
+        itensPendentes.push(`Prioridade: ${rotuloPrioridade(ticket.prioridade)} → ${rotuloPrioridade(rascDados.prioridade)}`);
+    }
     for (const campo of mudancasVinculos(ticket, rascVinculos)) {
       const rotulo = (id?: string) => {
         if (!id) return 'nenhum';
         if (campo === 'ativoId') return assets.find((a) => a.id === id)?.tag || 'equipamento';
         if (campo === 'softwareId') return licenses.find((l) => l.id === id)?.nome || ticket.softwareNome || 'software';
+        if (campo === 'linhaId') return linhas.find((l) => l.id === id)?.numero || 'linha';
         return employees.find((e) => e.id === id)?.nome || 'colaborador';
       };
       itensPendentes.push(
@@ -133,6 +144,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     setRascChecklist({});
     setRascVinculos(RASCUNHO_VAZIO);
     setRascAguardando(null);
+    setRascDados(null);
   };
 
   const salvarRascunho = () => {
@@ -147,6 +159,11 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     if (Object.keys(marcados).length > 0) mudancas.checklist = marcados;
     for (const campo of mudancasVinculos(ticket, rascVinculos)) mudancas[campo] = rascVinculos[campo] as string;
     if (rascAguardando !== null && rascAguardando !== (ticket.aguardandoMotivo || '')) mudancas.aguardandoMotivo = rascAguardando;
+    if (rascDados) {
+      if (rascDados.titulo.trim() && rascDados.titulo.trim() !== ticket.titulo) mudancas.titulo = rascDados.titulo.trim();
+      if (rascDados.categoria !== ticket.categoria) mudancas.categoria = rascDados.categoria;
+      if (rascDados.prioridade !== ticket.prioridade) mudancas.prioridade = rascDados.prioridade;
+    }
     salvarAlteracoesChamado(ticket.id, mudancas);
     descartarRascunho();
     setSalvamentos((n) => n + 1);
@@ -282,9 +299,74 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               <Caminho niveis={nav.niveis} indice={nav.indice} voltarAte={nav.voltarAte} />
             </div>
           )}
-          <h2 id={`chamado-titulo-${ticket.id}`} className="tela-titulo mt-1 break-words">
-            {ticket.titulo}
-          </h2>
+          <div className="mt-1 flex flex-wrap items-start gap-2">
+            <h2 id={`chamado-titulo-${ticket.id}`} className="tela-titulo min-w-0 flex-1 break-words">
+              {ticket.titulo}
+            </h2>
+            {isTI && ticket.tipo === 'suporte' && !encerrado && !rascDados && (
+              <button
+                type="button"
+                onClick={() => setRascDados({ titulo: ticket.titulo, categoria: ticket.categoria, prioridade: ticket.prioridade })}
+                className="link text-xs"
+              >
+                Corrigir título, categoria ou prioridade
+              </button>
+            )}
+          </div>
+          {rascDados && (
+            <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+              <div>
+                <label htmlFor={`chamado-${ticket.id}-titulo`} className="rotulo">
+                  Título
+                </label>
+                <input
+                  id={`chamado-${ticket.id}-titulo`}
+                  value={rascDados.titulo}
+                  onChange={(e) => setRascDados({ ...rascDados, titulo: e.target.value })}
+                  maxLength={150}
+                  className="campo campo-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor={`chamado-${ticket.id}-categoria`} className="rotulo">
+                  Categoria
+                </label>
+                <select
+                  id={`chamado-${ticket.id}-categoria`}
+                  value={rascDados.categoria}
+                  onChange={(e) => setRascDados({ ...rascDados, categoria: e.target.value })}
+                  className="campo campo-sm"
+                >
+                  {!CATEGORIAS_CHAMADO.some((c) => c.valor === ticket.categoria) && <option value={ticket.categoria}>{ticket.categoria}</option>}
+                  {CATEGORIAS_CHAMADO.map((c) => (
+                    <option key={c.valor} value={c.valor}>
+                      {c.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={`chamado-${ticket.id}-prioridade`} className="rotulo">
+                  Prioridade
+                </label>
+                <select
+                  id={`chamado-${ticket.id}-prioridade`}
+                  value={rascDados.prioridade}
+                  onChange={(e) => setRascDados({ ...rascDados, prioridade: e.target.value as TicketPriority })}
+                  className="campo campo-sm"
+                >
+                  <option value="baixa">Baixa</option>
+                  <option value="media">Média</option>
+                  <option value="alta">Alta</option>
+                  <option value="critica">Urgente</option>
+                </select>
+              </div>
+              <p className="ajuda md:col-span-3">
+                Grava em “Salvar alterações” e fica no histórico. Mudar a prioridade muda o prazo de atendimento.
+                {!rascDados.titulo.trim() && <span className="erro block">O título não pode ficar vazio.</span>}
+              </p>
+            </div>
+          )}
           {/* Solicitante na linha de abertura (antes era um cartão à parte) */}
           <p className="mt-0.5 text-xs text-slate-600">
             Aberto por{' '}

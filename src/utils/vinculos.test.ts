@@ -140,7 +140,7 @@ describe('rascunho dos vínculos do chamado', () => {
     expect(mudancasVinculos(suporte, RASCUNHO_VAZIO)).toEqual([]);
     expect(mudancasVinculos(suporte, { ...RASCUNHO_VAZIO, ativoId: 'at-1' })).toEqual([]);
     expect(mudancasVinculos(suporte, { ...RASCUNHO_VAZIO, ativoId: '' })).toEqual(['ativoId']);
-    expect(mudancasVinculos(suporte, { ativoId: null, softwareId: 'sw-1', colaboradorId: 'emp-1' })).toEqual([
+    expect(mudancasVinculos(suporte, { ativoId: null, softwareId: 'sw-1', colaboradorId: 'emp-1', linhaId: null })).toEqual([
       'softwareId',
       'colaboradorId',
     ]);

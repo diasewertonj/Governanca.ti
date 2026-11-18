@@ -478,6 +478,7 @@ export interface Ticket {
   ativoId?: string; // Vínculo ao ativo em posse
   softwareId?: string; // Vínculo ao software/licença SaaS
   softwareNome?: string; // Nome do software/licença vinculada
+  linhaId?: string; // Entrega A: linha telefônica ligada ao chamado
   titulo: string;
   categoria: string;
   prioridade: TicketPriority;
@@ -534,7 +535,8 @@ export type TipoEventoChamado =
   | 'resolvido'
   | 'cancelado'
   | 'reaberto'
-  | 'avaliado';
+  | 'avaliado'
+  | 'dados';
 
 export interface EventoChamado {
   id: string;
@@ -712,6 +714,11 @@ export interface ResponsibilityTerm {
   hashConteudo?: string;
   aceiteColaboradorEm?: string;
   aceiteTiEm?: string;
+  // Entrega A: contestação do colaborador e resposta da T.I.
+  contestacaoMotivo?: string;
+  contestacaoEm?: string;
+  contestacaoResposta?: string;
+  contestacaoRespondidaEm?: string;
   aceiteTiPor?: string;
   formaAssinatura?: 'pendente' | 'eletronica' | 'documento' | 'dispensada';
   motivoDispensa?: string;

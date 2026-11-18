@@ -24,6 +24,18 @@ export const PrazosSettings: React.FC = () => {
   const [salvo, setSalvo] = useState(false);
   const podeEditar = currentRole === 'ti_admin';
 
+  // Os prazos gravados mudaram (carga do banco, outra aba, gravação recusada): a tela acompanha
+  const base = JSON.stringify(atuais);
+  const [baseVista, setBaseVista] = useState(base);
+  if (baseVista !== base) {
+    setBaseVista(base);
+    setRascunho(
+      Object.fromEntries(
+        PRIORIDADES.map((p) => [p, { resposta: emHoras(atuais[p].resposta), solucao: emHoras(atuais[p].solucao) }])
+      ) as Record<TicketPriority, { resposta: string; solucao: string }>
+    );
+  }
+
   const alterado = PRIORIDADES.some(
     (p) => deHoras(rascunho[p].resposta) !== atuais[p].resposta || deHoras(rascunho[p].solucao) !== atuais[p].solucao
   );

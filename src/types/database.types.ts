@@ -594,6 +594,7 @@ export type Database = {
           onboarding: Json | null
           prioridade: string
           software_id: string | null
+          linha_id: string | null
           software_nome: string | null
           solicitante_cargo: string
           solicitante_email: string
@@ -636,6 +637,7 @@ export type Database = {
           onboarding?: Json | null
           prioridade: string
           software_id?: string | null
+          linha_id?: string | null
           software_nome?: string | null
           solicitante_cargo: string
           solicitante_email: string
@@ -678,6 +680,7 @@ export type Database = {
           onboarding?: Json | null
           prioridade?: string
           software_id?: string | null
+          linha_id?: string | null
           software_nome?: string | null
           solicitante_cargo?: string
           solicitante_email?: string
@@ -1485,6 +1488,11 @@ export type Database = {
           aceite_colaborador_em: string | null
           aceite_colaborador_uid: string | null
           aceite_ti_em: string | null
+          contestacao_motivo: string | null
+          contestacao_em: string | null
+          contestacao_resposta: string | null
+          contestacao_respondida_em: string | null
+          contestacao_respondida_por: string | null
           aceite_ti_por: string | null
           chamado_id: string | null
           doc_codigo: string | null
@@ -1522,6 +1530,11 @@ export type Database = {
           aceite_colaborador_em?: string | null
           aceite_colaborador_uid?: string | null
           aceite_ti_em?: string | null
+          contestacao_motivo?: string | null
+          contestacao_em?: string | null
+          contestacao_resposta?: string | null
+          contestacao_respondida_em?: string | null
+          contestacao_respondida_por?: string | null
           aceite_ti_por?: string | null
           chamado_id?: string | null
           doc_codigo?: string | null
@@ -1555,6 +1568,11 @@ export type Database = {
           aceite_colaborador_em?: string | null
           aceite_colaborador_uid?: string | null
           aceite_ti_em?: string | null
+          contestacao_motivo?: string | null
+          contestacao_em?: string | null
+          contestacao_resposta?: string | null
+          contestacao_respondida_em?: string | null
+          contestacao_respondida_por?: string | null
           aceite_ti_por?: string | null
           chamado_id?: string | null
           doc_codigo?: string | null
@@ -1932,6 +1950,14 @@ export type Database = {
       liberar_assento: {
         Args: { p_colaborador: string; p_licenca: string; p_motivo: string }
         Returns: Json
+      }
+      contestar_termo: {
+        Args: { p_termo: string; p_motivo: string }
+        Returns: undefined
+      }
+      responder_contestacao: {
+        Args: { p_termo: string; p_resposta: string }
+        Returns: undefined
       }
       reabrir_processo: {
         Args: { p_chamado: string; p_motivo: string }

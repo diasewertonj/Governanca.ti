@@ -276,10 +276,10 @@ export const RhProcessesView: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-1" className="rotulo">
                   Colaborador a ser Desligado (Seleção Dinâmica)
                 </label>
-                <select
+                <select id="rh-campo-1"
                   value={selectedColabId}
                   onChange={(e) => {
                     setSelectedColabId(e.target.value);
@@ -316,10 +316,10 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-2" className="rotulo">
                   Data do Último Dia de Trabalho
                 </label>
-                <input
+                <input id="rh-campo-2"
                   type="date"
                   required
                   value={dataDesligamento}
@@ -439,10 +439,10 @@ export const RhProcessesView: React.FC = () => {
 
                 {redirecionarEmail && (
                   <div className="pl-6 pt-1">
-                    <label className="rotulo">
+                    <label htmlFor="rh-campo-3" className="rotulo">
                       Destinatário que receberá os e-mails (Colaborador Ativo)
                     </label>
-                    <select
+                    <select id="rh-campo-3"
                       value={destinatarioEmailId}
                       onChange={(e) => setDestinatarioEmailId(e.target.value)}
                       required={redirecionarEmail}
@@ -480,10 +480,10 @@ export const RhProcessesView: React.FC = () => {
 
                 {transferirDrive && (
                   <div className="pl-6 pt-1">
-                    <label className="rotulo">
+                    <label htmlFor="rh-campo-4" className="rotulo">
                       Destinatário que receberá a propriedade dos arquivos
                     </label>
-                    <select
+                    <select id="rh-campo-4"
                       value={destinatarioDriveId}
                       onChange={(e) => setDestinatarioDriveId(e.target.value)}
                       required={transferirDrive}
@@ -522,10 +522,10 @@ export const RhProcessesView: React.FC = () => {
 
               {/* Observações Livres */}
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-5" className="rotulo">
                   Observações Operacionais do Desligamento
                 </label>
-                <textarea
+                <textarea id="rh-campo-5"
                   rows={2}
                   value={observacoesOff}
                   onChange={(e) => setObservacoesOff(e.target.value)}
@@ -570,10 +570,10 @@ export const RhProcessesView: React.FC = () => {
             <h4 className="secao-titulo">Dados do admitido</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
-                <label className="rotulo">
+                <label htmlFor="rh-campo-6" className="rotulo">
                   Nome Completo do Novo Colaborador
                 </label>
-                <input
+                <input id="rh-campo-6"
                   type="text"
                   required
                   value={onbNome}
@@ -584,10 +584,10 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-7" className="rotulo">
                   E-mail Corporativo Sugerido
                 </label>
-                <input
+                <input id="rh-campo-7"
                   type="email"
                   required
                   value={onbEmail}
@@ -598,10 +598,10 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-8" className="rotulo">
                   Cargo / Função
                 </label>
-                <input
+                <input id="rh-campo-8"
                   type="text"
                   required
                   value={onbCargo}
@@ -612,10 +612,10 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-9" className="rotulo">
                   Setor / Departamento
                 </label>
-                <select
+                <select id="rh-campo-9"
                   value={onbSetorId}
                   onChange={(e) => setOnbSetorId(e.target.value)}
                   className="campo w-full"
@@ -631,10 +631,10 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-10" className="rotulo">
                   Líder Imediato / Gestor
                 </label>
-                <select
+                <select id="rh-campo-10"
                   value={onbGestorId}
                   onChange={(e) => setOnbGestorId(e.target.value)}
                   className="campo w-full"
@@ -649,10 +649,10 @@ export const RhProcessesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-11" className="rotulo">
                   Data de Início Prevista
                 </label>
-                <input
+                <input id="rh-campo-11"
                   type="date"
                   required
                   value={onbDataInicio}
@@ -715,10 +715,10 @@ export const RhProcessesView: React.FC = () => {
             <div className="space-y-3 pt-3 border-t border-slate-100">
               <h4 className="secao-titulo">Acessos</h4>
               <div>
-                <label className="rotulo">
+                <label htmlFor="rh-campo-12" className="rotulo">
                   Nível de Acesso Sugerido ao Sistema
                 </label>
-                <select
+                <select id="rh-campo-12"
                   value={onbPapelAcesso}
                   onChange={(e) => setOnbPapelAcesso(e.target.value as 'colaborador' | 'rh' | 'ti_suporte' | 'ti_admin')}
                   className="campo w-full"
@@ -759,8 +759,8 @@ export const RhProcessesView: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div>
-                  <label className="rotulo">Outros sistemas (opcional)</label>
-                  <input
+                  <label htmlFor="rh-campo-13" className="rotulo">Outros sistemas (opcional)</label>
+                  <input id="rh-campo-13"
                     value={onbOutrosAcessos}
                     onChange={(e) => setOnbOutrosAcessos(e.target.value)}
                     placeholder="Ex.: Figma, VPN, ERP (separe por vírgula)"
@@ -768,10 +768,10 @@ export const RhProcessesView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="rotulo">
+                  <label htmlFor="rh-campo-14" className="rotulo">
                     Grupos de e-mail sugeridos (opcional)
                   </label>
-                  <input
+                  <input id="rh-campo-14"
                     value={onbGruposEmail}
                     onChange={(e) => setOnbGruposEmail(e.target.value)}
                     placeholder="Ex.: comercial@empresa.com.br, todos@..."
@@ -783,10 +783,10 @@ export const RhProcessesView: React.FC = () => {
             </div>
 
             <div>
-              <label className="rotulo">
+              <label htmlFor="rh-campo-15" className="rotulo">
                 Instruções de Entrega / Modelo Híbrido
               </label>
-              <textarea
+              <textarea id="rh-campo-15"
                 rows={2}
                 value={onbObservacoes}
                 onChange={(e) => setOnbObservacoes(e.target.value)}

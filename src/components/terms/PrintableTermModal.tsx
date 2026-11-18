@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { ItemTermo, ResponsibilityTerm } from '../../types/index.ts';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, formatDateTime } from '../../utils/formatters.ts';
-import { Printer, CheckCircle2, Upload, FileText, PenLine, Ban } from 'lucide-react';
+import { Printer, CheckCircle2, Upload, FileText, PenLine, Ban, MessageSquareWarning } from 'lucide-react';
 import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO, SEM_TOMBO } from '../../utils/processos.ts';
 import { erroCancelarTermo, situacaoTermo, termoCancelado } from '../../utils/termos.ts';
-import { confirmar } from '../ui/dialogo.tsx';
+import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { Janela } from '../ui/Janela.tsx';
 
 interface PrintableTermModalProps {
@@ -47,6 +47,8 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
     terms,
     aceitarTermo,
     dispensarAssinaturaTermo,
+    contestarTermo,
+    responderContestacao,
     cancelarTermo,
     employees,
   } = useApp();
@@ -166,6 +168,29 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
   };
 
   const podeAceitarColab = !encerrado && souColaborador && !t.aceiteColaboradorEm && Boolean(t.formaAssinatura);
+  // Entrega A: em vez de aceitar, o colaborador pode contestar (com motivo); a T.I. responde
+  const podeContestar = podeAceitarColab && (!t.contestacaoEm || !!t.contestacaoRespondidaEm);
+  const contestacaoAberta = !!t.contestacaoEm && !t.contestacaoRespondidaEm;
+
+  const contestar = async () => {
+    const motivo = await pedirTexto('Contestar o termo?\n\nExplique o que está errado (item que não recebeu, número de série diferente, dado pessoal incorreto...). A T.I. recebe o aviso e responde; você assina depois de corrigido.');
+    if (!motivo) return;
+    setGravando(true);
+    const falha = await contestarTermo(t.id, motivo);
+    setGravando(false);
+    if (falha) return setErro(falha);
+    setAviso('Contestação enviada à T.I.');
+  };
+
+  const responder = async () => {
+    const resposta = await pedirTexto('Responder a contestação?\n\nSe o termo estava errado, cancele-o e gere o correto (ficha da pessoa ou passo do processo); depois responda aqui o que foi feito.');
+    if (!resposta) return;
+    setGravando(true);
+    const falha = await responderContestacao(t.id, resposta);
+    setGravando(false);
+    if (falha) return setErro(falha);
+    setAviso('Resposta registrada.');
+  };
   const podeAceitarTI = !encerrado && isTI && !souColaborador && !t.aceiteTiEm && Boolean(t.formaAssinatura);
 
   const celula = 'border border-slate-400 px-2 py-1';
@@ -208,6 +233,16 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
               {souColaborador ? 'Li e concordo' : 'Assinar como T.I.'}
             </button>
           )}
+          {podeContestar && (
+            <button type="button" disabled={gravando} onClick={contestar} className="btn btn-secundario btn-sm">
+              <MessageSquareWarning /> Contestar
+            </button>
+          )}
+          {isTI && contestacaoAberta && (
+            <button type="button" disabled={gravando} onClick={responder} className="btn btn-secundario btn-sm">
+              <MessageSquareWarning /> Responder contestação
+            </button>
+          )}
           {t.arquivoAssinadoUrl && (
             <button type="button" onClick={handleVerAssinado} className="btn btn-secundario btn-sm">
               <CheckCircle2 /> Ver documento assinado
@@ -239,6 +274,20 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
           )}
         </div>
 
+        {t.contestacaoEm && (
+          <div className={`rounded-lg border p-2 ${contestacaoAberta ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+            <p>
+              <span className="font-semibold">Contestado pelo colaborador</span> em {formatDateTime(t.contestacaoEm)}: {t.contestacaoMotivo}
+            </p>
+            {t.contestacaoRespondidaEm ? (
+              <p className="mt-1">
+                <span className="font-semibold">Resposta da T.I.</span> em {formatDateTime(t.contestacaoRespondidaEm)}: {t.contestacaoResposta}
+              </p>
+            ) : (
+              <p className="mt-1 text-amber-800">Aguardando resposta da T.I.</p>
+            )}
+          </div>
+        )}
         {aviso && <p className="text-emerald-700">{aviso}</p>}
         {erro && <p className="erro">{erro}</p>}
         {cancelando !== null && (

@@ -12,6 +12,17 @@ import type {
 } from '../types/index.ts';
 import { rotuloPrioridade, rotuloStatus } from './formatters.ts';
 
+/** Categorias do chamado (abertura e correção pela T.I.) */
+export const CATEGORIAS_CHAMADO: { valor: string; rotulo: string }[] = [
+  { valor: 'Hardware / Equipamento', rotulo: 'Hardware / Equipamento Físico' },
+  { valor: 'Periféricos / Telas / Cabos', rotulo: 'Periféricos / Telas / Cabos' },
+  { valor: 'Softwares & Licenças', rotulo: 'Softwares & Licenças' },
+  { valor: 'Rede / VPN / Wi-Fi', rotulo: 'Rede / VPN / Wi-Fi' },
+  { valor: 'Telefonia / Linha de celular', rotulo: 'Telefonia / Linha de celular' },
+  { valor: 'Acessos & E-mail', rotulo: 'Acessos & E-mail Corporativo' },
+  { valor: 'Outros', rotulo: 'Outros' },
+];
+
 export const ROTULO_CAUSA: Record<CausaChamado, string> = {
   hardware: 'Defeito de hardware',
   configuracao: 'Configuração',
@@ -118,6 +129,7 @@ const ROTULO_VINCULO_EVENTO: Record<string, string> = {
   equipamento: 'Equipamento',
   software: 'Software',
   colaborador: 'Colaborador relacionado',
+  linha: 'Linha telefônica',
 };
 
 /** Frase do histórico ("Status: Aberto → Em andamento") */
@@ -137,6 +149,8 @@ export function descreverEvento(e: Pick<EventoChamado, 'tipo' | 'de' | 'para' | 
       return `Técnico: ${seta(e.de, e.para)}`;
     case 'prioridade':
       return `Prioridade: ${seta(e.de && rotuloPrioridade(e.de), e.para && rotuloPrioridade(e.para))}`;
+    case 'dados':
+      return `${e.detalhe === 'categoria' ? 'Categoria corrigida' : 'Título corrigido'}: ${seta(e.de, e.para)}`;
     case 'vinculo':
       return `${ROTULO_VINCULO_EVENTO[e.detalhe || ''] || 'Vínculo'}: ${seta(e.de, e.para)}`;
     case 'resolvido':
