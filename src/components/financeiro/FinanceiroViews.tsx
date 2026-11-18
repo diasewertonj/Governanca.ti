@@ -7,6 +7,7 @@ import { Download } from 'lucide-react';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
+import { useCompras } from '../../context/ComprasContext.tsx';
 import type { Fatura } from '../../types/index.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import { statusExibido } from '../../utils/faturas.ts';
@@ -31,6 +32,9 @@ import { FaturasSecao } from './FaturasSecao.tsx';
 export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) => {
   const { assets, contratos, licenses, faturas, employees, tickets, terms, settings, processoItens, abrirFicha, setSelectedTicketIdForDetail } = useApp();
   const { estoque, linhas } = useRecursos();
+  const { pedidos, alertas: alertasOrcamento } = useCompras();
+  const { currentRole } = useApp();
+  const [pedidoAberto, setPedidoAberto] = useState<string | null>(null);
   const [horizonte, setHorizonte] = useState(60);
   const [tipo, setTipo] = useState<TipoVencimento | 'todos'>('todos');
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
@@ -39,10 +43,10 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
   const lista = useMemo(() => {
     const termosDesatualizados = pendenciasTermo(employees, { ativos: assets, termos: terms, chamados: tickets, cfg: settings.termoExige });
     return listarVencimentos(
-      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados, termos: terms },
+      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados, termos: terms, pedidos, alertasOrcamento, papel: currentRole },
       horizonte
     );
-  }, [assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, horizonte]).filter(
+  }, [assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, horizonte, pedidos, alertasOrcamento, currentRole]).filter(
     (v) => tipo === 'todos' || v.tipo === tipo
   );
 
@@ -52,6 +56,7 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
     else if (v.alvo.tipo === 'ativo') abrirFicha({ tipo: 'ativo', id: v.alvo.id });
     else if (v.alvo.tipo === 'licenca') abrirFicha({ tipo: 'software', id: v.alvo.id });
     else if (v.alvo.tipo === 'contrato') setContratoAberto(v.alvo.id);
+    else if (v.alvo.tipo === 'pedido') setPedidoAberto(v.alvo.id);
     else if (v.alvo.tipo === 'fatura') {
       const f = faturas.find((x) => x.id === v.alvo.id);
       if (f?.contratoId) setContratoAberto(f.contratoId);
@@ -63,7 +68,7 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
     <div className="space-y-4">
       <CabecalhoTela
         titulo={noInicio ? 'Precisa de atenção' : 'Vencimentos'}
-        subtitulo="Garantias, contratos, prazos de cancelamento, renovações, faturas, estoque baixo, recursos de desligados, passos agendados de admissões e desligamentos e termos desatualizados"
+        subtitulo="Garantias, contratos, prazos de cancelamento, renovações, faturas, estoque baixo, recursos de desligados, passos agendados, termos desatualizados, orçamento e pedidos de compra"
         filtros={
           <>
             <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoVencimento | 'todos')} aria-label="Tipo" className="campo campo-sm">
@@ -115,11 +120,13 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
                     {v.detalhe && <span className="block text-slate-500">{v.detalhe}</span>}
                   </td>
                   <td data-label="Ação" className="text-right">
-                    {v.alvo.tipo !== 'estoque' && v.alvo.tipo !== 'linha' && (
+                    {v.alvo.tipo !== 'estoque' && v.alvo.tipo !== 'linha' && v.alvo.tipo !== 'orcamento' && (
                       <span className="acoes-linha">
                         <button type="button" onClick={() => abrir(v)} className="btn btn-sm btn-secundario">
                           {v.alvo.tipo === 'processo'
                             ? 'Abrir processo'
+                            : v.alvo.tipo === 'pedido'
+                              ? 'Abrir pedido'
                             : v.alvo.tipo === 'pessoa'
                               ? 'Abrir ficha'
                               : v.tipo === 'contrato' || v.tipo === 'cancelamento'
@@ -136,9 +143,16 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
         </div>
       )}
       {contratoAberto && <ContratoPorId id={contratoAberto} onClose={() => setContratoAberto(null)} />}
+      {pedidoAberto && (
+        <React.Suspense fallback={null}>
+          <FichaPedidoLazy pedidoId={pedidoAberto} onClose={() => setPedidoAberto(null)} />
+        </React.Suspense>
+      )}
     </div>
   );
 };
+
+const FichaPedidoLazy = React.lazy(() => import('../compras/FichaPedido.tsx').then((m) => ({ default: m.FichaPedido })));
 
 /** Abre a ficha do contrato a partir de outras telas */
 const ContratoFichaLazy = React.lazy(() => import('../fornecedores/ContratoFicha.tsx').then((m) => ({ default: m.ContratoFicha })));
@@ -163,10 +177,19 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
   const [mes, setMes] = useState('');
   const [busca, setBusca] = useState('');
 
+  const { pedidos: pedidosCompra } = useCompras();
   const fornecedorDe = (f: Fatura) =>
-    f.contratoId ? contratos.find((c) => c.id === f.contratoId)?.fornecedorId : licenses.find((l) => l.id === f.licencaId)?.fornecedorId;
+    f.pedidoId
+      ? pedidosCompra.find((p) => p.id === f.pedidoId)?.fornecedorId
+      : f.contratoId
+        ? contratos.find((c) => c.id === f.contratoId)?.fornecedorId
+        : licenses.find((l) => l.id === f.licencaId)?.fornecedorId;
   const nomeOrigem = (f: Fatura) => {
     const c = contratos.find((x) => x.id === f.contratoId);
+    if (f.pedidoId) {
+      const p = pedidosCompra.find((x) => x.id === f.pedidoId);
+      return p ? `Pedido ${p.codigo} · ${p.titulo}` : 'Pedido de compra';
+    }
     return c ? nomeContrato(c) : licenses.find((l) => l.id === f.licencaId)?.nome || '';
   };
   const agora = new Date();

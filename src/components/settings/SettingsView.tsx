@@ -1,7 +1,8 @@
+import { ROTULO_GRUPO_DEPRECIACAO, VIDA_UTIL_PADRAO } from '../../utils/patrimonio.ts';
 import { confirmar } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { AssetCategory, Employee, ModeloDocumento, UserRole } from '../../types/index.ts';
+import { AssetCategory, Employee, ModeloDocumento, UserRole, VidaUtil } from '../../types/index.ts';
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
@@ -55,7 +56,7 @@ const ROTULO_CAMPO_EMPRESA = {
 } as const;
 
 // Fase 7: abas com nomes do glossário (a chave interna não muda)
-type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'banco';
+type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'vida_util' | 'banco';
 const GRUPOS: GrupoNav<Aba>[] = [
   {
     titulo: 'Empresa',
@@ -79,7 +80,13 @@ const GRUPOS: GrupoNav<Aba>[] = [
       { id: 'prazos', rotulo: 'Prazos de atendimento' },
     ],
   },
-  { titulo: 'Inventário', itens: [{ id: 'campos', rotulo: 'Campos dos ativos' }] },
+  {
+    titulo: 'Inventário',
+    itens: [
+      { id: 'campos', rotulo: 'Campos dos ativos' },
+      { id: 'vida_util', rotulo: 'Vida útil (depreciação)' },
+    ],
+  },
   { titulo: 'Sistema', itens: [{ id: 'banco', rotulo: 'Conexão' }] },
 ];
 
@@ -139,6 +146,13 @@ export const SettingsView: React.FC = () => {
   const termoExigeSalvo = settings.termoExige || { computador: true, celular: true, monitor: true };
   const [termoExige, setTermoExige] = useState(termoExigeSalvo);
   const termoExigeAlterado = JSON.stringify(termoExige) !== JSON.stringify(termoExigeSalvo);
+  // Fase 11: vida útil (anos) por grupo e valor residual (%)
+  const vidaUtilSalva: VidaUtil = { ...VIDA_UTIL_PADRAO, residualPct: 0, ...(settings.vidaUtil || {}) };
+  const [vidaUtil, setVidaUtil] = useState<VidaUtil>(vidaUtilSalva);
+  const vidaUtilAlterada = JSON.stringify(vidaUtil) !== JSON.stringify(vidaUtilSalva);
+  const vidaUtilInvalida =
+    (Object.keys(VIDA_UTIL_PADRAO) as (keyof typeof VIDA_UTIL_PADRAO)[]).some((k) => !(Number(vidaUtil[k]) >= 1 && Number(vidaUtil[k]) <= 50)) ||
+    !(Number(vidaUtil.residualPct ?? 0) >= 0 && Number(vidaUtil.residualPct ?? 0) < 100);
 
   // 9.3: CNPJ/CEP achados preenchem só os campos vazios
   const cidadeUfDe = (cidade?: string, uf?: string) => [cidade, uf].filter(Boolean).join(' - ');
@@ -204,6 +218,7 @@ export const SettingsView: React.FC = () => {
     ...(docsAlterados ? ['Documentos da Qualidade (código/versão dos termos)'] : []),
     ...(logoAlterado ? ['Logo da empresa'] : []),
     ...(termoExigeAlterado ? ['O que exige termo de responsabilidade'] : []),
+    ...(vidaUtilAlterada ? ['Vida útil e valor residual (depreciação)'] : []),
   ];
   useRegistrarPendencias('configuracoes', itensPendentes);
 
@@ -224,6 +239,7 @@ export const SettingsView: React.FC = () => {
     setDocDevolucao(docDevolucaoSalvo);
     setLogoUrl(settings.logoUrl || '');
     setTermoExige(termoExigeSalvo);
+    setVidaUtil(vidaUtilSalva);
   };
 
   const salvarTudo = async () => {
@@ -231,6 +247,11 @@ export const SettingsView: React.FC = () => {
     if (logoInvalido) {
       setActiveTab('empresa');
       setErrorMsg('O logo precisa ser um link que começa com https://');
+      return;
+    }
+    if (vidaUtilInvalida) {
+      setActiveTab('vida_util');
+      setErrorMsg('Vida útil entre 1 e 50 anos em cada grupo; valor residual entre 0% e 99%.');
       return;
     }
     const viramAdmin = Object.entries(papeisPendentes)
@@ -250,13 +271,14 @@ export const SettingsView: React.FC = () => {
     }
     Object.entries(papeisPendentes).forEach(([id, papel]) => updateEmployeeRole(id, papel));
     Object.entries(setoresPendentes).forEach(([id, ativo]) => updateDepartment(id, { ativo }));
-    if (camposEmpresaAlterados.length > 0 || docsAlterados || logoAlterado || termoExigeAlterado) {
+    if (camposEmpresaAlterados.length > 0 || docsAlterados || logoAlterado || termoExigeAlterado || vidaUtilAlterada) {
       updateSettings({
         ...empresaRascunho,
         docEntrega,
         docDevolucao,
         logoUrl: logoUrl.trim() || undefined,
         ...(termoExigeAlterado ? { termoExige } : {}),
+        ...(vidaUtilAlterada ? { vidaUtil } : {}),
       });
     }
     setPapeisPendentes({});
@@ -559,6 +581,28 @@ export const SettingsView: React.FC = () => {
                 </>
               )}
             </form>
+          )}
+
+          {/* Fase 11: VIDA ÚTIL (depreciação linear) */}
+          {activeTab === 'vida_util' && (
+            <div className="cartao p-4">
+              {secao('Vida útil e valor residual', 'Depreciação linear, mês a mês, desde a data de compra. Vale para a ficha do equipamento, o Valor do patrimônio, o relatório e a baixa. Salve pela barra de alterações.')}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {(Object.keys(VIDA_UTIL_PADRAO) as (keyof typeof VIDA_UTIL_PADRAO)[]).map((g) => (
+                  <div key={g}>
+                    <label htmlFor={`vida-${g}`} className="rotulo">{ROTULO_GRUPO_DEPRECIACAO[g]} (anos)</label>
+                    <input id={`vida-${g}`} type="number" min={1} max={50} step={1} value={vidaUtil[g] ?? ''} onChange={(e) => setVidaUtil({ ...vidaUtil, [g]: e.target.value === '' ? undefined : Number(e.target.value) })} className="campo" />
+                    <p className="ajuda">Padrão: {VIDA_UTIL_PADRAO[g]} anos</p>
+                  </div>
+                ))}
+                <div>
+                  <label htmlFor="vida-residual" className="rotulo">Valor residual (% da compra)</label>
+                  <input id="vida-residual" type="number" min={0} max={99} step={1} value={vidaUtil.residualPct ?? 0} onChange={(e) => setVidaUtil({ ...vidaUtil, residualPct: Number(e.target.value) || 0 })} className="campo" />
+                  <p className="ajuda">0% = deprecia até zerar.</p>
+                </div>
+              </div>
+              {vidaUtilInvalida && <p className="erro">Use de 1 a 50 anos e residual de 0% a 99%.</p>}
+            </div>
           )}
 
           {/* UNIDADES */}

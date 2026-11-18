@@ -24,7 +24,9 @@ export type Vista =
   | 'lembretes'
   | 'settings'
   | 'my_assets'
-  | 'my_tickets';
+  | 'my_tickets'
+  | 'pedidos_compra'
+  | 'conferencia';
 
 /** Título da tela (cabeçalho e aba do navegador) */
 export const TITULO_VISTA: Record<Vista, string> = {
@@ -47,6 +49,8 @@ export const TITULO_VISTA: Record<Vista, string> = {
   settings: 'Configurações',
   my_assets: 'Meus equipamentos',
   my_tickets: 'Meus chamados',
+  pedidos_compra: 'Pedidos de compra',
+  conferencia: 'Inventário físico',
 };
 
 export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar' | 'processos';
@@ -69,7 +73,9 @@ export type Icone =
   | 'conciliar'
   | 'meus_equipamentos'
   | 'meus_chamados'
-  | 'configuracoes';
+  | 'configuracoes'
+  | 'compras'
+  | 'conferencia';
 
 export interface ItemMenu {
   vista: Vista;
@@ -98,9 +104,16 @@ const MINHA_AREA: GrupoMenu = {
   ],
 };
 
+/** O que muda o menu além do papel (Fase 11: gestor pede compra) */
+export interface OpcoesMenu {
+  pedeCompra?: boolean;
+}
+
 /** Menu de cada perfil (a proteção real continua no banco, por RLS) */
-export function menuDoPapel(papel: UserRole): GrupoMenu[] {
-  if (papel === 'colaborador') return [MINHA_AREA];
+export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu[] {
+  // Fase 11: o gestor (colaborador com equipe) pede compra pela Minha área
+  if (papel === 'colaborador')
+    return [opcoes.pedeCompra ? { ...MINHA_AREA, itens: [...MINHA_AREA.itens, item('pedidos_compra', 'compras')] } : MINHA_AREA];
 
   if (papel === 'rh') {
     return [
@@ -108,7 +121,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
       // Os chamados do RH ficam em Minha área › Meus chamados; processos têm tela própria
       {
         titulo: 'Pessoas',
-        itens: [item('rh_processes', 'admissoes', 'processos'), item('collaborators', 'colaboradores')],
+        itens: [item('rh_processes', 'admissoes', 'processos'), item('collaborators', 'colaboradores'), item('pedidos_compra', 'compras')],
       },
       MINHA_AREA,
     ];
@@ -120,7 +133,7 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
     { titulo: 'Atendimento', itens: [item('servicedesk', 'chamados', 'chamados'), item('lembretes', 'lembretes', 'lembretes')] },
     { titulo: 'Pessoas', itens: [item('collaborators', 'colaboradores'), item('rh_processes', 'admissoes', 'processos')] },
     // Seção 6: inventário separado de fornecedores/contratos; Financeiro centraliza as despesas
-    { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares'), item('linhas', 'linhas')] },
+    { titulo: 'Inventário', itens: [item('assets', 'ativos'), item('softwares', 'softwares'), item('linhas', 'linhas'), item('conferencia', 'conferencia')] },
     {
       titulo: 'Fornecedores e contratos',
       itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],
@@ -138,8 +151,8 @@ export function menuDoPapel(papel: UserRole): GrupoMenu[] {
 }
 
 /** Telas que o perfil pode abrir (as que aparecem no menu dele) */
-export function vistasDoPapel(papel: UserRole): Vista[] {
-  const doMenu = menuDoPapel(papel).flatMap((g) => g.itens.map((i) => i.vista));
+export function vistasDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): Vista[] {
+  const doMenu = menuDoPapel(papel, opcoes).flatMap((g) => g.itens.map((i) => i.vista));
   // Meus equipamentos abre pelo menu da conta (cabeçalho) para quem não tem Minha área no menu
   return doMenu.includes('my_assets') ? doMenu : [...doMenu, 'my_assets'];
 }

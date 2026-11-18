@@ -14,16 +14,20 @@ import type {
   ItemEstoque,
   LinhaTelefonica,
   Moeda,
+  PedidoCompra,
   ProcessoItem,
   ResponsibilityTerm,
   SoftwareLicense,
   Ticket,
   TipoContrato,
+  UserRole,
+  VidaUtil,
 } from '../types/index.ts';
 import { contratoQuePagaLicenca, contratoVigente, fimCoberturaEfetiva, nomeContrato } from './contratos.ts';
 import { diasAte, formatCurrency, isoLocal } from './formatters.ts';
 import { ACAO_DO_TIPO } from './processos.ts';
 import { resumoPendenciaTermo, type PendenciaTermo } from './inventario.ts';
+import { depreciacao } from './patrimonio.ts';
 
 export const ROTULO_FORMA_COBRANCA: Record<FormaCobranca, string> = {
   sem_custo: 'Sem custo',
@@ -245,7 +249,9 @@ export type TipoVencimento =
   | 'desligado_com_recurso'
   | 'passo_agendado'
   | 'termo_desatualizado'
-  | 'termo_contestado';
+  | 'termo_contestado'
+  | 'orcamento'
+  | 'pedido_compra';
 
 export interface Vencimento {
   id: string;
@@ -254,7 +260,7 @@ export interface Vencimento {
   dias?: number;
   titulo: string;
   detalhe?: string;
-  alvo: { tipo: 'ativo' | 'contrato' | 'licenca' | 'fatura' | 'estoque' | 'linha' | 'processo' | 'pessoa'; id: string };
+  alvo: { tipo: 'ativo' | 'contrato' | 'licenca' | 'fatura' | 'estoque' | 'linha' | 'processo' | 'pessoa' | 'orcamento' | 'pedido'; id: string };
 }
 
 export const ROTULO_VENCIMENTO: Record<TipoVencimento, string> = {
@@ -269,6 +275,8 @@ export const ROTULO_VENCIMENTO: Record<TipoVencimento, string> = {
   passo_agendado: 'Passo agendado',
   termo_desatualizado: 'Termo desatualizado',
   termo_contestado: 'Termo contestado',
+  orcamento: 'Orçamento',
+  pedido_compra: 'Pedido de compra',
 };
 
 export function listarVencimentos(
@@ -287,6 +295,11 @@ export function listarVencimentos(
     termosDesatualizados?: PendenciaTermo[];
     /** Entrega A: termos contestados pelo colaborador, aguardando a T.I. */
     termos?: ResponsibilityTerm[];
+    /** Fase 11: pedidos de compra parados esperando alguém e orçamento acima de 90%/100% */
+    pedidos?: PedidoCompra[];
+    alertasOrcamento?: { id: string; nivel: 'perto' | 'estourado'; titulo: string; detalhe: string }[];
+    /** Quem vê: o admin recebe os pedidos aguardando aprovação; a T.I., os de compra e recebimento */
+    papel?: UserRole;
   },
   horizonteDias = 90,
   agora: Date = new Date()
@@ -416,6 +429,20 @@ export function listarVencimentos(
       out.push({ id: `tc-${t.id}`, tipo: 'termo_contestado', titulo: `${t.colaboradorNome} · ${t.codigo}`, detalhe: t.contestacaoMotivo, alvo: { tipo: 'pessoa', id: t.colaboradorId } })
     );
 
+  // Fase 11: orçamento perto do limite ou estourado (pendência sem data)
+  (dados.alertasOrcamento || []).forEach((a) =>
+    out.push({ id: a.id, tipo: 'orcamento', titulo: a.titulo, detalhe: `${a.nivel === 'estourado' ? 'Acima do orçamento' : 'Perto do limite'}: ${a.detalhe}`, alvo: { tipo: 'orcamento', id: a.id } })
+  );
+  // Fase 11: pedido de compra esperando a próxima etapa
+  (dados.pedidos || [])
+    .filter((p) =>
+      dados.papel === 'ti_admin' ? ['aguardando', 'aprovado', 'comprado'].includes(p.status) : p.status === 'aprovado' || p.status === 'comprado'
+    )
+    .forEach((p) => {
+      const espera = p.status === 'aguardando' ? 'aguardando sua aprovação' : p.status === 'aprovado' ? 'aprovado: registrar a compra' : 'comprado: registrar o recebimento';
+      out.push({ id: `pc-${p.id}`, tipo: 'pedido_compra', titulo: `${p.codigo} · ${p.titulo}`, detalhe: espera, alvo: { tipo: 'pedido', id: p.id } });
+    });
+
   // Pendências (sem data) primeiro; depois por data
   return out.sort((a, b) => (a.data ? (b.data ? a.data.localeCompare(b.data) : 1) : b.data ? -1 : 0));
 }
@@ -534,26 +561,40 @@ export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency',
 // -----------------------------------------------------------------------------
 export interface ValorPatrimonio {
   equipamentos: number;
+  /** Fase 11: valor atual dos equipamentos (depreciação linear) e o quanto já depreciou */
+  equipamentosAtual: number;
+  depreciacaoAcumulada: number;
   qtdEquipamentos: number;
   semValor: number; // equipamentos ativos sem valor de compra informado
   acessorios: number;
   qtdAcessorios: number;
   total: number;
+  /** Equipamentos pelo valor atual + acessórios em estoque */
+  totalAtual: number;
 }
 
 /** Equipamentos ativos (sem baixa) pelo valor de compra + acessórios em estoque × valor unitário */
-export function valorPatrimonio(ativos: Pick<Asset, 'status' | 'fiscal'>[], estoque: Pick<ItemEstoque, 'ativo' | 'quantidade' | 'valorUnitario'>[]): ValorPatrimonio {
+export function valorPatrimonio(
+  ativos: (Pick<Asset, 'status' | 'fiscal'> & Partial<Pick<Asset, 'categoria' | 'nome' | 'modelo' | 'grupoDepreciacao'>>)[],
+  estoque: Pick<ItemEstoque, 'ativo' | 'quantidade' | 'valorUnitario'>[],
+  vida?: VidaUtil,
+  agora: Date = new Date()
+): ValorPatrimonio {
   const vivos = ativos.filter((a) => a.status !== 'descartado');
   const equipamentos = vivos.reduce((s, a) => s + (Number(a.fiscal?.valorCompra) || 0), 0);
+  const equipamentosAtual = Math.round(vivos.reduce((s, a) => s + depreciacao(a, vida, agora).valorAtual, 0) * 100) / 100;
   const itens = estoque.filter((i) => i.ativo && i.quantidade > 0);
   const acessorios = itens.reduce((s, i) => s + i.quantidade * (Number(i.valorUnitario) || 0), 0);
   return {
     equipamentos,
+    equipamentosAtual,
+    depreciacaoAcumulada: Math.round((equipamentos - equipamentosAtual) * 100) / 100,
     qtdEquipamentos: vivos.length,
     semValor: vivos.filter((a) => !(Number(a.fiscal?.valorCompra) > 0)).length,
     acessorios,
     qtdAcessorios: itens.reduce((s, i) => s + i.quantidade, 0),
     total: equipamentos + acessorios,
+    totalAtual: equipamentosAtual + acessorios,
   };
 }
 

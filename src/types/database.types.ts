@@ -411,6 +411,8 @@ export type Database = {
           data_entrega_atual: string | null
           fiscal: Json | null
           fornecedor_id: string | null
+          grupo_depreciacao?: string | null
+          pedido_id?: string | null
           id: string
           localizacao_fisica: string
           marca: string
@@ -431,6 +433,8 @@ export type Database = {
           data_entrega_atual?: string | null
           fiscal?: Json | null
           fornecedor_id?: string | null
+          grupo_depreciacao?: string | null
+          pedido_id?: string | null
           id: string
           localizacao_fisica: string
           marca: string
@@ -451,6 +455,8 @@ export type Database = {
           data_entrega_atual?: string | null
           fiscal?: Json | null
           fornecedor_id?: string | null
+          grupo_depreciacao?: string | null
+          pedido_id?: string | null
           id?: string
           localizacao_fisica?: string
           marca?: string
@@ -797,6 +803,7 @@ export type Database = {
           doc_devolucao: Json
           doc_entrega: Json
           termo_exige?: Json | null
+          vida_util?: Json | null
           campos_personalizados: Json | null
           cep: string
           cidade_uf: string
@@ -817,6 +824,7 @@ export type Database = {
           doc_devolucao?: Json
           doc_entrega?: Json
           termo_exige?: Json | null
+          vida_util?: Json | null
           campos_personalizados?: Json | null
           cep: string
           cidade_uf: string
@@ -837,6 +845,7 @@ export type Database = {
           doc_devolucao?: Json
           doc_entrega?: Json
           termo_exige?: Json | null
+          vida_util?: Json | null
           campos_personalizados?: Json | null
           cep?: string
           cidade_uf?: string
@@ -1062,6 +1071,7 @@ export type Database = {
           forma_pagamento: string | null
           estorno_motivo: string | null
           valor_pago: number | null
+          pedido_id?: string | null
           arquivo_caminho: string | null
           competencia: string
           contrato_id: string | null
@@ -1082,6 +1092,7 @@ export type Database = {
           forma_pagamento?: string | null
           estorno_motivo?: string | null
           valor_pago?: number | null
+          pedido_id?: string | null
           arquivo_caminho?: string | null
           competencia: string
           contrato_id?: string | null
@@ -1102,6 +1113,7 @@ export type Database = {
           forma_pagamento?: string | null
           estorno_motivo?: string | null
           valor_pago?: number | null
+          pedido_id?: string | null
           arquivo_caminho?: string | null
           competencia?: string
           contrato_id?: string | null

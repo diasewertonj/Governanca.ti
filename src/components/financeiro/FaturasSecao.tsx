@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Paperclip, Pencil, Plus, Receipt, RotateCcw, Trash2, Upload, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
+import { useCompras } from '../../context/ComprasContext.tsx';
 import type { Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
@@ -65,6 +66,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   // Arquivo de uma fatura já lançada sem arquivo: escolhe e só sobe ao clicar em "Enviar"
   const [anexando, setAnexando] = useState<{ id: string; arquivo: File | null; enviando: boolean } | null>(null);
   const [erro, setErro] = useState('');
+  const { pedidos: pedidosCompra } = useCompras();
   useRegistrarPendencias(`fatura-arquivo:${alvo ? alvo.licencaId || alvo.contratoId : 'todas'}`, anexando?.arquivo ? ['Arquivo da fatura não enviado'] : []);
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
@@ -72,6 +74,10 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
 
   const lista = alvo ? faturasDoAlvo(faturas, alvo) : listaGlobal || faturas;
   const origem = (f: Fatura) => {
+    if (f.pedidoId) {
+      const p = pedidosCompra.find((x) => x.id === f.pedidoId);
+      return p ? `Pedido ${p.codigo}` : 'Pedido de compra';
+    }
     if (f.contratoId) {
       const c = contratos.find((x) => x.id === f.contratoId);
       return c ? nomeContrato(c) : 'Contrato';
@@ -287,7 +293,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                               <CheckCircle2 aria-hidden="true" /> Pagar
                             </button>
                           )}
-                          {f.status === 'a_pagar' && (
+                          {f.status === 'a_pagar' && !f.pedidoId && (
                             <button
                               type="button"
                               onClick={() => {
@@ -323,7 +329,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                               <XCircle aria-hidden="true" />
                             </button>
                           )}
-                          {currentRole === 'ti_admin' && (
+                          {currentRole === 'ti_admin' && !f.pedidoId && (
                             <button
                               type="button"
                               onClick={() => excluir(f)}

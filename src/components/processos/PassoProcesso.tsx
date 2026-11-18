@@ -6,10 +6,14 @@
  * (observação, lembrete, termo, outra pessoa) abre em "Mais opções".
  */
 import React, { useState } from 'react';
-import { Ban, CalendarClock, Check, CheckCircle2, Circle, KeyRound, MinusCircle, Package, Plus, RotateCcw, SlidersHorizontal, Trash2, UserPlus } from 'lucide-react';
+import { Ban, CalendarClock, Check, CheckCircle2, Circle, KeyRound, MinusCircle, Package, Plus, RotateCcw, ShoppingCart, SlidersHorizontal, Trash2, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
-import type { Asset, AssetCategory, DestinoRecurso, ItemEstoque, ProcessoItem, Ticket, TipoAcessorio } from '../../types/index.ts';
+import { useCompras } from '../../context/ComprasContext.tsx';
+import { FormPedido, pedidoVazio } from '../compras/FormPedido.tsx';
+import { FichaPedido } from '../compras/FichaPedido.tsx';
+import { ROTULO_STATUS_PEDIDO } from '../../utils/compras.ts';
+import type { Asset, AssetCategory, DestinoRecurso, ItemEstoque, PedidoCompra, ProcessoItem, Ticket, TipoAcessorio } from '../../types/index.ts';
 import { ACAO_DO_TIPO, normalizar, podeReabrir } from '../../utils/processos.ts';
 import { assentosLivres, licencaDaConta } from '../../utils/admissao.ts';
 import { licencaAtiva } from '../../utils/licencas.ts';
@@ -126,6 +130,25 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
   const [destinoLinha, setDestinoLinha] = useState<'estoque' | 'transferir' | 'cancelar'>('estoque');
   const [cadastrando, setCadastrando] = useState(false);
   const [novoAtivo, setNovoAtivo] = useState(false);
+  // Fase 11: passo sem equipamento disponível → pedido de compra já preenchido
+  const { pedidos, podePedirCompra } = useCompras();
+  const [pedindo, setPedindo] = useState<PedidoCompra | null>(null);
+  const [pedidoAberto, setPedidoAberto] = useState<string | null>(null);
+  const pedidoDoItem = pedidos.find((p) => p.processoItemId === item.id && p.status !== 'cancelado');
+  const chegouDoPedido = (a: Asset) => !!pedidoDoItem && a.pedidoId === pedidoDoItem.id;
+  const pedirCompra = () =>
+    setPedindo(
+      pedidoVazio({
+        titulo: `${item.titulo} para ${colab?.nome || ob?.nomeColaborador || 'nova admissão'}`,
+        justificativa: `Admissão ${ticket.codigo}${ob?.dataAdmissao ? ` em ${formatDate(ob.dataAdmissao)}` : ''}: não há equipamento disponível no estoque.`,
+        area: '',
+        chamadoId: ticket.id,
+        processoItemId: item.id,
+        colaboradorDestinoId: colab?.id,
+        necessarioEm: ob?.dataAdmissao,
+        itens: [{ id: `pit-${crypto.randomUUID()}`, tipo: 'equipamento', descricao: item.titulo, categoriaAtivo: categoriaDoNome(item.titulo), quantidade: 1, ordem: 1 }],
+      })
+    );
   const [novoAcessorio, setNovoAcessorio] = useState(false);
   const [agendando, setAgendando] = useState(false);
 
@@ -451,16 +474,35 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
           <>
             <select aria-label="Equipamento entregue" value={ativoId} onChange={(e) => setAtivoId(e.target.value)} className={`${campoSm} w-full sm:w-60`}>
               <option value="">{ativosLivres.length ? 'Escolha no estoque…' : 'Nada disponível no estoque'}</option>
-              {ativosLivres.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.tag} · {a.nome}
-                </option>
-              ))}
+              {[...ativosLivres]
+                .sort((a, b) => (chegouDoPedido(a) ? 0 : 1) - (chegouDoPedido(b) ? 0 : 1))
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.tag} · {a.nome}
+                    {chegouDoPedido(a) ? ' · chegou do pedido' : ''}
+                  </option>
+                ))}
             </select>
             <button type="button" onClick={() => setNovoAtivo(true)} title="Cadastrar um equipamento novo aqui" aria-label="Cadastrar equipamento" className="btn-icone">
               <Plus />
             </button>
             {botao('Registrar')}
+            {pedidoDoItem ? (
+              <button type="button" onClick={() => setPedidoAberto(pedidoDoItem.id)} title="Abrir o pedido de compra deste passo" className="btn btn-sm btn-secundario">
+                <ShoppingCart /> {pedidoDoItem.codigo} · {ROTULO_STATUS_PEDIDO[pedidoDoItem.status]}
+              </button>
+            ) : (
+              podePedirCompra && (
+                <button
+                  type="button"
+                  onClick={pedirCompra}
+                  title="Abrir um pedido de compra já preenchido para este passo"
+                  className={`btn btn-sm ${ativosLivres.length ? 'btn-secundario' : 'btn-primario'}`}
+                >
+                  <ShoppingCart /> Pedir compra
+                </button>
+              )
+            )}
           </>
         );
       case 'acessorio':
@@ -662,6 +704,15 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
         />
       )}
       {agendando && <JanelaAgendar item={item} onFechar={() => setAgendando(false)} />}
+      {pedindo && (
+        <FormPedido
+          inicial={pedindo}
+          simples={currentRole !== 'ti_admin' && currentRole !== 'ti_suporte'}
+          onClose={() => setPedindo(null)}
+          onSalvo={(p) => setPedidoAberto(p.id)}
+        />
+      )}
+      {pedidoAberto && <FichaPedido pedidoId={pedidoAberto} onClose={() => setPedidoAberto(null)} />}
     </div>
   );
 };
