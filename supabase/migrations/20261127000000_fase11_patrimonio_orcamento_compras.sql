@@ -548,7 +548,7 @@ revoke all on function public.solicitar_compra(jsonb, jsonb) from public, anon;
 grant execute on function public.solicitar_compra(jsonb, jsonb) to authenticated;
 
 -- O que RH e gestor veem dos pedidos: situação e itens, sem valores nem fornecedor.
--- RH vê todos; gestor (colaborador) só os que pediu; T.I. lê a tabela.
+-- RH vê todos menos rascunhos de outras pessoas; gestor (colaborador) só os que pediu; T.I. lê a tabela.
 create or replace function public.pedidos_solicitados()
 returns table (
   id text, codigo text, titulo text, justificativa text, categoria text, area text, status text,
@@ -571,8 +571,9 @@ as $$
                      from public.pedido_eventos e where e.pedido_id = p.id), '[]'::jsonb)
     from public.pedidos_compra p
    where public.pode_pedir_compra()
-     and (coalesce(public.meu_papel(), '') in ('ti_admin', 'ti_suporte', 'rh')
-          or p.solicitante_id = public.meu_colaborador_id())
+     and (p.solicitante_id = public.meu_colaborador_id()
+          or coalesce(public.meu_papel(), '') in ('ti_admin', 'ti_suporte')
+          or (public.meu_papel() = 'rh' and p.status <> 'rascunho'))
    order by p.criado_em desc;
 $$;
 revoke all on function public.pedidos_solicitados() from public, anon;

@@ -368,9 +368,14 @@ export function listarVencimentos(
     .forEach((f) => {
       const dias = dentro(f.vencimento);
       if (dias === undefined) return;
-      const alvoNome = f.contratoId
-        ? nomeContrato(dados.contratos.find((c) => c.id === f.contratoId) || { descricao: 'Contrato' })
-        : dados.licencas.find((l) => l.id === f.licencaId)?.nome || 'Licença';
+      const pedido = f.pedidoId ? (dados.pedidos || []).find((p) => p.id === f.pedidoId) : undefined;
+      const alvoNome = f.pedidoId
+        ? pedido
+          ? `Pedido ${pedido.codigo} · ${pedido.titulo}`
+          : 'Pedido de compra'
+        : f.contratoId
+          ? nomeContrato(dados.contratos.find((c) => c.id === f.contratoId) || { descricao: 'Contrato' })
+          : dados.licencas.find((l) => l.id === f.licencaId)?.nome || 'Licença';
       out.push({ id: `f-${f.id}`, tipo: 'fatura', data: f.vencimento, dias, titulo: alvoNome, detalhe: valorDaFatura(f), alvo: { tipo: 'fatura', id: f.id } });
     });
 

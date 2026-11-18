@@ -59,7 +59,8 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
     else if (v.alvo.tipo === 'pedido') setPedidoAberto(v.alvo.id);
     else if (v.alvo.tipo === 'fatura') {
       const f = faturas.find((x) => x.id === v.alvo.id);
-      if (f?.contratoId) setContratoAberto(f.contratoId);
+      if (f?.pedidoId) setPedidoAberto(f.pedidoId);
+      else if (f?.contratoId) setContratoAberto(f.contratoId);
       else if (f?.licencaId) abrirFicha({ tipo: 'software', id: f.licencaId });
     }
   };

@@ -52,7 +52,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
   const nome = (id?: string) => employees.find((e) => e.id === id)?.nome || '—';
   const fornecedor = (id?: string) => fornecedores.find((f) => f.id === id)?.nome || '—';
   const admissao = tickets.find((t) => t.id === p.chamadoId);
-  const ativosRecebidos = assets.filter((a) => a.pedidoId === p.id);
+  const ativosRecebidos = assets.filter((a) => a.pedidoId === p.id).sort((a, b) => a.tag.localeCompare(b.tag));
   const fatura = faturas.find((f) => f.id === p.faturaId || (f.pedidoId === p.id && f.status !== 'cancelada'));
   const souSolicitante = !!currentUser && p.solicitanteId === currentUser.id;
   const aberto = p.status === 'rascunho' || p.status === 'aguardando' || p.status === 'recusado';

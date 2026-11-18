@@ -157,6 +157,8 @@ export function ativoDoCodigo(codigo: string, ativos: Pick<Asset, 'id' | 'tag' |
   if (!texto) return undefined;
   const id = /#asset\/([^/?#\s]+)/.exec(texto)?.[1];
   if (id) return ativos.find((a) => a.id === decodeURIComponent(id));
-  const n = texto.toLowerCase().replace(/\s+/g, '');
-  return ativos.find((a) => a.id === texto || a.tag.toLowerCase().replace(/\s+/g, '') === n || (a.serialNumber || '').toLowerCase().replace(/\s+/g, '') === n);
+  // Patrimônio com ou sem "#" (PAT-1050 = #PAT-1050)
+  const limpar = (s: string) => s.toLowerCase().replace(/\s+/g, '').replace(/^#/, '');
+  const n = limpar(texto);
+  return ativos.find((a) => a.id === texto || limpar(a.tag) === n || limpar(a.serialNumber || '') === n);
 }

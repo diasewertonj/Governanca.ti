@@ -143,9 +143,16 @@ select harness.rodar('fase11', 'R1 RH pede compra e o pedido já vai para aprova
       and solicitante_id = 'emp-rh' and chamado_id = 'tkt-3' and jsonb_array_length(itens) = 1$s$, v), 1);
   end $x$$q$);
 select harness.rodar('fase11', 'R2 RH vê os pedidos sem valores (nenhuma chave de valor nos itens)', 'ok', :'rh', 'authenticated',
+  $q$do $x$
+  declare v text;
+  begin
+    v := public.solicitar_compra('{"titulo":"Mouses","justificativa":"Reposição"}', '[{"descricao":"Mouse","quantidade":3},{"descricao":"Teclado"}]');
+    perform harness.espera(format($s$select 1 from public.pedidos_solicitados() p, jsonb_array_elements(p.itens) i
+      where p.id = %L and not (i ? 'valor_unitario')$s$, v), 2);
+  end $x$$q$);
+select harness.rodar('fase11', 'R2b RH não vê rascunho de outra pessoa', 'ok', :'rh', 'authenticated',
   $q$do $x$ begin
-    perform harness.espera($s$select 1 from public.pedidos_solicitados() p, jsonb_array_elements(p.itens) i
-      where p.id = 'pc-1' and not (i ? 'valor_unitario')$s$, 3);
+    perform harness.espera($s$select 1 from public.pedidos_solicitados() where id = 'pc-1'$s$, 0);
   end $x$$q$);
 select harness.rodar('fase11', 'R3 colaborador que não é gestor não pede compra', 'bloqueado', :'colab', 'authenticated',
   $q$select public.solicitar_compra('{"titulo":"Monitor","justificativa":"Trabalho remoto"}', '[{"descricao":"Monitor"}]')$q$);

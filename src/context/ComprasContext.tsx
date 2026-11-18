@@ -173,7 +173,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (isTI) return pedidosTodos;
     if (!demo) return pedidosTodos;
     return pedidosTodos
-      .filter((p) => currentRole === 'rh' || p.solicitanteId === currentUser?.id)
+      .filter((p) => p.solicitanteId === currentUser?.id || (currentRole === 'rh' && p.status !== 'rascunho'))
       .map((p) => ({ ...p, semValores: true, cotacoes: [], fornecedorId: undefined, valorFinal: undefined, itens: p.itens.map((i) => ({ ...i, valorUnitario: undefined })) }));
   }, [pedidosTodos, isTI, demo, currentRole, currentUser?.id]);
 

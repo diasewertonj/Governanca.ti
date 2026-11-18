@@ -313,7 +313,7 @@ const TelaConferencia: React.FC<{ inventarioId: string; onClose: () => void }> =
                   if (codigo.trim()) void ler(codigo);
                 }}
               >
-                <div className="min-w-0 flex-1">
+                <div className="w-full min-w-0 sm:w-auto sm:flex-1">
                   <label htmlFor="conf-codigo" className="rotulo">
                     <QrCode className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
                     Ler QR da etiqueta ou digitar o patrimônio

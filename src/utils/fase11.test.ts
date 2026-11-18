@@ -102,6 +102,7 @@ describe('Fase 11 · patrimônio sugerido e leitura do QR', () => {
     const lista = [ativo({}), ativo({ id: 'ast-9', tag: '#PAT-0009', serialNumber: 'ABC 123' })];
     expect(ativoDoCodigo('https://nexus.app/#asset/ast-9', lista)?.tag).toBe('#PAT-0009');
     expect(ativoDoCodigo(' #pat-0001 ', lista)?.id).toBe('a1');
+    expect(ativoDoCodigo('PAT-0009', lista)?.id).toBe('ast-9');
     expect(ativoDoCodigo('abc123', lista)?.id).toBe('ast-9');
     expect(ativoDoCodigo('xyz', lista)).toBeUndefined();
   });
