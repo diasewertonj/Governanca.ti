@@ -20,7 +20,7 @@ import type {
   TipoContrato,
 } from '../types/index.ts';
 import { contratoQuePagaLicenca, contratoVigente, fimCoberturaEfetiva, nomeContrato } from './contratos.ts';
-import { diasAte, isoLocal } from './formatters.ts';
+import { diasAte, formatCurrency, isoLocal } from './formatters.ts';
 import { ACAO_DO_TIPO } from './processos.ts';
 import { resumoPendenciaTermo, type PendenciaTermo } from './inventario.ts';
 
@@ -130,6 +130,10 @@ export interface FonteCusto {
   valor: number; // valor no período (licença ou contrato)
   periodicidade?: 'mensal' | 'anual' | 'unico';
   mensal: number; // valor mensal equivalente (o contrato inteiro, não rateado)
+  /** Parte deste software no mensal: o contrato dividido igualmente entre as licenças que cobre */
+  mensalDaLicenca: number;
+  /** Quantas licenças o contrato cobre (só quando pago pelo contrato) */
+  licencasNoContrato?: number;
   renovacao?: string; // próxima renovação / fim
   origem: string; // ex.: "do contrato CT-14" ou "da licença"
 }
@@ -137,18 +141,21 @@ export interface FonteCusto {
 /** De onde vêm o custo e a renovação mostrados na ficha (seção 6.2) */
 export function fonteCustoLicenca(l: SoftwareLicense, contratos: Contrato[], agora: Date = new Date()): FonteCusto {
   const forma = formaCobrancaDe(l, contratos);
-  if (forma === 'sem_custo') return { forma, valor: 0, mensal: 0, origem: 'sem custo', renovacao: l.dataRenovacao || undefined };
+  if (forma === 'sem_custo') return { forma, valor: 0, mensal: 0, mensalDaLicenca: 0, origem: 'sem custo', renovacao: l.dataRenovacao || undefined };
   if (forma === 'contrato') {
     const contrato =
       contratoQuePagaLicenca(l.id, contratos, undefined, agora) ||
       contratos.find((c) => contratoVigente(c, agora) && c.itens.some((i) => i.licencaId === l.id));
-    if (!contrato) return { forma, semContratoVigente: true, valor: 0, mensal: 0, origem: 'sem contrato vigente' };
+    if (!contrato) return { forma, semContratoVigente: true, valor: 0, mensal: 0, mensalDaLicenca: 0, origem: 'sem contrato vigente' };
+    const licencasNoContrato = Math.max(1, contrato.itens.filter((i) => i.licencaId).length);
     return {
       forma,
       contrato,
       valor: contrato.valor,
       periodicidade: contrato.periodicidade,
       mensal: mensalDoContrato(contrato),
+      mensalDaLicenca: mensalDoContrato(contrato) / licencasNoContrato,
+      licencasNoContrato,
       renovacao: contrato.fim,
       origem: `do contrato ${nomeContrato(contrato)}`,
     };
@@ -158,9 +165,20 @@ export function fonteCustoLicenca(l: SoftwareLicense, contratos: Contrato[], ago
     valor: l.valorMensal,
     periodicidade: l.tipoCobranca || 'mensal',
     mensal: mensalDaLicenca(l),
+    mensalDaLicenca: mensalDaLicenca(l),
     renovacao: l.dataRenovacao || undefined,
     origem: 'da licença',
   };
+}
+
+/** Valor que conta como gasto: o efetivamente pago (juros, multa, desconto) ou o da fatura */
+export const valorEfetivo = (f: Pick<Fatura, 'status' | 'valor' | 'valorPago'>) =>
+  f.status === 'paga' && f.valorPago != null ? f.valorPago : f.valor;
+
+/** Valor da fatura para exibir: R$ no padrão brasileiro; moeda estrangeira com o R$ entre parênteses */
+export function valorDaFatura(f: Pick<Fatura, 'status' | 'valor' | 'valorPago' | 'moeda' | 'valorMoeda'>): string {
+  const reais = formatCurrency(valorEfetivo(f));
+  return f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null ? `${formatCurrency(f.valorMoeda, f.moeda)} (${reais})` : reais;
 }
 
 /** Data limite para cancelar sem renovar (fim − aviso prévio) */
@@ -335,7 +353,7 @@ export function listarVencimentos(
       const alvoNome = f.contratoId
         ? nomeContrato(dados.contratos.find((c) => c.id === f.contratoId) || { descricao: 'Contrato' })
         : dados.licencas.find((l) => l.id === f.licencaId)?.nome || 'Licença';
-      out.push({ id: `f-${f.id}`, tipo: 'fatura', data: f.vencimento, dias, titulo: alvoNome, detalhe: `R$ ${f.valor.toFixed(2)}`, alvo: { tipo: 'fatura', id: f.id } });
+      out.push({ id: `f-${f.id}`, tipo: 'fatura', data: f.vencimento, dias, titulo: alvoNome, detalhe: valorDaFatura(f), alvo: { tipo: 'fatura', id: f.id } });
     });
 
   dados.estoque
@@ -458,7 +476,7 @@ export function pagoPorMes(faturas: Fatura[], meses = 12, agora: Date = new Date
     const mes = isoLocal(d);
     out.push({
       mes: mes.slice(0, 7),
-      total: faturas.filter((f) => f.status === 'paga' && f.competencia === mes).reduce((s, f) => s + f.valor, 0),
+      total: faturas.filter((f) => f.status === 'paga' && f.competencia === mes).reduce((s, f) => s + valorEfetivo(f), 0),
     });
   }
   return out;
@@ -471,7 +489,7 @@ export function assentosOciosos(licencas: SoftwareLicense[], contratos: Contrato
     .map((l) => {
       const livres = l.assentosTotais - l.assentosAlocados;
       const fonte = fonteCustoLicenca(l, contratos);
-      const porAssento = l.assentosTotais ? fonte.mensal / l.assentosTotais : 0;
+      const porAssento = l.assentosTotais ? fonte.mensalDaLicenca / l.assentosTotais : 0;
       return { licenca: l, livres, custoMensal: livres * porAssento };
     })
     .filter((x) => x.livres > 0);

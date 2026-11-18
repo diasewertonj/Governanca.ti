@@ -401,6 +401,8 @@ export interface Fatura {
   valorMoeda?: number;
   formaPagamento?: FormaPagamento;
   estornoMotivo?: string;
+  /** Valor efetivamente pago, quando difere do valor da fatura (juros, multa, desconto) */
+  valorPago?: number;
 }
 
 export type TicketType = 'suporte' | 'onboarding' | 'offboarding';

@@ -5,7 +5,7 @@ import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { Fatura, PeriodicidadeContrato } from '../../types/index.ts';
 import { formatCurrency, formatDate } from '../../utils/formatters.ts';
 import { ROTULO_TIPO_CONTRATO, nomeContrato, resumoVinculos, vinculosDoFornecedor } from '../../utils/contratos.ts';
-import { ROTULO_FORMA_COBRANCA, despesasRecorrentes, formaCobrancaDe } from '../../utils/financeiro.ts';
+import { ROTULO_FORMA_COBRANCA, despesasRecorrentes, formaCobrancaDe, valorDaFatura } from '../../utils/financeiro.ts';
 import { ROTULO_STATUS_FATURA, rotuloCompetencia, statusExibido, totalPagoNoAno, type StatusExibidoFatura } from '../../utils/faturas.ts';
 import { ContratoFicha, SeloContrato } from './ContratoFicha.tsx';
 import { ContratoFormModal } from './ContratoFormModal.tsx';
@@ -387,7 +387,7 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                           </td>
                           <td data-label="Competência">{rotuloCompetencia(f.competencia)}</td>
                           <td data-label="Valor" className="text-right font-mono text-slate-800">
-                            {formatCurrency(f.valor)}
+                            {valorDaFatura(f)}
                           </td>
                           <td data-label="Vencimento">{formatDate(f.vencimento)}</td>
                           <td data-label="Situação">

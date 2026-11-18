@@ -10,8 +10,11 @@ import {
   nomesParecidos,
   paraCsv,
   pendenciasConciliacao,
+  valorDaFatura,
+  valorEfetivo,
   valorPatrimonio,
 } from './financeiro.ts';
+import { contratoEmVigorNoPeriodo, contratoQuePagaLicenca } from './contratos.ts';
 
 const agora = new Date(2026, 10, 16);
 
@@ -149,5 +152,47 @@ describe('seção 9.4 · compras e valor do patrimônio', () => {
     expect(c.map((x) => x.ativoId)).toEqual(['a3', 'a1']);
     expect(c[0]).toMatchObject({ baixado: true, valor: 0, fornecedorTexto: 'Loja antiga' });
     expect(c[1]).toMatchObject({ baixado: false, valor: 5000, numeroNF: '123' });
+  });
+});
+
+describe('números do Financeiro (seção 10.3)', () => {
+  it('contrato que cobre 3 softwares: cada um fica com 1/3 do mensal', () => {
+    const c = ctr({ valor: 3000, itens: [{ licencaId: 'l1' }, { licencaId: 'l2' }, { licencaId: 'l3' }] });
+    const f = fonteCustoLicenca(lic({ formaCobranca: 'contrato' }), [c], agora);
+    expect(f.mensal).toBe(3000);
+    expect(f.mensalDaLicenca).toBe(1000);
+    expect(f.licencasNoContrato).toBe(3);
+  });
+
+  it('custo ocioso usa a parte do software no contrato', () => {
+    const c = ctr({ valor: 3000, itens: [{ licencaId: 'l1' }, { licencaId: 'l2' }, { licencaId: 'l3' }] });
+    const [o] = assentosOciosos([lic({ formaCobranca: 'contrato', assentosTotais: 10, assentosAlocados: 5 })], [c]);
+    expect(o.custoMensal).toBe(500);
+  });
+
+  it('contrato encerrado conta até a data do encerramento', () => {
+    const c = ctr({ status: 'encerrado', encerradoEm: '2026-11-10T12:00:00Z' });
+    expect(contratoEmVigorNoPeriodo(c, '2026-10-01', '2026-10-31')).toBe(true);
+    expect(contratoEmVigorNoPeriodo(c, '2026-11-01', '2026-11-30')).toBe(true);
+    expect(contratoEmVigorNoPeriodo(c, '2026-12-01', '2026-12-31')).toBe(false);
+    expect(contratoEmVigorNoPeriodo(c, '2026-01-01', '2026-01-31')).toBe(false); // antes do início
+  });
+
+  it('contrato encerrado não paga licença em competência depois do encerramento', () => {
+    const c = ctr({ status: 'encerrado', encerradoEm: '2026-11-10T12:00:00Z' });
+    expect(contratoQuePagaLicenca('l1', [c], '2026-10-01')?.id).toBe('c1');
+    expect(contratoQuePagaLicenca('l1', [c], '2026-12-01')).toBeUndefined();
+  });
+
+  it('valor efetivo: o pago quando difere; o da fatura nos demais casos', () => {
+    expect(valorEfetivo({ status: 'paga', valor: 100, valorPago: 112 })).toBe(112);
+    expect(valorEfetivo({ status: 'paga', valor: 100 })).toBe(100);
+    expect(valorEfetivo({ status: 'a_pagar', valor: 100, valorPago: 112 })).toBe(100);
+  });
+
+  it('valor da fatura no padrão brasileiro e com a moeda estrangeira', () => {
+    const nb = (s: string) => s.replace(/\s/g, ' ');
+    expect(nb(valorDaFatura({ status: 'a_pagar', valor: 1110.5 }))).toBe('R$ 1.110,50');
+    expect(nb(valorDaFatura({ status: 'a_pagar', valor: 110.5, moeda: 'USD', valorMoeda: 20 }))).toBe('US$ 20,00 (R$ 110,50)');
   });
 });

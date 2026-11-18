@@ -53,6 +53,21 @@ export function situacaoContrato(
   return { situacao: 'vigente', dias };
 }
 
+/**
+ * Esteve em vigor em algum dia do período (datas ISO). Um contrato encerrado conta até a
+ * data do encerramento: some só dos meses depois dele, não do histórico.
+ */
+export function contratoEmVigorNoPeriodo(
+  c: Pick<Contrato, 'inicio' | 'fim' | 'status' | 'encerradoEm'>,
+  de: string,
+  ate: string
+): boolean {
+  if (c.inicio > ate) return false;
+  if (c.fim && c.fim < de) return false;
+  if (c.status === 'encerrado') return !!c.encerradoEm && c.encerradoEm.slice(0, 10) >= de;
+  return true;
+}
+
 /** Em vigor hoje: já começou e não terminou */
 export function contratoVigente(c: Pick<Contrato, 'inicio' | 'fim' | 'status'>, agora: Date = new Date()): boolean {
   if (c.status === 'encerrado') return false;
@@ -162,7 +177,7 @@ export const resumoVinculos = (v: VinculosFornecedor) =>
 export const temVinculos = (v: VinculosFornecedor) => v.contratos + v.ativos + v.licencas > 0;
 
 /** Último dia do mês de uma competência "AAAA-MM-01" */
-const fimDoMes = (competencia: string) => {
+export const fimDoMes = (competencia: string) => {
   const [a, m] = competencia.split('-').map(Number);
   return isoLocal(new Date(a, m, 0));
 };
@@ -180,7 +195,7 @@ export function contratoQuePagaLicenca(
   return contratos.find((c) => {
     if (c.tipo !== 'licenciamento' || !c.itens.some((i) => i.licencaId === licencaId)) return false;
     if (!competencia) return contratoVigente(c, agora);
-    return c.inicio <= fimDoMes(competencia) && (!c.fim || c.fim >= competencia);
+    return contratoEmVigorNoPeriodo(c, competencia, fimDoMes(competencia));
   });
 }
 

@@ -22,10 +22,10 @@ const ROTULO_PRIORIDADE: Record<string, string> = {
 export const rotuloStatus = (status: string): string => ROTULO_STATUS[status] || status.replace(/_/g, ' ');
 export const rotuloPrioridade = (prioridade: string): string => ROTULO_PRIORIDADE[prioridade] || prioridade;
 
-export const formatCurrency = (val: number): string => {
+export const formatCurrency = (val: number, moeda: 'BRL' | 'USD' | 'EUR' = 'BRL'): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
-    currency: 'BRL',
+    currency: moeda,
   }).format(val);
 };
 

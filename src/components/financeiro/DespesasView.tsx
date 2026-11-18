@@ -15,7 +15,7 @@ import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { CategoriaDespesa, Fatura } from '../../types/index.ts';
 import { formatDate, isoLocal } from '../../utils/formatters.ts';
 import { statusExibido, ROTULO_STATUS_FATURA, rotuloCompetencia } from '../../utils/faturas.ts';
-import { contratoVigente, nomeContrato } from '../../utils/contratos.ts';
+import { contratoEmVigorNoPeriodo, fimDoMes, nomeContrato } from '../../utils/contratos.ts';
 import {
   CATEGORIA_DO_TIPO,
   ROTULO_CATEGORIA,
@@ -27,6 +27,7 @@ import {
   mensalDoContrato,
   paraCsv,
   somarPor,
+  valorEfetivo,
 } from '../../utils/financeiro.ts';
 import { ContasPagarView, ContratoPorId } from './FinanceiroViews.tsx';
 import { CartaoPatrimonio, ComprasView } from './ComprasView.tsx';
@@ -180,11 +181,10 @@ export const DespesasView: React.FC<{
 
   // Previsto de um mês: recorrentes vigentes naquele mês
   const previstoDoMes = (comp: string): { origem: Origem; valor: number }[] => {
-    const [a, m] = comp.split('-').map(Number);
-    const meio = new Date(a, m - 1, 15);
+    const ate = fimDoMes(comp);
     const itens: { origem: Origem; valor: number }[] = [];
     contratos
-      .filter((c) => contratoVigente(c, meio))
+      .filter((c) => contratoEmVigorNoPeriodo(c, comp, ate))
       .forEach((c) =>
         itens.push({
           origem: { tipo: 'contrato', id: c.id, nome: nomeContrato(c), fornecedorId: c.fornecedorId, categoria: c.categoriaDespesa || CATEGORIA_DO_TIPO[c.tipo], area: c.centroCusto },
@@ -192,7 +192,8 @@ export const DespesasView: React.FC<{
         })
       );
     licenses
-      .filter((l) => l.status !== 'inativa' && formaCobrancaDe(l, contratos) === 'propria')
+      // licença inativada conta até o mês em que foi inativada
+      .filter((l) => (l.status !== 'inativa' || (!!l.inativadaEm && l.inativadaEm.slice(0, 10) >= comp)) && formaCobrancaDe(l, contratos) === 'propria')
       .forEach((l) =>
         itens.push({
           origem: { tipo: 'licenca', id: l.id, nome: l.nome, fornecedorId: l.fornecedorId, categoria: l.categoriaDespesa || 'software', area: l.centroCusto },
@@ -209,20 +210,20 @@ export const DespesasView: React.FC<{
     const dentro = (f: Fatura, de: string, ate: string) => f.competencia >= de.slice(0, 8) + '01' && f.competencia <= ate;
     const doPeriodo = faturas.filter((f) => f.status !== 'cancelada' && dentro(f, periodo.de, periodo.ate) && passa(origemDaFatura(f)));
     const pagas = doPeriodo.filter((f) => f.status === 'paga');
-    const realizado = pagas.reduce((s, f) => s + f.valor, 0);
+    const realizado = pagas.reduce((s, f) => s + valorEfetivo(f), 0);
     const realizadoAnterior = faturas
       .filter((f) => f.status === 'paga' && dentro(f, anterior.de, anterior.ate) && passa(origemDaFatura(f)))
-      .reduce((s, f) => s + f.valor, 0);
+      .reduce((s, f) => s + valorEfetivo(f), 0);
     const porMes = meses.map((comp) => ({
       comp,
-      realizado: pagas.filter((f) => f.competencia === comp).reduce((s, f) => s + f.valor, 0),
+      realizado: pagas.filter((f) => f.competencia === comp).reduce((s, f) => s + valorEfetivo(f), 0),
       previsto: previstoDoMes(comp).reduce((s, i) => s + i.valor, 0),
     }));
     const previsto = porMes.reduce((s, m) => s + m.previsto, 0);
-    const aPagar = doPeriodo.filter((f) => f.status === 'a_pagar').reduce((s, f) => s + f.valor, 0);
+    const aPagar = doPeriodo.filter((f) => f.status === 'a_pagar').reduce((s, f) => s + valorEfetivo(f), 0);
     const chave = (o: Origem) =>
       agrupar === 'categoria' ? ROTULO_CATEGORIA[o.categoria] : agrupar === 'fornecedor' ? nomeForn(o.fornecedorId) : agrupar === 'area' ? o.area || 'Sem área' : o.tipo === 'contrato' ? 'Contratos' : o.tipo === 'licenca' ? 'Softwares' : 'Linhas';
-    const grupos = somarPor(pagas, (f) => chave(origemDaFatura(f) as Origem), (f) => f.valor);
+    const grupos = somarPor(pagas, (f) => chave(origemDaFatura(f) as Origem), (f) => valorEfetivo(f));
     return { doPeriodo, realizado, realizadoAnterior, porMes, previsto, aPagar, grupos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faturas, contratos, licenses, linhas, periodo.de, periodo.ate, fFornecedor, fCategoria, fArea, fOrigem, agrupar]);
@@ -247,7 +248,7 @@ export const DespesasView: React.FC<{
         ['Competência', 'Origem', 'Tipo', 'Fornecedor', 'Categoria', 'Área', 'Valor (R$)', 'Situação', 'Vencimento', 'Pago em'],
         dados.doPeriodo.map((f) => {
           const o = origemDaFatura(f);
-          return [f.competencia.slice(0, 7), o?.nome, o?.tipo, nomeForn(o?.fornecedorId), o ? ROTULO_CATEGORIA[o.categoria] : '', o?.area || '', f.valor, statusExibido(f), f.vencimento, f.pagoEm || ''];
+          return [f.competencia.slice(0, 7), o?.nome, o?.tipo, nomeForn(o?.fornecedorId), o ? ROTULO_CATEGORIA[o.categoria] : '', o?.area || '', valorEfetivo(f), statusExibido(f), f.vencimento, f.pagoEm || ''];
         })
       )
     );
@@ -430,7 +431,7 @@ export const DespesasView: React.FC<{
                       <td data-label="Fornecedor">{nomeForn(o?.fornecedorId)}</td>
                       <td data-label="Categoria" className="hidden xl:table-cell">{o ? ROTULO_CATEGORIA[o.categoria] : '—'}</td>
                       <td data-label="Área" className="hidden xl:table-cell">{o?.area || '—'}</td>
-                      <td data-label="Valor" className="font-mono">{brl(f.valor)}</td>
+                      <td data-label="Valor" className="font-mono">{brl(valorEfetivo(f))}</td>
                       <td data-label="Situação">
                         <span className={`selo ${SELO_FATURA[st]}`}>{ROTULO_STATUS_FATURA[st]}</span>
                         {f.pagoEm && <span className="block text-slate-500">em {formatDate(f.pagoEm)}</span>}

@@ -21,6 +21,7 @@ import {
   paraCsv,
   type TipoVencimento,
   type Vencimento,
+  valorEfetivo,
 } from '../../utils/financeiro.ts';
 import { FaturasSecao } from './FaturasSecao.tsx';
 
@@ -181,7 +182,7 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
     .filter((f) => !mes || f.competencia.startsWith(mes))
     .filter((f) => !busca || normalizar(`${nomeOrigem(f)} ${f.numeroDocumento || ''}`).includes(normalizar(busca)))
     .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
-  const total = lista.filter((f) => f.status !== 'cancelada').reduce((s, f) => s + f.valor, 0);
+  const total = lista.filter((f) => f.status !== 'cancelada').reduce((s, f) => s + valorEfetivo(f), 0);
 
   const exportar = () =>
     baixarCsv(
@@ -193,7 +194,7 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
           fornecedores.find((x) => x.id === fornecedorDe(f))?.nome || '',
           f.competencia.slice(0, 7),
           f.vencimento,
-          f.valor,
+          valorEfetivo(f),
           statusExibido(f, agora),
           f.pagoEm || '',
           f.numeroDocumento || '',
