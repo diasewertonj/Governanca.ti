@@ -27,10 +27,13 @@ export const RhProcessesView: React.FC = () => {
     catalogo,
     tickets,
     currentUser,
+    currentRole,
     createTicket,
     setSelectedTicketIdForDetail,
     setSelectedAssetIdFor360,
   } = useApp();
+  // Perfis de T.I. só a própria T.I. sugere (o RH escolhe entre colaborador e RH)
+  const sugereTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
   // Abre no histórico; os formulários só aparecem em Nova admissão / Novo desligamento
   const [activeTab, setActiveTab] = useState<'lista' | 'offboarding' | 'onboarding'>('lista');
@@ -722,8 +725,8 @@ export const RhProcessesView: React.FC = () => {
                 >
                   <option value="colaborador">Colaborador Padrão (Solicitante)</option>
                   <option value="rh">Recursos Humanos (admissões e desligamentos)</option>
-                  <option value="ti_suporte">Técnico de Suporte T.I.</option>
-                  <option value="ti_admin">Administrador de T.I. (Acesso Total)</option>
+                  {sugereTI && <option value="ti_suporte">Técnico de Suporte T.I.</option>}
+                  {sugereTI && <option value="ti_admin">Administrador de T.I. (Acesso Total)</option>}
                 </select>
                 <span className="text-xs text-slate-500 mt-0.5 block">
                   Pré-define as permissões do novo usuário pós-login

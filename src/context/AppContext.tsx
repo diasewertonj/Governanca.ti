@@ -110,6 +110,7 @@ import {
   registrarItemProcessoDb,
   DadosRegistroItem,
   concluirProcessoDb,
+  reabrirProcessoDb,
   fetchRecursosFromDb,
   fetchLembretesFromDb,
   criarLembreteDb,
@@ -326,6 +327,7 @@ interface AppContextType {
     dados: DadosRegistroItem
   ) => Promise<string | null>;
   concluirProcesso: (chamadoId: string) => Promise<string | null>;
+  reabrirProcesso: (chamadoId: string, motivo: string) => Promise<string | null>;
   /** Seção 9.2: marca (ou tira, com null) a data de um passo pendente; gera o lembrete */
   agendarPasso: (itemId: string, data: string | null, observacao?: string) => Promise<string | null>;
   /** Seção 9.2: anotações fixas do processo */
@@ -2590,6 +2592,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   };
 
+  /** Admin reabre um processo concluído por engano (no desligamento, a pessoa volta a ativa) */
+  const reabrirProcesso = async (chamadoId: string, motivo: string): Promise<string | null> => {
+    if (currentRole !== 'ti_admin') return 'Só o administrador reabre um processo concluído.';
+    if (motivo.trim().length < 5) return 'Explique por que o processo precisa ser reaberto.';
+    if (isProduction) {
+      try {
+        await reabrirProcessoDb(chamadoId, motivo.trim());
+        await loadDataFromSupabase();
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    const tkt = tickets.find((t) => t.id === chamadoId);
+    if (!tkt || tkt.status !== 'resolvido') return 'Só um processo concluído pode ser reaberto.';
+    setTickets((prev) => prev.map((t) => (t.id === chamadoId ? { ...t, status: 'em_andamento' } : t)));
+    if (tkt.tipo === 'offboarding' && tkt.colaboradorId) {
+      setEmployees((prev) => prev.map((e) => (e.id === tkt.colaboradorId && e.status === 'desligado' ? { ...e, status: 'ativo' } : e)));
+    }
+    return null;
+  };
+
   const acessoNexus = async (colaboradorId: string, acao: 'criar' | 'redefinir', chamadoId?: string) => {
     try {
       const r = await acessoNexusDb(colaboradorId, acao, chamadoId);
@@ -2841,6 +2865,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         removerItemProcesso,
         registrarItemProcesso,
         concluirProcesso,
+        reabrirProcesso,
         agendarPasso,
         salvarAnotacoesProcesso,
         processoAberto,

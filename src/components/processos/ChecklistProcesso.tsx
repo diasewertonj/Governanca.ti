@@ -17,7 +17,7 @@ import {
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { PassoProcesso, avisoDoLogin } from './PassoProcesso.tsx';
-import { confirmar } from '../ui/dialogo.tsx';
+import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { Janela } from '../ui/Janela.tsx';
 
 const TIPOS_LIVRES_ONB: TipoItemProcesso[] = ['conta', 'grupo_email', 'licenca', 'equipamento', 'acessorio', 'tarefa'];
@@ -52,6 +52,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     employees,
     salvarChecklist,
     concluirProcesso,
+    reabrirProcesso,
   } = useApp();
   const { linhas } = useRecursos();
 
@@ -107,6 +108,18 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     const erro = await concluirProcesso(ticket.id);
     setConcluindo(false);
     setMensagem(erro ? { ok: false, texto: erro } : { ok: true, texto: 'Processo concluído e chamado encerrado.' });
+  };
+
+  const reabrir = async () => {
+    const efeito = ehOnb
+      ? 'O processo volta para "em atendimento".'
+      : `O processo volta para "em atendimento"${colab ? ` e ${colab.nome} volta a ficar ativo` : ''}. Equipamentos e licenças devolvidos não voltam sozinhos: entregue de novo pelo checklist.`;
+    const motivo = await pedirTexto(`Reabrir ${ehOnb ? 'a admissão' : 'o desligamento'}?\n\n${efeito} O motivo fica no histórico.`);
+    if (!motivo) return;
+    setConcluindo(true);
+    const erro = await reabrirProcesso(ticket.id, motivo);
+    setConcluindo(false);
+    setMensagem(erro ? { ok: false, texto: erro } : { ok: true, texto: 'Processo reaberto.' });
   };
 
   const grupos = ORDEM_ETAPAS.map((etapa) => ({
@@ -233,6 +246,15 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
               Para concluir, cada passo precisa estar feito ou marcado como "não se aplica" (o termo pode ficar para depois).
             </p>
           )}
+        </div>
+      )}
+
+      {currentRole === 'ti_admin' && ticket.status === 'resolvido' && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+          <p className="ajuda">Concluído por engano? O administrador pode reabrir, com motivo.</p>
+          <button type="button" onClick={reabrir} disabled={concluindo} className="btn btn-sm btn-secundario">
+            Reabrir processo
+          </button>
         </div>
       )}
     </section>
