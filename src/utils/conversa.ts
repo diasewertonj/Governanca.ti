@@ -6,6 +6,7 @@ export const ROTULO_PAPEL: Record<UserRole, string> = {
   ti_suporte: 'Suporte de T.I.',
   rh: 'RH',
   colaborador: 'Colaborador',
+  compras: 'Compras',
 };
 
 export const ROTULO_TIPO_CHAMADO: Record<TicketType, string> = {

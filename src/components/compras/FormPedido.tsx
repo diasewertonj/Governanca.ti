@@ -32,6 +32,7 @@ export function pedidoVazio(base: Partial<PedidoCompra> = {}): PedidoCompra {
     categoria: 'hardware',
     area: '',
     status: 'rascunho',
+    tipoPedido: 'ti',
     criadoEm: new Date().toISOString(),
     itens: [itemVazio(1)],
     cotacoes: [],
@@ -103,7 +104,7 @@ export const FormPedido: React.FC<{
   return (
     <Janela
       titulo={novo ? (simples ? 'Pedir compra' : 'Novo pedido de compra') : `Editar ${p.codigo}`}
-      subtitulo={simples ? 'O pedido vai para a T.I. cotar e para o administrador aprovar' : 'Rascunho → aprovação do administrador → compra → recebimento'}
+      subtitulo={simples ? 'Pedido de T.I.: a T.I. cota; depois o seu gestor e Compras aprovam' : 'Cotação → aprovação do gestor e de Compras → compra → recebimento'}
       icone={<ShoppingCart className="h-4 w-4" />}
       tamanho="g"
       onFechar={fechar}
@@ -121,7 +122,7 @@ export const FormPedido: React.FC<{
               <button type="button" disabled={salvando} onClick={() => salvar(false)} className="btn btn-secundario">
                 Salvar rascunho
               </button>
-              {(p.status === 'rascunho' || p.status === 'recusado') && (
+              {(p.status === 'rascunho' || p.status === 'recusado' || p.status === 'em_cotacao') && (
                 <button type="button" disabled={salvando} onClick={() => salvar(true)} className="btn btn-primario">
                   {salvando ? 'Salvando…' : 'Salvar e enviar para aprovação'}
                 </button>
@@ -140,6 +141,19 @@ export const FormPedido: React.FC<{
         <section className="cartao space-y-3 p-4">
           <h3 className="secao-titulo">O que e para quê</h3>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <fieldset className="md:col-span-2">
+              <legend className="rotulo">Tipo de pedido</legend>
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:gap-5">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+                  <input type="radio" name={id('tipo')} checked={p.tipoPedido !== 'outros'} onChange={() => setP({ ...p, tipoPedido: 'ti', categoria: p.categoria === 'outros' ? 'hardware' : p.categoria, itens: p.itens.map((i) => (i.tipo === 'servico' ? { ...i, tipo: 'equipamento', categoriaAtivo: 'hardware' } : i)) })} />
+                  De T.I. (equipamento, acessório, software) — a T.I. cota
+                </label>
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+                  <input type="radio" name={id('tipo')} checked={p.tipoPedido === 'outros'} onChange={() => setP({ ...p, tipoPedido: 'outros', categoria: 'outros', itens: p.itens.map((i) => ({ ...i, tipo: 'servico', estoqueItemId: undefined, licencaId: undefined })) })} />
+                  Outros (móveis, material, serviços) — Compras cota
+                </label>
+              </div>
+            </fieldset>
             <div className="md:col-span-2">
               <label htmlFor={id('titulo')} className="rotulo">O que precisa ser comprado</label>
               <input id={id('titulo')} value={p.titulo} onChange={(e) => setP({ ...p, titulo: e.target.value })} placeholder="Ex.: Notebook para nova analista de RH" className="campo" />
@@ -201,7 +215,7 @@ export const FormPedido: React.FC<{
           {p.itens.map((i, n) => (
             <div key={i.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[12rem_minmax(0,1fr)_6rem] lg:grid-cols-[12rem_minmax(0,1fr)_6rem_10rem_auto]">
-                <div>
+                <div className={p.tipoPedido === 'outros' ? 'hidden' : ''}>
                   <label htmlFor={id(`tipo-${n}`)} className="text-xs text-slate-600">Tipo</label>
                   <select id={id(`tipo-${n}`)} value={i.tipo} onChange={(e) => mudarItem(i.id, { tipo: e.target.value as TipoItemPedido, estoqueItemId: undefined, licencaId: undefined })} className="campo campo-sm">
                     {(Object.keys(ROTULO_TIPO_ITEM) as TipoItemPedido[]).filter((t) => !simples || t === 'equipamento' || t === 'servico').map((t) => (
@@ -231,7 +245,7 @@ export const FormPedido: React.FC<{
                   </button>
                 </div>
               </div>
-              {i.tipo === 'equipamento' && (
+              {i.tipo === 'equipamento' && p.tipoPedido !== 'outros' && (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <label htmlFor={id(`catat-${n}`)} className="text-xs text-slate-600">Tipo de equipamento</label>

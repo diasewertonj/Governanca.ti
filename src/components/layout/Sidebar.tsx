@@ -31,6 +31,7 @@ import { termoAberto } from '../../utils/termos.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import { listarVencimentos, pendenciasConciliacao } from '../../utils/financeiro.ts';
+import { esperaPorMim } from '../../utils/compras.ts';
 import { pendenciasTermo } from '../../utils/inventario.ts';
 
 const ICONES: Record<Icone, LucideIcon> = {
@@ -73,6 +74,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
   const { currentRole, tickets, currentUser, lembretes, terms, assets, contratos, licenses, faturas, employees, processoItens, settings } = useApp();
   const { estoque, linhas } = useRecursos();
   const { podePedirCompra, pedidos, alertas: alertasOrcamento } = useCompras();
+  // Seção 13: pedidos que esperam uma ação desta pessoa (cotar, aprovar, comprar, receber)
+  const pedidosParaMim = useMemo(() => pedidos.filter((p) => esperaPorMim(p, currentRole, currentUser?.id)), [pedidos, currentRole, currentUser?.id]);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   // Seção 6: o que vence em 30 dias (e pendências sem data), só para a T.I. — os mesmos
   // dados do "Precisa de atenção" (inclui passos agendados e termos desatualizados)
@@ -80,10 +83,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     if (!isTI) return 0;
     const termosDesatualizados = pendenciasTermo(employees, { ativos: assets, termos: terms, chamados: tickets, cfg: settings.termoExige });
     return listarVencimentos(
-      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados, termos: terms, pedidos, alertasOrcamento, papel: currentRole },
+      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados, termos: terms, pedidos: pedidosParaMim, alertasOrcamento, papel: currentRole },
       30
     ).length;
-  }, [isTI, assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, pedidos, alertasOrcamento, currentRole]);
+  }, [isTI, assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, pedidosParaMim, alertasOrcamento, currentRole]);
   const qtdConciliar = currentRole === 'ti_admin' ? pendenciasConciliacao(licenses, assets).length : 0;
 
   // Fecha a gaveta com Esc
@@ -108,6 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     ).length,
     vencimentos: qtdVencimentos,
     conciliar: qtdConciliar,
+    pedidos: pedidosParaMim.length,
   };
   const corContador: Record<Contador, string> = {
     chamados: 'bg-slate-100 text-slate-700',
@@ -116,6 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     termos_para_assinar: 'bg-amber-100 text-amber-900',
     vencimentos: 'bg-amber-100 text-amber-900',
     conciliar: 'bg-amber-100 text-amber-900',
+    pedidos: 'bg-amber-100 text-amber-900',
     processos: 'bg-slate-100 text-slate-700',
   };
   const dicaContador: Record<Contador, string> = {
@@ -125,6 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     termos_para_assinar: 'termos para você assinar',
     vencimentos: 'vencimentos nos próximos 30 dias ou pendências',
     conciliar: 'cadastros com fornecedor antigo em texto',
+    pedidos: 'pedidos de compra esperando por você',
     processos: 'admissões e desligamentos em andamento',
   };
 

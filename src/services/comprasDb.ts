@@ -17,11 +17,13 @@ import type {
   InventarioFisico,
   ItemInventario,
   ItemPedido,
+  MensagemPedido,
   Orcamento,
   PedidoCompra,
   SituacaoConferencia,
   StatusPedido,
   TipoItemPedido,
+  TipoPedido,
 } from '../types/index.ts';
 
 type Linha = Record<string, unknown>;
@@ -124,6 +126,7 @@ const deEvento = (r: Linha): EventoPedido => ({
   para: r.para as StatusPedido,
   motivo: txt(r.motivo),
   por: txt(r.por),
+  porNome: txt(r.por_nome),
   em: String(r.em),
 });
 
@@ -135,7 +138,17 @@ const dePedido = (r: Linha, itens: ItemPedido[], cotacoes: CotacaoPedido[], even
   categoria: (r.categoria || 'hardware') as CategoriaDespesa,
   area: String(r.area || ''),
   status: r.status as StatusPedido,
+  tipoPedido: (r.tipo_pedido || 'ti') as TipoPedido,
   solicitanteId: txt(r.solicitante_id),
+  solicitanteNome: txt(r.solicitante_nome),
+  gestorId: txt(r.gestor_id),
+  gestorNome: txt(r.gestor_nome),
+  destinoNome: txt(r.destino_nome),
+  aprovadoGestorPor: txt(r.aprovado_gestor_por),
+  aprovadoGestorEm: txt(r.aprovado_gestor_em),
+  nfChave: txt(r.nf_chave),
+  nfArquivo: txt(r.nf_arquivo),
+  fornecedorTrocaMotivo: txt(r.fornecedor_troca_motivo),
   colaboradorDestinoId: txt(r.colaborador_destino_id),
   chamadoId: txt(r.chamado_id),
   processoItemId: txt(r.processo_item_id),
@@ -183,7 +196,17 @@ export async function fetchPedidosDb(): Promise<PedidoCompra[] | null> {
   );
 }
 
-/** RH e gestor: pela função do banco, sem valores, fornecedor nem cotações */
+/** Seção 13: quem não é T.I./Compras (e nomes para todos), pela função do banco, sem valores */
+export async function fetchPedidosVisiveisDb(): Promise<PedidoCompra[] | null> {
+  if (!supabase) return null;
+  const data = await ler(bd().rpc('pedidos_visiveis'));
+  if (!data) return null;
+  return (data as Linha[]).map((r) =>
+    dePedido(r, ((r.itens || []) as Linha[]).map((x, n) => deItem({ ...x, ordem: n })), [], ((r.eventos || []) as Linha[]).map(deEvento), true)
+  );
+}
+
+/** (Fase 11, mantida para compatibilidade) RH e gestor sem valores */
 export async function fetchPedidosSolicitadosDb(): Promise<PedidoCompra[] | null> {
   if (!supabase) return null;
   const data = await ler(bd().rpc('pedidos_solicitados'));
@@ -201,6 +224,7 @@ export async function podePedirCompraDb(): Promise<boolean> {
 
 const linhaPedido = (p: PedidoCompra) => ({
   titulo: p.titulo.trim(),
+  tipo_pedido: p.tipoPedido || 'ti',
   justificativa: p.justificativa?.trim() || null,
   categoria: p.categoria,
   area: p.area.trim(),
@@ -279,6 +303,7 @@ export async function solicitarCompraDb(p: PedidoCompra): Promise<string | undef
         chamado_id: p.chamadoId,
         processo_item_id: p.processoItemId,
         necessario_em: p.necessarioEm,
+        tipo_pedido: p.tipoPedido || 'ti',
       },
       p_itens: p.itens.map((i) => ({ tipo: i.tipo, descricao: i.descricao, categoria_ativo: i.categoriaAtivo, especificacao: i.especificacao, quantidade: i.quantidade })),
     })
@@ -286,7 +311,7 @@ export async function solicitarCompraDb(p: PedidoCompra): Promise<string | undef
   return data as string;
 }
 
-export async function mudarStatusPedidoDb(id: string, acao: 'enviar' | 'aprovar' | 'recusar' | 'cancelar', motivo?: string) {
+export async function mudarStatusPedidoDb(id: string, acao: 'enviar' | 'devolver' | 'aprovar' | 'recusar' | 'cancelar', motivo?: string) {
   if (!supabase) return;
   await checar(bd().rpc('mudar_status_pedido', { p_pedido: id, p_acao: acao, p_motivo: motivo || null }));
 }
@@ -297,6 +322,10 @@ export interface DadosCompra {
   dataCompra: string;
   vencimento: string;
   formaPagamento?: FormaPagamento;
+  /** Seção 13: chave (44 dígitos) e arquivo da NF; motivo quando o fornecedor não é o sugerido pela T.I. */
+  nfChave?: string;
+  nfArquivo?: string;
+  motivoTroca?: string;
   itens: { id: string; valorUnitario: number }[];
 }
 
@@ -311,6 +340,9 @@ export async function registrarCompraDb(id: string, d: DadosCompra): Promise<str
         data_compra: d.dataCompra,
         vencimento: d.vencimento,
         forma_pagamento: d.formaPagamento || '',
+        nf_chave: d.nfChave || '',
+        nf_arquivo: d.nfArquivo || '',
+        motivo_troca: d.motivoTroca || '',
         itens: d.itens.map((i) => ({ id: i.id, valor_unitario: i.valorUnitario })),
       },
     })
@@ -414,4 +446,32 @@ export async function fecharInventarioDb(id: string, atualizarLocais: boolean): 
 
 export async function cancelarInventarioDb(id: string, motivo: string) {
   await atualizar('inventarios_fisicos', id, { status: 'cancelado', observacoes: motivo });
+}
+
+// -----------------------------------------------------------------------------
+// Seção 13 · Conversa do pedido
+// -----------------------------------------------------------------------------
+export async function fetchMensagensPedidoDb(pedidoId: string): Promise<MensagemPedido[] | null> {
+  if (!supabase) return null;
+  const data = await ler(bd().from('pedido_mensagens').select('*').eq('pedido_id', pedidoId).order('criado_em'));
+  if (!data) return null;
+  return (data as Linha[]).map((r) => ({
+    id: String(r.id),
+    pedidoId: String(r.pedido_id),
+    autorId: txt(r.autor_id),
+    texto: String(r.texto || ''),
+    interna: !!r.interna,
+    anexoCaminho: txt(r.anexo_caminho),
+    criadoEm: String(r.criado_em),
+  }));
+}
+
+export async function enviarMensagemPedidoDb(m: MensagemPedido) {
+  if (!supabase) return;
+  await checar(
+    bd()
+      .from('pedido_mensagens')
+      .insert({ id: m.id, pedido_id: m.pedidoId, texto: m.texto.trim(), interna: m.interna, anexo_caminho: m.anexoCaminho || null })
+      .select('id')
+  );
 }

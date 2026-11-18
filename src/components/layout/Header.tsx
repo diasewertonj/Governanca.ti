@@ -19,6 +19,7 @@ const ROTULO_PAPEL: Record<string, { label: string; badgeClass: string }> = {
   ti_suporte: { label: 'Suporte T.I.', badgeClass: 'selo-info' },
   rh: { label: 'Recursos Humanos', badgeClass: 'selo-neutro' },
   colaborador: { label: 'Colaborador', badgeClass: 'selo-neutro' },
+  compras: { label: 'Compras', badgeClass: 'selo-neutro' },
 };
 
 /** Logo da empresa (Configurações › Empresa) ou as iniciais do nome fantasia */

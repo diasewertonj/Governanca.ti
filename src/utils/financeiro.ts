@@ -439,12 +439,20 @@ export function listarVencimentos(
     out.push({ id: a.id, tipo: 'orcamento', titulo: a.titulo, detalhe: `${a.nivel === 'estourado' ? 'Acima do orçamento' : 'Perto do limite'}: ${a.detalhe}`, alvo: { tipo: 'orcamento', id: a.id } })
   );
   // Fase 11: pedido de compra esperando a próxima etapa
+  // Quem chama já filtra os que esperam por esta pessoa (utils/compras.ts: esperaPorMim)
   (dados.pedidos || [])
-    .filter((p) =>
-      dados.papel === 'ti_admin' ? ['aguardando', 'aprovado', 'comprado'].includes(p.status) : p.status === 'aprovado' || p.status === 'comprado'
-    )
+    .filter((p) => !['recebido', 'cancelado'].includes(p.status))
     .forEach((p) => {
-      const espera = p.status === 'aguardando' ? 'aguardando sua aprovação' : p.status === 'aprovado' ? 'aprovado: registrar a compra' : 'comprado: registrar o recebimento';
+      const espera =
+        p.status === 'em_cotacao'
+          ? 'cotar e enviar para aprovação'
+          : p.status === 'aguardando'
+            ? 'aguardando sua aprovação'
+            : p.status === 'aprovado'
+              ? 'aprovado: registrar a compra'
+              : p.status === 'recusado'
+                ? `recusado: ${p.motivo || 'ajustar e reenviar, ou cancelar'}`
+                : 'comprado: registrar o recebimento';
       out.push({ id: `pc-${p.id}`, tipo: 'pedido_compra', titulo: `${p.codigo} · ${p.titulo}`, detalhe: espera, alvo: { tipo: 'pedido', id: p.id } });
     });
 

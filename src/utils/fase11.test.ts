@@ -10,6 +10,8 @@ import {
   resumoOrcamento,
   somaMeses,
   valorDoPedido,
+  esperaPorMim,
+  vezDoPedido,
 } from './compras.ts';
 import { listarVencimentos, valorPatrimonio } from './financeiro.ts';
 
@@ -36,6 +38,7 @@ const pedido = (p: Partial<PedidoCompra>): PedidoCompra => ({
   categoria: 'hardware',
   area: 'TI',
   status: 'aguardando',
+  tipoPedido: 'ti',
   criadoEm: '2026-11-01T10:00:00Z',
   itens: [{ id: 'i1', tipo: 'equipamento', descricao: 'Notebook', quantidade: 2, valorUnitario: 5000, ordem: 1 }],
   cotacoes: [],
@@ -165,12 +168,23 @@ describe('Fase 11 · orçamento', () => {
 
 describe('Fase 11 · Precisa de atenção', () => {
   const base = { ativos: [], contratos: [], licencas: [], faturas: [], estoque: [], linhas: [], pessoas: [] };
-  it('admin vê o pedido aguardando aprovação; suporte vê compra e recebimento', () => {
-    const pedidos = [pedido({}), pedido({ id: 'p2', status: 'comprado' }), pedido({ id: 'p3', status: 'recebido' })];
-    const admin = listarVencimentos({ ...base, pedidos, papel: 'ti_admin' }, 30);
-    expect(admin.filter((v) => v.tipo === 'pedido_compra').map((v) => v.alvo.id)).toEqual(['p1', 'p2']);
-    const suporte = listarVencimentos({ ...base, pedidos, papel: 'ti_suporte' }, 30);
-    expect(suporte.filter((v) => v.tipo === 'pedido_compra').map((v) => v.alvo.id)).toEqual(['p2']);
+  it('cada um vê o que espera por ele (seção 13)', () => {
+    const pedidos = [
+      pedido({}),
+      pedido({ id: 'p2', status: 'comprado' }),
+      pedido({ id: 'p3', status: 'recebido' }),
+      pedido({ id: 'p4', status: 'em_cotacao' }),
+      pedido({ id: 'p5', gestorId: 'g1' }),
+      pedido({ id: 'p6', status: 'comprado', tipoPedido: 'outros' }),
+    ];
+    const ids = (papel: string, eu?: string) => pedidos.filter((p) => esperaPorMim(p, papel, eu)).map((p) => p.id);
+    expect(ids('ti_suporte')).toEqual(['p2', 'p4', 'p6']);
+    expect(ids('compras')).toEqual(['p1', 'p6']);
+    expect(ids('ti_admin')).toEqual(['p1', 'p2', 'p4', 'p6']);
+    expect(ids('colaborador', 'g1')).toEqual(['p5']);
+    expect(vezDoPedido(pedido({ gestorId: 'g1', aprovadoGestorEm: '2026-11-01' }))).toBe('compras_aprovacao');
+    const v = listarVencimentos({ ...base, pedidos: pedidos.filter((p) => esperaPorMim(p, 'compras')) }, 30);
+    expect(v.filter((x) => x.tipo === 'pedido_compra')).toHaveLength(2);
   });
   it('orçamento estourado entra como pendência', () => {
     const v = listarVencimentos({ ...base, alertasOrcamento: [{ id: 'orc-x', nivel: 'estourado', titulo: 'Hardware · TI', detalhe: '105%' }] }, 30);

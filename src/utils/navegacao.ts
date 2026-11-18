@@ -53,7 +53,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   conferencia: 'Inventário físico',
 };
 
-export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar' | 'processos';
+export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar' | 'processos' | 'pedidos';
 
 export type Icone =
   | 'inicio'
@@ -113,7 +113,16 @@ export interface OpcoesMenu {
 export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu[] {
   // Fase 11: o gestor (colaborador com equipe) pede compra pela Minha área
   if (papel === 'colaborador')
-    return [opcoes.pedeCompra ? { ...MINHA_AREA, itens: [...MINHA_AREA.itens, item('pedidos_compra', 'compras')] } : MINHA_AREA];
+    return [opcoes.pedeCompra === false ? MINHA_AREA : { ...MINHA_AREA, itens: [...MINHA_AREA.itens, item('pedidos_compra', 'compras', 'pedidos')] }];
+
+  // Seção 13: departamento de Compras (aprova, compra e paga as faturas dos pedidos)
+  if (papel === 'compras') {
+    return [
+      { itens: [item('pedidos_compra', 'compras', 'pedidos')] },
+      { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('fornecedores', 'fornecedores')] },
+      MINHA_AREA,
+    ];
+  }
 
   if (papel === 'rh') {
     return [
@@ -121,7 +130,7 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
       // Os chamados do RH ficam em Minha área › Meus chamados; processos têm tela própria
       {
         titulo: 'Pessoas',
-        itens: [item('rh_processes', 'admissoes', 'processos'), item('collaborators', 'colaboradores'), item('pedidos_compra', 'compras')],
+        itens: [item('rh_processes', 'admissoes', 'processos'), item('collaborators', 'colaboradores'), item('pedidos_compra', 'compras', 'pedidos')],
       },
       MINHA_AREA,
     ];

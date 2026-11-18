@@ -2,7 +2,7 @@
  * Tipos e Interfaces do Sistema Nexus IT & HR
  */
 
-export type UserRole = 'colaborador' | 'rh' | 'ti_admin' | 'ti_suporte';
+export type UserRole = 'colaborador' | 'rh' | 'ti_admin' | 'ti_suporte' | 'compras';
 
 export type EmployeeStatus = 'ativo' | 'ferias' | 'desligado';
 
@@ -786,7 +786,7 @@ export interface Orcamento {
   observacoes?: string;
 }
 
-export type StatusPedido = 'rascunho' | 'aguardando' | 'aprovado' | 'recusado' | 'comprado' | 'recebido' | 'cancelado';
+export type StatusPedido = 'rascunho' | 'em_cotacao' | 'aguardando' | 'aprovado' | 'recusado' | 'comprado' | 'recebido' | 'cancelado';
 export type TipoItemPedido = 'equipamento' | 'acessorio' | 'licenca' | 'servico';
 
 export interface ItemPedido {
@@ -821,8 +821,23 @@ export interface EventoPedido {
   para: StatusPedido;
   motivo?: string;
   por?: string;
+  porNome?: string;
   em: string;
 }
+
+/** Seção 13: conversa do pedido (nota interna só T.I. e Compras) */
+export interface MensagemPedido {
+  id: string;
+  pedidoId: string;
+  autorId?: string;
+  texto: string;
+  interna: boolean;
+  anexoCaminho?: string;
+  criadoEm: string;
+}
+
+/** Seção 13: pedido de T.I. (a T.I. cota) ou outros (vai direto para Compras) */
+export type TipoPedido = 'ti' | 'outros';
 
 export interface PedidoCompra {
   id: string;
@@ -832,7 +847,18 @@ export interface PedidoCompra {
   categoria: CategoriaDespesa;
   area: string;
   status: StatusPedido;
+  tipoPedido: TipoPedido;
   solicitanteId?: string;
+  /** Nomes vindos do banco (quem não lê o cadastro de pessoas) */
+  solicitanteNome?: string;
+  gestorId?: string;
+  gestorNome?: string;
+  destinoNome?: string;
+  aprovadoGestorPor?: string;
+  aprovadoGestorEm?: string;
+  nfChave?: string;
+  nfArquivo?: string;
+  fornecedorTrocaMotivo?: string;
   colaboradorDestinoId?: string;
   chamadoId?: string;
   processoItemId?: string;

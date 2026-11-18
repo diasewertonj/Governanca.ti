@@ -172,6 +172,19 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     role: 'ti_suporte',
     telefone: '(11) 98765-1007',
   },
+  {
+    // Seção 13: departamento de Compras (aprova e compra)
+    id: 'emp-8',
+    matricula: 'NX-1008',
+    nome: 'Juliana Prado Martins',
+    email: 'juliana.compras@nexuscorp.com.br',
+    cargo: 'Compradora',
+    setorId: 'dep-5',
+    status: 'ativo',
+    dataAdmissao: '2024-08-12',
+    role: 'compras',
+    telefone: '(11) 98765-1008',
+  },
 ];
 
 export const INITIAL_ASSETS: Asset[] = [

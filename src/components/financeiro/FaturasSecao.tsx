@@ -70,7 +70,8 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   useRegistrarPendencias(`fatura-arquivo:${alvo ? alvo.licencaId || alvo.contratoId : 'todas'}`, anexando?.arquivo ? ['Arquivo da fatura não enviado'] : []);
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
-  if (!isTI) return null;
+  // Seção 13: Compras vê e paga as faturas dos pedidos (a RLS só entrega essas)
+  if (!isTI && currentRole !== 'compras') return null;
 
   const lista = alvo ? faturasDoAlvo(faturas, alvo) : listaGlobal || faturas;
   const origem = (f: Fatura) => {
@@ -160,7 +161,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
               Pago em {ano}: <span className="font-mono font-semibold text-slate-900">{formatCurrency(totalPagoNoAno(lista, ano))}</span>
             </span>
           )}
-          {!bloqueioLancamento && (
+          {!bloqueioLancamento && isTI && (
             <button
               type="button"
               onClick={() => {

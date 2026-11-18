@@ -1,8 +1,10 @@
 /**
- * Fase 11 · Orçamento, pedidos de compra e inventário físico.
- * Separado do AppContext (como o RecursosContext). A T.I. carrega tudo; RH e gestor
- * só os pedidos, sem valores (função do banco). Gravações esperam o banco e devolvem
- * a mensagem de erro ou null. Modo demonstração: dados de exemplo só em memória.
+ * Fase 11 + seção 13 · Orçamento, pedidos de compra e inventário físico.
+ * Fluxo: qualquer colaborador pede → T.I. cota (pedido "T.I.") → gestor de quem pediu
+ * aprova (se houver) → Compras ou admin da T.I. aprova → Compras compra (NF) → T.I.
+ * recebe (Compras recebe pedido "Outros"). T.I. e Compras leem tudo; os demais, pela
+ * função pedidos_visiveis() (sem valores). Gravações esperam o banco e devolvem a
+ * mensagem de erro ou null. Modo demonstração: dados de exemplo só em memória.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useApp } from './AppContext.tsx';
@@ -13,15 +15,16 @@ import {
   abrirInventarioDb,
   cancelarInventarioDb,
   conferirItemDb,
+  enviarMensagemPedidoDb,
   excluirOrcamentoDb,
   fecharInventarioDb,
   fetchInventariosDb,
+  fetchMensagensPedidoDb,
   fetchOrcamentosDb,
   fetchPedidosDb,
-  fetchPedidosSolicitadosDb,
+  fetchPedidosVisiveisDb,
   incluirItemInventarioDb,
   mudarStatusPedidoDb,
-  podePedirCompraDb,
   receberPedidoDb,
   registrarCompraDb,
   salvarOrcamentosDb,
@@ -30,20 +33,24 @@ import {
   type DadosCompra,
   type DadosRecebimento,
 } from '../services/comprasDb.ts';
-import type { EventoPedido, InventarioFisico, ItemInventario, Orcamento, PedidoCompra, StatusPedido } from '../types/index.ts';
-import { alertasOrcamento, distribuirMensal, lancamentosRealizados, resumoOrcamento, type AlertaOrcamento, type LinhaOrcamento } from '../utils/compras.ts';
+import type { Employee, EventoPedido, InventarioFisico, ItemInventario, MensagemPedido, Orcamento, PedidoCompra, StatusPedido } from '../types/index.ts';
+import { alertasOrcamento, distribuirMensal, lancamentosRealizados, resumoOrcamento, vezDoPedido, type AlertaOrcamento, type LinhaOrcamento } from '../utils/compras.ts';
 
-type AcaoPedido = 'enviar' | 'aprovar' | 'recusar' | 'cancelar';
+export type AcaoPedido = 'enviar' | 'devolver' | 'aprovar' | 'recusar' | 'cancelar';
 
 interface ComprasContextType {
   orcamentos: Orcamento[];
   pedidos: PedidoCompra[];
   inventarios: InventarioFisico[];
-  /** RH, gestor e T.I. pedem compra */
+  /** Qualquer colaborador ativo pede compra (seção 13) */
   podePedirCompra: boolean;
-  /** Previsto × realizado do ano corrente (para alertas e impacto) */
+  /** T.I. ou Compras: leem tudo, com valores */
+  equipeCompras: boolean;
   linhasAnoAtual: LinhaOrcamento[];
   alertas: AlertaOrcamento[];
+  mensagens: Record<string, MensagemPedido[]>;
+  carregarMensagens: (pedidoId: string) => Promise<void>;
+  enviarMensagem: (pedidoId: string, texto: string, interna: boolean, arquivo?: File) => Promise<string | null>;
   salvarOrcamentos: (linhas: Orcamento[]) => Promise<string | null>;
   excluirOrcamento: (id: string) => Promise<string | null>;
   salvarPedido: (p: PedidoCompra, enviar?: boolean) => Promise<{ item?: PedidoCompra; erro?: string }>;
@@ -66,6 +73,12 @@ const agoraIso = () => new Date().toISOString();
 const hoje = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+/** Gestor de quem pede: ativo e diferente da própria pessoa (o banco faz igual) */
+const gestorDe = (pessoas: Employee[], id?: string) => {
+  const p = pessoas.find((e) => e.id === id);
+  const g = pessoas.find((e) => e.id === p?.gestorId && e.status !== 'desligado');
+  return g && g.id !== id ? g.id : undefined;
 };
 
 // -----------------------------------------------------------------------------
@@ -95,6 +108,7 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
     categoria: 'hardware',
     area: 'Recursos Humanos',
     status: 'aguardando',
+    tipoPedido: 'ti',
     solicitanteId: 'emp-2',
     necessarioEm: `${ANO}-12-15`,
     criadoEm: new Date(Date.now() - 3 * 86400000).toISOString(),
@@ -103,7 +117,7 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
       { id: 'cot-1', fornecedorId: 'forn-1', valor: 5190, prazoDias: 10, vencedora: true },
       { id: 'cot-2', fornecedorId: 'forn-2', valor: 5480, prazoDias: 5, vencedora: false },
     ],
-    eventos: [ev('aguardando', 3, 'emp-2')],
+    eventos: [ev('em_cotacao', 4, 'emp-2'), ev('aguardando', 3, 'emp-7', 'em_cotacao')],
   },
   {
     id: 'ped-2',
@@ -113,14 +127,18 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
     categoria: 'hardware',
     area: 'Tecnologia da Informação',
     status: 'aprovado',
+    tipoPedido: 'ti',
     solicitanteId: 'emp-7',
+    gestorId: 'emp-1',
+    aprovadoGestorPor: 'emp-1',
+    aprovadoGestorEm: new Date(Date.now() - 2 * 86400000).toISOString(),
     fornecedorId: 'forn-1',
-    aprovadoPor: 'emp-1',
+    aprovadoPor: 'emp-8',
     aprovadoEm: new Date(Date.now() - 1 * 86400000).toISOString(),
     criadoEm: new Date(Date.now() - 6 * 86400000).toISOString(),
     itens: [{ id: 'pit-2', tipo: 'equipamento', descricao: 'Monitor 24" Full HD', categoriaAtivo: 'periferico', marca: 'Dell', modelo: 'P2422H', quantidade: 2, valorUnitario: 1100, ordem: 1 }],
     cotacoes: [{ id: 'cot-3', fornecedorId: 'forn-1', valor: 2150, prazoDias: 7, vencedora: true }],
-    eventos: [ev('rascunho', 6, 'emp-7'), ev('aguardando', 5, 'emp-7', 'rascunho'), ev('aprovado', 1, 'emp-1', 'aguardando')],
+    eventos: [ev('rascunho', 6, 'emp-7'), ev('aguardando', 5, 'emp-7', 'rascunho'), ev('aguardando', 2, 'emp-1', 'aguardando', 'Aprovado pelo gestor'), ev('aprovado', 1, 'emp-8', 'aguardando')],
   },
   {
     id: 'ped-3',
@@ -130,13 +148,69 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
     categoria: 'hardware',
     area: 'Tecnologia da Informação',
     status: 'rascunho',
+    tipoPedido: 'ti',
     solicitanteId: 'emp-7',
+    gestorId: 'emp-1',
     criadoEm: new Date(Date.now() - 1 * 86400000).toISOString(),
     itens: [{ id: 'pit-3', tipo: 'acessorio', descricao: 'Mouse USB Logitech M90', estoqueItemId: 'est-2', quantidade: 10, valorUnitario: 45, ordem: 1 }],
     cotacoes: [],
     eventos: [ev('rascunho', 1, 'emp-7')],
   },
+  {
+    id: 'ped-4',
+    codigo: `PC-${ANO}-0004`,
+    titulo: 'Headset para reuniões',
+    justificativa: 'O atual parou de funcionar o microfone.',
+    categoria: 'hardware',
+    area: 'Engenharia de Software & Produto',
+    status: 'aguardando',
+    tipoPedido: 'ti',
+    solicitanteId: 'emp-3',
+    gestorId: 'emp-4',
+    criadoEm: new Date(Date.now() - 2 * 86400000).toISOString(),
+    itens: [{ id: 'pit-4', tipo: 'equipamento', descricao: 'Headset USB-C com cancelamento de ruído', categoriaAtivo: 'periferico', quantidade: 1, valorUnitario: 420, ordem: 1 }],
+    cotacoes: [{ id: 'cot-4', fornecedorId: 'forn-1', valor: 420, prazoDias: 5, vencedora: true }],
+    eventos: [ev('em_cotacao', 2, 'emp-3'), ev('aguardando', 1, 'emp-7', 'em_cotacao')],
+  },
+  {
+    id: 'ped-5',
+    codigo: `PC-${ANO}-0005`,
+    titulo: 'Dock USB-C para o notebook',
+    justificativa: 'Ligar dois monitores na mesa.',
+    categoria: 'hardware',
+    area: 'Engenharia de Software & Produto',
+    status: 'em_cotacao',
+    tipoPedido: 'ti',
+    solicitanteId: 'emp-3',
+    gestorId: 'emp-4',
+    criadoEm: new Date(Date.now() - 1 * 86400000).toISOString(),
+    itens: [{ id: 'pit-5', tipo: 'equipamento', descricao: 'Dock USB-C', categoriaAtivo: 'periferico', quantidade: 1, ordem: 1 }],
+    cotacoes: [],
+    eventos: [ev('em_cotacao', 1, 'emp-3')],
+  },
+  {
+    id: 'ped-6',
+    codigo: `PC-${ANO}-0006`,
+    titulo: 'Cadeiras para a sala de reunião',
+    justificativa: 'Sala nova do 14º andar.',
+    categoria: 'outros',
+    area: 'Recursos Humanos',
+    status: 'aguardando',
+    tipoPedido: 'outros',
+    solicitanteId: 'emp-2',
+    criadoEm: new Date(Date.now() - 1 * 86400000).toISOString(),
+    itens: [{ id: 'pit-6', tipo: 'servico', descricao: 'Cadeira ergonômica', quantidade: 6, ordem: 1 }],
+    cotacoes: [],
+    eventos: [ev('aguardando', 1, 'emp-2')],
+  },
 ];
+const DEMO_MENSAGENS: Record<string, MensagemPedido[]> = {
+  'ped-4': [
+    { id: 'msg-1', pedidoId: 'ped-4', autorId: 'emp-3', texto: 'Pode ser sem fio?', interna: false, criadoEm: new Date(Date.now() - 2 * 86400000).toISOString() },
+    { id: 'msg-2', pedidoId: 'ped-4', autorId: 'emp-7', texto: 'Cotamos com fio USB-C: o sem fio custa o dobro.', interna: false, criadoEm: new Date(Date.now() - 1 * 86400000).toISOString() },
+    { id: 'msg-3', pedidoId: 'ped-4', autorId: 'emp-7', texto: 'Fornecedor 2 não tem em estoque.', interna: true, criadoEm: new Date(Date.now() - 1 * 86400000).toISOString() },
+  ],
+};
 const DEMO_INVENTARIOS: InventarioFisico[] = [
   {
     id: 'inv-1',
@@ -158,41 +232,52 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { estoque, movimentarEstoque, recarregarRecursos } = useRecursos();
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   const isAdmin = currentRole === 'ti_admin';
+  const isCompras = currentRole === 'compras';
+  const equipe = isTI || isCompras;
   const demo = !isSupabaseConfigured;
+  const eu = currentUser?.id;
 
   const [orcamentos, setOrcamentos] = useState<Orcamento[]>(demo ? DEMO_ORCAMENTOS : []);
   const [pedidosTodos, setPedidos] = useState<PedidoCompra[]>(demo ? DEMO_PEDIDOS : []);
   const [inventarios, setInventarios] = useState<InventarioFisico[]>(demo ? DEMO_INVENTARIOS : []);
-  const [podeBanco, setPodeBanco] = useState(false);
+  const [mensagens, setMensagens] = useState<Record<string, MensagemPedido[]>>(demo ? DEMO_MENSAGENS : {});
+  const podePedirCompra = !!currentUser;
 
-  const ehGestor = !!currentUser && employees.some((e) => e.gestorId === currentUser.id && e.status !== 'desligado');
-  const podePedirCompra = isTI || currentRole === 'rh' || (demo ? ehGestor : podeBanco);
+  const nomeDe = useCallback((id?: string) => employees.find((e) => e.id === id)?.nome, [employees]);
 
-  // Demonstração: RH e gestor veem só o que o banco mostraria (sem valores; gestor, só os seus)
+  // Equipe vê tudo; os demais, o que o banco mostraria (sem valores)
   const pedidos = useMemo(() => {
-    if (isTI) return pedidosTodos;
-    if (!demo) return pedidosTodos;
-    return pedidosTodos
-      .filter((p) => p.solicitanteId === currentUser?.id || (currentRole === 'rh' && p.status !== 'rascunho'))
+    const comNomes = pedidosTodos.map((p) => ({
+      ...p,
+      solicitanteNome: p.solicitanteNome || nomeDe(p.solicitanteId),
+      gestorNome: p.gestorNome || nomeDe(p.gestorId),
+      destinoNome: p.destinoNome || nomeDe(p.colaboradorDestinoId),
+    }));
+    if (equipe || !demo) return comNomes;
+    return comNomes
+      .filter((p) => p.solicitanteId === eu || (!!eu && p.gestorId === eu) || (currentRole === 'rh' && p.status !== 'rascunho'))
       .map((p) => ({ ...p, semValores: true, cotacoes: [], fornecedorId: undefined, valorFinal: undefined, itens: p.itens.map((i) => ({ ...i, valorUnitario: undefined })) }));
-  }, [pedidosTodos, isTI, demo, currentRole, currentUser?.id]);
+  }, [pedidosTodos, equipe, demo, currentRole, eu, nomeDe]);
 
   const buscar = useCallback(async () => {
     if (demo || !currentUser) return null;
-    if (isTI) {
-      const [o, p, i] = await Promise.all([fetchOrcamentosDb(), fetchPedidosDb(), fetchInventariosDb()]);
-      return { o, p, i, pode: true };
+    if (equipe) {
+      const [o, p, i, nomes] = await Promise.all([fetchOrcamentosDb(), fetchPedidosDb(), isTI ? fetchInventariosDb() : Promise.resolve(null), fetchPedidosVisiveisDb()]);
+      // Nomes de quem pediu e do gestor vêm da função (Compras não lê o cadastro de pessoas)
+      const comNomes = p?.map((x) => {
+        const n = nomes?.find((y) => y.id === x.id);
+        return n ? { ...x, solicitanteNome: n.solicitanteNome, gestorNome: n.gestorNome, destinoNome: n.destinoNome, eventos: n.eventos.length ? n.eventos : x.eventos } : x;
+      });
+      return { o, p: comNomes || null, i };
     }
-    const pode = await podePedirCompraDb();
-    return { o: null, p: pode ? await fetchPedidosSolicitadosDb() : [], i: null, pode };
-  }, [demo, isTI, currentUser]);
+    return { o: null, p: await fetchPedidosVisiveisDb(), i: null };
+  }, [demo, equipe, isTI, currentUser]);
 
   const aplicar = useCallback((r: Awaited<ReturnType<typeof buscar>>) => {
     if (!r) return;
     if (r.o) setOrcamentos(r.o);
     if (r.p) setPedidos(r.p);
     if (r.i) setInventarios(r.i);
-    setPodeBanco(r.pode);
   }, []);
 
   const recarregarCompras = async () => aplicar(await buscar());
@@ -207,12 +292,11 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [buscar, aplicar]);
 
-  // Previsto × realizado do ano corrente (alertas no Precisa de atenção e impacto do pedido)
   const linhasAnoAtual = useMemo(() => {
-    if (!isTI) return [];
+    if (!equipe) return [];
     const lanc = lancamentosRealizados({ faturas, contratos, licencas: licenses, pedidos: pedidosTodos, ativos: assets, departamentos: departments }, ANO);
     return resumoOrcamento(orcamentos, lanc, ANO);
-  }, [isTI, faturas, contratos, licenses, pedidosTodos, assets, departments, orcamentos]);
+  }, [equipe, faturas, contratos, licenses, pedidosTodos, assets, departments, orcamentos]);
   const alertas = useMemo(() => alertasOrcamento(linhasAnoAtual, ANO), [linhasAnoAtual]);
 
   const noBanco = async (op: () => Promise<unknown>): Promise<string | null> => {
@@ -226,12 +310,40 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Demonstração: muda a situação e registra o histórico
-  const mudarLocal = (id: string, para: StatusPedido, extra: Partial<PedidoCompra> = {}, motivo?: string) =>
+  const mudarLocal = (id: string, para: StatusPedido, extra: Partial<PedidoCompra> = {}, motivo?: string, de?: StatusPedido) =>
     setPedidos((prev) =>
       prev.map((p) =>
-        p.id === id ? { ...p, ...extra, status: para, atualizadoEm: agoraIso(), eventos: [...p.eventos, { de: p.status, para, motivo, por: currentUser?.id, em: agoraIso() }] } : p
+        p.id === id ? { ...p, ...extra, status: para, atualizadoEm: agoraIso(), eventos: [...p.eventos, { de: de ?? p.status, para, motivo, por: eu, em: agoraIso() }] } : p
       )
     );
+
+  // ---------------------------------------------------------------------------
+  // Conversa
+  // ---------------------------------------------------------------------------
+  const carregarMensagens: ComprasContextType['carregarMensagens'] = async (pedidoId) => {
+    if (demo) return;
+    const lista = await fetchMensagensPedidoDb(pedidoId);
+    if (lista) setMensagens((prev) => ({ ...prev, [pedidoId]: lista }));
+  };
+
+  const enviarMensagem: ComprasContextType['enviarMensagem'] = async (pedidoId, texto, interna, arquivo) => {
+    if (!texto.trim()) return 'Escreva a mensagem.';
+    if (interna && !equipe) return 'Só T.I. e Compras escrevem nota interna.';
+    let anexoCaminho: string | undefined;
+    if (arquivo) {
+      if (!equipe) return 'Só T.I. e Compras anexam arquivos na conversa.';
+      try {
+        anexoCaminho = await enviarAnexoPedidoDb(pedidoId, arquivo);
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    const m: MensagemPedido = { id: novoId('pmsg'), pedidoId, autorId: eu, texto: texto.trim(), interna, anexoCaminho, criadoEm: agoraIso() };
+    const erro = await noBanco(() => enviarMensagemPedidoDb(m));
+    if (erro) return erro;
+    setMensagens((prev) => ({ ...prev, [pedidoId]: [...(prev[pedidoId] || []), m] }));
+    return null;
+  };
 
   // ---------------------------------------------------------------------------
   // Orçamento
@@ -280,7 +392,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const salvarPedido: ComprasContextType['salvarPedido'] = async (dados, enviar) => {
-    if (!isTI) return { erro: 'Só a T.I. edita o pedido. Use "Pedir compra".' };
+    if (!equipe) return { erro: 'Só a T.I. ou Compras editam o pedido. Use "Pedir compra".' };
     const invalido = validarPedido(dados);
     if (invalido) return { erro: invalido };
     const existente = pedidosTodos.find((p) => p.id === dados.id);
@@ -290,9 +402,10 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       itens: dados.itens.map((i, n) => ({ ...i, ordem: n + 1 })),
       status: existente?.status || 'rascunho',
       codigo: existente?.codigo || `PC-${ANO}-${String(pedidosTodos.length + 1).padStart(4, '0')}`,
-      solicitanteId: existente?.solicitanteId || currentUser?.id,
+      solicitanteId: existente?.solicitanteId || eu,
+      gestorId: existente ? existente.gestorId : gestorDe(employees, eu),
       criadoEm: existente?.criadoEm || agoraIso(),
-      eventos: existente?.eventos || [{ para: 'rascunho', por: currentUser?.id, em: agoraIso() }],
+      eventos: existente?.eventos || [{ para: 'rascunho', por: eu, em: agoraIso() }],
     };
     let codigo: string | undefined;
     const erro = await noBanco(async () => {
@@ -301,7 +414,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (erro) return { erro };
     if (codigo) item = { ...item, codigo };
     setPedidos((prev) => (novo ? [item, ...prev] : prev.map((p) => (p.id === item.id ? item : p))));
-    if (enviar && (item.status === 'rascunho' || item.status === 'recusado')) {
+    if (enviar && ['rascunho', 'em_cotacao', 'recusado'].includes(item.status)) {
       const e2 = await mudar(item, 'enviar');
       if (e2) return { item, erro: `Pedido salvo, mas não foi enviado: ${e2}` };
     } else if (!demo) {
@@ -311,7 +424,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const solicitarCompra: ComprasContextType['solicitarCompra'] = async (dados) => {
-    if (!podePedirCompra) return { erro: 'Você não pode pedir compras. Fale com o RH ou com a T.I.' };
+    if (!podePedirCompra) return { erro: 'Entre com o seu login para pedir compras.' };
     if ((dados.justificativa || '').trim().length < 5) return { erro: 'Explique para que é a compra.' };
     const invalido = validarPedido({ ...dados, semValores: true });
     if (invalido) return { erro: invalido };
@@ -320,16 +433,18 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id = await solicitarCompraDb(dados);
     });
     if (erro) return { erro };
+    const status: StatusPedido = dados.tipoPedido === 'outros' ? 'aguardando' : 'em_cotacao';
     const item: PedidoCompra = {
       ...dados,
       id: id || dados.id,
       codigo: `PC-${ANO}-${String(pedidosTodos.length + 1).padStart(4, '0')}`,
-      status: 'aguardando',
-      solicitanteId: currentUser?.id,
+      status,
+      solicitanteId: eu,
+      gestorId: gestorDe(employees, eu),
       criadoEm: agoraIso(),
-      itens: dados.itens.map((i, n) => ({ ...i, ordem: n + 1, valorUnitario: undefined })),
+      itens: dados.itens.map((i, n) => ({ ...i, ordem: n + 1, valorUnitario: undefined, tipo: dados.tipoPedido === 'outros' ? 'servico' : i.tipo })),
       cotacoes: [],
-      eventos: [{ para: 'aguardando', por: currentUser?.id, em: agoraIso() }],
+      eventos: [{ para: status, por: eu, em: agoraIso() }],
     };
     if (demo) setPedidos((prev) => [item, ...prev]);
     else await recarregarCompras();
@@ -342,45 +457,53 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return mudar(p, acao, motivo);
   };
 
+  // Mesmas regras da função mudar_status_pedido do banco (aqui só para avisar antes)
   async function mudar(p: PedidoCompra, acao: AcaoPedido, motivo?: string): Promise<string | null> {
-    const id = p.id;
-    if ((acao === 'aprovar' || acao === 'recusar') && !isAdmin) return 'Só o administrador aprova ou recusa pedidos de compra.';
-    if ((acao === 'recusar' || acao === 'cancelar') && (motivo || '').trim().length < 5) return 'Explique o motivo.';
-    if (acao === 'aprovar' && p.cotacoes.length > 0 && !p.cotacoes.some((c) => c.vencedora)) return 'Escolha a cotação vencedora antes de aprovar.';
-    const erro = await noBanco(() => mudarStatusPedidoDb(id, acao, motivo));
+    const vez = vezDoPedido(p);
+    const precisaMotivo = acao === 'recusar' || acao === 'cancelar' || acao === 'devolver';
+    if (precisaMotivo && (motivo || '').trim().length < 5) return 'Explique o motivo.';
+    if (acao === 'devolver' && !(equipe && p.status === 'em_cotacao')) return 'Só a T.I. devolve um pedido em cotação.';
+    if (acao === 'enviar' && p.status === 'em_cotacao' && !equipe) return 'A T.I. está cotando este pedido.';
+    if (acao === 'aprovar' || acao === 'recusar') {
+      if (p.status !== 'aguardando') return 'O pedido não está aguardando aprovação.';
+      if (vez === 'gestor' && p.gestorId !== eu) return 'Falta a aprovação do gestor de quem pediu.';
+      if (vez === 'compras_aprovacao' && !(isCompras || isAdmin)) return 'Só Compras ou o administrador da T.I. aprova ou recusa.';
+      if (acao === 'aprovar' && vez === 'compras_aprovacao' && p.cotacoes.length > 0 && !p.cotacoes.some((c) => c.vencedora))
+        return 'Escolha a cotação vencedora antes de aprovar.';
+    }
+    const erro = await noBanco(() => mudarStatusPedidoDb(p.id, acao, motivo));
     if (erro) return erro;
-    if (demo) {
-      const para: StatusPedido = acao === 'enviar' ? 'aguardando' : acao === 'aprovar' ? 'aprovado' : acao === 'recusar' ? 'recusado' : 'cancelado';
-      mudarLocal(
-        id,
-        para,
-        acao === 'aprovar'
-          ? { aprovadoPor: currentUser?.id, aprovadoEm: agoraIso(), fornecedorId: p.cotacoes.find((c) => c.vencedora)?.fornecedorId || p.fornecedorId }
-          : acao === 'enviar'
-            ? { motivo: undefined }
-            : { motivo: motivo?.trim() },
-        motivo?.trim()
-      );
-    } else {
+    if (!demo) {
       await recarregarCompras();
+      return null;
+    }
+    if (acao === 'aprovar' && vez === 'gestor') {
+      mudarLocal(p.id, 'aguardando', { aprovadoGestorPor: eu, aprovadoGestorEm: agoraIso() }, motivo?.trim() || 'Aprovado pelo gestor', 'aguardando');
+    } else if (acao === 'aprovar') {
+      mudarLocal(p.id, 'aprovado', { aprovadoPor: eu, aprovadoEm: agoraIso(), fornecedorId: p.cotacoes.find((c) => c.vencedora)?.fornecedorId || p.fornecedorId });
+    } else if (acao === 'enviar') {
+      const para: StatusPedido = !equipe && p.tipoPedido === 'ti' ? 'em_cotacao' : 'aguardando';
+      mudarLocal(p.id, para, { motivo: undefined, aprovadoGestorPor: undefined, aprovadoGestorEm: undefined, aprovadoPor: undefined, aprovadoEm: undefined });
+    } else {
+      mudarLocal(p.id, acao === 'cancelar' ? 'cancelado' : 'recusado', { motivo: motivo?.trim() }, motivo?.trim());
     }
     return null;
   }
 
   const registrarCompra: ComprasContextType['registrarCompra'] = async (id, d) => {
-    if (!isTI) return 'Só a T.I. registra a compra.';
+    if (!(isCompras || isAdmin)) return 'Só Compras (ou o administrador da T.I.) registra a compra.';
     const p = pedidosTodos.find((x) => x.id === id);
     if (!p || p.status !== 'aprovado') return 'Só um pedido aprovado pode ser registrado como comprado.';
     if (!d.fornecedorId) return 'Informe o fornecedor da compra.';
     if (!d.dataCompra || !d.vencimento) return 'Informe a data da compra e o vencimento.';
+    const sugerido = p.cotacoes.find((c) => c.vencedora)?.fornecedorId;
+    if (sugerido && sugerido !== d.fornecedorId && (d.motivoTroca || '').trim().length < 5) return 'Explique por que a compra foi feita em outro fornecedor.';
+    if (d.nfChave && !/^\d{44}$/.test(d.nfChave)) return 'A chave da NF-e tem 44 dígitos.';
     const valores = new Map(d.itens.map((i) => [i.id, i.valorUnitario]));
     const itens = p.itens.map((i) => ({ ...i, valorUnitario: valores.get(i.id) ?? i.valorUnitario }));
     const total = Math.round(itens.reduce((s, i) => s + i.quantidade * (i.valorUnitario || 0), 0) * 100) / 100;
     if (!(total > 0)) return 'Informe o valor pago de cada item.';
-    let faturaId: string | undefined;
-    const erro = await noBanco(async () => {
-      faturaId = await registrarCompraDb(id, d);
-    });
+    const erro = await noBanco(() => registrarCompraDb(id, d));
     if (erro) return erro;
     if (demo) {
       const f = app.lancarFatura({
@@ -393,18 +516,30 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
         formaPagamento: d.formaPagamento,
         observacoes: `Pedido de compra ${p.codigo}`,
       });
-      mudarLocal(id, 'comprado', { itens, valorFinal: total, faturaId: f.id, fornecedorId: d.fornecedorId, numeroNf: d.numeroNf, dataCompra: d.dataCompra, vencimento: d.vencimento, formaPagamento: d.formaPagamento });
+      if (d.nfArquivo) app.alterarFatura(f.id, { arquivoCaminho: d.nfArquivo });
+      mudarLocal(id, 'comprado', {
+        itens,
+        valorFinal: total,
+        faturaId: f.id,
+        fornecedorId: d.fornecedorId,
+        numeroNf: d.numeroNf,
+        nfChave: d.nfChave,
+        nfArquivo: d.nfArquivo,
+        fornecedorTrocaMotivo: sugerido && sugerido !== d.fornecedorId ? d.motivoTroca : undefined,
+        dataCompra: d.dataCompra,
+        vencimento: d.vencimento,
+        formaPagamento: d.formaPagamento,
+      });
     } else {
-      void faturaId;
       await Promise.all([recarregarCompras(), app.refreshSupabaseData()]);
     }
     return null;
   };
 
   const receberPedido: ComprasContextType['receberPedido'] = async (id, d) => {
-    if (!isTI) return 'Só a T.I. registra o recebimento.';
     const p = pedidosTodos.find((x) => x.id === id);
     if (!p || p.status !== 'comprado') return 'Só um pedido comprado pode ser recebido.';
+    if (!(isTI || (isCompras && p.tipoPedido === 'outros'))) return 'Só a T.I. registra o recebimento.';
     for (const i of p.itens.filter((x) => x.tipo === 'equipamento')) {
       const doItem = d.ativos.filter((a) => a.itemId === i.id);
       if (doItem.length !== i.quantidade || doItem.some((a) => !a.tag.trim()))
@@ -432,7 +567,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 serialNumber: a.serial?.trim() || `A-PREENCHER-${p.codigo}-${i.ordem}-${n + 1}`,
                 localizacaoFisica: d.localizacao || 'Almoxarifado T.I.',
                 status: 'disponivel',
-                fiscal: { numeroNF: p.numeroNf || '', chaveAcesso44: '', valorCompra: i.valorUnitario || 0, fornecedor: forn, dataAquisicao: p.dataCompra || hoje(), dataGarantia: '' },
+                fiscal: { numeroNF: p.numeroNf || '', chaveAcesso44: p.nfChave || '', valorCompra: i.valorUnitario || 0, fornecedor: forn, dataAquisicao: p.dataCompra || hoje(), dataGarantia: '' },
                 fornecedorId: p.fornecedorId,
                 pedidoId: p.id,
                 observacoes: i.especificacao ? `Especificação do pedido: ${i.especificacao}` : undefined,
@@ -447,7 +582,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (l) app.updateLicense(l.id, { assentosTotais: l.assentosTotais + i.quantidade });
         }
       }
-      mudarLocal(id, 'recebido', { recebidoPor: currentUser?.id, recebidoEm: agoraIso() });
+      mudarLocal(id, 'recebido', { recebidoPor: eu, recebidoEm: agoraIso() });
     } else {
       await Promise.all([recarregarCompras(), app.refreshSupabaseData(), recarregarRecursos()]);
     }
@@ -480,7 +615,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const itens: ItemInventario[] = assets
         .filter((a) => a.status !== 'descartado' && (!l || a.localizacaoFisica.trim().toLowerCase() === l.toLowerCase()))
         .map((a) => ({ id: novoId('ii'), ativoId: a.id, localEsperado: a.localizacaoFisica, situacao: 'pendente', viaQr: false }));
-      setInventarios((prev) => [{ id: id!, titulo: titulo.trim(), local: l, unidadeId, status: 'aberto', criadoPor: currentUser?.id, criadoEm: agoraIso(), itens }, ...prev]);
+      setInventarios((prev) => [{ id: id!, titulo: titulo.trim(), local: l, unidadeId, status: 'aberto', criadoPor: eu, criadoEm: agoraIso(), itens }, ...prev]);
     } else {
       await recarregarCompras();
     }
@@ -499,7 +634,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const erro = await noBanco(() => conferirItemDb(item));
     if (erro) return erro;
     const carimbado: ItemInventario =
-      item.situacao === 'pendente' ? { ...item, conferidoPor: undefined, conferidoEm: undefined } : { ...item, conferidoPor: currentUser?.id, conferidoEm: agoraIso() };
+      item.situacao === 'pendente' ? { ...item, conferidoPor: undefined, conferidoEm: undefined } : { ...item, conferidoPor: eu, conferidoEm: agoraIso() };
     trocarItem(inventarioId, carimbado);
     return null;
   };
@@ -508,7 +643,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const inv = inventarios.find((i) => i.id === inventarioId);
     if (!inv || inv.status !== 'aberto') return 'Esta conferência já foi encerrada.';
     if (inv.itens.some((i) => i.ativoId === dados.ativoId)) return 'O equipamento já está nesta conferência.';
-    const item: ItemInventario = { ...dados, id: novoId('ii'), conferidoPor: currentUser?.id, conferidoEm: agoraIso() };
+    const item: ItemInventario = { ...dados, id: novoId('ii'), conferidoPor: eu, conferidoEm: agoraIso() };
     const erro = await noBanco(() => incluirItemInventarioDb(inventarioId, item));
     if (erro) return erro;
     trocarItem(inventarioId, item, true);
@@ -524,11 +659,9 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
     if (erro) return { erro };
     if (demo) {
-      const itens = inv.itens.map((i) => (i.situacao === 'pendente' ? { ...i, situacao: 'nao_encontrado' as const, conferidoPor: currentUser?.id, conferidoEm: agoraIso() } : i));
-      const venceEm = (() => {
-        const d = new Date(Date.now() + 7 * 86400000);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      })();
+      const itens = inv.itens.map((i) => (i.situacao === 'pendente' ? { ...i, situacao: 'nao_encontrado' as const, conferidoPor: eu, conferidoEm: agoraIso() } : i));
+      const d7 = new Date(Date.now() + 7 * 86400000);
+      const venceEm = `${d7.getFullYear()}-${String(d7.getMonth() + 1).padStart(2, '0')}-${String(d7.getDate()).padStart(2, '0')}`;
       for (const i of itens) {
         const a = assets.find((x) => x.id === i.ativoId);
         if (!a) continue;
@@ -558,7 +691,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
         via_qr: itens.filter((i) => i.viaQr).length,
         locais_atualizados: atualizarLocais,
       };
-      setInventarios((prev) => prev.map((x) => (x.id === id ? { ...x, itens, status: 'fechado', resumo, fechadoPor: currentUser?.id, fechadoEm: agoraIso() } : x)));
+      setInventarios((prev) => prev.map((x) => (x.id === id ? { ...x, itens, status: 'fechado', resumo, fechadoPor: eu, fechadoEm: agoraIso() } : x)));
     } else {
       await Promise.all([recarregarCompras(), app.refreshSupabaseData()]);
     }
@@ -569,7 +702,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (motivo.trim().length < 5) return 'Explique por que a conferência foi cancelada.';
     const erro = await noBanco(() => cancelarInventarioDb(id, motivo.trim()));
     if (erro) return erro;
-    setInventarios((prev) => prev.map((x) => (x.id === id ? { ...x, status: 'cancelado', observacoes: motivo.trim(), fechadoPor: currentUser?.id, fechadoEm: agoraIso() } : x)));
+    setInventarios((prev) => prev.map((x) => (x.id === id ? { ...x, status: 'cancelado', observacoes: motivo.trim(), fechadoPor: eu, fechadoEm: agoraIso() } : x)));
     return null;
   };
 
@@ -580,8 +713,12 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
         pedidos,
         inventarios,
         podePedirCompra,
+        equipeCompras: equipe,
         linhasAnoAtual,
         alertas,
+        mensagens,
+        carregarMensagens,
+        enviarMensagem,
         salvarOrcamentos,
         excluirOrcamento,
         salvarPedido,
