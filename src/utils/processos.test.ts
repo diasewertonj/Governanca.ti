@@ -30,6 +30,28 @@ const titulos = (itens: { tipo: string; titulo: string }[], tipo: string) =>
   itens.filter((i) => i.tipo === tipo).map((i) => i.titulo);
 
 describe('montarOnboarding', () => {
+  it('celular pedido pelo RH: aparelho como equipamento + passo de entregar a linha', () => {
+    const itens = montarOnboarding(onb(['Celular corporativo'], []), [], []);
+    expect(titulos(itens, 'equipamento')).toContain('Celular corporativo');
+    expect(titulos(itens, 'entregar_linha')).toEqual(['Entregar linha de celular']);
+    expect(titulos(itens, 'acessorio')).not.toContain('Celular corporativo');
+  });
+
+  it('celular descrito no campo do equipamento: aparelho como passo próprio + linha', () => {
+    const pedido = onb([], []);
+    pedido.onboarding!.tipoComputador = 'Celular corporativo';
+    const itens = montarOnboarding(pedido, [], []);
+    expect(titulos(itens, 'equipamento')).toEqual(['Celular corporativo']);
+    expect(titulos(itens, 'entregar_linha')).toHaveLength(1);
+  });
+
+  it('só a linha (chip): passo de entregar a linha, sem acessório', () => {
+    const itens = montarOnboarding(onb(['Chip / linha'], []), [], []);
+    expect(titulos(itens, 'entregar_linha')).toHaveLength(1);
+    expect(titulos(itens, 'acessorio')).toHaveLength(0);
+    expect(titulos(montarOnboarding(onb(['Mouse'], []), [], []), 'entregar_linha')).toHaveLength(0);
+  });
+
   it('pedido antigo (nomes livres): entram os sugeridos do catálogo + os pedidos do RH', () => {
     const itens = montarOnboarding(onb(['Monitor 27"'], ['Figma']), CATALOGO_PADRAO, [{ id: 'lic-f', nome: 'Figma' }]);
     expect(itens[0].tipo).toBe('cadastro');

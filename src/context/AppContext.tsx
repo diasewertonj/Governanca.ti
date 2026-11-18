@@ -25,6 +25,7 @@ import {
   Ticket,
   TicketAttachment,
   TicketStatus,
+  TicketPriority,
   UserRole,
 } from '../types/index.ts';
 import {
@@ -117,6 +118,8 @@ import {
   encerrarLembreteDb,
   aceitarTermoDb,
   dispensarAssinaturaTermoDb,
+  contestarTermoDb,
+  responderContestacaoDb,
   cancelarTermoDb,
   acessoNexusDb,
   fetchFornecedoresFromDb,
@@ -193,6 +196,11 @@ export interface AlteracoesChamado {
   ativoId?: string;
   softwareId?: string;
   colaboradorId?: string;
+  linhaId?: string;
+  // Entrega A: a T.I. corrige os dados do chamado (com registro no histórico)
+  titulo?: string;
+  categoria?: string;
+  prioridade?: TicketPriority;
 }
 
 interface AppContextType {
@@ -348,6 +356,8 @@ interface AppContextType {
   encerrarLembrete: (id: string, status: 'feito' | 'cancelado', observacao?: string) => Promise<string | null>;
   aceitarTermo: (termoId: string) => Promise<string | null>;
   dispensarAssinaturaTermo: (termoId: string, motivo: string) => Promise<string | null>;
+  contestarTermo: (termoId: string, motivo: string) => Promise<string | null>;
+  responderContestacao: (termoId: string, resposta: string) => Promise<string | null>;
   cancelarTermo: (termoId: string, motivo: string, substitutoId?: string) => Promise<string | null>;
 
   // Fase 8 · Fornecedores, contratos e faturas (só a T.I.; gravação otimista)
@@ -2039,6 +2049,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
         if (mudancas.ativoId !== undefined) novo = { ...novo, ativoId: mudancas.ativoId || undefined };
+        if (mudancas.linhaId !== undefined) novo = { ...novo, linhaId: mudancas.linhaId || undefined };
+        if (mudancas.titulo !== undefined && mudancas.titulo.trim()) novo = { ...novo, titulo: mudancas.titulo.trim() };
+        if (mudancas.categoria) novo = { ...novo, categoria: mudancas.categoria };
+        if (mudancas.prioridade) novo = { ...novo, prioridade: mudancas.prioridade };
         if (mudancas.softwareId !== undefined) {
           novo = {
             ...novo,
@@ -2743,6 +2757,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   };
 
+  /** Entrega A: contestação do termo (colaborador) e resposta (T.I.) */
+  const contestarTermo = async (termoId: string, motivo: string): Promise<string | null> => {
+    if (motivo.trim().length < 5) return 'Explique o que está errado no termo.';
+    const t = terms.find((x) => x.id === termoId);
+    if (!t) return 'Termo não encontrado';
+    if (t.colaboradorId !== currentUserId) return 'Só o colaborador do termo pode contestá-lo.';
+    if (t.aceiteColaboradorEm) return 'Você já aceitou este termo.';
+    if (isProduction) {
+      try {
+        await contestarTermoDb(termoId, motivo.trim());
+        const termos = await fetchTermsFromDb();
+        if (termos) setTerms(termos);
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    setTerms((prev) =>
+      trocar(prev, { ...t, contestacaoMotivo: motivo.trim(), contestacaoEm: new Date().toISOString(), contestacaoResposta: undefined, contestacaoRespondidaEm: undefined })
+    );
+    return null;
+  };
+
+  const responderContestacao = async (termoId: string, resposta: string): Promise<string | null> => {
+    if (currentRole !== 'ti_admin' && currentRole !== 'ti_suporte') return 'Só a T.I. responde a contestação de um termo.';
+    if (resposta.trim().length < 5) return 'Escreva a resposta ao colaborador.';
+    const t = terms.find((x) => x.id === termoId);
+    if (!t?.contestacaoEm || t.contestacaoRespondidaEm) return 'Este termo não tem contestação aguardando resposta.';
+    if (isProduction) {
+      try {
+        await responderContestacaoDb(termoId, resposta.trim());
+        const termos = await fetchTermsFromDb();
+        if (termos) setTerms(termos);
+        return null;
+      } catch (err) {
+        return mensagemDeErro(err);
+      }
+    }
+    setTerms((prev) => trocar(prev, { ...t, contestacaoResposta: resposta.trim(), contestacaoRespondidaEm: new Date().toISOString() }));
+    return null;
+  };
+
   const dispensarAssinaturaTermo = async (termoId: string, motivo: string): Promise<string | null> => {
     if (!motivo.trim()) return 'Informe o motivo da dispensa';
     if (isProduction) {
@@ -2877,6 +2933,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         encerrarLembrete,
         aceitarTermo,
         dispensarAssinaturaTermo,
+        contestarTermo,
+        responderContestacao,
         cancelarTermo,
         fornecedores,
         contratos,

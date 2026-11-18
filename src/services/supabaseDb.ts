@@ -347,6 +347,8 @@ const linhaChamado = (t: Ticket): TablesInsert<'chamados'> => ({
   tecnico_responsavel_nome: t.tecnicoResponsavelNome || null,
   ativo_id: t.ativoId || null,
   software_id: t.softwareId || null,
+  // Só vai quando existe (assim abrir chamado funciona mesmo antes da coluna existir no banco)
+  ...(t.linhaId ? { linha_id: t.linhaId } : {}),
   software_nome: t.softwareNome || null,
   onboarding: t.onboarding ? json(t.onboarding) : null,
   offboarding: t.offboarding ? json(t.offboarding) : null,
@@ -1471,6 +1473,7 @@ export async function fetchTicketsFromDb(): Promise<Ticket[] | null> {
     tecnicoResponsavelNome: t.tecnico_responsavel_nome || undefined,
     ativoId: t.ativo_id || undefined,
     softwareId: t.software_id || undefined,
+    linhaId: t.linha_id || undefined,
     softwareNome: t.software_nome || undefined,
     onboarding: (t.onboarding || undefined) as unknown as OnboardingData | undefined,
     offboarding: (t.offboarding || undefined) as unknown as OffboardingData | undefined,
@@ -1662,6 +1665,10 @@ export async function fetchTermsFromDb(): Promise<ResponsibilityTerm[] | null> {
     hashConteudo: tm.hash_conteudo || undefined,
     aceiteColaboradorEm: tm.aceite_colaborador_em || undefined,
     aceiteTiEm: tm.aceite_ti_em || undefined,
+    contestacaoMotivo: tm.contestacao_motivo || undefined,
+    contestacaoEm: tm.contestacao_em || undefined,
+    contestacaoResposta: tm.contestacao_resposta || undefined,
+    contestacaoRespondidaEm: tm.contestacao_respondida_em || undefined,
     aceiteTiPor: tm.aceite_ti_por || undefined,
     formaAssinatura: (tm.forma_assinatura || 'pendente') as ResponsibilityTerm['formaAssinatura'],
     motivoDispensa: tm.motivo_dispensa || undefined,
@@ -2110,6 +2117,18 @@ export async function aceitarTermoDb(termoId: string) {
     assinado: boolean;
     hash: string;
   };
+}
+
+/** Entrega A: o colaborador contesta o termo (antes de aceitar), com motivo */
+export async function contestarTermoDb(termoId: string, motivo: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('contestar_termo', { p_termo: termoId, p_motivo: motivo }));
+}
+
+/** Entrega A: a T.I. responde a contestação */
+export async function responderContestacaoDb(termoId: string, resposta: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('responder_contestacao', { p_termo: termoId, p_resposta: resposta }));
 }
 
 export async function dispensarAssinaturaTermoDb(termoId: string, motivo: string) {

@@ -15,6 +15,7 @@ import type {
   LinhaTelefonica,
   Moeda,
   ProcessoItem,
+  ResponsibilityTerm,
   SoftwareLicense,
   Ticket,
   TipoContrato,
@@ -243,7 +244,8 @@ export type TipoVencimento =
   | 'estoque'
   | 'desligado_com_recurso'
   | 'passo_agendado'
-  | 'termo_desatualizado';
+  | 'termo_desatualizado'
+  | 'termo_contestado';
 
 export interface Vencimento {
   id: string;
@@ -266,6 +268,7 @@ export const ROTULO_VENCIMENTO: Record<TipoVencimento, string> = {
   desligado_com_recurso: 'Desligado com recurso',
   passo_agendado: 'Passo agendado',
   termo_desatualizado: 'Termo desatualizado',
+  termo_contestado: 'Termo contestado',
 };
 
 export function listarVencimentos(
@@ -282,6 +285,8 @@ export function listarVencimentos(
     chamados?: Ticket[];
     /** Seção 9.5: pendências de termo já calculadas (utils/inventario.ts) */
     termosDesatualizados?: PendenciaTermo[];
+    /** Entrega A: termos contestados pelo colaborador, aguardando a T.I. */
+    termos?: ResponsibilityTerm[];
   },
   horizonteDias = 90,
   agora: Date = new Date()
@@ -403,6 +408,13 @@ export function listarVencimentos(
     const nome = dados.pessoas.find((x) => x.id === p.colaboradorId)?.nome || 'Pessoa';
     out.push({ id: `td-${p.colaboradorId}`, tipo: 'termo_desatualizado', titulo: nome, detalhe: resumoPendenciaTermo(p), alvo: { tipo: 'pessoa', id: p.colaboradorId } });
   });
+
+  // Entrega A: contestação do colaborador aguardando resposta
+  (dados.termos || [])
+    .filter((t) => t.contestacaoEm && !t.contestacaoRespondidaEm && !t.canceladoEm)
+    .forEach((t) =>
+      out.push({ id: `tc-${t.id}`, tipo: 'termo_contestado', titulo: `${t.colaboradorNome} · ${t.codigo}`, detalhe: t.contestacaoMotivo, alvo: { tipo: 'pessoa', id: t.colaboradorId } })
+    );
 
   // Pendências (sem data) primeiro; depois por data
   return out.sort((a, b) => (a.data ? (b.data ? a.data.localeCompare(b.data) : 1) : b.data ? -1 : 0));

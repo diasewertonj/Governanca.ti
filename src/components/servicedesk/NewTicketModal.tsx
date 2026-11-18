@@ -13,6 +13,7 @@ import {
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { Janela } from '../ui/Janela.tsx';
+import { CATEGORIAS_CHAMADO } from '../../utils/atendimento.ts';
 
 // Anexo escolhido, ainda só no navegador (Fase 5: sobe apenas ao enviar o chamado)
 interface AnexoPendente {
@@ -349,12 +350,11 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
               Categoria do problema
             </label>
             <select id="novo-chamado-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="campo">
-              <option value="Hardware / Equipamento">Hardware / Equipamento Físico</option>
-              <option value="Periféricos / Telas / Cabos">Periféricos / Telas / Cabos</option>
-              <option value="Softwares & Licenças">Softwares & Licenças</option>
-              <option value="Rede / VPN / Wi-Fi">Rede / VPN / Wi-Fi</option>
-              <option value="Acessos & E-mail">Acessos & E-mail Corporativo</option>
-              <option value="Outros">Outros</option>
+              {CATEGORIAS_CHAMADO.map((c) => (
+                <option key={c.valor} value={c.valor}>
+                  {c.rotulo}
+                </option>
+              ))}
             </select>
           </div>
 

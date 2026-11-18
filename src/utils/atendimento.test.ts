@@ -80,5 +80,7 @@ describe('textos', () => {
     );
     expect(descreverEvento({ tipo: 'cancelado', detalhe: 'engano' })).toBe('Cancelado: Aberto por engano');
     expect(descreverEvento({ tipo: 'avaliado', para: '5' })).toBe('Avaliado com 5 de 5');
+    expect(descreverEvento({ tipo: 'dados', de: 'Impressora', para: 'Impressora não liga', detalhe: 'título' })).toBe('Título corrigido: Impressora → Impressora não liga');
+    expect(descreverEvento({ tipo: 'vinculo', para: '(11) 99999-0001', detalhe: 'linha' })).toBe('Linha telefônica: nenhum → (11) 99999-0001');
   });
 });
