@@ -283,7 +283,6 @@ interface AppContextType {
     ehNotaInterna: boolean,
     anexos?: TicketAttachment[]
   ) => void;
-  updateTicketStatus: (ticketId: string, status: TicketStatus) => void;
   salvarAlteracoesChamado: (ticketId: string, mudancas: AlteracoesChamado) => void;
   // Fase 10: atendimento documentado (devolvem o erro em texto ou null)
   resolverChamado: (ticketId: string, dados: DadosResolucao) => Promise<string | null>;
@@ -1984,15 +1983,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!antes) return;
     const depois = { ...mudar(antes), dataAtualizacao: new Date().toISOString() };
     setTickets((prev) => trocar(prev, depois));
-    persistir(updateTicketDb(antes, depois), () => setTickets((prev) => trocar(prev, antes)), contexto);
-  };
-
-  const updateTicketStatus = (ticketId: string, status: TicketStatus) => {
-    alterarChamado(
-      ticketId,
-      (t) => ({ ...t, status, dataResolucao: status === 'resolvido' ? new Date().toISOString() : t.dataResolucao }),
-      'Não foi possível alterar o status do chamado'
-    );
+    // Se o banco recusar, desfaz só os campos que esta alteração mudou (uma mensagem enviada
+    // ou outra alteração feita nesse meio-tempo continua na tela)
+    const campos = (Object.keys(depois) as (keyof Ticket)[]).filter((k) => depois[k] !== antes[k]);
+    const desfazer = () =>
+      setTickets((prev) =>
+        prev.map((t) => {
+          if (t.id !== ticketId) return t;
+          const volta = { ...t } as Record<string, unknown>;
+          for (const k of campos) volta[k] = antes[k];
+          return volta as unknown as Ticket;
+        })
+      );
+    persistir(updateTicketDb(antes, depois), desfazer, contexto);
   };
 
   // Fase 5: status, técnico e checklist mudam na tela como rascunho e só são
@@ -2115,6 +2118,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             aguardandoMotivo: undefined,
             ...relido,
           }));
+        } else {
+          // Gravou, mas a releitura falhou: mostra o efeito esperado (corrige na próxima carga)
+          mudarNoChamado(ticketId, (t) => ({ ...local(t), dataAtualizacao: new Date().toISOString() }));
         }
       } else {
         mudarNoChamado(ticketId, (t) => ({ ...local(t), dataAtualizacao: new Date().toISOString() }));
@@ -2517,11 +2523,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const item = processoItens.find((i) => i.id === itemId);
     if (!item) return 'Passo não encontrado';
     if (item.status !== 'pendente') return 'Só passos pendentes podem ser agendados';
+    // Os lembretes antigos só são cancelados depois que a nova data (ou a retirada) gravou:
+    // se a gravação falhar, o agendamento anterior continua valendo
     const abertos = lembretes.filter((l) => l.itemId === itemId && l.status === 'aberto');
-    for (const l of abertos) {
-      const falha = await encerrarLembrete(l.id, 'cancelado', data ? `Reagendado para ${data.split('-').reverse().join('/')}` : 'Agendamento retirado');
-      if (falha) return falha;
-    }
     if (!data) {
       if (isProduction) {
         try {
@@ -2530,12 +2534,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (err) {
           return mensagemDeErro(err);
         }
-        return null;
+      } else {
+        setProcessoItens((prev) => prev.map((i) => (i.id === itemId ? { ...i, lembreteEm: undefined } : i)));
       }
-      setProcessoItens((prev) => prev.map((i) => (i.id === itemId ? { ...i, lembreteEm: undefined } : i)));
-      return null;
+    } else {
+      const falha = await registrarItemProcesso(itemId, 'pendente', observacao, { lembrete_em: data });
+      if (falha) return falha;
     }
-    return registrarItemProcesso(itemId, 'pendente', observacao, { lembrete_em: data });
+    const motivo = data ? `Reagendado para ${data.split('-').reverse().join('/')}` : 'Agendamento retirado';
+    const naoCancelados: string[] = [];
+    for (const l of abertos) {
+      if (await encerrarLembrete(l.id, 'cancelado', motivo)) naoCancelados.push(l.id);
+    }
+    return naoCancelados.length
+      ? `${motivo}, mas ${naoCancelados.length} lembrete(s) antigo(s) continua(m) aberto(s): cancele em Lembretes.`
+      : null;
   };
 
   /** Seção 9.2: anotações fixas do processo (gravadas no chamado; ficam depois de concluir) */
@@ -2910,7 +2923,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         revokeLicense,
         createTicket,
         addTicketMessage,
-        updateTicketStatus,
         salvarAlteracoesChamado,
         resolverChamado,
         cancelarChamado,

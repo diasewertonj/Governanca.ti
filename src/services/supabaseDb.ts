@@ -474,7 +474,12 @@ export async function deleteEmployeeDb(id: string) {
 // ---------------------------------------------------------------------------
 export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('ativos').select('*').order('tag');
+  // A função do banco entrega tudo à T.I.; ao RH e ao colaborador, sem custo, nota e fornecedor
+  // (colaborador: só os que estão com ele). Antes da migration, lê a tabela direto.
+  let { data, error } = await supabase.rpc('ativos_visiveis');
+  if (error && /ativos_visiveis|PGRST202/i.test(`${error.code} ${error.message}`)) {
+    ({ data, error } = await supabase.from('ativos').select('*').order('tag'));
+  }
   if (error) {
     console.error('Erro ao buscar ativos do Supabase:', error);
     return null;
@@ -794,7 +799,12 @@ export async function updateCustodyEntryDb(ativoId: string, antes: CustodyHistor
 // ---------------------------------------------------------------------------
 export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('licencas_software').select('*').order('nome');
+  // A função do banco entrega tudo à T.I.; ao RH e ao colaborador só nome, fabricante e fornecedor
+  // (sem valores, pagamento ou cartão; colaborador só as dele). Antes da migration, lê a tabela direto.
+  let { data, error } = await supabase.rpc('licencas_visiveis');
+  if (error && /licencas_visiveis|PGRST202/i.test(`${error.code} ${error.message}`)) {
+    ({ data, error } = await supabase.from('licencas_software').select('*').order('nome'));
+  }
   if (error) {
     console.error('Erro ao buscar licenças do Supabase:', error);
     return null;
@@ -998,7 +1008,7 @@ export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
     supabase.from('contratos').select('*').order('inicio', { ascending: false }),
     supabase.from('contrato_itens').select('contrato_id, ativo_id, licenca_id'),
   ]);
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   const itensPorContrato: Record<string, ItemContrato[]> = {};
   (itensData || []).forEach((i) => {
     const item: ItemContrato | null = i.ativo_id ? { ativoId: i.ativo_id } : i.licenca_id ? { licencaId: i.licenca_id } : null;
@@ -1096,7 +1106,7 @@ const linhaFatura = (f: Fatura): TablesInsert<'faturas'> => ({
 export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('faturas').select('*').order('competencia', { ascending: false });
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   return (data || []).map((l) => ({
     id: l.id,
     licencaId: l.licenca_id || undefined,
@@ -1136,7 +1146,7 @@ const linhaUnidade = (u: Unidade): TablesInsert<'unidades'> => ({
 export async function fetchUnidadesFromDb(): Promise<Unidade[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('unidades').select('*').order('nome');
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   return (data || []).map((l) => ({
     id: l.id,
     nome: l.nome,
@@ -1159,7 +1169,7 @@ export async function updateUnidadeDb(antes: Unidade, depois: Unidade) {
 export async function fetchAnexosContratoFromDb(): Promise<AnexoContrato[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('contrato_anexos').select('*').order('criado_em', { ascending: false });
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   return (data || []).map((l) => ({
     id: l.id,
     contratoId: l.contrato_id,
@@ -1216,7 +1226,7 @@ const linhaLinha = (l: LinhaTelefonica): TablesInsert<'linhas_telefonicas'> => (
 export async function fetchLinhasFromDb(): Promise<LinhaTelefonica[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('linhas_telefonicas').select('*').order('numero');
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   return (data || []).map((l) => ({
     id: l.id,
     numero: l.numero,
@@ -1248,7 +1258,7 @@ export async function deleteLinhaDb(id: string) {
 export async function fetchAtribuicoesLinhaFromDb(): Promise<AtribuicaoLinha[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('linha_atribuicoes').select('*').order('inicio', { ascending: false });
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   return (data || []).map((a) => ({
     id: a.id,
     linhaId: a.linha_id,
@@ -1275,7 +1285,7 @@ const linhaEstoque = (i: ItemEstoque): TablesInsert<'estoque_itens'> => ({
 export async function fetchEstoqueFromDb(): Promise<ItemEstoque[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('estoque_itens').select('*').order('nome');
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   return (data || []).map((l) => ({
     id: l.id,
     nome: l.nome,
@@ -1306,7 +1316,7 @@ export async function deleteItemEstoqueDb(id: string) {
 export async function fetchMovimentosEstoqueFromDb(): Promise<MovimentoEstoque[] | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('estoque_movimentos').select('*').order('criado_em', { ascending: false }).limit(2000);
-  if (error) return [];
+  if (error) return erroDeLeitura(error);
   return (data || []).map((l) => ({
     id: l.id,
     itemId: l.item_id,
@@ -2174,6 +2184,12 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthStatus> {
 /** Tabela que ainda não existe (migration não aplicada): não há o que apagar nela */
 const tabelaAusente = (error: { code?: string; message?: string }) =>
   error.code === '42P01' || error.code === 'PGRST205' || /does not exist|could not find the table/i.test(error.message || '');
+
+/** Leitura que falhou: devolve null para a tela manter o que já mostra (lista vazia apagaria dados reais) */
+function erroDeLeitura(error: { code?: string; message?: string }): null {
+  if (!tabelaAusente(error)) console.error('Erro ao ler do banco:', error);
+  return null;
+}
 
 export async function clearAllDatabaseTables(keepEmployeeEmail?: string) {
   if (!supabase) return;
