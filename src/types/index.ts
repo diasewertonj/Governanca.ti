@@ -167,6 +167,9 @@ export interface Asset {
   observacoes?: string; // Fase 8
   fornecedorId?: string; // Fase 8: vínculo com o cadastro de fornecedores
   anexos?: AnexoAtivo[]; // Fase 8: só a TI recebe
+  /** Fase 11: grupo de vida útil (vazio = pela categoria) e pedido de compra de origem */
+  grupoDepreciacao?: GrupoDepreciacao | '';
+  pedidoId?: string;
   historicoCustodia: CustodyHistoryEntry[];
   historicoManutencao: Manutencao[]; // Fase 8: só a T.I. recebe
   baixas?: BaixaAtivo[]; // Fase 8: vigente e estornadas (só a T.I. recebe)
@@ -386,6 +389,8 @@ export interface Fatura {
   id: string;
   licencaId?: string;
   contratoId?: string;
+  /** Fase 11: fatura gerada pelo pedido de compra ("Comprado") */
+  pedidoId?: string;
   competencia: string;
   valor: number;
   vencimento: string;
@@ -759,4 +764,126 @@ export interface CompanySettings {
   docDevolucao?: ModeloDocumento;
   /** Seção 9.5: o que exige termo (vazio = computador, celular e monitor) */
   termoExige?: { computador: boolean; celular: boolean; monitor: boolean };
+  /** Fase 11: vida útil (anos) por grupo e valor residual (% do valor de compra) */
+  vidaUtil?: VidaUtil;
+}
+
+// -----------------------------------------------------------------------------
+// Fase 11 · Patrimônio, orçamento e compras
+// -----------------------------------------------------------------------------
+export type GrupoDepreciacao = 'computadores' | 'celulares' | 'servidores' | 'perifericos' | 'moveis' | 'nao_deprecia';
+export type VidaUtil = Partial<Record<Exclude<GrupoDepreciacao, 'nao_deprecia'>, number>> & { residualPct?: number };
+
+export interface Orcamento {
+  id: string;
+  ano: number;
+  categoria: CategoriaDespesa;
+  /** Área / centro de custo (texto, igual ao das despesas); vazio = geral */
+  area: string;
+  valorAnual: number;
+  /** 12 valores (jan a dez); o anual é a soma */
+  meses: number[];
+  observacoes?: string;
+}
+
+export type StatusPedido = 'rascunho' | 'aguardando' | 'aprovado' | 'recusado' | 'comprado' | 'recebido' | 'cancelado';
+export type TipoItemPedido = 'equipamento' | 'acessorio' | 'licenca' | 'servico';
+
+export interface ItemPedido {
+  id: string;
+  tipo: TipoItemPedido;
+  descricao: string;
+  categoriaAtivo?: AssetCategory;
+  marca?: string;
+  modelo?: string;
+  especificacao?: string;
+  estoqueItemId?: string;
+  licencaId?: string;
+  quantidade: number;
+  /** Estimado até a compra; depois, o valor pago (RH e gestor não recebem) */
+  valorUnitario?: number;
+  ordem: number;
+}
+
+export interface CotacaoPedido {
+  id: string;
+  fornecedorId: string;
+  valor: number;
+  prazoDias?: number;
+  validade?: string;
+  observacoes?: string;
+  arquivoCaminho?: string;
+  vencedora: boolean;
+}
+
+export interface EventoPedido {
+  de?: StatusPedido;
+  para: StatusPedido;
+  motivo?: string;
+  por?: string;
+  em: string;
+}
+
+export interface PedidoCompra {
+  id: string;
+  codigo: string;
+  titulo: string;
+  justificativa?: string;
+  categoria: CategoriaDespesa;
+  area: string;
+  status: StatusPedido;
+  solicitanteId?: string;
+  colaboradorDestinoId?: string;
+  chamadoId?: string;
+  processoItemId?: string;
+  necessarioEm?: string;
+  fornecedorId?: string;
+  numeroNf?: string;
+  dataCompra?: string;
+  vencimento?: string;
+  formaPagamento?: FormaPagamento;
+  valorFinal?: number;
+  faturaId?: string;
+  motivo?: string;
+  aprovadoPor?: string;
+  aprovadoEm?: string;
+  recebidoPor?: string;
+  recebidoEm?: string;
+  criadoEm: string;
+  atualizadoEm?: string;
+  itens: ItemPedido[];
+  cotacoes: CotacaoPedido[];
+  eventos: EventoPedido[];
+  /** Lido por RH/gestor: sem valores, fornecedor nem cotações */
+  semValores?: boolean;
+}
+
+export type SituacaoConferencia = 'pendente' | 'encontrado' | 'nao_encontrado' | 'outro_local';
+
+export interface ItemInventario {
+  id: string;
+  ativoId: string;
+  localEsperado?: string;
+  situacao: SituacaoConferencia;
+  localEncontrado?: string;
+  viaQr: boolean;
+  observacao?: string;
+  conferidoPor?: string;
+  conferidoEm?: string;
+}
+
+export interface InventarioFisico {
+  id: string;
+  titulo: string;
+  /** Local conferido (vazio = todos os equipamentos sem baixa) */
+  local: string;
+  unidadeId?: string;
+  status: 'aberto' | 'fechado' | 'cancelado';
+  observacoes?: string;
+  resumo?: { total: number; encontrados: number; nao_encontrados: number; outro_local: number; via_qr: number; locais_atualizados: boolean };
+  criadoPor?: string;
+  criadoEm: string;
+  fechadoPor?: string;
+  fechadoEm?: string;
+  itens: ItemInventario[];
 }

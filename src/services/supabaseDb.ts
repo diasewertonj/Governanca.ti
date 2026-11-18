@@ -19,6 +19,7 @@ import {
   CatalogoItem,
   ColaboradorRecurso,
   CompanySettings,
+  GrupoDepreciacao,
   CondicaoItem,
   Contrato,
   DestinoRecurso,
@@ -156,7 +157,12 @@ const MENSAGEM_DA_REGRA: Record<string, string> = {
   chk_contrato_item_alvo: 'Cada item do contrato deve ser um ativo ou uma licença',
   uq_contrato_item_ativo: 'O ativo já está neste contrato',
   uq_contrato_item_licenca: 'A licença já está neste contrato',
-  chk_fatura_alvo: 'A fatura deve ser de uma licença ou de um contrato',
+  chk_fatura_alvo: 'A fatura deve ser de uma licença, de um contrato ou de um pedido de compra',
+  uq_fatura_pedido: 'O pedido já tem fatura',
+  uq_orcamento: 'Já existe orçamento para esta categoria e área neste ano',
+  uq_pedido_cotacao_vencedora: 'O pedido já tem uma cotação vencedora',
+  uq_inventario_item: 'O equipamento já está nesta conferência',
+  chk_inventario_outro_local: 'Informe onde o equipamento foi encontrado',
   chk_fatura_paga: 'Fatura paga precisa da data de pagamento',
   chk_fatura_competencia: 'A competência deve ser o primeiro dia do mês',
   uq_fatura_licenca_comp: 'Já existe fatura não cancelada para esta competência',
@@ -256,6 +262,8 @@ const linhaAtivo = (a: Asset): TablesInsert<'ativos'> => ({
   custom_fields: json(a.customFields || {}),
   observacoes: a.observacoes?.trim() || null,
   fornecedor_id: a.fornecedorId || null,
+  // Fase 11: só vai quando informado (antes da migration a coluna não existe); '' = automático
+  ...(a.grupoDepreciacao !== undefined ? { grupo_depreciacao: a.grupoDepreciacao || null } : {}),
 });
 
 const linhaCustodia = (ativoId: string, c: CustodyHistoryEntry): TablesInsert<'historico_custodia'> => ({
@@ -554,6 +562,8 @@ export async function fetchAssetsFromDb(): Promise<Asset[] | null> {
     customFields: (a.custom_fields || {}) as Record<string, string>,
     observacoes: a.observacoes || undefined,
     fornecedorId: a.fornecedor_id || undefined,
+    grupoDepreciacao: (a.grupo_depreciacao || undefined) as GrupoDepreciacao | undefined,
+    pedidoId: a.pedido_id || undefined,
     anexos: anexosPorAtivo[a.id] || [],
     historicoCustodia: custodyByAssetId[a.id] || [],
     historicoManutencao: manutencoesPorAtivo[a.id] || [],
@@ -1093,6 +1103,7 @@ const linhaFatura = (f: Fatura): TablesInsert<'faturas'> => ({
   id: f.id,
   licenca_id: f.licencaId || null,
   contrato_id: f.contratoId || null,
+  ...(f.pedidoId ? { pedido_id: f.pedidoId } : {}),
   competencia: f.competencia,
   valor: f.valor,
   vencimento: f.vencimento,
@@ -1115,6 +1126,7 @@ export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
     id: l.id,
     licencaId: l.licenca_id || undefined,
     contratoId: l.contrato_id || undefined,
+    pedidoId: l.pedido_id || undefined,
     competencia: l.competencia,
     valor: Number(l.valor) || 0,
     vencimento: l.vencimento,
@@ -1728,6 +1740,7 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     logoUrl: data.logo_url || undefined,
     sla: (data.sla || undefined) as CompanySettings['sla'],
     termoExige: (data.termo_exige || undefined) as CompanySettings['termoExige'],
+    vidaUtil: (data.vida_util || undefined) as CompanySettings['vidaUtil'],
   };
 }
 
@@ -1753,6 +1766,8 @@ export async function saveSettingsDb(st: CompanySettings) {
         ...(st.docDevolucao ? { doc_devolucao: json(st.docDevolucao) } : {}),
         // Seção 9.5: só vai quando configurado (antes da migration a coluna não existe)
         ...(st.termoExige ? { termo_exige: json(st.termoExige) } : {}),
+        // Fase 11: idem para a vida útil (depreciação)
+        ...(st.vidaUtil ? { vida_util: json(st.vidaUtil) } : {}),
         logo_url: st.logoUrl || null,
         sla: st.sla ? json(st.sla) : null,
         updated_at: new Date().toISOString(),
@@ -1830,6 +1845,16 @@ export async function enviarTermoAssinadoDb(termoId: string, arquivo: File): Pro
   if (erro) throw new DbError(erro, 'validacao');
   if (!supabase) return URL.createObjectURL(arquivo);
   const caminho = `termos/${termoId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
+  await enviar(caminho, arquivo);
+  return caminho;
+}
+
+/** Fase 11: anexo da cotação (pedidos/<pedido_id>/...; só a T.I. envia); devolve o caminho */
+export async function enviarAnexoPedidoDb(pedidoId: string, arquivo: File): Promise<string> {
+  const erro = validarArquivo(arquivo);
+  if (erro) throw new DbError(erro, 'validacao');
+  if (!supabase) return URL.createObjectURL(arquivo);
+  const caminho = `pedidos/${pedidoId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`;
   await enviar(caminho, arquivo);
   return caminho;
 }

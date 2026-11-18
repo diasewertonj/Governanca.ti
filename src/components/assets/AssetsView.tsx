@@ -315,7 +315,8 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                         </span>
                       </td>
                       <td data-label="Número de série" className="hidden xl:table-cell font-mono text-slate-600">
-                        {asset.serialNumber}
+                        {/* Fase 11: recebido de pedido sem série informada */}
+                        {asset.serialNumber.startsWith('A-PREENCHER') ? <span className="selo selo-atencao font-sans">a preencher</span> : asset.serialNumber}
                       </td>
 
                       {/* Custodiante com link contextual 360° */}

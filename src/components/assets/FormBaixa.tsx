@@ -16,6 +16,8 @@ import { isoLocal } from '../../utils/formatters.ts';
 import { ArquivosParaEnviar, enviarArquivos, type ArquivoParaEnviar } from './ArquivosParaEnviar.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
 import { CampoMoeda } from '../ui/Campos.tsx';
+import { depreciacao } from '../../utils/patrimonio.ts';
+import { brl } from '../../utils/financeiro.ts';
 
 /**
  * Fase 8: "Dar baixa" (só ti_admin) em modal-tela. Explica na tela o que
@@ -23,7 +25,7 @@ import { CampoMoeda } from '../ui/Campos.tsx';
  * pede confirmação e só então grava; as evidências sobem depois, ligadas à baixa.
  */
 export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ asset, onClose }) => {
-  const { employees, baixarAtivo, anexarArquivoAtivo } = useApp();
+  const { employees, baixarAtivo, anexarArquivoAtivo, settings } = useApp();
   const [motivo, setMotivo] = useState<MotivoBaixa | ''>('');
   const [destino, setDestino] = useState<DestinoBaixa | ''>('');
   const [dataBaixa, setDataBaixa] = useState(isoLocal(new Date()));
@@ -38,6 +40,8 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
   const custodiante = employees.find((e) => e.id === asset.custodianteId);
   const bloqueios = bloqueiosDaBaixa(asset, motivo);
   const encerraCustodia = Boolean(asset.custodianteId && motivo && MOTIVOS_SEM_DEVOLUCAO.includes(motivo));
+  // Fase 11: valor contábil na data da baixa (compra − depreciação até lá)
+  const contabil = depreciacao(asset, settings.vidaUtil, dataBaixa || isoLocal(new Date()));
 
   const valores = JSON.stringify([motivo, destino, dataBaixa, destinatario, documento, valorVenda, observacoes]);
   const [valoresIniciais] = useState(valores);
@@ -114,6 +118,13 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
       }
     >
         <form id={id('form')} onSubmit={registrar} className="space-y-4">
+          {!contabil.semDados && (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              Valor contábil em {dataBaixa ? dataBaixa.split('-').reverse().join('/') : 'hoje'}:{' '}
+              <span className="font-mono font-semibold text-slate-900">{brl(contabil.valorAtual)}</span> (compra {brl(contabil.valorCompra)} − depreciação{' '}
+              {brl(contabil.acumulada)}). É o valor que sai do patrimônio com a baixa.
+            </p>
+          )}
           {bloqueios.length > 0 && (
             <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1" role="status">
               <p className="flex items-center gap-1.5 font-semibold">

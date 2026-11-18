@@ -8,6 +8,7 @@ import { DialogoHost } from './components/ui/dialogo.tsx';
 import { NavegacaoProvider } from './components/ui/navegacao.tsx';
 import { AppProvider, useApp } from './context/AppContext.tsx';
 import { RecursosProvider } from './context/RecursosContext.tsx';
+import { ComprasProvider, useCompras } from './context/ComprasContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
@@ -37,6 +38,8 @@ const PrintableTermModal = lazy(() => import('./components/terms/PrintableTermMo
 const QrCodeLabelModal = lazy(() => import('./components/assets/QrCodeLabelModal.tsx').then((m) => ({ default: m.QrCodeLabelModal })));
 const Software360Modal = lazy(() => import('./components/assets/Software360Modal.tsx').then((m) => ({ default: m.Software360Modal })));
 const SoftwareFormModal = lazy(() => import('./components/assets/SoftwareFormModal.tsx').then((m) => ({ default: m.SoftwareFormModal })));
+const PedidosCompraView = lazy(() => import('./components/compras/PedidosCompraView.tsx').then((m) => ({ default: m.PedidosCompraView })));
+const ConferenciaView = lazy(() => import('./components/compras/ConferenciaView.tsx').then((m) => ({ default: m.ConferenciaView })));
 const TelaProcesso = lazy(() => import('./components/processos/TelaProcesso.tsx').then((m) => ({ default: m.TelaProcesso })));
 
 const Carregando = () => (
@@ -67,6 +70,7 @@ function MainApp() {
     processoAberto,
     fecharProcesso,
   } = useApp();
+  const { podePedirCompra } = useCompras();
 
   const [viewSolicitada, setCurrentView] = useState<string>('dashboard');
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
@@ -97,7 +101,7 @@ function MainApp() {
 
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
-  const currentView = vistaPermitida(currentRole, viewSolicitada);
+  const currentView = vistaPermitida(currentRole, viewSolicitada, { pedeCompra: podePedirCompra });
 
   // Fase 5: trocar de tela com alterações não salvas pede confirmação
   // Seção 9.2: com a tela de um processo aberta, o menu volta para a tela escolhida
@@ -190,6 +194,8 @@ function MainApp() {
           {currentView === 'terms' && <TermsView />}
           {currentView === 'lembretes' && <LembretesView />}
           {currentView === 'settings' && <SettingsView />}
+          {currentView === 'pedidos_compra' && <PedidosCompraView />}
+          {currentView === 'conferencia' && <ConferenciaView />}
           {currentView === 'my_assets' && (
             <MyAssetsView
               onOpenNewTicketForAsset={(ativoId) => {
@@ -271,9 +277,11 @@ export default function App() {
   return (
     <AppProvider>
       <RecursosProvider>
-        <NavegacaoProvider>
-          <MainApp />
-        </NavegacaoProvider>
+        <ComprasProvider>
+          <NavegacaoProvider>
+            <MainApp />
+          </NavegacaoProvider>
+        </ComprasProvider>
       </RecursosProvider>
     </AppProvider>
   );

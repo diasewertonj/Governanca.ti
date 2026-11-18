@@ -32,6 +32,9 @@ import {
 import { ContasPagarView, ContratoPorId } from './FinanceiroViews.tsx';
 import { CartaoPatrimonio, ComprasView } from './ComprasView.tsx';
 import { Abas } from '../ui/Abas.tsx';
+import { useCompras } from '../../context/ComprasContext.tsx';
+import { PedidosCompraView } from '../compras/PedidosCompraView.tsx';
+import { OrcamentoView } from '../compras/OrcamentoView.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
 type Atalho = 'este_mes' | 'mes_anterior' | 'ult3' | 'ult6' | 'ult12' | 'este_ano' | 'ano_anterior' | 'personalizado';
@@ -97,7 +100,11 @@ interface Origem {
 }
 
 export const FinanceiroView: React.FC = () => {
-  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras'>('contas');
+  const { pedidos } = useCompras();
+  const { currentRole } = useApp();
+  // Admin: os que esperam a aprovação dele; T.I.: os que esperam compra ou recebimento
+  const pedidosPendentes = pedidos.filter((p) => (currentRole === 'ti_admin' ? p.status === 'aguardando' : p.status === 'aprovado' || p.status === 'comprado')).length;
+  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras' | 'pedidos' | 'orcamento'>('contas');
   // Período em comum entre Despesas e Compras
   const [atalho, setAtalho] = useState<Atalho>('ult6');
   const [deManual, setDeManual] = useState('');
@@ -116,6 +123,8 @@ export const FinanceiroView: React.FC = () => {
         { id: 'contas', rotulo: 'Contas a pagar' },
         { id: 'despesas', rotulo: 'Despesas' },
         { id: 'compras', rotulo: 'Compras' },
+        { id: 'pedidos', rotulo: 'Pedidos de compra', contador: pedidosPendentes },
+        { id: 'orcamento', rotulo: 'Orçamento' },
       ]}
     />
   );
@@ -135,6 +144,8 @@ export const FinanceiroView: React.FC = () => {
     </>
   );
   if (aba === 'contas') return <ContasPagarView abas={abas} />;
+  if (aba === 'pedidos') return <PedidosCompraView abas={abas} />;
+  if (aba === 'orcamento') return <OrcamentoView abas={abas} />;
   if (aba === 'compras') return <ComprasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
   return <DespesasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
 };

@@ -12,6 +12,7 @@ import { formatDate } from '../../utils/formatters.ts';
 import { normalizar } from '../../utils/processos.ts';
 import { baixarCsv, brl, comprasDeEquipamentos, paraCsv, somarPor, valorPatrimonio, type CompraEquipamento } from '../../utils/financeiro.ts';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
+import { ROTULO_GRUPO_DEPRECIACAO, depreciacao } from '../../utils/patrimonio.ts';
 
 const ROTULO_CATEGORIA_ATIVO: Record<AssetCategory, string> = {
   hardware: 'Hardware',
@@ -22,15 +23,16 @@ const ROTULO_CATEGORIA_ATIVO: Record<AssetCategory, string> = {
 
 /** Cartão "Valor do patrimônio" (Despesas e Compras): equipamentos sem baixa + acessórios em estoque */
 export const CartaoPatrimonio: React.FC<{ className?: string }> = ({ className = '' }) => {
-  const { assets } = useApp();
+  const { assets, settings } = useApp();
   const { estoque } = useRecursos();
-  const vp = useMemo(() => valorPatrimonio(assets, estoque), [assets, estoque]);
+  const vp = useMemo(() => valorPatrimonio(assets, estoque, settings.vidaUtil), [assets, estoque, settings.vidaUtil]);
   return (
     <div className={`cartao min-w-0 p-3 ${className}`}>
       <p className="text-xs text-slate-500">Valor do patrimônio hoje</p>
-      <p className="font-mono text-lg font-semibold text-slate-900">{brl(vp.total)}</p>
+      <p className="font-mono text-lg font-semibold text-slate-900">{brl(vp.totalAtual)}</p>
       <p className="text-xs text-slate-500">
-        equipamentos <span className="font-mono">{brl(vp.equipamentos)}</span> · acessórios em estoque <span className="font-mono">{brl(vp.acessorios)}</span>
+        valor atual · compra <span className="font-mono">{brl(vp.total)}</span> · depreciado <span className="font-mono">{brl(vp.depreciacaoAcumulada)}</span> · acessórios em estoque{' '}
+        <span className="font-mono">{brl(vp.acessorios)}</span>
       </p>
       {vp.semValor > 0 && (
         <p className="text-xs text-amber-800">
@@ -74,7 +76,7 @@ export const ComprasView: React.FC<{
   /** Seletor de período (atalhos ou de/até), montado pelo Financeiro */
   filtroPeriodo: React.ReactNode;
 }> = ({ abas, periodo, filtroPeriodo }) => {
-  const { assets, fornecedores, abrirFicha } = useApp();
+  const { assets, fornecedores, abrirFicha, departments, settings } = useApp();
   const [fFornecedor, setFFornecedor] = useState('');
   const [fCategoria, setFCategoria] = useState<AssetCategory | ''>('');
   const [busca, setBusca] = useState('');
@@ -108,6 +110,34 @@ export const ComprasView: React.FC<{
       )
     );
 
+  // Fase 11: relatório do patrimônio (cada equipamento sem baixa, com área, categoria, local e valor atual)
+  const relatorioPatrimonio = () =>
+    baixarCsv(
+      `patrimonio-${new Date().toISOString().slice(0, 10)}.csv`,
+      paraCsv(
+        ['Patrimônio', 'Equipamento', 'Área', 'Categoria', 'Grupo de vida útil', 'Local', 'Data de aquisição', 'Valor de compra (R$)', 'Depreciação acumulada (R$)', 'Valor atual (R$)', 'Chega ao residual em'],
+        assets
+          .filter((a) => a.status !== 'descartado')
+          .sort((a, b) => a.tag.localeCompare(b.tag))
+          .map((a) => {
+            const d = depreciacao(a, settings.vidaUtil);
+            return [
+              a.tag,
+              a.nome,
+              departments.find((x) => x.id === a.setorId)?.nome || '',
+              ROTULO_CATEGORIA_ATIVO[a.categoria] || a.categoria,
+              `${ROTULO_GRUPO_DEPRECIACAO[d.grupo]}${d.anos ? ` (${d.anos} anos)` : ''}`,
+              a.localizacaoFisica,
+              a.fiscal?.dataAquisicao || '',
+              d.valorCompra,
+              d.acumulada,
+              d.valorAtual,
+              d.zeraEm ? d.zeraEm.slice(0, 7) : '',
+            ];
+          })
+      )
+    );
+
   const limpar = () => {
     setFFornecedor('');
     setFCategoria('');
@@ -121,9 +151,14 @@ export const ComprasView: React.FC<{
         titulo="Financeiro"
         subtitulo={`Compras de equipamento de ${formatDate(periodo.de)} a ${formatDate(periodo.ate)}, pela data de aquisição · valor da ficha fiscal, sem lançamento novo`}
         acoes={
-          <button type="button" onClick={exportar} className="btn btn-secundario">
-            <Download /> Exportar CSV
-          </button>
+          <>
+            <button type="button" onClick={relatorioPatrimonio} className="btn btn-secundario" title="Todos os equipamentos sem baixa, com valor de compra, depreciação e valor atual">
+              <Download /> Relatório do patrimônio
+            </button>
+            <button type="button" onClick={exportar} className="btn btn-secundario">
+              <Download /> Exportar CSV
+            </button>
+          </>
         }
         abas={abas}
         filtros={

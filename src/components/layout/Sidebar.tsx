@@ -12,6 +12,8 @@ import {
   Phone,
   Wallet,
   Briefcase,
+  ClipboardCheck,
+  ShoppingCart,
   FileText,
   Handshake,
   House,
@@ -27,6 +29,7 @@ import {
 import { menuDoPapel, type Contador, type Icone } from '../../utils/navegacao.ts';
 import { termoAberto } from '../../utils/termos.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
+import { useCompras } from '../../context/ComprasContext.tsx';
 import { listarVencimentos, pendenciasConciliacao } from '../../utils/financeiro.ts';
 import { pendenciasTermo } from '../../utils/inventario.ts';
 
@@ -49,6 +52,8 @@ const ICONES: Record<Icone, LucideIcon> = {
   meus_equipamentos: Briefcase,
   meus_chamados: Ticket,
   configuracoes: Settings,
+  compras: ShoppingCart,
+  conferencia: ClipboardCheck,
 };
 
 interface SidebarProps {
@@ -67,6 +72,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpenNewTicketModal, aberto, onFechar }) => {
   const { currentRole, tickets, currentUser, lembretes, terms, assets, contratos, licenses, faturas, employees, processoItens, settings } = useApp();
   const { estoque, linhas } = useRecursos();
+  const { podePedirCompra, pedidos, alertas: alertasOrcamento } = useCompras();
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   // Seção 6: o que vence em 30 dias (e pendências sem data), só para a T.I. — os mesmos
   // dados do "Precisa de atenção" (inclui passos agendados e termos desatualizados)
@@ -74,10 +80,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     if (!isTI) return 0;
     const termosDesatualizados = pendenciasTermo(employees, { ativos: assets, termos: terms, chamados: tickets, cfg: settings.termoExige });
     return listarVencimentos(
-      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados, termos: terms },
+      { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados, termos: terms, pedidos, alertasOrcamento, papel: currentRole },
       30
     ).length;
-  }, [isTI, assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige]);
+  }, [isTI, assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, pedidos, alertasOrcamento, currentRole]);
   const qtdConciliar = currentRole === 'ti_admin' ? pendenciasConciliacao(licenses, assets).length : 0;
 
   // Fecha a gaveta com Esc
@@ -182,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
           </button>
 
           <nav className="space-y-2">
-            {menuDoPapel(currentRole).map((grupo, gi) => {
+            {menuDoPapel(currentRole, { pedeCompra: podePedirCompra }).map((grupo, gi) => {
               // Grupos recolhíveis: o do item atual fica sempre aberto; recolhido mostra a soma dos contadores
               const temAtual = grupo.itens.some((it) => it.vista === currentView);
               const recolhido = !!grupo.titulo && !temAtual && recolhidos.includes(grupo.titulo);

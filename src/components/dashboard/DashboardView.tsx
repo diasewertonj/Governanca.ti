@@ -38,6 +38,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     currentRole,
     terms,
     abrirFicha,
+    settings,
   } = useApp();
   const { linhas, estoque } = useRecursos();
   const termosAguardando = terms.filter((t) => termoAberto(t) && (!t.formaAssinatura || t.formaAssinatura === 'pendente'));
@@ -75,7 +76,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const emManutencao = assets.filter((a) => a.status === 'manutencao').length;
   // Seção 9.4: valor do patrimônio (ficha fiscal + acessórios em estoque), só para a T.I.
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
-  const patrimonio = isTI ? valorPatrimonio(assets, estoque) : null;
+  const patrimonio = isTI ? valorPatrimonio(assets, estoque, settings.vidaUtil) : null;
   const mostrarQuadro =
     garantiasProximas.length > 0 ||
     contratosVencendo > 0 ||
@@ -187,9 +188,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <span className="secao-titulo">Valor do patrimônio</span>
               <Landmark className="w-4 h-4 text-blue-600" aria-hidden="true" />
             </div>
-            <div className="mt-2 text-2xl 2xl:text-xl font-bold font-mono tracking-tight text-slate-900">{brl(patrimonio.total)}</div>
+            <div className="mt-2 text-2xl 2xl:text-xl font-bold font-mono tracking-tight text-slate-900">{brl(patrimonio.totalAtual)}</div>
+            <div className="text-xs text-slate-500">valor atual (com depreciação)</div>
             <div className="mt-2 text-xs text-slate-500">
-              equipamentos <span className="font-mono">{brl(patrimonio.equipamentos)}</span> · acessórios em estoque{' '}
+              compra <span className="font-mono">{brl(patrimonio.total)}</span> · depreciado <span className="font-mono">{brl(patrimonio.depreciacaoAcumulada)}</span> · acessórios{' '}
               <span className="font-mono">{brl(patrimonio.acessorios)}</span>
             </div>
             {patrimonio.semValor > 0 && (
