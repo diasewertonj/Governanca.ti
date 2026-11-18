@@ -1933,6 +1933,10 @@ export type Database = {
         Args: { p_colaborador: string; p_licenca: string; p_motivo: string }
         Returns: Json
       }
+      reabrir_processo: {
+        Args: { p_chamado: string; p_motivo: string }
+        Returns: undefined
+      }
       ativos_visiveis: {
         Args: Record<PropertyKey, never>
         Returns: Database['public']['Tables']['ativos']['Row'][]

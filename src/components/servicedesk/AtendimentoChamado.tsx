@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Ban, CheckCircle2, History, RotateCcw, Star } from 'lucide-react';
+import { Ban, CheckCircle2, RotateCcw, Star } from 'lucide-react';
 import { Janela } from '../ui/Janela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import type { CausaChamado, EventoChamado, MotivoCancelamento, Ticket, TipoSolucao } from '../../types/index.ts';
@@ -205,7 +205,6 @@ export const HistoricoChamado: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   );
 };
 
-export const IconeHistorico = History;
 
 // -----------------------------------------------------------------------------
 // Janelas: registrar solução, cancelar, reabrir

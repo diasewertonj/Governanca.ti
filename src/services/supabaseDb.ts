@@ -1992,6 +1992,12 @@ export async function limparAgendaItemDb(itemId: string) {
   await atualizar('processo_itens', itemId, { lembrete_em: null });
 }
 
+/** Admin: reabre admissão/desligamento concluído (motivo obrigatório; desligamento reativa a pessoa) */
+export async function reabrirProcessoDb(chamadoId: string, motivo: string) {
+  if (!supabase) return;
+  await checar(supabase.rpc('reabrir_processo', { p_chamado: chamadoId, p_motivo: motivo }));
+}
+
 export async function concluirProcessoDb(chamadoId: string) {
   if (!supabase) return null;
   return (await checar(supabase.rpc('concluir_processo', { p_chamado: chamadoId }))) as unknown as {

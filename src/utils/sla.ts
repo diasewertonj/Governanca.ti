@@ -75,14 +75,21 @@ export function somarMinutosUteis(inicio: Date, minutos: number): Date {
   return cursor;
 }
 
-/** Intervalos em que o chamado ficou "aguardando" (o último pode estar em aberto) */
+/** Situações que param o relógio: aguardando terceiro e encerrado (até uma eventual reabertura) */
+const PAUSAM = new Set(['aguardando_terceiro', 'resolvido']);
+
+/**
+ * Intervalos em que o prazo ficou parado (o último pode estar em aberto): "aguardando" e o
+ * tempo entre encerrar e reabrir — um chamado reaberto não "herda" o tempo em que ficou fechado.
+ */
 export function pausas(eventos: Pick<EventoChamado, 'tipo' | 'de' | 'para' | 'criadoEm'>[]): { inicio: Date; fim?: Date }[] {
   const lista: { inicio: Date; fim?: Date }[] = [];
   const ordenados = [...eventos].sort((x, y) => x.criadoEm.localeCompare(y.criadoEm));
   for (const e of ordenados) {
     const aberta = lista.length && !lista[lista.length - 1].fim ? lista[lista.length - 1] : undefined;
-    if (e.para === 'aguardando_terceiro' && !aberta) lista.push({ inicio: new Date(e.criadoEm) });
-    else if (aberta && e.de === 'aguardando_terceiro' && e.para !== 'aguardando_terceiro') aberta.fim = new Date(e.criadoEm);
+    const paraPausa = !!e.para && PAUSAM.has(e.para);
+    if (paraPausa && !aberta) lista.push({ inicio: new Date(e.criadoEm) });
+    else if (aberta && e.de && PAUSAM.has(e.de) && !paraPausa) aberta.fim = new Date(e.criadoEm);
   }
   return lista;
 }

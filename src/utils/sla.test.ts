@@ -66,6 +66,18 @@ describe('prazos', () => {
     expect(pausado.solucao.estado).toBe('pausado');
   });
 
+  it('reaberto: o tempo em que ficou encerrado não conta', () => {
+    const eventos = [
+      { tipo: 'status' as const, de: 'em_andamento', para: 'resolvido', criadoEm: d(16, 10).toISOString() },
+      { tipo: 'status' as const, de: 'resolvido', para: 'em_andamento', criadoEm: d(18, 10).toISOString() },
+    ];
+    expect(pausas(eventos)).toHaveLength(1);
+    // aberto às 9h, encerrado às 10h (1h usada), reaberto 2 dias depois às 10h: restam 3h de prazo
+    const s = situacaoSla({ ...base, status: 'em_andamento' }, eventos, PRAZOS_PADRAO, d(18, 11))!;
+    expect(s.solucao.vence).toEqual(d(18, 13));
+    expect(s.solucao.estado).toBe('no_prazo'); // antes: "atrasado" logo na reabertura
+  });
+
   it('encerrado: no prazo ou fora do prazo; processos e cancelados ficam de fora', () => {
     const resolvido = (h: number) =>
       situacaoSla(

@@ -416,6 +416,36 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             </dl>
           </section>
 
+          {/* Revisão 10.5: o RH vê, no desligamento, o que ainda está com a pessoa */}
+          {currentRole === 'rh' &&
+            (employee.status === 'desligado' ||
+              tickets.some(
+                (t) =>
+                  t.tipo === 'offboarding' &&
+                  (t.colaboradorId === employee.id || t.offboarding?.colaboradorId === employee.id) &&
+                  t.status !== 'resolvido' &&
+                  t.status !== 'cancelado'
+              )) && (
+              <section className="cartao space-y-2 p-4">
+                <h3 className="secao-titulo">Ainda com a pessoa</h3>
+                {currentAssets.length === 0 && assignedLicenses.length === 0 ? (
+                  <p className="text-xs text-slate-600">Nenhum equipamento nem software em nome dela.</p>
+                ) : (
+                  <ul className="space-y-1 text-xs text-slate-700">
+                    {currentAssets.map((a) => (
+                      <li key={a.id}>
+                        <span className="font-mono">{a.tag}</span> · {a.nome}
+                      </li>
+                    ))}
+                    {assignedLicenses.map((l) => (
+                      <li key={l.id}>Software: {l.nome}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="ajuda">A T.I. devolve e desvincula tudo pelo checklist do desligamento.</p>
+              </section>
+            )}
+
           {/* Fase 7: acesso ao Nexus (senha provisória fora do onboarding) */}
           {isTIFicha && (
             <section className="cartao space-y-3 p-4">
