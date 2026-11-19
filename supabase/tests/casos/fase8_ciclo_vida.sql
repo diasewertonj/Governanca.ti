@@ -83,17 +83,21 @@ select harness.rodar('fase8', 'R2 fatura com valor negativo é recusada',
   'erro: new row for relation "faturas" violates check constraint "faturas_valor_check"', :'sup', 'authenticated',
   $q$insert into public.faturas (licenca_id, competencia, valor, vencimento) values ('lic-1', '2026-11-01', -1, '2026-11-10')$q$);
 select harness.rodar('fase8', 'R3 fatura paga sem data de pagamento é recusada',
-  'erro: new row for relation "faturas" violates check constraint "chk_fatura_paga"', :'sup', 'authenticated',
+  'erro: new row for relation "faturas" violates check constraint "chk_fatura_paga"', :'admin', 'authenticated',
   $q$update public.faturas set status = 'paga' where id = 'fat-1'$q$);
 select harness.rodar('fase8', 'R4 duas faturas na mesma competência são recusadas',
   'erro: duplicate key value violates unique constraint "uq_fatura_licenca_comp"', :'sup', 'authenticated',
   $q$insert into public.faturas (licenca_id, competencia, valor, vencimento) values ('lic-1', '2026-10-01', 100, '2026-10-10')$q$);
-select harness.rodar('fase8', 'R5 competência liberada quando a fatura anterior foi cancelada; pagar com data', 'ok', :'sup', 'authenticated',
+select harness.rodar('fase8', 'R5 competência liberada quando a fatura anterior foi cancelada; suporte lança mas não paga (seção 17, decisão 2)', 'ok', :'sup', 'authenticated',
   $q$do $x$ begin
     perform harness.afeta($s$update public.faturas set status = 'cancelada' where id = 'fat-1'$s$, 1);
     insert into public.faturas (id, licenca_id, competencia, valor, vencimento) values ('fat-2', 'lic-1', '2026-10-01', 100, '2026-10-10');
-    perform harness.afeta($s$update public.faturas set status = 'paga', pago_em = '2026-10-09' where id = 'fat-2'$s$, 1);
-    perform harness.espera($s$select 1 from public.faturas where id = 'fat-2' and criado_por = 'emp-sup'$s$, 1);
+    begin
+      update public.faturas set status = 'paga', pago_em = '2026-10-09' where id = 'fat-2';
+      raise exception 'suporte pagou';
+    exception when insufficient_privilege then null;
+    end;
+    perform harness.espera($s$select 1 from public.faturas where id = 'fat-2' and criado_por = 'emp-sup' and status = 'a_pagar'$s$, 1);
   end $x$$q$);
 select harness.rodar('fase8', 'R6 competência precisa ser o 1º dia do mês',
   'erro: new row for relation "faturas" violates check constraint "chk_fatura_competencia"', :'sup', 'authenticated',

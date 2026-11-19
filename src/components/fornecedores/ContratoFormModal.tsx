@@ -534,7 +534,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                       ))}
                     </select>
                   </div>
-                  {formaPagamento === 'cartao' && (
+                  {formaPagamento === 'cartao' && currentRole !== 'ti_suporte' && (
                     <div>
                       <label htmlFor="ctr-cartao" className={CLASSE_ROTULO}>
                         Cartão (4 últimos dígitos)
@@ -549,12 +549,14 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                       />
                     </div>
                   )}
-                  <div>
-                    <label htmlFor="ctr-titular" className={CLASSE_ROTULO}>
-                      Titular do pagamento
-                    </label>
-                    <input id="ctr-titular" value={titular} onChange={(e) => setTitular(e.target.value)} className={CLASSE_CAMPO} />
-                  </div>
+                  {currentRole !== 'ti_suporte' && (
+                    <div>
+                      <label htmlFor="ctr-titular" className={CLASSE_ROTULO}>
+                        Titular do pagamento
+                      </label>
+                      <input id="ctr-titular" value={titular} onChange={(e) => setTitular(e.target.value)} className={CLASSE_CAMPO} />
+                    </div>
+                  )}
                 </div>
               </div>
 

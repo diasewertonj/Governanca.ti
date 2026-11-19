@@ -26,7 +26,15 @@ export type Vista =
   | 'my_assets'
   | 'my_tickets'
   | 'pedidos_compra'
-  | 'conferencia';
+  | 'conferencia'
+  // Seção 17: Financeiro e Gestão de T.I.
+  | 'recebimentos'
+  | 'painel_executivo'
+  | 'orcamento'
+  | 'projecao'
+  | 'patrimonio'
+  | 'relatorios'
+  | 'custos_area';
 
 /** Título da tela (cabeçalho e aba do navegador) */
 export const TITULO_VISTA: Record<Vista, string> = {
@@ -38,9 +46,9 @@ export const TITULO_VISTA: Record<Vista, string> = {
   contratos: 'Contratos',
   vencimentos: 'Vencimentos',
   contas_pagar: 'Contas a pagar',
-  despesas: 'Despesas',
+  despesas: 'Custos recorrentes',
   conciliar: 'Conciliar fornecedores',
-  financeiro: 'Financeiro',
+  financeiro: 'Contas a pagar',
   collaborators: 'Colaboradores',
   servicedesk: 'Chamados',
   rh_processes: 'Admissões e desligamentos',
@@ -51,6 +59,13 @@ export const TITULO_VISTA: Record<Vista, string> = {
   my_tickets: 'Meus chamados',
   pedidos_compra: 'Pedidos de compra',
   conferencia: 'Inventário físico',
+  recebimentos: 'Recebimentos',
+  painel_executivo: 'Painel executivo',
+  orcamento: 'Orçamento',
+  projecao: 'Projeção',
+  patrimonio: 'Patrimônio',
+  relatorios: 'Relatórios',
+  custos_area: 'Custos da minha área',
 };
 
 export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar' | 'processos' | 'pedidos';
@@ -75,7 +90,13 @@ export type Icone =
   | 'meus_chamados'
   | 'configuracoes'
   | 'compras'
-  | 'conferencia';
+  | 'conferencia'
+  | 'recebimentos'
+  | 'painel'
+  | 'orcamento'
+  | 'projecao'
+  | 'patrimonio'
+  | 'relatorios';
 
 export interface ItemMenu {
   vista: Vista;
@@ -107,19 +128,27 @@ const MINHA_AREA: GrupoMenu = {
 /** O que muda o menu além do papel (Fase 11: gestor pede compra) */
 export interface OpcoesMenu {
   pedeCompra?: boolean;
+  /** Seção 17 (decisão 10): colaborador com equipe vê os custos da área dele */
+  gestor?: boolean;
 }
 
 /** Menu de cada perfil (a proteção real continua no banco, por RLS) */
 export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu[] {
   // Fase 11: o gestor (colaborador com equipe) pede compra pela Minha área
-  if (papel === 'colaborador')
-    return [opcoes.pedeCompra === false ? MINHA_AREA : { ...MINHA_AREA, itens: [...MINHA_AREA.itens, item('pedidos_compra', 'compras', 'pedidos')] }];
+  if (papel === 'colaborador') {
+    const itens = [...MINHA_AREA.itens];
+    if (opcoes.pedeCompra !== false) itens.push(item('pedidos_compra', 'compras', 'pedidos'));
+    if (opcoes.gestor) itens.push(item('custos_area', 'orcamento'));
+    return [{ ...MINHA_AREA, itens }];
+  }
 
-  // Seção 13: departamento de Compras (aprova, compra e paga as faturas dos pedidos)
+  // Seção 13 + 17 (decisão 1): Compras paga todas as faturas, confirma recebimentos,
+  // acompanha o orçamento e a projeção (totais) e tira os relatórios
   if (papel === 'compras') {
     return [
       { itens: [item('pedidos_compra', 'compras', 'pedidos')] },
-      { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('fornecedores', 'fornecedores')] },
+      { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('recebimentos', 'recebimentos'), item('fornecedores', 'fornecedores')] },
+      { titulo: 'Acompanhamento', itens: [item('orcamento', 'orcamento'), item('projecao', 'projecao'), item('relatorios', 'relatorios')] },
       MINHA_AREA,
     ];
   }
@@ -148,9 +177,20 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
       itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],
     },
     // Seção 15: pedidos de compra com item próprio (não é mais aba do Financeiro)
-    { itens: [item('pedidos_compra', 'compras', 'pedidos')] },
-    // Item único: sem título de grupo repetindo o nome
-    { itens: [item('financeiro', 'contas_pagar')] },
+    { titulo: 'Compras', itens: [item('pedidos_compra', 'compras', 'pedidos')] },
+    // Seção 17: Financeiro (executar e pagar) separado da Gestão de T.I. (planejar e prestar contas)
+    { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('recebimentos', 'recebimentos'), item('despesas', 'despesas')] },
+    {
+      titulo: 'Gestão de T.I.',
+      itens: [
+        // Painel executivo e exportações contábeis: só o admin (decisão 2)
+        ...(papel === 'ti_admin' ? [item('painel_executivo', 'painel')] : []),
+        item('orcamento', 'orcamento'),
+        item('projecao', 'projecao'),
+        item('patrimonio', 'patrimonio'),
+        ...(papel === 'ti_admin' ? [item('relatorios', 'relatorios')] : []),
+      ],
+    },
     // T.I./admin: sem Minha área — Meus equipamentos fica no menu da conta; os próprios chamados, em Chamados
   ];
   if (papel === 'ti_admin')

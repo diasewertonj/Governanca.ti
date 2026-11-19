@@ -334,8 +334,11 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
 
             <SecaoResumo titulo="Pagamento e renovação">
               <Dado rotulo="Forma de pagamento">{pg?.formaPagamento ? ROTULO_FORMA_PAGAMENTO[pg.formaPagamento] : undefined}</Dado>
-              {pg?.formaPagamento === 'cartao' && <Dado rotulo="Cartão">{pg.cartaoFinal ? <span className="font-mono">final {pg.cartaoFinal}</span> : undefined}</Dado>}
-              <Dado rotulo="Titular">{pg?.titular || undefined}</Dado>
+              {/* Seção 17 (decisão 2): o suporte não vê cartão nem titular */}
+              {pg?.formaPagamento === 'cartao' && currentRole !== 'ti_suporte' && (
+                <Dado rotulo="Cartão">{pg.cartaoFinal ? <span className="font-mono">final {pg.cartaoFinal}</span> : undefined}</Dado>
+              )}
+              {currentRole !== 'ti_suporte' && <Dado rotulo="Titular">{pg?.titular || undefined}</Dado>}
               <Dado rotulo="Moeda">
                 {!pg?.moeda || pg.moeda === 'BRL' ? (
                   'Real (R$)'

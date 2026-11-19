@@ -566,6 +566,32 @@ export function baixarCsv(nome: string, conteudo: string) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Seção 17 (decisão 12): planilha do Excel (XML 2003, abre direto no Excel, com
+ * números como números). Mesmo cabeçalho e linhas do CSV.
+ */
+export function paraExcel(aba: string, cabecalho: string[], linhas: (string | number | undefined)[][]): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const cel = (v: string | number | undefined) =>
+    typeof v === 'number' && Number.isFinite(v) ? `<Cell><Data ss:Type="Number">${v}</Data></Cell>` : `<Cell><Data ss:Type="String">${esc(v === undefined ? '' : String(v))}</Data></Cell>`;
+  const linha = (l: (string | number | undefined)[]) => `<Row>${l.map(cel).join('')}</Row>`;
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+    `<Worksheet ss:Name="${esc(aba.slice(0, 31))}"><Table>${linha(cabecalho)}${linhas.map(linha).join('')}</Table></Worksheet></Workbook>`
+  );
+}
+
+export function baixarExcel(nome: string, conteudo: string) {
+  const blob = new Blob([conteudo], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // -----------------------------------------------------------------------------

@@ -804,6 +804,7 @@ export type Database = {
           doc_entrega: Json
           termo_exige?: Json | null
           vida_util?: Json | null
+          premissas_financeiras?: Json | null
           campos_personalizados: Json | null
           cep: string
           cidade_uf: string
@@ -825,6 +826,7 @@ export type Database = {
           doc_entrega?: Json
           termo_exige?: Json | null
           vida_util?: Json | null
+          premissas_financeiras?: Json | null
           campos_personalizados?: Json | null
           cep: string
           cidade_uf: string
@@ -846,6 +848,7 @@ export type Database = {
           doc_entrega?: Json
           termo_exige?: Json | null
           vida_util?: Json | null
+          premissas_financeiras?: Json | null
           campos_personalizados?: Json | null
           cep?: string
           cidade_uf?: string

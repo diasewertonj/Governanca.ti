@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Paperclip, Pencil, Plus, Receipt, RotateCcw, Trash2, Upload, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
-import type { Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
+import type { Asset, CategoriaDespesa, Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
+import { LIMITE_CAPITALIZACAO_PADRAO, naturezaDoLancamento } from '../../utils/gestaoFinanceira.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
 import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
@@ -24,7 +25,7 @@ import {
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
-import { formaCobrancaDe, ROTULO_FORMA_PAGAMENTO, valorDaFatura } from '../../utils/financeiro.ts';
+import { formaCobrancaDe, ROTULO_CATEGORIA, ROTULO_FORMA_PAGAMENTO, valorDaFatura } from '../../utils/financeiro.ts';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { CampoMoeda } from '../ui/Campos.tsx';
 import { Janela } from '../ui/Janela.tsx';
@@ -41,6 +42,8 @@ interface FaturasSecaoProps {
   listaGlobal?: Fatura[];
   /** Lote 1 (L2): quando informado, não deixa lançar fatura aqui e explica onde lançar */
   bloqueioLancamento?: string;
+  /** Seção 17: nome da origem calculado pela tela (Compras usa o resumo de contratos) */
+  nomeOrigem?: (f: Fatura) => string;
 }
 
 /** Selo de situação da fatura (padrão único: ok / atenção / problema / neutro) */
@@ -57,7 +60,7 @@ const SELO_STATUS: Record<StatusExibidoFatura, string> = {
  * próxima competência e o valor cadastrado), "Pagar" e "Cancelar fatura".
  * Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
-export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal }) => {
+export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal, nomeOrigem }) => {
   const { faturas, currentRole, alterarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
   const [editando, setEditando] = useState<Fatura | null>(null);
   const [lancando, setLancando] = useState(false);
@@ -75,6 +78,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
 
   const lista = alvo ? faturasDoAlvo(faturas, alvo) : listaGlobal || faturas;
   const origem = (f: Fatura) => {
+    if (nomeOrigem) return nomeOrigem(f);
     if (f.pedidoId) {
       const p = pedidosCompra.find((x) => x.id === f.pedidoId);
       return p ? `Pedido ${p.codigo}` : 'Pedido de compra';
@@ -83,8 +87,11 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
       const c = contratos.find((x) => x.id === f.contratoId);
       return c ? nomeContrato(c) : 'Contrato';
     }
+    if (ehAvulsa(f)) return f.descricao || 'Conta avulsa';
     return licenses.find((l) => l.id === f.licencaId)?.nome || 'Licença';
   };
+  // Decisão 2: suporte lança e confere, mas não paga (o banco também recusa)
+  const podePagar = currentRole === 'ti_admin' || currentRole === 'compras';
   const desfazer = async (f: Fatura) => {
     const motivo = await pedirTexto({
       titulo: `Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}?`,
@@ -146,7 +153,9 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
     if (ok) excluirFatura(f.id);
   };
 
-  const alvoDaFatura = (f: Fatura): AlvoFatura => (f.contratoId ? { contratoId: f.contratoId } : { licencaId: f.licencaId as string });
+  const alvoDaFatura = (f: Fatura): AlvoFatura | undefined =>
+    f.contratoId ? { contratoId: f.contratoId } : f.licencaId ? { licencaId: f.licencaId } : undefined;
+  const alvoEditando = editando ? alvoDaFatura(editando) : undefined;
 
   return (
     <div className="space-y-3">
@@ -284,7 +293,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                     <td data-label="Ações" className="text-right">
                       {(
                         <span className="acoes-linha">
-                          {f.status === 'a_pagar' && (
+                          {f.status === 'a_pagar' && podePagar && (
                             <button
                               type="button"
                               onClick={() => setPagando(f)}
@@ -294,7 +303,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                               <CheckCircle2 aria-hidden="true" /> Pagar
                             </button>
                           )}
-                          {f.status === 'a_pagar' && !f.pedidoId && (
+                          {f.status === 'a_pagar' && !f.pedidoId && isTI && (
                             <button
                               type="button"
                               onClick={() => {
@@ -319,7 +328,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                               <RotateCcw aria-hidden="true" />
                             </button>
                           )}
-                          {f.status === 'a_pagar' && (
+                          {f.status === 'a_pagar' && (isTI || currentRole === 'compras') && (
                             <button
                               type="button"
                               onClick={() => cancelar(f)}
@@ -364,10 +373,10 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
         ? createPortal(
             <FormFatura
               key={editando.id}
-              alvo={alvoDaFatura(editando)}
+              alvo={alvoEditando}
               periodicidade={periodicidade}
               valorPadrao={editando.valor}
-              doMesmoAlvo={faturasDoAlvo(faturas, alvoDaFatura(editando))}
+              doMesmoAlvo={alvoEditando ? faturasDoAlvo(faturas, alvoEditando) : []}
               editando={editando}
               onFechar={() => setEditando(null)}
             />,
@@ -551,19 +560,75 @@ const JanelaPagamento: React.FC<{
   );
 };
 
+/**
+ * Seção 17 (decisão 11): equipamento comprado sem pedido e sem conta lançada.
+ * Mostra "Lançar conta a pagar" já preenchido (fornecedor, NF, valor, área e mês da compra).
+ */
+export const BotaoContaDoAtivo: React.FC<{ ativo: Asset; compacto?: boolean }> = ({ ativo, compacto }) => {
+  const { faturas, currentRole } = useApp();
+  const [aberto, setAberto] = useState(false);
+  const valor = Number(ativo.fiscal?.valorCompra) || 0;
+  if (currentRole !== 'ti_admin' && currentRole !== 'ti_suporte') return null;
+  if (!valor || ativo.pedidoId || faturas.some((f) => f.ativoId === ativo.id && f.status !== 'cancelada')) return null;
+  const competencia = ativo.fiscal?.dataAquisicao ? `${ativo.fiscal.dataAquisicao.slice(0, 7)}-01` : undefined;
+  return (
+    <>
+      <button type="button" onClick={() => setAberto(true)} className={`btn btn-sm ${compacto ? 'btn-secundario' : 'btn-primario'}`} title="Comprado sem pedido e sem conta a pagar: lance para entrar no orçamento e no livro">
+        <Receipt aria-hidden="true" /> Lançar conta a pagar
+      </button>
+      {aberto &&
+        createPortal(
+          <FormFatura
+            periodicidade="unico"
+            valorPadrao={valor}
+            doMesmoAlvo={[]}
+            avulsaInicial={{
+              ativoId: ativo.id,
+              fornecedorId: ativo.fornecedorId,
+              descricao: `${ativo.tag} · ${ativo.nome}${ativo.fiscal?.numeroNF ? ` (NF ${ativo.fiscal.numeroNF})` : ''}`,
+              categoriaDespesa: 'hardware',
+              departamentoId: ativo.setorId,
+              valor,
+              competencia,
+            }}
+            onFechar={() => setAberto(false)}
+          />,
+          document.body
+        )}
+    </>
+  );
+};
+
+/** Fatura avulsa: sem contrato, licença ou pedido (seção 17) */
+export const ehAvulsa = (f: Pick<Fatura, 'licencaId' | 'contratoId' | 'pedidoId'>) => !f.licencaId && !f.contratoId && !f.pedidoId;
+
+/** Dados que já vêm preenchidos na avulsa (ex.: "lançar conta a pagar" da ficha do ativo) */
+export type AvulsaInicial = Partial<Pick<Fatura, 'fornecedorId' | 'descricao' | 'categoriaDespesa' | 'departamentoId' | 'ativoId' | 'valor' | 'competencia'>>;
+
 /** Janela de fatura nova (ou edição), já preenchida com a próxima competência, o valor e o vencimento no dia 10 */
-const FormFatura: React.FC<{
-  alvo?: AlvoFatura; // sem alvo: Contas a pagar escolhe licença ou contrato
+export const FormFatura: React.FC<{
+  alvo?: AlvoFatura; // sem alvo: Contas a pagar escolhe licença, contrato ou avulsa
   periodicidade: PeriodicidadeContrato;
   valorPadrao: number;
   doMesmoAlvo: Fatura[];
   editando?: Fatura;
+  /** Abre já como avulsa, com estes dados */
+  avulsaInicial?: AvulsaInicial;
   onFechar: () => void;
-}> = ({ alvo: alvoFixo, periodicidade, valorPadrao, doMesmoAlvo: doMesmoAlvoFixo, editando, onFechar }) => {
-  const { cadastrarFatura, editarFatura, anexarArquivoFatura, faturas, contratos, licenses } = useApp();
+}> = ({ alvo: alvoFixo, periodicidade, valorPadrao, doMesmoAlvo: doMesmoAlvoFixo, editando, avulsaInicial, onFechar }) => {
+  const { cadastrarFatura, editarFatura, anexarArquivoFatura, faturas, contratos, licenses, fornecedores, departments, settings, currentRole } = useApp();
   const [salvando, setSalvando] = useState(false);
   // Seção 6: em Contas a pagar a pessoa escolhe de quem é a fatura (licença paga por contrato vai para o contrato)
-  const [alvoEscolhido, setAlvoEscolhido] = useState('');
+  // Seção 17: ou "avulsa" (fornecedor + descrição), para o que não tem contrato, licença nem pedido
+  const [alvoEscolhido, setAlvoEscolhido] = useState(avulsaInicial || (editando && ehAvulsa(editando)) ? 'avulsa' : '');
+  const avulsa = !alvoFixo && alvoEscolhido === 'avulsa';
+  const [fornecedorId, setFornecedorId] = useState(editando?.fornecedorId || avulsaInicial?.fornecedorId || '');
+  const [descricao, setDescricao] = useState(editando?.descricao || avulsaInicial?.descricao || '');
+  const [categoria, setCategoria] = useState<CategoriaDespesa>(editando?.categoriaDespesa || avulsaInicial?.categoriaDespesa || 'outros');
+  const [departamentoId, setDepartamentoId] = useState(editando?.departamentoId || avulsaInicial?.departamentoId || '');
+  const [naturezaManual, setNaturezaManual] = useState<'' | 'capex' | 'opex'>(editando?.naturezaManual && editando.natureza ? editando.natureza : '');
+  const [naturezaMotivo, setNaturezaMotivo] = useState(editando?.naturezaMotivo || '');
+  const limite = settings.premissasFinanceiras?.limiteCapitalizacao ?? LIMITE_CAPITALIZACAO_PADRAO;
   const alvo: AlvoFatura | undefined =
     alvoFixo ||
     (alvoEscolhido.startsWith('c:')
@@ -573,8 +638,9 @@ const FormFatura: React.FC<{
         : undefined);
   const doMesmoAlvo = alvoFixo ? doMesmoAlvoFixo : alvo ? faturasDoAlvo(faturas, alvo) : [];
   const [sugerida] = useState(() => editando?.competencia || proximaCompetencia(doMesmoAlvo, periodicidade));
-  const [competencia, setCompetencia] = useState(sugerida);
-  const [valor, setValor] = useState<number | undefined>(editando?.valor ?? valorPadrao);
+  const [competencia, setCompetencia] = useState(avulsaInicial?.competencia || sugerida);
+  const [valor, setValor] = useState<number | undefined>(editando?.valor ?? avulsaInicial?.valor ?? valorPadrao);
+  const naturezaAuto = naturezaDoLancamento({ categoria, valorUnitario: valor || 0 }, limite);
   const [vencimento, setVencimento] = useState(() => editando?.vencimento || vencimentoSugerido(sugerida));
   const [vencimentoEditado, setVencimentoEditado] = useState(!!editando);
   const [status, setStatus] = useState<Exclude<StatusFatura, 'cancelada'>>('a_pagar');
@@ -587,8 +653,8 @@ const FormFatura: React.FC<{
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [erro, setErro] = useState('');
 
-  const chave = editando ? `editar:${editando.id}` : alvo?.licencaId ? `licenca:${alvo.licencaId}` : alvo?.contratoId ? `contrato:${alvo.contratoId}` : 'nova';
-  const valores = JSON.stringify([competencia, valor, vencimento, status, pagoEm, numeroDocumento, observacoes]);
+  const chave = editando ? `editar:${editando.id}` : avulsaInicial?.ativoId ? `ativo:${avulsaInicial.ativoId}` : alvo?.licencaId ? `licenca:${alvo.licencaId}` : alvo?.contratoId ? `contrato:${alvo.contratoId}` : 'nova';
+  const valores = JSON.stringify([competencia, valor, vencimento, status, pagoEm, numeroDocumento, observacoes, fornecedorId, descricao, categoria, departamentoId, naturezaManual]);
   const [valoresIniciais] = useState(valores);
   const pendenciasFatura = valores !== valoresIniciais || arquivo ? [editando ? 'Edição da fatura não salva' : 'Fatura nova não lançada'] : [];
   useRegistrarPendencias(`fatura:${chave}`, pendenciasFatura);
@@ -597,6 +663,7 @@ const FormFatura: React.FC<{
   };
 
   const nomeAlvo = (() => {
+    if (avulsa) return 'Conta avulsa (sem contrato, licença ou pedido)';
     if (!alvo) return 'Escolha de quem é a fatura';
     if (alvo.contratoId) {
       const c = contratos.find((x) => x.id === alvo.contratoId);
@@ -624,9 +691,26 @@ const FormFatura: React.FC<{
     // A janela fica em portal, mas o React ainda propaga o "submit" pela árvore: não deixa chegar a um formulário de fora
     e.stopPropagation();
     if (salvando) return;
-    if (!alvo) return setErro('Escolha de quem é a fatura (contrato ou licença).');
+    if (!alvo && !avulsa) return setErro('Escolha de quem é a fatura (contrato, licença ou avulsa).');
+    if (avulsa && !fornecedorId) return setErro('Conta avulsa: escolha o fornecedor.');
+    if (avulsa && descricao.trim().length < 3) return setErro('Conta avulsa: descreva o que foi comprado ou contratado.');
+    if (naturezaManual && naturezaManual !== naturezaAuto && naturezaMotivo.trim().length < 3)
+      return setErro('Você trocou a natureza (CAPEX/OPEX) sugerida: informe o motivo.');
+    const extrasAvulsa: Partial<Fatura> = avulsa
+      ? {
+          fornecedorId,
+          descricao: descricao.trim(),
+          categoriaDespesa: categoria,
+          departamentoId: departamentoId || undefined,
+          ativoId: editando?.ativoId || avulsaInicial?.ativoId,
+          natureza: naturezaManual || naturezaAuto,
+          naturezaManual: !!naturezaManual && naturezaManual !== naturezaAuto,
+          naturezaMotivo: naturezaManual && naturezaManual !== naturezaAuto ? naturezaMotivo.trim() : undefined,
+        }
+      : {};
     const dados = {
-      ...alvo,
+      ...(alvo || {}),
+      ...extrasAvulsa,
       moeda: moeda as Fatura['moeda'],
       valorMoeda: moeda !== 'BRL' && valorMoeda !== '' ? Number(valorMoeda) : undefined,
       formaPagamento: (formaPagamento || undefined) as Fatura['formaPagamento'],
@@ -644,7 +728,7 @@ const FormFatura: React.FC<{
     const problema = validarFatura({ id: editando?.id || '', ...dados }, doMesmoAlvo.filter((f) => f.id !== editando?.id));
     if (problema) return setErro(problema);
     // Mesmo mês já lançado do outro lado (na licença e no contrato que a paga): seria contado em dobro
-    if (!editando) {
+    if (!editando && alvo) {
       const mesmoMes = (f: Fatura) => f.status !== 'cancelada' && f.competencia === dados.competencia;
       const contrato = alvo.contratoId ? contratos.find((c) => c.id === alvo.contratoId) : undefined;
       const cobertas = new Set((contrato?.itens || []).map((i) => i.licencaId).filter(Boolean));
@@ -679,6 +763,7 @@ const FormFatura: React.FC<{
         moeda: dados.moeda,
         valorMoeda: dados.valorMoeda,
         formaPagamento: dados.formaPagamento,
+        ...extrasAvulsa,
       });
       setSalvando(false);
       if (falhaEd) return setErro(`Não foi possível salvar: ${falhaEd}`);
@@ -714,7 +799,7 @@ const FormFatura: React.FC<{
     >
       <form id={id('form')} onSubmit={lancar} className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {!alvoFixo && (
+          {!alvoFixo && !editando && !avulsaInicial && (
             <div className="sm:col-span-2">
               <label htmlFor={id('alvo')} className={CLASSE_ROTULO}>
                 De quem é a fatura *
@@ -732,6 +817,7 @@ const FormFatura: React.FC<{
                 className={CLASSE_CAMPO}
               >
                 <option value="">Escolha…</option>
+                <option value="avulsa">Conta avulsa (sem contrato, licença ou pedido)</option>
                 <optgroup label="Contratos">
                   {contratos
                     .filter((c) => c.status !== 'encerrado')
@@ -752,6 +838,73 @@ const FormFatura: React.FC<{
                 </optgroup>
               </select>
             </div>
+          )}
+          {avulsa && (
+            <>
+              <div>
+                <label htmlFor={id('forn')} className={CLASSE_ROTULO}>
+                  Fornecedor *
+                </label>
+                <select id={id('forn')} value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} className={CLASSE_CAMPO}>
+                  <option value="">Escolha…</option>
+                  {fornecedores.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={id('cat')} className={CLASSE_ROTULO}>
+                  Categoria *
+                </label>
+                <select id={id('cat')} value={categoria} onChange={(e) => setCategoria(e.target.value as CategoriaDespesa)} className={CLASSE_CAMPO}>
+                  {Object.entries(ROTULO_CATEGORIA).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor={id('desc')} className={CLASSE_ROTULO}>
+                  O que foi comprado ou contratado *
+                </label>
+                <input id={id('desc')} value={descricao} onChange={(e) => setDescricao(e.target.value)} className={CLASSE_CAMPO} placeholder="Ex.: conserto da impressora do 2º andar" />
+              </div>
+              <div>
+                <label htmlFor={id('dep')} className={CLASSE_ROTULO}>
+                  Área (departamento)
+                </label>
+                <select id={id('dep')} value={departamentoId} onChange={(e) => setDepartamentoId(e.target.value)} className={CLASSE_CAMPO}>
+                  <option value="">Sem área (custo geral de T.I.)</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={id('nat')} className={CLASSE_ROTULO}>
+                  Natureza
+                </label>
+                <select id={id('nat')} value={naturezaManual} onChange={(e) => setNaturezaManual(e.target.value as typeof naturezaManual)} className={CLASSE_CAMPO}>
+                  <option value="">Automática: {naturezaAuto.toUpperCase()}</option>
+                  <option value="capex">CAPEX (investimento, deprecia)</option>
+                  <option value="opex">OPEX (despesa do mês)</option>
+                </select>
+                <p className="ajuda">CAPEX: equipamento ou licença perpétua a partir de {formatCurrency(limite)}.</p>
+              </div>
+              {naturezaManual && naturezaManual !== naturezaAuto && (
+                <div className="sm:col-span-2">
+                  <label htmlFor={id('natmot')} className={CLASSE_ROTULO}>
+                    Por que trocar a natureza? *
+                  </label>
+                  <input id={id('natmot')} value={naturezaMotivo} onChange={(e) => setNaturezaMotivo(e.target.value)} className={CLASSE_CAMPO} />
+                </div>
+              )}
+            </>
           )}
           <div>
             <label htmlFor={id('comp')} className={CLASSE_ROTULO}>
@@ -787,7 +940,7 @@ const FormFatura: React.FC<{
               className={CLASSE_CAMPO}
             />
           </div>
-          {!editando && (
+          {!editando && currentRole !== 'ti_suporte' && (
             <div>
               <label htmlFor={id('status')} className={CLASSE_ROTULO}>
                 Situação

@@ -51,6 +51,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
     contratos,
     licenses,
     employees,
+    currentRole,
   } = useApp();
 
   const isEditing = Boolean(softwareToEdit);
@@ -469,16 +470,19 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                       ))}
                     </select>
                   </div>
-                  {formaPagamento === 'cartao' && (
+                  {/* Seção 17 (decisão 2): o suporte não vê cartão nem titular */}
+                  {formaPagamento === 'cartao' && currentRole !== 'ti_suporte' && (
                     <div>
                       <label htmlFor="licenca-cartao" className={ROTULO}>Cartão (4 últimos dígitos)</label>
                       <input id="licenca-cartao" inputMode="numeric" maxLength={4} value={cartaoFinal} onChange={(e) => setCartaoFinal(e.target.value.replace(/\D/g, ''))} className={`${CAMPO} font-mono`} />
                     </div>
                   )}
-                  <div>
-                    <label htmlFor="licenca-titular" className={ROTULO}>Titular / responsável pelo pagamento</label>
-                    <input id="licenca-titular" value={titular} onChange={(e) => setTitular(e.target.value)} className={CAMPO} />
-                  </div>
+                  {currentRole !== 'ti_suporte' && (
+                    <div>
+                      <label htmlFor="licenca-titular" className={ROTULO}>Titular / responsável pelo pagamento</label>
+                      <input id="licenca-titular" value={titular} onChange={(e) => setTitular(e.target.value)} className={CAMPO} />
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="licenca-aviso" className={ROTULO}>Avisar para cancelar com (dias)</label>
                     <input id="licenca-aviso" type="number" min={0} value={avisoDias} onChange={(e) => setAvisoDias(e.target.value)} placeholder="Ex.: 30" className={CAMPO} />

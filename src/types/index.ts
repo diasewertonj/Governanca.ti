@@ -408,6 +408,75 @@ export interface Fatura {
   estornoMotivo?: string;
   /** Valor efetivamente pago, quando difere do valor da fatura (juros, multa, desconto) */
   valorPago?: number;
+  // Seção 17: natureza, área e fatura avulsa (sem contrato/licença/pedido)
+  natureza?: NaturezaGasto;
+  naturezaManual?: boolean;
+  naturezaMotivo?: string;
+  departamentoId?: string;
+  fornecedorId?: string;
+  descricao?: string;
+  ativoId?: string;
+  categoriaDespesa?: CategoriaDespesa;
+}
+
+/** Seção 17: CAPEX (investimento, deprecia) × OPEX (despesa do período) */
+export type NaturezaGasto = 'capex' | 'opex';
+
+export type TipoRecebimento = 'venda_ativo' | 'ressarcimento' | 'reembolso_fornecedor' | 'devolucao_compra' | 'outro';
+export type StatusRecebimento = 'previsto' | 'recebido' | 'cancelado';
+
+/** Seção 17: entrada de dinheiro da T.I. (não é faturamento) */
+export interface Recebimento {
+  id: string;
+  tipo: TipoRecebimento;
+  descricao: string;
+  valor: number;
+  previstoPara?: string;
+  recebidoEm?: string;
+  valorRecebido?: number;
+  status: StatusRecebimento;
+  ativoId?: string;
+  baixaId?: string;
+  colaboradorId?: string;
+  fornecedorId?: string;
+  pedidoId?: string;
+  departamentoId?: string;
+  arquivoCaminho?: string;
+  observacoes?: string;
+  criadoPor?: string;
+  criadoEm: string;
+}
+
+/** Seção 17: alocação de custo entre áreas (soma ≤ 100%) */
+export interface Rateio {
+  id: string;
+  origemTipo: 'contrato' | 'licenca' | 'linha' | 'fatura';
+  origemId: string;
+  departamentoId: string;
+  percentual: number;
+}
+
+/** Seção 17: foto imutável do imobilizado do ano, entregue à contabilidade */
+export interface FechamentoImobilizado {
+  id: string;
+  ano: number;
+  foto: unknown;
+  fechadoPor?: string;
+  fechadoEm: string;
+  reabertoPor?: string;
+  reabertoEm?: string;
+  reaberturaMotivo?: string;
+}
+
+/** Seção 17: premissas da classificação e da projeção (Configurações) */
+export interface PremissasFinanceiras {
+  limiteCapitalizacao?: number;
+  reajustePadraoPct?: number;
+  cambio?: Partial<Record<Moeda, number>>;
+  reposicao?: Record<string, number>;
+  contaContabil?: Partial<Record<CategoriaDespesa, string>>;
+  /** Decisão 7: centro de custo antigo (texto, minúsculo) → departamento */
+  mapaAreas?: Record<string, string>;
 }
 
 export type TicketType = 'suporte' | 'onboarding' | 'offboarding';
@@ -766,6 +835,8 @@ export interface CompanySettings {
   termoExige?: { computador: boolean; celular: boolean; monitor: boolean };
   /** Fase 11: vida útil (anos) por grupo e valor residual (% do valor de compra) */
   vidaUtil?: VidaUtil;
+  /** Seção 17: limite de capitalização, reajuste padrão, reposição e conta contábil */
+  premissasFinanceiras?: PremissasFinanceiras;
 }
 
 // -----------------------------------------------------------------------------
@@ -784,6 +855,10 @@ export interface Orcamento {
   /** 12 valores (jan a dez); o anual é a soma */
   meses: number[];
   observacoes?: string;
+  /** Seção 17: CAPEX/OPEX e área = departamento (decisão 7) */
+  natureza?: NaturezaGasto;
+  departamentoId?: string;
+  origem?: 'manual' | 'copia' | 'projecao';
 }
 
 export type StatusPedido = 'rascunho' | 'em_cotacao' | 'aguardando' | 'aprovado' | 'recusado' | 'comprado' | 'recebido' | 'cancelado';

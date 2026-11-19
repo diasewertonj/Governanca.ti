@@ -21,6 +21,14 @@ const AssetsView = lazy(() => import('./components/assets/AssetsView.tsx').then(
 const LinhasView = lazy(() => import('./components/fornecedores/LinhasView.tsx').then((m) => ({ default: m.LinhasView })));
 const FornecedoresView = lazy(() => import('./components/fornecedores/FornecedoresView.tsx').then((m) => ({ default: m.FornecedoresView })));
 const FinanceiroView = lazy(() => import('./components/financeiro/DespesasView.tsx').then((m) => ({ default: m.FinanceiroView })));
+const ContasPagarView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.ContasPagarView })));
+const RecebimentosView = lazy(() => import('./components/financeiro/RecebimentosView.tsx').then((m) => ({ default: m.RecebimentosView })));
+const PainelExecutivoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.PainelExecutivoView })));
+const OrcamentoGestaoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.OrcamentoGestaoView })));
+const ProjecaoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.ProjecaoView })));
+const PatrimonioView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.PatrimonioView })));
+const RelatoriosView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.RelatoriosView })));
+const CustosMinhaAreaView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.CustosMinhaAreaView })));
 const CollaboratorsView = lazy(() => import('./components/collaborators/CollaboratorsView.tsx').then((m) => ({ default: m.CollaboratorsView })));
 const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
 const RhProcessesView = lazy(() => import('./components/rh/RhProcessesView.tsx').then((m) => ({ default: m.RhProcessesView })));
@@ -70,7 +78,7 @@ function MainApp() {
     processoAberto,
     fecharProcesso,
   } = useApp();
-  const { podePedirCompra } = useCompras();
+  const { podePedirCompra, ehGestor } = useCompras();
 
   const [viewSolicitada, setCurrentView] = useState<string>('dashboard');
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
@@ -101,7 +109,7 @@ function MainApp() {
 
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
-  const currentView = vistaPermitida(currentRole, viewSolicitada, { pedeCompra: podePedirCompra });
+  const currentView = vistaPermitida(currentRole, viewSolicitada, { pedeCompra: podePedirCompra, gestor: ehGestor });
 
   // Fase 5: trocar de tela com alterações não salvas pede confirmação
   // Seção 9.2: com a tela de um processo aberta, o menu volta para a tela escolhida
@@ -185,7 +193,16 @@ function MainApp() {
           {currentView === 'linhas' && <LinhasView />}
           {currentView === 'fornecedores' && <FornecedoresView key="fornecedores" modo="fornecedores" />}
           {currentView === 'contratos' && <FornecedoresView key="contratos" modo="contratos" />}
-          {currentView === 'financeiro' && <FinanceiroView />}
+          {/* Seção 17: Financeiro (executar e pagar) e Gestão de T.I. (planejar e prestar contas) */}
+          {currentView === 'financeiro' && <ContasPagarView />}
+          {currentView === 'recebimentos' && <RecebimentosView />}
+          {currentView === 'despesas' && <FinanceiroView />}
+          {currentView === 'painel_executivo' && <PainelExecutivoView onNavigate={navegar} />}
+          {currentView === 'orcamento' && <OrcamentoGestaoView />}
+          {currentView === 'projecao' && <ProjecaoView />}
+          {currentView === 'patrimonio' && <PatrimonioView />}
+          {currentView === 'relatorios' && <RelatoriosView />}
+          {currentView === 'custos_area' && <CustosMinhaAreaView />}
           {currentView === 'collaborators' && <CollaboratorsView />}
           {currentView === 'servicedesk' && (
             <ServiceDeskView onOpenNewTicketModal={() => setShowNewTicketModal(true)} />

@@ -7,7 +7,7 @@ insert into public.contratos (id, fornecedor_id, tipo, descricao, inicio, fim, v
 insert into public.faturas (id, contrato_id, competencia, valor, vencimento) values
   ('fat-vp', 'ct-vp', '2026-10-01', 100, '2026-10-10');
 
-select harness.rodar('financeiro', 'V1 pagar com multa guarda o pago e mantém o valor da fatura', 'ok', :'sup', 'authenticated',
+select harness.rodar('financeiro', 'V1 pagar com multa guarda o pago e mantém o valor da fatura', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
     update public.faturas set status = 'paga', pago_em = '2026-10-15', valor_pago = 112 where id = 'fat-vp';
     perform harness.espera($s$select 1 from public.faturas where id = 'fat-vp' and valor = 100 and valor_pago = 112$s$, 1);

@@ -704,9 +704,10 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                 <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Dado rotulo="Forma de pagamento">
                     {pg?.formaPagamento ? ROTULO_FORMA_PAGAMENTO[pg.formaPagamento] : '—'}
-                    {pg?.cartaoFinal ? ` final ${pg.cartaoFinal}` : ''}
+                    {pg?.cartaoFinal && currentRole !== 'ti_suporte' ? ` final ${pg.cartaoFinal}` : ''}
                   </Dado>
-                  <Dado rotulo="Titular">{pg?.titular || '—'}</Dado>
+                  {/* Seção 17 (decisão 2): o suporte não vê cartão nem titular */}
+                  {currentRole !== 'ti_suporte' && <Dado rotulo="Titular">{pg?.titular || '—'}</Dado>}
                   <Dado rotulo="Moeda">
                     {pg?.moeda && pg.moeda !== 'BRL' && pg.valorMoeda != null ? (
                       <span className="font-mono">

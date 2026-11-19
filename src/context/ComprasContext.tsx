@@ -38,7 +38,17 @@ import {
   type DadosRecebimento,
 } from '../services/comprasDb.ts';
 import type { Employee, EventoPedido, FormaAprovacao, InventarioFisico, ItemInventario, MensagemPedido, Orcamento, PedidoCompra, StatusPedido } from '../types/index.ts';
-import { alertasOrcamento, distribuirMensal, lancamentosRealizados, opcaoEscolhida, resumoOrcamento, type AlertaOrcamento, type LinhaOrcamento } from '../utils/compras.ts';
+import {
+  alertasOrcamento,
+  comprometidoNoOrcamento,
+  distribuirMensal,
+  lancamentosRealizados,
+  opcaoEscolhida,
+  resumoOrcamento,
+  valorDoPedido,
+  type AlertaOrcamento,
+  type LinhaOrcamento,
+} from '../utils/compras.ts';
 
 export type AcaoPedido = 'enviar' | 'devolver' | 'aprovar' | 'recusar' | 'cancelar';
 
@@ -48,6 +58,8 @@ interface ComprasContextType {
   inventarios: InventarioFisico[];
   /** Qualquer colaborador ativo pede compra (seção 13) */
   podePedirCompra: boolean;
+  /** Seção 17 (decisão 10): tem equipe (vê os custos da própria área) */
+  ehGestor: boolean;
   /** T.I. ou Compras: leem tudo, com valores */
   equipeCompras: boolean;
   linhasAnoAtual: LinhaOrcamento[];
@@ -253,6 +265,10 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [inventarios, setInventarios] = useState<InventarioFisico[]>(demo ? DEMO_INVENTARIOS : []);
   const [mensagens, setMensagens] = useState<Record<string, MensagemPedido[]>>(demo ? DEMO_MENSAGENS : {});
   const podePedirCompra = !!currentUser;
+  const ehGestor = useMemo(
+    () => !!eu && (employees.some((e) => e.gestorId === eu && e.id !== eu && e.status !== 'desligado') || pedidosTodos.some((p) => p.gestorId === eu)),
+    [eu, employees, pedidosTodos]
+  );
   const [pessoasBanco, setPessoasBanco] = useState<{ id: string; nome: string; cargo?: string }[]>([]);
   // Demonstração e T.I.: o cadastro; Compras (produção): pela função do banco
   const pessoasAprovacao = useMemo(
@@ -329,12 +345,20 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [buscar, aplicar]);
 
-  const linhasAnoAtual = useMemo(() => {
+  const lancamentosAno = useMemo(
+    () => (equipe ? lancamentosRealizados({ faturas, contratos, licencas: licenses, pedidos: pedidosTodos, ativos: assets, departamentos: departments }, ANO) : []),
+    [equipe, faturas, contratos, licenses, pedidosTodos, assets, departments]
+  );
+  const linhasAnoAtual = useMemo(() => (equipe ? resumoOrcamento(orcamentos, lancamentosAno, ANO) : []), [equipe, orcamentos, lancamentosAno]);
+  // Seção 17: os alertas de 90%/100% olham realizado + comprometido (pedido aprovado ainda sem fatura paga)
+  const alertas = useMemo(() => {
     if (!equipe) return [];
-    const lanc = lancamentosRealizados({ faturas, contratos, licencas: licenses, pedidos: pedidosTodos, ativos: assets, departamentos: departments }, ANO);
-    return resumoOrcamento(orcamentos, lanc, ANO);
-  }, [equipe, faturas, contratos, licenses, pedidosTodos, assets, departments, orcamentos]);
-  const alertas = useMemo(() => alertasOrcamento(linhasAnoAtual, ANO), [linhasAnoAtual]);
+    const comprometidos = pedidosTodos
+      .filter((p) => comprometidoNoOrcamento(p, faturas) && (p.aprovadoEm || p.criadoEm).startsWith(`${ANO}-`))
+      .filter((p) => !faturas.some((f) => f.pedidoId === p.id && f.status === 'paga'))
+      .map((p) => ({ categoria: p.categoria, area: p.area, mes: Number((p.aprovadoEm || p.criadoEm).slice(5, 7)) - 1, valor: valorDoPedido(p), origem: 'fatura' as const }));
+    return alertasOrcamento(resumoOrcamento(orcamentos, [...lancamentosAno, ...comprometidos], ANO), ANO);
+  }, [equipe, orcamentos, lancamentosAno, pedidosTodos, faturas]);
 
   const noBanco = async (op: () => Promise<unknown>): Promise<string | null> => {
     try {
@@ -789,6 +813,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
         pedidos,
         inventarios,
         podePedirCompra,
+        ehGestor,
         equipeCompras: equipe,
         linhasAnoAtual,
         alertas,

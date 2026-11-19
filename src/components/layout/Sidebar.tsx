@@ -3,6 +3,12 @@ import { useApp } from '../../context/AppContext.tsx';
 import {
   ArrowLeftRight,
   Bell,
+  ChartLine,
+  FileBarChart,
+  Gauge,
+  HandCoins,
+  Landmark,
+  Target,
   CalendarClock,
   ChevronDown,
   FileSignature,
@@ -55,6 +61,12 @@ const ICONES: Record<Icone, LucideIcon> = {
   configuracoes: Settings,
   compras: ShoppingCart,
   conferencia: ClipboardCheck,
+  recebimentos: HandCoins,
+  painel: Gauge,
+  orcamento: Target,
+  projecao: ChartLine,
+  patrimonio: Landmark,
+  relatorios: FileBarChart,
 };
 
 interface SidebarProps {
@@ -73,7 +85,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpenNewTicketModal, aberto, onFechar }) => {
   const { currentRole, tickets, currentUser, lembretes, terms, assets, contratos, licenses, faturas, employees, processoItens, settings } = useApp();
   const { estoque, linhas } = useRecursos();
-  const { podePedirCompra, pedidos, alertas: alertasOrcamento } = useCompras();
+  const { podePedirCompra, ehGestor, pedidos, alertas: alertasOrcamento } = useCompras();
   // Seção 13: pedidos que esperam uma ação desta pessoa (cotar, aprovar, comprar, receber)
   const pedidosParaMim = useMemo(() => pedidos.filter((p) => esperaPorMim(p, currentRole, currentUser?.id)), [pedidos, currentRole, currentUser?.id]);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
@@ -194,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
           </button>
 
           <nav className="space-y-2">
-            {menuDoPapel(currentRole, { pedeCompra: podePedirCompra }).map((grupo, gi) => {
+            {menuDoPapel(currentRole, { pedeCompra: podePedirCompra, gestor: ehGestor }).map((grupo, gi) => {
               // Grupos recolhíveis: o do item atual fica sempre aberto; recolhido mostra a soma dos contadores
               const temAtual = grupo.itens.some((it) => it.vista === currentView);
               const recolhido = !!grupo.titulo && !temAtual && recolhidos.includes(grupo.titulo);
