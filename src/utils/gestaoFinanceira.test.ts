@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { imobilizadoDoAno, lancamentosDoLivro, naturezaDoAtivo, naturezaDoLancamento, orcamentoDeGestao, projecaoGastos, recorrentesParaProjecao, totaisImobilizado } from './gestaoFinanceira.ts';
+import { csvImobilizado, depreciacaoMensal, imobilizadoDoAno, indicadoresExecutivos, lancamentosDoLivro, naturezaDoAtivo, naturezaDoLancamento, orcamentoDeGestao, projecaoGastos, recorrentesParaProjecao, totaisImobilizado } from './gestaoFinanceira.ts';
 
 const ativo = (id: string, valor: number, data: string, extra: Record<string, unknown> = {}) =>
   ({ id, tag: id, nome: id, status: 'em_uso', categoria: 'notebook', fiscal: { valorCompra: valor, dataAquisicao: data }, ...extra }) as never;
@@ -58,6 +58,30 @@ describe('ponte cadastro → projeção', () => {
     );
     expect(r.map((x) => x.renova)).toEqual([false, true, false]);
     expect(r[0].reajusteMes).toBe(3);
+  });
+});
+
+describe('exportações e painel', () => {
+  it('depreciação mensal soma a depreciação do ano', () => {
+    const ativos = [ativo('x', 12000, '2024-01-01'), ativo('y', 6000, '2025-07-01')];
+    const mensal = depreciacaoMensal(ativos, 2025);
+    const somaMensal = Math.round(mensal.reduce((s, g) => s + g.meses.reduce((a, b) => a + b, 0), 0) * 100) / 100;
+    expect(somaMensal).toBe(totaisImobilizado(imobilizadoDoAno(ativos, 2025)).depreciacaoAno);
+  });
+  it('CSV do imobilizado tem uma linha por ativo e indicadores separam CAPEX/OPEX', () => {
+    const linhas = imobilizadoDoAno([ativo('x', 12000, '2024-01-01')], 2025);
+    expect(csvImobilizado(linhas).linhas).toHaveLength(1);
+    const ind = indicadoresExecutivos(
+      [
+        { situacao: 'realizado', natureza: 'opex', categoria: 'software', area: '', mes: 0, valor: 1000 },
+        { situacao: 'comprometido', natureza: 'capex', categoria: 'hardware', area: '', mes: 0, valor: 9000 },
+        { situacao: 'a_pagar', natureza: 'capex', categoria: 'hardware', area: '', mes: 0, valor: 3000 },
+      ],
+      8000,
+      10,
+      { meses: [{ mes: '2025-12', opex: 100, capex: 0, total: 100 }], itens: [] }
+    );
+    expect(ind).toMatchObject({ opexAno: 1000, capexAno: 3000, totalAno: 4000, pctOrcamento: 0.5, custoPorColaborador: 100, projecao12m: 100 });
   });
 });
 

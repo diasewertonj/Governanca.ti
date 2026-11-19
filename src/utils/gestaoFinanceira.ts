@@ -454,6 +454,96 @@ export function lancamentosDoLivro(
   return out;
 }
 
+// -----------------------------------------------------------------------------
+// Exportações para a contabilidade (mesmo layout todo mês; CSV com ;)
+// -----------------------------------------------------------------------------
+type Celula = string | number | undefined;
+
+export function csvImobilizado(linhas: LinhaImobilizado[], area: (setorId?: string) => string = () => ''): { cabecalho: string[]; linhas: Celula[][] } {
+  return {
+    cabecalho: ['Patrimônio', 'Equipamento', 'Grupo', 'Área', 'Aquisição', 'Custo inicial', 'Dep. acumulada inicial', 'Aquisições', 'Depreciação do ano', 'Data da baixa', 'Custo baixado', 'Dep. acumulada baixada', 'Valor de venda', 'Ganho/perda', 'Custo final', 'Dep. acumulada final', 'Líquido final'],
+    linhas: linhas.map((l) => [
+      l.tag,
+      l.nome,
+      l.grupo,
+      area(l.setorId),
+      l.dataAquisicao,
+      l.custoInicial,
+      l.depAcumInicial,
+      l.aquisicao,
+      l.depreciacaoAno,
+      l.baixa?.data,
+      l.baixa?.custo,
+      l.baixa?.depAcum,
+      l.baixa?.valorVenda,
+      l.baixa?.resultado,
+      l.custoFinal,
+      l.depAcumFinal,
+      c(l.custoFinal - l.depAcumFinal),
+    ]),
+  };
+}
+
+/** Depreciação mês a mês do ano (para o lançamento contábil mensal), por grupo */
+export function depreciacaoMensal(ativos: AtivoImobilizado[], ano: number, vida?: VidaUtil, limite = LIMITE_CAPITALIZACAO_PADRAO): { grupo: GrupoDepreciacao; meses: number[] }[] {
+  const fimDoMes = (m: number) => new Date(ano, m + 1, 0);
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const porGrupo = new Map<GrupoDepreciacao, number[]>();
+  ativos.forEach((a) => {
+    if (!a.fiscal?.dataAquisicao || !(Number(a.fiscal?.valorCompra) > 0) || naturezaDoAtivo(a, limite) !== 'capex') return;
+    const baixa = baixaVigente(a)?.dataBaixa?.slice(0, 10);
+    const grupo = grupoDoAtivo(a);
+    const meses = porGrupo.get(grupo) || Array(12).fill(0);
+    let anterior = depreciacao(a, vida, `${ano - 1}-12-31`).acumulada;
+    for (let m = 0; m < 12; m++) {
+      const ate = iso(fimDoMes(m));
+      if (baixa && baixa < ate.slice(0, 8) + '01') break; // já baixado antes deste mês
+      const atual = depreciacao(a, vida, baixa && baixa < ate ? baixa : ate).acumulada;
+      meses[m] = c(meses[m] + atual - anterior);
+      anterior = atual;
+    }
+    porGrupo.set(grupo, meses);
+  });
+  return [...porGrupo.entries()].map(([grupo, meses]) => ({ grupo, meses }));
+}
+
+/** Lançamentos do ano por competência com natureza, área e conta contábil */
+export function csvLancamentos(lancs: Lancamento[], ano: number, contaContabil: Partial<Record<CategoriaDespesa, string>> = {}): { cabecalho: string[]; linhas: Celula[][] } {
+  return {
+    cabecalho: ['Competência', 'Situação', 'Natureza', 'Categoria', 'Conta contábil', 'Área', 'Valor'],
+    linhas: lancs.map((l) => [`${String(l.mes + 1).padStart(2, '0')}/${ano}`, l.situacao, l.natureza.toUpperCase(), l.categoria, contaContabil[l.categoria], l.area, l.valor]),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Painel executivo
+// -----------------------------------------------------------------------------
+export interface IndicadoresExecutivos {
+  opexAno: number;
+  capexAno: number;
+  totalAno: number;
+  previstoAno: number;
+  pctOrcamento?: number;
+  custoPorColaborador?: number;
+  projecao12m: number;
+}
+
+export function indicadoresExecutivos(lancs: Lancamento[], orcamentoAnual: number, colaboradoresAtivos: number, projecao: Projecao): IndicadoresExecutivos {
+  const usados = lancs.filter((l) => l.situacao !== 'comprometido');
+  const opexAno = c(usados.filter((l) => l.natureza === 'opex').reduce((s, l) => s + l.valor, 0));
+  const capexAno = c(usados.filter((l) => l.natureza === 'capex').reduce((s, l) => s + l.valor, 0));
+  const totalAno = c(opexAno + capexAno);
+  return {
+    opexAno,
+    capexAno,
+    totalAno,
+    previstoAno: orcamentoAnual,
+    pctOrcamento: orcamentoAnual > 0 ? totalAno / orcamentoAnual : undefined,
+    custoPorColaborador: colaboradoresAtivos > 0 ? c(opexAno / colaboradoresAtivos) : undefined,
+    projecao12m: c(projecao.meses.slice(0, 12).reduce((s, m) => s + m.total, 0)),
+  };
+}
+
 /** Totais por chave (grupo, área ou local) para o relatório e a exportação */
 export function imobilizadoPor(linhas: LinhaImobilizado[], chave: (l: LinhaImobilizado) => string): { chave: string; totais: TotaisImobilizado }[] {
   const m = new Map<string, LinhaImobilizado[]>();
