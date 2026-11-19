@@ -377,7 +377,7 @@ const Montagem: React.FC<{
           <select
             value={doCatalogo}
             onChange={(e) => incluirCatalogo(e.target.value)}
-            className="campo campo-sm w-auto"
+            className="campo campo-sm w-full sm:w-auto sm:max-w-64"
             aria-label="Adicionar do catálogo"
           >
             <option value="">+ Do catálogo...</option>
@@ -393,7 +393,7 @@ const Montagem: React.FC<{
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value as TipoItemProcesso)}
-          className="campo campo-sm w-auto"
+          className="campo campo-sm w-full sm:w-auto"
           aria-label="Tipo do passo"
         >
           {tipos.map((t) => (
@@ -412,7 +412,7 @@ const Montagem: React.FC<{
             }
           }}
           placeholder="Nome (ex.: VPN, grupo financeiro@...)"
-          className="campo campo-sm w-auto min-w-[10rem] flex-1"
+          className="campo campo-sm w-full min-w-0 sm:w-auto sm:min-w-40 sm:flex-1"
         />
         <button type="button" onClick={incluirLivre} className="btn btn-sm btn-secundario">
           Incluir

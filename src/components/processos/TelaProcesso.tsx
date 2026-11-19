@@ -15,10 +15,9 @@ import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { ChecklistProcesso, TrilhaAuditoria } from './ChecklistProcesso.tsx';
 import { PedidoDesligamento } from '../servicedesk/PedidoDesligamento.tsx';
 import { ConversaChamado } from '../servicedesk/ConversaChamado.tsx';
-import { BlocoCancelamento, FormCancelamento, HistoricoChamado } from '../servicedesk/AtendimentoChamado.tsx';
+import { BlocoCancelamento, FormCancelamento } from '../servicedesk/AtendimentoChamado.tsx';
 import { SELO_STATUS_CHAMADO } from '../servicedesk/SeloSla.tsx';
 import { imprimirRelatorio } from '../servicedesk/relatorioChamado.ts';
-import { Abas } from '../ui/Abas.tsx';
 import { Vazio } from '../ui/Tela.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
 
@@ -57,7 +56,6 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
   } = useApp();
   const ticket = tickets.find((t) => t.id === chamadoId);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
-  const [aba, setAba] = useState<'conversa' | 'historico'>('conversa');
   const [cancelando, setCancelando] = useState(false);
 
   // Abre no topo da página (a lista podia estar rolada) e com o título do processo na aba
@@ -74,8 +72,10 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
   const voltar = () =>
     void podeDescartarPendencias().then((ok) => {
       if (!ok) return;
-      if (emJanela) window.close();
-      else onVoltar();
+      if (!emJanela) return onVoltar();
+      window.close();
+      // Se o navegador não deixar fechar (janela não aberta pelo sistema), volta para o sistema
+      setTimeout(() => window.location.assign(window.location.pathname), 300);
     });
 
   if (!ticket) {
@@ -226,25 +226,16 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
         <aside className="min-w-0 space-y-4" aria-label="Pedido, anotações e conversa">
           {ehOnb ? <PedidoAdmissao ticket={ticket} /> : ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
           <AnotacoesProcesso ticket={ticket} podeEditar={isTI} onSalvar={salvarAnotacoesProcesso} />
+          {/* Seção 19: conversa, notas e histórico já vêm em abas no próprio bloco (sem abas repetidas por fora) */}
           <section className="cartao space-y-3 p-4">
-            <Abas
-              rotulo="Conversa e histórico"
-              ativa={aba}
-              onMudar={setAba}
-              itens={[
-                { id: 'conversa', rotulo: 'Conversa', contador: ticket.mensagens.length },
-                { id: 'historico', rotulo: 'Histórico' },
-              ]}
-            />
-            {aba === 'conversa' ? (
-              <Conversa ticket={ticket} isTI={isTI} encerrado={encerrado} enviar={addTicketMessage} meuId={currentUser?.id} />
-            ) : (
-              <div className="space-y-4">
-                <TrilhaAuditoria chamadoId={ticket.id} nomeDe={(id) => employees.find((e) => e.id === id)?.nome} atualizar={itens.filter((i) => i.status !== 'pendente').length} />
-                <HistoricoChamado ticket={ticket} />
-              </div>
-            )}
+            <Conversa ticket={ticket} isTI={isTI} encerrado={encerrado} enviar={addTicketMessage} meuId={currentUser?.id} />
           </section>
+          <details className="cartao p-4">
+            <summary className="secao-titulo cursor-pointer">Quem fez cada passo do checklist</summary>
+            <div className="mt-3">
+              <TrilhaAuditoria chamadoId={ticket.id} nomeDe={(id) => employees.find((e) => e.id === id)?.nome} atualizar={itens.filter((i) => i.status !== 'pendente').length} />
+            </div>
+          </details>
         </aside>
       </div>
       {cancelando && <FormCancelamento ticket={ticket} onClose={() => setCancelando(false)} />}

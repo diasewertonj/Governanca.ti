@@ -400,7 +400,7 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
     </button>
   );
   const selectPessoa = (valor: string, mudar: (v: string) => void, rotulo: string) => (
-    <select aria-label={rotulo} value={valor} onChange={(e) => mudar(e.target.value)} className={`${campoSm} w-full sm:w-44`}>
+    <select aria-label={rotulo} value={valor} onChange={(e) => mudar(e.target.value)} className={`${campoSm} w-full sm:w-56`}>
       <option value="">{rotulo}…</option>
       {pessoas.map((p) => (
         <option key={p.id} value={p.id}>
@@ -472,7 +472,7 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
       case 'equipamento':
         return (
           <>
-            <select aria-label="Equipamento entregue" value={ativoId} onChange={(e) => setAtivoId(e.target.value)} className={`${campoSm} w-full sm:w-60`}>
+            <select aria-label="Equipamento entregue" value={ativoId} onChange={(e) => setAtivoId(e.target.value)} className={`${campoSm} w-full sm:w-80`}>
               <option value="">{ativosLivres.length ? 'Escolha no estoque…' : 'Nada disponível no estoque'}</option>
               {[...ativosLivres]
                 .sort((a, b) => (chegouDoPedido(a) ? 0 : 1) - (chegouDoPedido(b) ? 0 : 1))
@@ -508,7 +508,7 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
       case 'acessorio':
         return (
           <>
-            <select aria-label="Sai do estoque" value={estoqueId} onChange={(e) => setEstoqueId(e.target.value)} className={`${campoSm} w-full sm:w-52`}>
+            <select aria-label="Sai do estoque" value={estoqueId} onChange={(e) => setEstoqueId(e.target.value)} className={`${campoSm} w-full sm:w-72`}>
               <option value="">Sem baixa no estoque</option>
               {acessoriosEmEstoque.map((i) => (
                 <option key={i.id} value={i.id}>
@@ -595,11 +595,11 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
         <div className="min-w-[12rem] flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`font-semibold ${item.status === 'nao_se_aplica' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>{item.titulo}</span>
-            {item.sugeridoPor === 'rh' && <span className="selo selo-info">Pedido do RH</span>}
             {seloAgenda}
           </span>
           <span className="texto-aux block">
             {ACAO_DO_TIPO[item.tipo]}
+            {item.sugeridoPor === 'rh' ? ' · pedido do RH' : ''}
             {item.tipo === 'cadastro' && item.status === 'feito' && cadastrada
               ? ` · ${cadastrada.nome} · ${cadastrada.email}`
               : item.detalhe

@@ -62,7 +62,7 @@ export const Janela: React.FC<{
             )}
             <div className="min-w-0">
               {temAnterior && <Caminho niveis={nav.niveis} indice={nav.indice} voltarAte={nav.voltarAte} />}
-              <h2 id={idTitulo} className="janela-titulo truncate">
+              <h2 id={idTitulo} className="janela-titulo line-clamp-2 break-words">
                 {titulo}
               </h2>
               {subtitulo && <p className="texto-aux truncate">{subtitulo}</p>}
