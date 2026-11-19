@@ -165,6 +165,33 @@ revoke execute on function public.reabrir_imobilizado(integer, text) from public
 grant execute on function public.fechar_imobilizado(integer, jsonb) to authenticated;
 grant execute on function public.reabrir_imobilizado(integer, text) to authenticated;
 
+-- Decisão 1: Compras paga todas as faturas e vê só o resumo de contratos e licenças
+-- (sem cláusulas, anexos, detalhes técnicos nem dados de pagamento)
+create or replace function public.contratos_resumo()
+returns table (id text, fornecedor_id text, tipo text, valor numeric, periodicidade text, inicio date, fim date, status text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if public.meu_papel() not in ('ti_admin', 'ti_suporte', 'compras') then
+    raise exception 'Sem acesso' using errcode = '42501';
+  end if;
+  return query select c.id, c.fornecedor_id, c.tipo::text, c.valor::numeric, c.periodicidade::text, c.inicio::date, c.fim::date, c.status::text from public.contratos c;
+end $$;
+
+create or replace function public.licencas_resumo()
+returns table (id text, nome text, fornecedor_id text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if public.meu_papel() not in ('ti_admin', 'ti_suporte', 'compras') then
+    raise exception 'Sem acesso' using errcode = '42501';
+  end if;
+  return query select l.id, l.nome, l.fornecedor_id from public.licencas_software l;
+end $$;
+
+revoke execute on function public.contratos_resumo() from public, anon;
+revoke execute on function public.licencas_resumo() from public, anon;
+grant execute on function public.contratos_resumo() to authenticated;
+grant execute on function public.licencas_resumo() to authenticated;
+
 -- 6) Premissas (limite de capitalização, reajuste, câmbio, reposição, contas) -----
 -- Ex.: {"limiteCapitalizacao":1200,"reajustePadraoPct":5,"cambio":{"USD":5.4,"EUR":5.9},
 --       "reposicao":{"notebook":6000},"contaContabil":{"software":"3.1.01"}}
