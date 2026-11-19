@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { imobilizadoDoAno, naturezaDoAtivo, naturezaDoLancamento, orcamentoDeGestao, projecaoGastos, recorrentesParaProjecao, totaisImobilizado } from './gestaoFinanceira.ts';
+import { imobilizadoDoAno, lancamentosDoLivro, naturezaDoAtivo, naturezaDoLancamento, orcamentoDeGestao, projecaoGastos, recorrentesParaProjecao, totaisImobilizado } from './gestaoFinanceira.ts';
 
 const ativo = (id: string, valor: number, data: string, extra: Record<string, unknown> = {}) =>
   ({ id, tag: id, nome: id, status: 'em_uso', categoria: 'notebook', fiscal: { valorCompra: valor, dataAquisicao: data }, ...extra }) as never;
@@ -58,6 +58,36 @@ describe('ponte cadastro → projeção', () => {
     );
     expect(r.map((x) => x.renova)).toEqual([false, true, false]);
     expect(r[0].reajusteMes).toBe(3);
+  });
+});
+
+describe('livro único', () => {
+  it('classifica fatura paga, a pagar, pedido sem fatura e equipamento sem pedido; área pelo departamento', () => {
+    const l = lancamentosDoLivro(
+      {
+        faturas: [
+          { id: 'f1', status: 'paga', competencia: '2025-03-01', valor: 100, valorPago: 110, licencaId: 'l1' },
+          { id: 'f2', status: 'a_pagar', competencia: '2025-04-01', valor: 200, contratoId: 'c1' },
+          { id: 'f3', status: 'cancelada', competencia: '2025-04-01', valor: 999, contratoId: 'c1' },
+          { id: 'f4', status: 'paga', competencia: '2025-05-01', valor: 5000, pedidoId: 'p2' },
+        ],
+        licencas: [{ id: 'l1', categoriaDespesa: 'software', departamentoId: 'd1' }],
+        contratos: [{ id: 'c1', categoriaDespesa: 'internet', centroCusto: 'Matriz' }],
+        pedidos: [
+          { id: 'p1', status: 'aprovado', categoria: 'hardware', valor: 6000, competencia: '2025-06-10' },
+          { id: 'p2', status: 'comprado', categoria: 'hardware', valor: 5000, competencia: '2025-05-02' },
+        ],
+        ativos: [ativo('a1', 3000, '2025-02-01', { setorId: 'd1' }), ativo('a2', 3000, '2024-02-01')],
+        departamentos: [{ id: 'd1', nome: 'Tecnologia' }],
+      },
+      2025
+    );
+    expect(l).toHaveLength(5);
+    expect(l[0]).toMatchObject({ situacao: 'realizado', natureza: 'opex', area: 'Tecnologia', valor: 110, mes: 2 });
+    expect(l[1]).toMatchObject({ situacao: 'a_pagar', categoria: 'internet', area: 'Matriz' });
+    expect(l[2]).toMatchObject({ situacao: 'realizado', natureza: 'capex', categoria: 'hardware' });
+    expect(l.find((x) => x.situacao === 'comprometido')).toMatchObject({ valor: 6000, natureza: 'capex', mes: 5 });
+    expect(l.at(-1)).toMatchObject({ situacao: 'realizado', natureza: 'capex', area: 'Tecnologia', valor: 3000 });
   });
 });
 

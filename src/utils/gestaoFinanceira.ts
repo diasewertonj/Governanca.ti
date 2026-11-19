@@ -361,6 +361,99 @@ export function orcamentoDeGestao(
     .sort((a, b) => a.natureza.localeCompare(b.natureza) || a.categoria.localeCompare(b.categoria) || a.area.localeCompare(b.area));
 }
 
+type FaturaLivro = {
+  id: string;
+  status: 'a_pagar' | 'paga' | 'cancelada';
+  competencia: string;
+  valor: number;
+  valorPago?: number;
+  licencaId?: string;
+  contratoId?: string;
+  pedidoId?: string;
+  ativoId?: string;
+  natureza?: Natureza | null;
+  naturezaManual?: boolean;
+  departamentoId?: string;
+  categoriaDespesa?: CategoriaDespesa | null;
+};
+type OrigemLivro = { id: string; categoriaDespesa?: CategoriaDespesa | null; centroCusto?: string; departamentoId?: string };
+
+/**
+ * O "livro" único do ano: faturas pagas (realizado) e a pagar, pedidos aprovados
+ * ainda sem fatura (comprometido) e equipamentos comprados sem pedido nem fatura
+ * (realizado CAPEX/OPEX pela regra). Área = departamento; sem ele, o texto legado.
+ */
+export function lancamentosDoLivro(
+  dados: {
+    faturas: FaturaLivro[];
+    contratos: (OrigemLivro & { tipo?: string })[];
+    licencas: OrigemLivro[];
+    pedidos: { id: string; status: string; categoria?: CategoriaDespesa; area?: string; departamentoId?: string; valor: number; competencia?: string }[];
+    ativos: (AtivoNatureza & { id: string; setorId?: string; pedidoId?: string })[];
+    departamentos: { id: string; nome: string }[];
+    categoriaDoTipo?: (tipo: string) => CategoriaDespesa;
+  },
+  ano: number,
+  limite = LIMITE_CAPITALIZACAO_PADRAO
+): Lancamento[] {
+  const nomeDep = (id?: string) => (id ? dados.departamentos.find((d) => d.id === id)?.nome || '' : '');
+  const area = (depId?: string, legado?: string) => nomeDep(depId) || (legado || '').trim();
+  const prefixo = `${ano}-`;
+  const out: Lancamento[] = [];
+  const comFatura = new Set<string>();
+  const ativosComFatura = new Set<string>();
+
+  dados.faturas.forEach((f) => {
+    if (f.pedidoId) comFatura.add(f.pedidoId);
+    if (f.ativoId) ativosComFatura.add(f.ativoId);
+    if (f.status === 'cancelada' || !f.competencia.startsWith(prefixo)) return;
+    let categoria: CategoriaDespesa = f.categoriaDespesa || 'outros';
+    let ar = nomeDep(f.departamentoId);
+    if (f.contratoId) {
+      const ct = dados.contratos.find((x) => x.id === f.contratoId);
+      categoria = f.categoriaDespesa || ct?.categoriaDespesa || (ct?.tipo && dados.categoriaDoTipo ? dados.categoriaDoTipo(ct.tipo) : 'outros');
+      ar = ar || area(ct?.departamentoId, ct?.centroCusto);
+    } else if (f.licencaId) {
+      const l = dados.licencas.find((x) => x.id === f.licencaId);
+      categoria = f.categoriaDespesa || l?.categoriaDespesa || 'software';
+      ar = ar || area(l?.departamentoId, l?.centroCusto);
+    } else if (f.pedidoId) {
+      const p = dados.pedidos.find((x) => x.id === f.pedidoId);
+      categoria = f.categoriaDespesa || p?.categoria || 'hardware';
+      ar = ar || area(p?.departamentoId, p?.area);
+    }
+    const valor = f.status === 'paga' && f.valorPago != null ? Number(f.valorPago) : Number(f.valor);
+    out.push({
+      situacao: f.status === 'paga' ? 'realizado' : 'a_pagar',
+      natureza: naturezaDoLancamento({ categoria, valorUnitario: valor, natureza: f.natureza, naturezaManual: f.naturezaManual }, limite),
+      categoria,
+      area: ar,
+      mes: Number(f.competencia.slice(5, 7)) - 1,
+      valor: c(valor),
+    });
+  });
+
+  const anoCorrenteMes = (iso?: string) => (iso && iso.startsWith(prefixo) ? Number(iso.slice(5, 7)) - 1 : null);
+  dados.pedidos
+    .filter((p) => (p.status === 'aprovado' || p.status === 'comprado' || p.status === 'recebido') && !comFatura.has(p.id))
+    .forEach((p) => {
+      const mes = anoCorrenteMes(p.competencia);
+      if (mes === null || !(p.valor > 0)) return;
+      const categoria = p.categoria || 'hardware';
+      out.push({ situacao: 'comprometido', natureza: naturezaDoLancamento({ categoria, valorUnitario: p.valor }, limite), categoria, area: area(p.departamentoId, p.area), mes, valor: c(p.valor) });
+    });
+
+  dados.ativos
+    .filter((a) => !a.pedidoId && !ativosComFatura.has(a.id))
+    .forEach((a) => {
+      const mes = anoCorrenteMes(a.fiscal?.dataAquisicao);
+      const valor = Number(a.fiscal?.valorCompra) || 0;
+      if (mes === null || !valor) return;
+      out.push({ situacao: 'realizado', natureza: naturezaDoAtivo(a, limite), categoria: 'hardware', area: nomeDep(a.setorId), mes, valor: c(valor) });
+    });
+  return out;
+}
+
 /** Totais por chave (grupo, área ou local) para o relatório e a exportação */
 export function imobilizadoPor(linhas: LinhaImobilizado[], chave: (l: LinhaImobilizado) => string): { chave: string; totais: TotaisImobilizado }[] {
   const m = new Map<string, LinhaImobilizado[]>();
