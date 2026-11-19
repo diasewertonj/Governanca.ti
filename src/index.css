@@ -640,6 +640,34 @@ body:has(.modal-tela) {
   .tabela-cartoes td.num {
     text-align: left;
   }
+  /* Sem "cartão dentro de cartão": no celular a caixa em volta da tabela some e
+     os cartões das linhas ocupam a largura toda, sem margem e borda duplicadas */
+  .cartao:has(> .tabela-cartoes),
+  .cartao:has(> div > .tabela-cartoes),
+  .cartao-tabela:has(> .tabela-cartoes),
+  .cartao-tabela:has(> div > .tabela-cartoes) {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .tabela-cartoes tr {
+    margin: 0 0 0.5rem;
+  }
+  .tabela-cartoes tbody tr:hover {
+    background: var(--cor-superficie);
+  }
+  /* 1ª célula vazia (ex.: fatura sem origem): ela some e as ações vão para o
+     fim do cartão — nada de linha em branco ao lado dos botões */
+  .tabela-cartoes td:first-child:empty {
+    display: none;
+  }
+  .tabela-cartoes tr:has(> td:first-child:empty) > td:last-child:not(:first-child):not([colspan]) {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+  }
   .tabela-cartoes td.col-acoes {
     width: auto;
   }
