@@ -38,7 +38,7 @@ import {
   type DadosRecebimento,
 } from '../services/comprasDb.ts';
 import type { Employee, EventoPedido, FormaAprovacao, InventarioFisico, ItemInventario, MensagemPedido, Orcamento, PedidoCompra, StatusPedido } from '../types/index.ts';
-import { alertasOrcamento, distribuirMensal, itensSemEscolha, lancamentosRealizados, opcaoEscolhida, resumoOrcamento, type AlertaOrcamento, type LinhaOrcamento } from '../utils/compras.ts';
+import { alertasOrcamento, distribuirMensal, lancamentosRealizados, opcaoEscolhida, resumoOrcamento, type AlertaOrcamento, type LinhaOrcamento } from '../utils/compras.ts';
 
 export type AcaoPedido = 'enviar' | 'devolver' | 'aprovar' | 'recusar' | 'cancelar';
 
@@ -490,7 +490,13 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       gestorId: gestorDe(employees, eu),
       criadoEm: agoraIso(),
       itens: dados.itens.map((i, n) => ({ ...i, ordem: n + 1, valorUnitario: undefined, tipo: dados.tipoPedido === 'outros' ? 'servico' : i.tipo })),
-      cotacoes: dados.cotacoes.filter((c) => c.itemId).map((c) => ({ ...c, fornecedorId: '', vencedora: false, criadoPor: eu })),
+      // Seção 16: o link que a pessoa indicou vira a 1ª opção do item
+      cotacoes: [
+        ...dados.itens
+          .filter((i) => i.link)
+          .map((i) => ({ id: novoId('cot'), itemId: i.id, fornecedorId: '', link: i.link, loja: (/^https?:\/\/(?:www\.)?([^/:]+)/.exec(i.link || '') || [])[1], marca: i.marca, modelo: i.modelo, valor: i.valorReferencia || 0, observacoes: 'Sugestão de quem pediu', vencedora: false, criadoPor: eu })),
+        ...dados.cotacoes.filter((c) => c.itemId).map((c) => ({ ...c, fornecedorId: '', vencedora: false, criadoPor: eu })),
+      ],
       eventos: [{ para: status, por: eu, em: agoraIso() }],
     };
     if (demo) setPedidos((prev) => [item, ...prev]);
@@ -532,9 +538,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!['rascunho', 'em_cotacao', 'aguardando', 'recusado'].includes(p.status)) return 'Este pedido não está aguardando aprovação.';
     if (!aprovadorId) return 'Escolha quem aprovou.';
     if (aprovadorId === p.solicitanteId) return 'Quem pediu não pode aprovar o próprio pedido.';
-    const sem = itensSemEscolha(p);
-    if (sem.length) return `Escolha a opção de: ${sem.join(', ')}.`;
-    if (p.cotacoes.some((c) => !c.itemId) && !p.cotacoes.some((c) => !c.itemId && c.vencedora)) return 'Escolha a cotação vencedora antes de aprovar.';
+    // Seção 16: recomendar uma opção é opcional (sem recomendação, Compras escolhe na compra)
     const erro = await noBanco(() => aprovarPedidoDb(id, aprovadorId, forma, obs));
     if (erro) return erro;
     if (!demo) {
@@ -560,7 +564,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!(isCompras || isAdmin)) return 'Só Compras (ou o administrador da T.I.) registra a compra.';
     const p = pedidosTodos.find((x) => x.id === id);
     if (!p || p.status !== 'aprovado') return 'Só um pedido aprovado pode ser registrado como comprado.';
-    if (!d.fornecedorId) return 'Informe o fornecedor da compra.';
+    if (!d.fornecedorId && !(d.loja || '').trim()) return 'Informe o fornecedor ou a loja da compra.';
     if (!d.dataCompra || !d.vencimento) return 'Informe a data da compra e o vencimento.';
     const sugeridos = p.cotacoes.filter((c) => c.vencedora && c.fornecedorId).map((c) => c.fornecedorId);
     const trocou = sugeridos.length > 0 && !sugeridos.includes(d.fornecedorId);
@@ -588,7 +592,9 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
         itens,
         valorFinal: total,
         faturaId: f.id,
-        fornecedorId: d.fornecedorId,
+        fornecedorId: d.fornecedorId || undefined,
+        lojaCompra: d.loja?.trim() || undefined,
+        linkCompra: d.link?.trim() || undefined,
         numeroNf: d.numeroNf,
         nfChave: d.nfChave,
         nfArquivo: d.nfArquivo,

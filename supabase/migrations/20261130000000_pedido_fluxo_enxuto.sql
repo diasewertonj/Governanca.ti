@@ -9,6 +9,8 @@
 -- ==============================================================================
 
 alter table public.pedidos_compra
+  add column if not exists loja_compra     text,
+  add column if not exists link_compra     text,
   add column if not exists aprovador_id    text references public.colaboradores (id) on delete set null,
   add column if not exists aprovacao_forma text,
   add column if not exists aprovacao_obs   text;
@@ -49,7 +51,6 @@ declare
   v_papel text := coalesce(public.meu_papel(), '');
   v_equipe boolean := v_papel in ('ti_admin', 'ti_suporte', 'compras');
   v_nome  text;
-  v_sem   text;
   v_forn  text;
 begin
   select * into v_p from public.pedidos_compra where id = p_pedido for update;
@@ -75,19 +76,7 @@ begin
   if not exists (select 1 from public.pedido_itens where pedido_id = p_pedido) then
     raise exception 'Inclua pelo menos um item' using errcode = '23514';
   end if;
-  select string_agg(i.descricao, ', ') into v_sem
-    from public.pedido_itens i
-   where i.pedido_id = p_pedido
-     and exists (select 1 from public.pedido_cotacoes o where o.item_id = i.id)
-     and not exists (select 1 from public.pedido_cotacoes o where o.item_id = i.id and o.vencedora);
-  if v_sem is not null then
-    raise exception 'Escolha a opção de: %', v_sem using errcode = '23514';
-  end if;
-  if exists (select 1 from public.pedido_cotacoes where pedido_id = p_pedido and item_id is null)
-     and not exists (select 1 from public.pedido_cotacoes where pedido_id = p_pedido and item_id is null and vencedora) then
-    raise exception 'Escolha a cotação vencedora antes de aprovar' using errcode = '23514';
-  end if;
-
+  -- Seção 16: recomendar uma opção é opcional (sem recomendação, Compras escolhe na compra)
   perform set_config('app.operacao_pedido', 'sim', true);
   perform set_config('app.motivo_pedido', 'Aprovado por ' || v_nome || ' (' || p_forma || ')' ||
                      coalesce(' — ' || nullif(btrim(coalesce(p_obs, '')), ''), ''), true);
@@ -168,6 +157,13 @@ begin
             nullif(btrim(coalesce(v_item ->> 'link', '')), ''), nullif(v_item ->> 'valor_referencia', '')::numeric,
             nullif(btrim(coalesce(v_item ->> 'imagem_url', '')), ''))
     returning id into v_item_id;
+    -- Seção 16: o produto que a pessoa indicou (link) vira a 1ª opção do item
+    if nullif(btrim(coalesce(v_item ->> 'link', '')), '') is not null then
+      insert into public.pedido_cotacoes (pedido_id, item_id, link, loja, marca, modelo, valor, observacoes)
+      values (v_id, v_item_id, btrim(v_item ->> 'link'), substring(btrim(v_item ->> 'link') from '^https?://(?:www\.)?([^/:]+)'),
+              nullif(btrim(coalesce(v_item ->> 'marca', '')), ''), nullif(btrim(coalesce(v_item ->> 'modelo', '')), ''),
+              coalesce(nullif(v_item ->> 'valor_referencia', '')::numeric, 0), 'Sugestão de quem pediu');
+    end if;
     for v_op in select value from jsonb_array_elements(coalesce(v_item -> 'opcoes', '[]'::jsonb)) loop
       insert into public.pedido_cotacoes (pedido_id, item_id, link, loja, marca, modelo, descricao, valor, observacoes, imagem_url)
       values (v_id, v_item_id, nullif(btrim(coalesce(v_op ->> 'link', '')), ''), nullif(btrim(coalesce(v_op ->> 'loja', '')), ''),
@@ -256,3 +252,89 @@ end;
 $$;
 revoke all on function public.mudar_status_pedido(text, text, text) from public, anon;
 grant execute on function public.mudar_status_pedido(text, text, text) to authenticated;
+
+-- Seção 16: Compras pode comprar fora do cadastro (loja e link) e fora da lista de opções.
+-- Motivo só quando havia opção RECOMENDADA com fornecedor e a compra foi em outro.
+create or replace function public.registrar_compra_pedido(p_pedido text, p_dados jsonb)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_p          public.pedidos_compra%rowtype;
+  v_item       jsonb;
+  v_total      numeric;
+  v_data       date := nullif(p_dados ->> 'data_compra', '')::date;
+  v_venc       date := nullif(p_dados ->> 'vencimento', '')::date;
+  v_fornecedor text;
+  v_loja       text := nullif(btrim(coalesce(p_dados ->> 'loja', '')), '');
+  v_link       text := nullif(btrim(coalesce(p_dados ->> 'link', '')), '');
+  v_motivo     text := nullif(btrim(coalesce(p_dados ->> 'motivo_troca', '')), '');
+  v_chave      text := nullif(regexp_replace(coalesce(p_dados ->> 'nf_chave', ''), '\D', '', 'g'), '');
+  v_arquivo    text := nullif(p_dados ->> 'nf_arquivo', '');
+  v_fatura     text := gen_random_uuid()::text;
+  v_trocou     boolean;
+begin
+  if coalesce(public.meu_papel(), '') not in ('ti_admin', 'compras') then
+    raise exception 'Só Compras (ou o administrador da T.I.) registra a compra' using errcode = '42501';
+  end if;
+  select * into v_p from public.pedidos_compra where id = p_pedido for update;
+  if not found then
+    raise exception 'Pedido não encontrado' using errcode = '23514';
+  end if;
+  if v_p.status <> 'aprovado' then
+    raise exception 'Só um pedido aprovado pode ser registrado como comprado' using errcode = '23514';
+  end if;
+  if v_data is null or v_venc is null then
+    raise exception 'Informe a data da compra e o vencimento' using errcode = '23514';
+  end if;
+  v_fornecedor := coalesce(nullif(p_dados ->> 'fornecedor_id', ''), case when v_loja is null then v_p.fornecedor_id end);
+  if v_fornecedor is null and v_loja is null then
+    raise exception 'Informe o fornecedor ou a loja da compra' using errcode = '23514';
+  end if;
+  if v_link is not null and v_link !~* '^https?://' then
+    raise exception 'O link da compra precisa começar com https://' using errcode = '23514';
+  end if;
+  v_trocou := exists (select 1 from public.pedido_cotacoes where pedido_id = p_pedido and vencedora and fornecedor_id is not null)
+              and not exists (select 1 from public.pedido_cotacoes where pedido_id = p_pedido and vencedora and fornecedor_id = v_fornecedor);
+  if v_trocou and coalesce(length(v_motivo), 0) < 5 then
+    raise exception 'Explique por que a compra foi feita em outro fornecedor' using errcode = '23514';
+  end if;
+  if v_chave is not null and v_chave !~ '^[0-9]{44}$' then
+    raise exception 'A chave da NF-e tem 44 dígitos' using errcode = '23514';
+  end if;
+  if v_arquivo is not null and v_arquivo not like 'pedidos/' || p_pedido || '/%' then
+    raise exception 'Arquivo da NF inválido' using errcode = '23514';
+  end if;
+
+  perform set_config('app.operacao_pedido', 'sim', true);
+  for v_item in select value from jsonb_array_elements(coalesce(p_dados -> 'itens', '[]'::jsonb)) loop
+    update public.pedido_itens
+       set valor_unitario = nullif(v_item ->> 'valor_unitario', '')::numeric
+     where id = v_item ->> 'id' and pedido_id = p_pedido;
+  end loop;
+  select coalesce(sum(quantidade * coalesce(valor_unitario, 0)), 0) into v_total from public.pedido_itens where pedido_id = p_pedido;
+  if v_total <= 0 then
+    raise exception 'Informe o valor pago de cada item' using errcode = '23514';
+  end if;
+
+  insert into public.faturas (id, pedido_id, competencia, valor, vencimento, status, numero_documento, forma_pagamento,
+                              arquivo_caminho, observacoes)
+  values (v_fatura, p_pedido, date_trunc('month', v_data)::date, v_total, v_venc, 'a_pagar',
+          nullif(btrim(coalesce(p_dados ->> 'numero_nf', '')), ''), nullif(p_dados ->> 'forma_pagamento', ''),
+          v_arquivo, 'Pedido de compra ' || v_p.codigo || coalesce(' · ' || v_loja, ''));
+
+  update public.pedidos_compra
+     set status = 'comprado', fornecedor_id = v_fornecedor, loja_compra = v_loja, link_compra = v_link,
+         data_compra = v_data, vencimento = v_venc,
+         numero_nf = nullif(btrim(coalesce(p_dados ->> 'numero_nf', '')), ''), nf_chave = v_chave, nf_arquivo = v_arquivo,
+         fornecedor_troca_motivo = case when v_trocou then v_motivo end,
+         forma_pagamento = nullif(p_dados ->> 'forma_pagamento', ''), valor_final = v_total, fatura_id = v_fatura
+   where id = p_pedido;
+  perform set_config('app.operacao_pedido', '', true);
+  return v_fatura;
+end;
+$$;
+revoke all on function public.registrar_compra_pedido(text, jsonb) from public, anon;
+grant execute on function public.registrar_compra_pedido(text, jsonb) to authenticated;

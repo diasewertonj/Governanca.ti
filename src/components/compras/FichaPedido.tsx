@@ -14,7 +14,6 @@ import {
   ROTULO_FORMA_APROVACAO,
   opcaoEscolhida,
   opcoesDoItem,
-  itensSemEscolha,
   fluxoDoPedido,
   vezDoPedido,
   ROTULO_STATUS_PEDIDO,
@@ -31,6 +30,7 @@ import { CampoMoeda } from '../ui/Campos.tsx';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { FormPedido } from './FormPedido.tsx';
+import { PainelCotacao } from './PainelCotacao.tsx';
 import { ConversaPedido } from './ConversaPedido.tsx';
 import { CampoMascara } from '../ui/Campos.tsx';
 
@@ -48,6 +48,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
   const [comprando, setComprando] = useState(false);
   const [recebendo, setRecebendo] = useState(false);
   const [registrando, setRegistrando] = useState(false);
+  const [painelAlterado, setPainelAlterado] = useState(false);
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   // T.I. e Compras ("equipe") veem valores e operam; a T.I. recebe; Compras/admin aprovam e compram
@@ -156,7 +157,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
               </button>
             )}
             {podeRegistrar && isTI && (
-              <button type="button" disabled={ocupado} onClick={() => setRegistrando(true)} className="btn btn-primario">
+              <button type="button" disabled={ocupado || painelAlterado} title={painelAlterado ? 'Salve a cotação antes' : undefined} onClick={() => setRegistrando(true)} className="btn btn-primario">
                 <Check /> Registrar aprovação
               </button>
             )}
@@ -241,7 +242,8 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </dl>
           </section>
 
-          <section className="cartao overflow-hidden">
+          {isTI && aberto && <PainelCotacao pedido={p} onAlterado={setPainelAlterado} />}
+          <section className={`cartao overflow-hidden ${isTI && aberto ? 'hidden' : ''}`}>
             <h3 className="secao-titulo px-4 pt-4">Itens ({p.itens.length})</h3>
             <table className="tabela tabela-cartoes mt-2">
               <thead>
@@ -268,7 +270,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                         <ul className="mt-1 space-y-0.5">
                           {opcoesDoItem(p, i.id).map((o) => (
                             <li key={o.id} className={`text-xs ${o.vencedora ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
-                              {o.vencedora ? '✓ ' : '· '}
+                              {o.vencedora ? '✓ recomendada · ' : '· '}
                               {fornecedores.find((f) => f.id === o.fornecedorId)?.nome || o.loja || 'Opção'}
                               {[o.marca, o.modelo].filter(Boolean).length ? ` · ${[o.marca, o.modelo].filter(Boolean).join(' ')}` : ''}
                               {o.valor > 0 && !p.semValores ? ` · ${brl(o.valor)}` : o.valor > 0 && p.semValores ? ` · ${brl(o.valor)} (o seu)` : ''}
@@ -344,7 +346,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             <section className="cartao space-y-2 p-4">
               <h3 className="secao-titulo">Compra</h3>
               <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Dado rotulo="Fornecedor">{fornecedor(p.fornecedorId)}</Dado>
+                <Dado rotulo="Fornecedor">{p.lojaCompra ? `${p.lojaCompra} (fora do cadastro)` : fornecedor(p.fornecedorId)}</Dado>
                 <Dado rotulo="Nota fiscal">{p.numeroNf || '—'}</Dado>
                 <Dado rotulo="Data da compra">{p.dataCompra ? formatDate(p.dataCompra) : '—'}</Dado>
                 <Dado rotulo="Pagamento">{p.formaPagamento ? ROTULO_FORMA_PAGAMENTO[p.formaPagamento] : '—'}</Dado>
@@ -406,7 +408,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
           </section>
         </div>
       </Janela>
-      {editando && <FormPedido inicial={p} onClose={() => setEditando(false)} />}
+      {editando && <FormPedido inicial={p} somenteDados onClose={() => setEditando(false)} />}
       {comprando && <FormCompra pedido={p} onClose={() => setComprando(false)} />}
       {recebendo && <FormRecebimento pedido={p} onClose={() => setRecebendo(false)} />}
       {registrando && <FormAprovacao pedido={p} impacto={impacto} onClose={() => setRegistrando(false)} />}
@@ -431,7 +433,10 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
   const [nfArquivo, setNfArquivo] = useState<string | undefined>();
   const [enviandoNf, setEnviandoNf] = useState(false);
   const [motivoTroca, setMotivoTroca] = useState('');
-  const trocou = sugeridos.length > 0 && !!fornecedorId && !sugeridos.includes(fornecedorId);
+  // Seção 16: compra fora do cadastro e fora da lista de opções
+  const [loja, setLoja] = useState('');
+  const [linkCompra, setLinkCompra] = useState('');
+  const trocou = sugeridos.length > 0 && !sugeridos.includes(fornecedorId);
   const anexarNf = async (arquivo?: File) => {
     if (!arquivo) return;
     setEnviandoNf(true);
@@ -449,7 +454,7 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
   const total = p.itens.reduce((s, i) => s + i.quantidade * (valores[i.id] || 0), 0);
 
   const salvar = async () => {
-    if (!fornecedorId) return setErro('Escolha o fornecedor.');
+    if (!fornecedorId && !loja.trim()) return setErro('Escolha o fornecedor do cadastro ou informe a loja.');
     if (!vencimento) return setErro('Informe o vencimento da fatura.');
     if (!(total > 0)) return setErro('Informe o valor pago de cada item.');
     if (trocou && motivoTroca.trim().length < 5) return setErro('Explique por que a compra foi feita em outro fornecedor.');
@@ -464,6 +469,8 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
     setSalvando(true);
     const r = await registrarCompra(p.id, {
       fornecedorId,
+      loja: loja.trim() || undefined,
+      link: linkCompra.trim() || undefined,
       numeroNf: numeroNf.trim() || undefined,
       dataCompra,
       vencimento,
@@ -498,9 +505,9 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label htmlFor="compra-forn" className="rotulo">Fornecedor</label>
+            <label htmlFor="compra-forn" className="rotulo">Fornecedor do cadastro</label>
             <select id="compra-forn" value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} className="campo">
-              <option value="">Escolha…</option>
+              <option value="">Fora do cadastro (informe a loja)</option>
               {fornecedores.filter((f) => f.ativo || f.id === fornecedorId).map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.nome}
@@ -508,6 +515,18 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
               ))}
             </select>
           </div>
+          {!fornecedorId && (
+            <>
+              <div>
+                <label htmlFor="compra-loja" className="rotulo">Loja</label>
+                <input id="compra-loja" value={loja} onChange={(e) => setLoja(e.target.value)} placeholder="Ex.: Kabum" className="campo" />
+              </div>
+              <div>
+                <label htmlFor="compra-link" className="rotulo">Link da compra (opcional)</label>
+                <input id="compra-link" type="url" value={linkCompra} onChange={(e) => setLinkCompra(e.target.value)} placeholder="https://…" className="campo" />
+              </div>
+            </>
+          )}
           {trocou && (
             <div className="sm:col-span-2">
               <label htmlFor="compra-motivo" className="rotulo">Por que outro fornecedor? (a T.I. sugeriu {sugeridos.map((s) => fornecedores.find((f) => f.id === s)?.nome).filter(Boolean).join(', ') || 'outro'})</label>
@@ -725,7 +744,6 @@ const FormAprovacao: React.FC<{ pedido: PedidoCompra; impacto: ReturnType<typeof
   const [obs, setObs] = useState('');
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
-  const sem = itensSemEscolha(p);
   const salvar = async () => {
     setSalvando(true);
     const r = await registrarAprovacao(p.id, aprovador, forma, obs);
@@ -744,14 +762,13 @@ const FormAprovacao: React.FC<{ pedido: PedidoCompra; impacto: ReturnType<typeof
           <button type="button" onClick={onClose} className="btn btn-secundario">
             Cancelar
           </button>
-          <button type="button" disabled={salvando || !aprovador || sem.length > 0} onClick={salvar} className="btn btn-primario">
+          <button type="button" disabled={salvando || !aprovador} onClick={salvar} className="btn btn-primario">
             {salvando ? 'Registrando…' : 'Aprovado: seguir para compra'}
           </button>
         </>
       }
     >
       <div className="space-y-3">
-        {sem.length > 0 && <p className="erro">Escolha a opção de: {sem.join(', ')} (Editar).</p>}
         <div>
           <label htmlFor="aprov-quem" className="rotulo">Aprovado por</label>
           <select id="aprov-quem" value={aprovador} onChange={(e) => setAprovador(e.target.value)} className="campo">

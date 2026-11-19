@@ -877,6 +877,9 @@ export interface PedidoCompra {
   nfChave?: string;
   nfArquivo?: string;
   fornecedorTrocaMotivo?: string;
+  /** Seção 16: compra fora do cadastro (loja e link) */
+  lojaCompra?: string;
+  linkCompra?: string;
   /** Seção 15: aprovação registrada (quem aprovou, como e observação) */
   aprovadorId?: string;
   aprovacaoForma?: FormaAprovacao;

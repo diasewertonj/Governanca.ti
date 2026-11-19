@@ -46,9 +46,11 @@ export const FormPedido: React.FC<{
   inicial: PedidoCompra;
   /** true = pedido de RH/gestor (sem valores) */
   simples?: boolean;
+  /** Seção 16: editar só o que é e para quem (itens e opções ficam no painel de cotação da ficha) */
+  somenteDados?: boolean;
   onClose: () => void;
   onSalvo?: (p: PedidoCompra) => void;
-}> = ({ inicial, simples, onClose, onSalvo }) => {
+}> = ({ inicial, simples, somenteDados, onClose, onSalvo }) => {
   const { employees, departments, fornecedores, licenses, tickets, contratos } = useApp();
   const { estoque } = useRecursos();
   const { salvarPedido, solicitarCompra, anexarCotacao } = useCompras();
@@ -208,6 +210,7 @@ export const FormPedido: React.FC<{
           </div>
         </section>
 
+        {!somenteDados && (
         <section className="cartao space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="secao-titulo">Itens ({p.itens.length})</h3>
@@ -313,8 +316,9 @@ export const FormPedido: React.FC<{
             <Plus /> Adicionar item
           </button>
         </section>
+        )}
 
-        {!simples && p.cotacoes.some((c) => !c.itemId) && (
+        {!simples && !somenteDados && p.cotacoes.some((c) => !c.itemId) && (
           <section className="cartao space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="secao-titulo">Cotações do pedido inteiro (formato antigo)</h3>
@@ -386,7 +390,7 @@ export const FormPedido: React.FC<{
   );
 };
 
-type PropsProduto = {
+export type PropsProduto = {
   pedido: PedidoCompra;
   item: ItemPedido;
   n: number;
@@ -399,7 +403,7 @@ type PropsProduto = {
 };
 
 /** Seção 14: produto do item (link, marca, modelo, valor de referência) e as opções de compra */
-const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, simples, id, mudarItem, setP, anexar, enviandoArquivo }) => {
+export const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, simples, id, mudarItem, setP, anexar, enviandoArquivo }) => {
   const { fornecedores } = useApp();
   const { lerDadosDoLink } = useCompras();
   const [buscando, setBuscando] = useState<string | null>(null);
@@ -472,7 +476,7 @@ const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, simples,
 
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-slate-700">
-          Opções de compra ({opcoes.length}){!simples && opcoes.length > 0 ? ' · marque a escolhida' : ''}
+          Opções de compra ({opcoes.length}){!simples && opcoes.length > 0 ? ' · recomendar uma é opcional' : ''}
         </p>
         {opcoes.map((c, k) => (
           <div key={c.id} className={`grid grid-cols-1 gap-1.5 rounded-md border bg-white p-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_9rem_auto] ${c.vencedora ? 'border-emerald-300' : 'border-slate-200'}`}>
@@ -499,9 +503,9 @@ const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, simples,
             <CampoMoeda aria-label={`Valor unitário da opção ${k + 1}`} className="campo campo-sm" valor={c.valor || undefined} onMudar={(v) => mudarOp(c.id, { valor: v || 0 })} />
             <div className="flex items-center gap-1">
               {!simples && (
-                <label className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" title="Opção escolhida para este item">
+                <label className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" title="Opção recomendada para Compras (opcional)">
                   <input type="radio" name={id(`escolhida-${n}`)} checked={c.vencedora} onChange={() => setP((x) => ({ ...x, cotacoes: x.cotacoes.map((o) => (o.itemId === i.id ? { ...o, vencedora: o.id === c.id } : o)) }))} />
-                  Escolhida
+                  Recomendada
                 </label>
               )}
               {!simples &&

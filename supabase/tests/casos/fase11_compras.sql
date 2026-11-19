@@ -52,7 +52,7 @@ select harness.rodar('fase11', 'P5 uma só cotação vencedora por pedido (seç�
 -- Aprovação: só o admin --------------------------------------------------------------------------
 select harness.rodar('fase11', 'A1 quem pediu não aprova o próprio pedido', 'erro: Quem pediu não pode aprovar o próprio pedido', :'sup', 'authenticated',
   $q$select public.aprovar_pedido('pc-1', 'emp-sup', 'pessoalmente')$q$);
-select harness.rodar('fase11', 'A2 com cotações, aprovar exige a vencedora', 'erro: Escolha a cotação vencedora antes de aprovar', :'admin', 'authenticated',
+select harness.rodar('fase11', 'A2 recomendar é opcional: aprova com cotações sem vencedora (seção 16)', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor) values ('pc-1', 'for-f11', 10230);
     perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');

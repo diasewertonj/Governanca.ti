@@ -162,6 +162,8 @@ const dePedido = (r: Linha, itens: ItemPedido[], cotacoes: CotacaoPedido[], even
   nfChave: txt(r.nf_chave),
   nfArquivo: txt(r.nf_arquivo),
   fornecedorTrocaMotivo: txt(r.fornecedor_troca_motivo),
+  lojaCompra: txt(r.loja_compra),
+  linkCompra: txt(r.link_compra),
   aprovadorId: txt(r.aprovador_id),
   aprovacaoForma: txt(r.aprovacao_forma) as FormaAprovacao | undefined,
   aprovacaoObs: txt(r.aprovacao_obs),
@@ -382,6 +384,9 @@ export interface DadosCompra {
   nfChave?: string;
   nfArquivo?: string;
   motivoTroca?: string;
+  /** Seção 16: compra fora do cadastro */
+  loja?: string;
+  link?: string;
   itens: { id: string; valorUnitario: number }[];
 }
 
@@ -391,7 +396,7 @@ export async function registrarCompraDb(id: string, d: DadosCompra): Promise<str
     bd().rpc('registrar_compra_pedido', {
       p_pedido: id,
       p_dados: {
-        fornecedor_id: d.fornecedorId,
+        fornecedor_id: d.fornecedorId || '',
         numero_nf: d.numeroNf || '',
         data_compra: d.dataCompra,
         vencimento: d.vencimento,
@@ -399,6 +404,8 @@ export async function registrarCompraDb(id: string, d: DadosCompra): Promise<str
         nf_chave: d.nfChave || '',
         nf_arquivo: d.nfArquivo || '',
         motivo_troca: d.motivoTroca || '',
+        loja: d.loja || '',
+        link: d.link || '',
         itens: d.itens.map((i) => ({ id: i.id, valor_unitario: i.valorUnitario })),
       },
     })
