@@ -31,12 +31,14 @@ import {
   salvarPedidoDb,
   solicitarCompraDb,
   lerDadosDoLinkDb,
+  aprovarPedidoDb,
+  fetchPessoasAprovacaoDb,
   type DadosDoLink,
   type DadosCompra,
   type DadosRecebimento,
 } from '../services/comprasDb.ts';
-import type { Employee, EventoPedido, InventarioFisico, ItemInventario, MensagemPedido, Orcamento, PedidoCompra, StatusPedido } from '../types/index.ts';
-import { alertasOrcamento, distribuirMensal, itensSemEscolha, lancamentosRealizados, opcaoEscolhida, resumoOrcamento, vezDoPedido, type AlertaOrcamento, type LinhaOrcamento } from '../utils/compras.ts';
+import type { Employee, EventoPedido, FormaAprovacao, InventarioFisico, ItemInventario, MensagemPedido, Orcamento, PedidoCompra, StatusPedido } from '../types/index.ts';
+import { alertasOrcamento, distribuirMensal, lancamentosRealizados, opcaoEscolhida, resumoOrcamento, type AlertaOrcamento, type LinhaOrcamento } from '../utils/compras.ts';
 
 export type AcaoPedido = 'enviar' | 'devolver' | 'aprovar' | 'recusar' | 'cancelar';
 
@@ -69,6 +71,9 @@ interface ComprasContextType {
   recarregarCompras: () => Promise<void>;
   /** Seção 14: dados públicos do produto pelo link (função no servidor) */
   lerDadosDoLink: (url: string) => Promise<{ dados?: DadosDoLink; erro?: string }>;
+  registrarAprovacao: (id: string, aprovadorId: string, forma: FormaAprovacao, obs?: string) => Promise<string | null>;
+  /** Quem pode constar como "Aprovado por" (T.I. e Compras) */
+  pessoasAprovacao: { id: string; nome: string; cargo?: string }[];
 }
 
 const ComprasContext = createContext<ComprasContextType | undefined>(undefined);
@@ -111,7 +116,7 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
     justificativa: 'Admissão prevista para o próximo mês; não há notebook disponível no estoque.',
     categoria: 'hardware',
     area: 'Recursos Humanos',
-    status: 'aguardando',
+    status: 'em_cotacao',
     tipoPedido: 'ti',
     solicitanteId: 'emp-2',
     necessarioEm: `${ANO}-12-15`,
@@ -121,7 +126,7 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
       { id: 'cot-1', itemId: 'pit-1', fornecedorId: 'forn-1', link: 'https://www.dell.com/pt-br/shop/notebooks', marca: 'Dell', modelo: 'Latitude 3450', valor: 5190, prazoDias: 10, vencedora: true },
       { id: 'cot-2', itemId: 'pit-1', fornecedorId: 'forn-2', loja: 'Lenovo', link: 'https://www.lenovo.com/br/pt/', marca: 'Lenovo', modelo: 'ThinkPad E14', valor: 5480, prazoDias: 5, vencedora: false },
     ],
-    eventos: [ev('em_cotacao', 4, 'emp-2'), ev('aguardando', 3, 'emp-7', 'em_cotacao')],
+    eventos: [ev('em_cotacao', 4, 'emp-2')],
   },
   {
     id: 'ped-2',
@@ -137,12 +142,14 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
     aprovadoGestorPor: 'emp-1',
     aprovadoGestorEm: new Date(Date.now() - 2 * 86400000).toISOString(),
     fornecedorId: 'forn-1',
-    aprovadoPor: 'emp-8',
+    aprovadoPor: 'emp-7',
+    aprovadorId: 'emp-1',
+    aprovacaoForma: 'pessoalmente',
     aprovadoEm: new Date(Date.now() - 1 * 86400000).toISOString(),
     criadoEm: new Date(Date.now() - 6 * 86400000).toISOString(),
     itens: [{ id: 'pit-2', tipo: 'equipamento', descricao: 'Monitor 24" Full HD', categoriaAtivo: 'periferico', marca: 'Dell', modelo: 'P2422H', quantidade: 2, valorUnitario: 1100, ordem: 1 }],
     cotacoes: [{ id: 'cot-3', itemId: 'pit-2', fornecedorId: 'forn-1', marca: 'Dell', modelo: 'P2422H', valor: 1075, prazoDias: 7, vencedora: true }],
-    eventos: [ev('rascunho', 6, 'emp-7'), ev('aguardando', 5, 'emp-7', 'rascunho'), ev('aguardando', 2, 'emp-1', 'aguardando', 'Aprovado pelo gestor'), ev('aprovado', 1, 'emp-8', 'aguardando')],
+    eventos: [ev('rascunho', 6, 'emp-7'), ev('aguardando', 5, 'emp-7', 'rascunho'), ev('em_cotacao', 5, 'emp-7', 'rascunho'), ev('aprovado', 1, 'emp-7', 'em_cotacao', 'Aprovado por Carlos Eduardo Mendes (pessoalmente)')],
   },
   {
     id: 'ped-3',
@@ -167,14 +174,14 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
     justificativa: 'O atual parou de funcionar o microfone.',
     categoria: 'hardware',
     area: 'Engenharia de Software & Produto',
-    status: 'aguardando',
+    status: 'em_cotacao',
     tipoPedido: 'ti',
     solicitanteId: 'emp-3',
     gestorId: 'emp-4',
     criadoEm: new Date(Date.now() - 2 * 86400000).toISOString(),
     itens: [{ id: 'pit-4', tipo: 'equipamento', descricao: 'Headset USB-C com cancelamento de ruído', categoriaAtivo: 'periferico', quantidade: 1, valorUnitario: 420, ordem: 1 }],
     cotacoes: [{ id: 'cot-4', itemId: 'pit-4', fornecedorId: 'forn-1', marca: 'Jabra', modelo: 'Evolve2 30', valor: 420, prazoDias: 5, vencedora: true }],
-    eventos: [ev('em_cotacao', 2, 'emp-3'), ev('aguardando', 1, 'emp-7', 'em_cotacao')],
+    eventos: [ev('em_cotacao', 2, 'emp-3')],
   },
   {
     id: 'ped-5',
@@ -199,13 +206,13 @@ const DEMO_PEDIDOS: PedidoCompra[] = [
     justificativa: 'Sala nova do 14º andar.',
     categoria: 'outros',
     area: 'Recursos Humanos',
-    status: 'aguardando',
+    status: 'em_cotacao',
     tipoPedido: 'outros',
     solicitanteId: 'emp-2',
     criadoEm: new Date(Date.now() - 1 * 86400000).toISOString(),
     itens: [{ id: 'pit-6', tipo: 'servico', descricao: 'Cadeira ergonômica', quantidade: 6, ordem: 1 }],
     cotacoes: [],
-    eventos: [ev('aguardando', 1, 'emp-2')],
+    eventos: [ev('em_cotacao', 1, 'emp-2')],
   },
 ];
 const DEMO_MENSAGENS: Record<string, MensagemPedido[]> = {
@@ -246,6 +253,22 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [inventarios, setInventarios] = useState<InventarioFisico[]>(demo ? DEMO_INVENTARIOS : []);
   const [mensagens, setMensagens] = useState<Record<string, MensagemPedido[]>>(demo ? DEMO_MENSAGENS : {});
   const podePedirCompra = !!currentUser;
+  const [pessoasBanco, setPessoasBanco] = useState<{ id: string; nome: string; cargo?: string }[]>([]);
+  // Demonstração e T.I.: o cadastro; Compras (produção): pela função do banco
+  const pessoasAprovacao = useMemo(
+    () => (pessoasBanco.length ? pessoasBanco : employees.filter((e) => e.status !== 'desligado').map((e) => ({ id: e.id, nome: e.nome, cargo: e.cargo }))),
+    [pessoasBanco, employees]
+  );
+  useEffect(() => {
+    if (demo || !equipe) return;
+    let vivo = true;
+    fetchPessoasAprovacaoDb().then((l) => {
+      if (vivo && l) setPessoasBanco(l);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [demo, equipe]);
 
   const nomeDe = useCallback((id?: string) => employees.find((e) => e.id === id)?.nome, [employees]);
 
@@ -438,7 +461,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (erro) return { erro };
     if (codigo) item = { ...item, codigo };
     setPedidos((prev) => (novo ? [item, ...prev] : prev.map((p) => (p.id === item.id ? item : p))));
-    if (enviar && ['rascunho', 'em_cotacao', 'recusado'].includes(item.status)) {
+    if (enviar && ['rascunho', 'recusado'].includes(item.status)) {
       const e2 = await mudar(item, 'enviar');
       if (e2) return { item, erro: `Pedido salvo, mas não foi enviado: ${e2}` };
     } else if (!demo) {
@@ -467,7 +490,13 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       gestorId: gestorDe(employees, eu),
       criadoEm: agoraIso(),
       itens: dados.itens.map((i, n) => ({ ...i, ordem: n + 1, valorUnitario: undefined, tipo: dados.tipoPedido === 'outros' ? 'servico' : i.tipo })),
-      cotacoes: dados.cotacoes.filter((c) => c.itemId).map((c) => ({ ...c, fornecedorId: '', vencedora: false, criadoPor: eu })),
+      // Seção 16: o link que a pessoa indicou vira a 1ª opção do item
+      cotacoes: [
+        ...dados.itens
+          .filter((i) => i.link)
+          .map((i) => ({ id: novoId('cot'), itemId: i.id, fornecedorId: '', link: i.link, loja: (/^https?:\/\/(?:www\.)?([^/:]+)/.exec(i.link || '') || [])[1], marca: i.marca, modelo: i.modelo, valor: i.valorReferencia || 0, observacoes: 'Sugestão de quem pediu', vencedora: false, criadoPor: eu })),
+        ...dados.cotacoes.filter((c) => c.itemId).map((c) => ({ ...c, fornecedorId: '', vencedora: false, criadoPor: eu })),
+      ],
       eventos: [{ para: status, por: eu, em: agoraIso() }],
     };
     if (demo) setPedidos((prev) => [item, ...prev]);
@@ -483,51 +512,59 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Mesmas regras da função mudar_status_pedido do banco (aqui só para avisar antes)
   async function mudar(p: PedidoCompra, acao: AcaoPedido, motivo?: string): Promise<string | null> {
-    const vez = vezDoPedido(p);
-    const precisaMotivo = acao === 'recusar' || acao === 'cancelar' || acao === 'devolver';
+    const precisaMotivo = acao === 'cancelar' || acao === 'devolver' || acao === 'recusar';
     if (precisaMotivo && (motivo || '').trim().length < 5) return 'Explique o motivo.';
-    if (acao === 'devolver' && !(equipe && p.status === 'em_cotacao')) return 'Só a T.I. devolve um pedido em cotação.';
-    if (acao === 'enviar' && p.status === 'em_cotacao' && !equipe) return 'A T.I. está cotando este pedido.';
-    if (acao === 'aprovar' || acao === 'recusar') {
-      if (p.status !== 'aguardando') return 'O pedido não está aguardando aprovação.';
-      if (vez === 'gestor' && p.gestorId !== eu) return 'Falta a aprovação do gestor de quem pediu.';
-      if (vez === 'compras_aprovacao' && !(isCompras || isAdmin)) return 'Só Compras ou o administrador da T.I. aprova ou recusa.';
-      if (acao === 'aprovar' && vez === 'compras_aprovacao') {
-        const sem = itensSemEscolha(p);
-        if (sem.length) return `Escolha a opção de: ${sem.join(', ')}.`;
-        if (p.cotacoes.some((c) => !c.itemId) && !p.cotacoes.some((c) => !c.itemId && c.vencedora)) return 'Escolha a cotação vencedora antes de aprovar.';
-      }
-    }
+    if (acao === 'aprovar' || acao === 'recusar') return 'Use "Registrar aprovação" (com quem aprovou) ou "Devolver".';
+    if (acao === 'devolver' && !(equipe && ['em_cotacao', 'aguardando', 'aprovado'].includes(p.status))) return 'Só a T.I. ou Compras devolvem um pedido em cotação ou aprovado.';
+    if (acao === 'enviar' && !['rascunho', 'recusado'].includes(p.status)) return 'Só um rascunho ou um pedido devolvido vai para cotação.';
     const erro = await noBanco(() => mudarStatusPedidoDb(p.id, acao, motivo));
     if (erro) return erro;
     if (!demo) {
       await recarregarCompras();
       return null;
     }
-    if (acao === 'aprovar' && vez === 'gestor') {
-      mudarLocal(p.id, 'aguardando', { aprovadoGestorPor: eu, aprovadoGestorEm: agoraIso() }, motivo?.trim() || 'Aprovado pelo gestor', 'aguardando');
-    } else if (acao === 'aprovar') {
-      // A opção escolhida de cada item define o produto (como no banco)
-      const itens = p.itens.map((i) => {
-        const o = opcaoEscolhida(p, i.id);
-        return o ? { ...i, marca: o.marca || i.marca, modelo: o.modelo || i.modelo, link: o.link || i.link, imagemUrl: o.imagemUrl || i.imagemUrl, valorUnitario: o.valor > 0 ? o.valor : i.valorUnitario } : i;
-      });
-      const forn = p.cotacoes.find((c) => c.vencedora && !c.itemId)?.fornecedorId || p.cotacoes.find((c) => c.vencedora && c.fornecedorId)?.fornecedorId;
-      mudarLocal(p.id, 'aprovado', { itens, aprovadoPor: eu, aprovadoEm: agoraIso(), fornecedorId: forn || p.fornecedorId });
-    } else if (acao === 'enviar') {
-      const para: StatusPedido = !equipe && p.tipoPedido === 'ti' ? 'em_cotacao' : 'aguardando';
-      mudarLocal(p.id, para, { motivo: undefined, aprovadoGestorPor: undefined, aprovadoGestorEm: undefined, aprovadoPor: undefined, aprovadoEm: undefined });
-    } else {
-      mudarLocal(p.id, acao === 'cancelar' ? 'cancelado' : 'recusado', { motivo: motivo?.trim() }, motivo?.trim());
-    }
+    const limpaAprov = { aprovadoPor: undefined, aprovadoEm: undefined, aprovadorId: undefined, aprovacaoForma: undefined };
+    if (acao === 'enviar') mudarLocal(p.id, 'em_cotacao', { motivo: undefined, ...limpaAprov });
+    else if (acao === 'devolver') mudarLocal(p.id, p.status === 'aprovado' ? 'em_cotacao' : 'recusado', { motivo: motivo?.trim(), ...(p.status === 'aprovado' ? limpaAprov : {}) }, motivo?.trim());
+    else mudarLocal(p.id, 'cancelado', { motivo: motivo?.trim() }, motivo?.trim());
     return null;
   }
 
+  // Seção 15: aprovação registrada — T.I./Compras registram quem aprovou; o gestor de quem pediu aprova ele mesmo
+  const registrarAprovacao: ComprasContextType['registrarAprovacao'] = async (id, aprovadorId, forma, obs) => {
+    const p = pedidosTodos.find((x) => x.id === id);
+    if (!p) return 'Pedido não encontrado.';
+    if (!equipe && !(eu && p.gestorId === eu && aprovadorId === eu)) return 'Só a T.I., Compras ou o gestor de quem pediu registram a aprovação.';
+    if (!['rascunho', 'em_cotacao', 'aguardando', 'recusado'].includes(p.status)) return 'Este pedido não está aguardando aprovação.';
+    if (!aprovadorId) return 'Escolha quem aprovou.';
+    if (aprovadorId === p.solicitanteId) return 'Quem pediu não pode aprovar o próprio pedido.';
+    // Seção 16: recomendar uma opção é opcional (sem recomendação, Compras escolhe na compra)
+    const erro = await noBanco(() => aprovarPedidoDb(id, aprovadorId, forma, obs));
+    if (erro) return erro;
+    if (!demo) {
+      await recarregarCompras();
+      return null;
+    }
+    // A opção escolhida de cada item define o produto (como no banco)
+    const itens = p.itens.map((i) => {
+      const o = opcaoEscolhida(p, i.id);
+      return o ? { ...i, marca: o.marca || i.marca, modelo: o.modelo || i.modelo, link: o.link || i.link, imagemUrl: o.imagemUrl || i.imagemUrl, valorUnitario: o.valor > 0 ? o.valor : i.valorUnitario } : i;
+    });
+    const forn = p.cotacoes.find((c) => c.vencedora && !c.itemId)?.fornecedorId || p.cotacoes.find((c) => c.vencedora && c.fornecedorId)?.fornecedorId;
+    const nome = employees.find((e) => e.id === aprovadorId)?.nome || 'liderança';
+    mudarLocal(
+      id,
+      'aprovado',
+      { itens, aprovadoPor: eu, aprovadoEm: agoraIso(), aprovadorId, aprovacaoForma: forma, aprovacaoObs: obs?.trim() || undefined, motivo: undefined, fornecedorId: forn || p.fornecedorId },
+      `Aprovado por ${nome} (${forma})${obs?.trim() ? ` — ${obs.trim()}` : ''}`
+    );
+    return null;
+  };
   const registrarCompra: ComprasContextType['registrarCompra'] = async (id, d) => {
     if (!(isCompras || isAdmin)) return 'Só Compras (ou o administrador da T.I.) registra a compra.';
     const p = pedidosTodos.find((x) => x.id === id);
     if (!p || p.status !== 'aprovado') return 'Só um pedido aprovado pode ser registrado como comprado.';
-    if (!d.fornecedorId) return 'Informe o fornecedor da compra.';
+    if (!d.fornecedorId && !(d.loja || '').trim()) return 'Informe o fornecedor ou a loja da compra.';
     if (!d.dataCompra || !d.vencimento) return 'Informe a data da compra e o vencimento.';
     const sugeridos = p.cotacoes.filter((c) => c.vencedora && c.fornecedorId).map((c) => c.fornecedorId);
     const trocou = sugeridos.length > 0 && !sugeridos.includes(d.fornecedorId);
@@ -555,7 +592,9 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
         itens,
         valorFinal: total,
         faturaId: f.id,
-        fornecedorId: d.fornecedorId,
+        fornecedorId: d.fornecedorId || undefined,
+        lojaCompra: d.loja?.trim() || undefined,
+        linkCompra: d.link?.trim() || undefined,
         numeroNf: d.numeroNf,
         nfChave: d.nfChave,
         nfArquivo: d.nfArquivo,
@@ -771,6 +810,8 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
         cancelarInventario,
         recarregarCompras,
         lerDadosDoLink: lerDadosDoLinkDb,
+        registrarAprovacao,
+        pessoasAprovacao,
       }}
     >
       {children}

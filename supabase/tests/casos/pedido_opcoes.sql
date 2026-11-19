@@ -23,7 +23,7 @@ select harness.rodar('opcoes', 'O1 quem pede informa link, valor, marca e opçõ
          "opcoes":[{"link":"https://outra.test/dell","loja":"Outra","marca":"Dell","valor":1700}]}]');
     perform harness.espera(format($s$select 1 from public.pedidos_visiveis() p, jsonb_array_elements(p.itens) i
       where p.id = %L and i ->> 'link' = 'https://loja.test/lg' and (i ->> 'valor_referencia')::numeric = 1800
-        and jsonb_array_length(i -> 'opcoes') = 1 and (i -> 'opcoes' -> 0 ->> 'valor')::numeric = 1700$s$, v), 1);
+        and jsonb_array_length(i -> 'opcoes') = 2 and (i -> 'opcoes' -> 0 ->> 'loja') = 'loja.test'$s$, v), 1);
   end $x$$q$);
 select harness.rodar('opcoes', 'O2 RH vê o item e o link, mas não os valores de quem pediu', 'ok', :'rh', 'authenticated',
   $q$do $x$
@@ -44,18 +44,21 @@ select harness.rodar('opcoes', 'O3 T.I. inclui opções no item e muda a marca; 
     perform harness.espera($s$select 1 from public.pedido_eventos where pedido_id = 'pop-1' and campo = 'item'
       and motivo like '%Marca: Logitech → Microsoft%'$s$, 1);
   end $x$$q$);
-select harness.rodar('opcoes', 'O4 aprovar exige a opção escolhida de cada item que tem opções', 'erro: Escolha a opção de: Teclado sem fio', :'admin', 'authenticated',
+select harness.rodar('opcoes', 'O4 aprova sem opção recomendada; T.I. exclui e inclui item com histórico', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, item_id, fornecedor_id, valor) values ('pop-1', 'poi-1', 'for-op1', 140);
-    perform public.mudar_status_pedido('pop-1', 'enviar');
-    perform public.mudar_status_pedido('pop-1', 'aprovar');
+    delete from public.pedido_itens where id = 'poi-2';
+    insert into public.pedido_itens (pedido_id, tipo, descricao, quantidade, ordem) values ('pop-1', 'acessorio', 'Mouse', 2, 3);
+    perform harness.espera($s$select 1 from public.pedido_eventos where pedido_id = 'pop-1' and campo = 'item'
+      and (motivo like 'Item excluído: Instalação%' or motivo like 'Item incluído: Mouse%')$s$, 2);
+    perform public.aprovar_pedido('pop-1', 'emp-admin', 'pessoalmente');
+    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pop-1' and status = 'aprovado'$s$, 1);
   end $x$$q$);
 select harness.rodar('opcoes', 'O5 aprovar copia marca, modelo, link e valor da escolhida para o item', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, item_id, fornecedor_id, link, marca, modelo, valor, vencedora)
       values ('pop-1', 'poi-1', 'for-op1', 'https://op1.test/k', 'Logitech', 'K270', 140, true);
-    perform public.mudar_status_pedido('pop-1', 'enviar');
-    perform public.mudar_status_pedido('pop-1', 'aprovar');
+    perform public.aprovar_pedido('pop-1', 'emp-admin', 'pessoalmente');
     perform harness.espera($s$select 1 from public.pedido_itens where id = 'poi-1' and marca = 'Logitech' and modelo = 'K270'
       and link = 'https://op1.test/k' and valor_unitario = 140$s$, 1);
     perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pop-1' and status = 'aprovado' and fornecedor_id = 'for-op1'$s$, 1);
@@ -78,6 +81,13 @@ select harness.rodar('opcoes', 'O8 recebimento cria o acessório no estoque com 
     perform public.receber_pedido('pop-1', '{"criar_estoque":["poi-1"],"localizacao":"Almoxarifado"}');
     perform harness.espera($s$select 1 from public.estoque_itens where nome = 'Teclado sem fio' and marca = 'Logitech'
       and modelo = 'K270' and quantidade = 2 and valor_unitario = 140$s$, 1);
+  end $x$$q$);
+
+select harness.rodar('opcoes', 'O9 Compras compra fora do cadastro informando loja e link', 'ok', :'admin', 'authenticated',
+  $q$do $x$ begin
+    perform public.aprovar_pedido('pop-1', 'emp-admin', 'pessoalmente');
+    perform public.registrar_compra_pedido('pop-1', '{"loja":"Loja Online X","link":"https://x.test/pedido/1","data_compra":"2026-11-10","vencimento":"2026-12-10","itens":[{"id":"poi-1","valor_unitario":130},{"id":"poi-2","valor_unitario":20}]}');
+    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pop-1' and status = 'comprado' and fornecedor_id is null and loja_compra = 'Loja Online X'$s$, 1);
   end $x$$q$);
 
 -- Limpeza

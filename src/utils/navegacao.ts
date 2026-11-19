@@ -147,6 +147,8 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
       titulo: 'Fornecedores e contratos',
       itens: [item('fornecedores', 'fornecedores'), item('contratos', 'contratos')],
     },
+    // Seção 15: pedidos de compra com item próprio (não é mais aba do Financeiro)
+    { itens: [item('pedidos_compra', 'compras', 'pedidos')] },
     // Item único: sem título de grupo repetindo o nome
     { itens: [item('financeiro', 'contas_pagar')] },
     // T.I./admin: sem Minha área — Meus equipamentos fica no menu da conta; os próprios chamados, em Chamados

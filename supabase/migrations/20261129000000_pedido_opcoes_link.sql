@@ -93,30 +93,42 @@ set search_path = ''
 as $$
 declare
   v_status text;
+  v_pedido text := case when tg_op = 'DELETE' then old.pedido_id else new.pedido_id end;
   v_mud    text[] := '{}';
+  v_texto  text;
 begin
   if coalesce(current_setting('app.operacao_pedido', true), '') = 'sim' then
-    return new;
+    return case when tg_op = 'DELETE' then old else new end;
   end if;
-  if new.descricao is distinct from old.descricao then v_mud := v_mud || ('Descrição: ' || coalesce(old.descricao, '—') || ' → ' || coalesce(new.descricao, '—')); end if;
-  if new.marca is distinct from old.marca then v_mud := v_mud || ('Marca: ' || coalesce(old.marca, '—') || ' → ' || coalesce(new.marca, '—')); end if;
-  if new.modelo is distinct from old.modelo then v_mud := v_mud || ('Modelo: ' || coalesce(old.modelo, '—') || ' → ' || coalesce(new.modelo, '—')); end if;
-  if new.link is distinct from old.link then v_mud := v_mud || 'Link alterado'::text; end if;
-  if new.quantidade is distinct from old.quantidade then v_mud := v_mud || ('Quantidade: ' || old.quantidade || ' → ' || new.quantidade); end if;
-  if array_length(v_mud, 1) is null then
-    return new;
+  select status into v_status from public.pedidos_compra where id = v_pedido;
+  -- Pedido sendo criado (rascunho) ou apagado: não registra
+  if v_status is null or v_status = 'rascunho' then
+    return case when tg_op = 'DELETE' then old else new end;
   end if;
-  select status into v_status from public.pedidos_compra where id = new.pedido_id;
+  if tg_op = 'INSERT' then
+    v_texto := 'Item incluído: ' || new.descricao || ' (' || new.quantidade || ')';
+  elsif tg_op = 'DELETE' then
+    v_texto := 'Item excluído: ' || old.descricao || ' (' || old.quantidade || ')';
+  else
+    if new.descricao is distinct from old.descricao then v_mud := v_mud || ('Descrição: ' || coalesce(old.descricao, '—') || ' → ' || coalesce(new.descricao, '—')); end if;
+    if new.marca is distinct from old.marca then v_mud := v_mud || ('Marca: ' || coalesce(old.marca, '—') || ' → ' || coalesce(new.marca, '—')); end if;
+    if new.modelo is distinct from old.modelo then v_mud := v_mud || ('Modelo: ' || coalesce(old.modelo, '—') || ' → ' || coalesce(new.modelo, '—')); end if;
+    if new.link is distinct from old.link then v_mud := v_mud || 'Link alterado'::text; end if;
+    if new.quantidade is distinct from old.quantidade then v_mud := v_mud || ('Quantidade: ' || old.quantidade || ' → ' || new.quantidade); end if;
+    if array_length(v_mud, 1) is null then
+      return new;
+    end if;
+    v_texto := new.descricao || ': ' || array_to_string(v_mud, '; ');
+  end if;
   insert into public.pedido_eventos (pedido_id, de, para, motivo, por, campo)
-  values (new.pedido_id, v_status, v_status, new.descricao || ': ' || array_to_string(v_mud, '; '), public.meu_colaborador_id(), 'item');
-  return new;
+  values (v_pedido, v_status, v_status, v_texto, public.meu_colaborador_id(), 'item');
+  return case when tg_op = 'DELETE' then old else new end;
 end;
 $$;
 revoke all on function public.registrar_alteracao_item_pedido() from public, anon, authenticated;
 create or replace trigger trg_pedido_itens_historico
-  after update on public.pedido_itens
+  after insert or update or delete on public.pedido_itens
   for each row execute function public.registrar_alteracao_item_pedido();
-
 -- 4 -------------------------------------------------------------------------------------------
 create or replace function public.solicitar_compra(p_pedido jsonb, p_itens jsonb)
 returns text

@@ -855,6 +855,7 @@ export interface MensagemPedido {
 
 /** Seção 13: pedido de T.I. (a T.I. cota) ou outros (vai direto para Compras) */
 export type TipoPedido = 'ti' | 'outros';
+export type FormaAprovacao = 'pessoalmente' | 'email' | 'mensagem' | 'sistema' | 'outro';
 
 export interface PedidoCompra {
   id: string;
@@ -876,6 +877,13 @@ export interface PedidoCompra {
   nfChave?: string;
   nfArquivo?: string;
   fornecedorTrocaMotivo?: string;
+  /** Seção 16: compra fora do cadastro (loja e link) */
+  lojaCompra?: string;
+  linkCompra?: string;
+  /** Seção 15: aprovação registrada (quem aprovou, como e observação) */
+  aprovadorId?: string;
+  aprovacaoForma?: FormaAprovacao;
+  aprovacaoObs?: string;
   colaboradorDestinoId?: string;
   chamadoId?: string;
   processoItemId?: string;

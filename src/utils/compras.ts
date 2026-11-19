@@ -14,6 +14,7 @@ import type {
   SoftwareLicense,
   StatusPedido,
   TipoItemPedido,
+  FormaAprovacao,
 } from '../types/index.ts';
 import { CATEGORIA_DO_TIPO, ROTULO_CATEGORIA, brl, valorEfetivo } from './financeiro.ts';
 
@@ -201,20 +202,29 @@ export const ROTULO_TIPO_ITEM: Record<TipoItemPedido, string> = {
 };
 
 /** Ordem do fluxo (para a linha do tempo); pedido "Outros" não passa pela cotação da T.I. */
-export const FLUXO_PEDIDO: StatusPedido[] = ['rascunho', 'em_cotacao', 'aguardando', 'aprovado', 'comprado', 'recebido'];
-export const fluxoDoPedido = (p: Pick<PedidoCompra, 'tipoPedido'>) => FLUXO_PEDIDO.filter((s) => p.tipoPedido !== 'outros' || s !== 'em_cotacao');
+// Seção 15 (fluxo enxuto): cotação → aprovação registrada → compra → recebimento
+export const FLUXO_PEDIDO: StatusPedido[] = ['rascunho', 'em_cotacao', 'aprovado', 'comprado', 'recebido'];
+export const fluxoDoPedido = (_p?: Pick<PedidoCompra, 'tipoPedido'>) => FLUXO_PEDIDO;
+
+export const ROTULO_FORMA_APROVACAO: Record<FormaAprovacao, string> = {
+  pessoalmente: 'pessoalmente',
+  email: 'por e-mail',
+  mensagem: 'por mensagem',
+  sistema: 'pelo sistema',
+  outro: 'outra forma',
+};
 
 /** De quem é a vez (seção 13): T.I. cota, gestor aprova, Compras aprova e compra, T.I. recebe */
-export type VezPedido = 'solicitante' | 'ti_cotacao' | 'gestor' | 'compras_aprovacao' | 'compras_compra' | 'recebimento' | null;
+export type VezPedido = 'solicitante' | 'ti_cotacao' | 'compras_cotacao' | 'gestor' | 'compras_aprovacao' | 'compras_compra' | 'recebimento' | null;
 export function vezDoPedido(p: Pick<PedidoCompra, 'status' | 'gestorId' | 'aprovadoGestorEm' | 'tipoPedido'>): VezPedido {
   switch (p.status) {
     case 'rascunho':
     case 'recusado':
       return 'solicitante';
+    // Em cotação (ou aguardando, do fluxo antigo): quem cota registra a aprovação
     case 'em_cotacao':
-      return 'ti_cotacao';
     case 'aguardando':
-      return p.gestorId && !p.aprovadoGestorEm ? 'gestor' : 'compras_aprovacao';
+      return p.tipoPedido === 'outros' ? 'compras_cotacao' : 'ti_cotacao';
     case 'aprovado':
       return 'compras_compra';
     case 'comprado':
@@ -233,6 +243,8 @@ export function esperaPorMim(p: PedidoCompra, papel: string, eu?: string): boole
       return p.status === 'recusado' && !!eu && p.solicitanteId === eu;
     case 'ti_cotacao':
       return ti;
+    case 'compras_cotacao':
+      return papel === 'compras' || papel === 'ti_admin';
     case 'gestor':
       return !!eu && p.gestorId === eu;
     case 'compras_aprovacao':
@@ -320,7 +332,9 @@ export function proximoPasso(p: Pick<PedidoCompra, 'status' | 'gestorId' | 'apro
     case 'solicitante':
       return p.status === 'recusado' ? 'ajustar e reenviar, ou cancelar' : 'enviar o pedido';
     case 'ti_cotacao':
-      return 'a T.I. está cotando';
+      return 'a T.I. cota e registra a aprovação';
+    case 'compras_cotacao':
+      return 'Compras cota e registra a aprovação';
     case 'gestor':
       return `aprovação do gestor${p.gestorNome ? ` (${p.gestorNome})` : ''}`;
     case 'compras_aprovacao':

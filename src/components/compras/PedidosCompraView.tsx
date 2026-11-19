@@ -67,7 +67,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
               <Download /> Exportar CSV
             </button>
             {podePedirCompra && (
-              <button type="button" onClick={() => setNovo(pedidoVazio())} className="btn btn-primario">
+              <button type="button" onClick={() => setNovo(pedidoVazio({ colaboradorDestinoId: currentUser?.id }))} className="btn btn-primario">
                 <Plus /> {isTI && !ehCompras ? 'Novo pedido' : 'Pedir compra'}
               </button>
             )}
@@ -94,7 +94,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
         }
       />
       {lista.length === 0 ? (
-        <Vazio acao={podePedirCompra ? <button type="button" onClick={() => setNovo(pedidoVazio())} className="btn btn-sm btn-primario"><Plus /> {isTI && !ehCompras ? 'Novo pedido' : 'Pedir compra'}</button> : undefined}>
+        <Vazio acao={podePedirCompra ? <button type="button" onClick={() => setNovo(pedidoVazio({ colaboradorDestinoId: currentUser?.id }))} className="btn btn-sm btn-primario"><Plus /> {isTI && !ehCompras ? 'Novo pedido' : 'Pedir compra'}</button> : undefined}>
           {pedidos.length === 0 ? 'Nenhum pedido de compra ainda.' : 'Nenhum pedido com estes filtros.'}
         </Vazio>
       ) : (

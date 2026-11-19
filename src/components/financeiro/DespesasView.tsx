@@ -32,9 +32,6 @@ import {
 import { ContasPagarView, ContratoPorId } from './FinanceiroViews.tsx';
 import { CartaoPatrimonio, ComprasView } from './ComprasView.tsx';
 import { Abas } from '../ui/Abas.tsx';
-import { useCompras } from '../../context/ComprasContext.tsx';
-import { PedidosCompraView } from '../compras/PedidosCompraView.tsx';
-import { esperaPorMim } from '../../utils/compras.ts';
 import { OrcamentoView } from '../compras/OrcamentoView.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
@@ -101,12 +98,10 @@ interface Origem {
 }
 
 export const FinanceiroView: React.FC = () => {
-  const { pedidos } = useCompras();
-  const { currentRole, currentUser } = useApp();
-  // Seção 13: pedidos que esperam esta pessoa; Compras vê só Contas a pagar, Pedidos e Orçamento
-  const pedidosPendentes = pedidos.filter((p) => esperaPorMim(p, currentRole, currentUser?.id)).length;
+  const { currentRole } = useApp();
+  // Compras vê só Contas a pagar e Orçamento (Pedidos de compra tem item próprio no menu)
   const ehCompras = currentRole === 'compras';
-  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras' | 'pedidos' | 'orcamento'>(() => (currentRole === 'compras' ? 'pedidos' : 'contas'));
+  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras' | 'orcamento'>('contas');
   // Período em comum entre Despesas e Compras
   const [atalho, setAtalho] = useState<Atalho>('ult6');
   const [deManual, setDeManual] = useState('');
@@ -125,9 +120,8 @@ export const FinanceiroView: React.FC = () => {
         { id: 'contas' as const, rotulo: 'Contas a pagar' },
         { id: 'despesas' as const, rotulo: 'Despesas' },
         { id: 'compras' as const, rotulo: 'Compras' },
-        { id: 'pedidos' as const, rotulo: 'Pedidos de compra', contador: pedidosPendentes },
         { id: 'orcamento' as const, rotulo: 'Orçamento' },
-      ].filter((a) => !ehCompras || a.id === 'contas' || a.id === 'pedidos' || a.id === 'orcamento')}
+      ].filter((a) => !ehCompras || a.id === 'contas' || a.id === 'orcamento')}
     />
   );
   const filtroPeriodo = (
@@ -146,7 +140,6 @@ export const FinanceiroView: React.FC = () => {
     </>
   );
   if (aba === 'contas') return <ContasPagarView abas={abas} />;
-  if (aba === 'pedidos') return <PedidosCompraView abas={abas} />;
   if (aba === 'orcamento') return <OrcamentoView abas={abas} />;
   if (aba === 'compras') return <ComprasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
   return <DespesasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
