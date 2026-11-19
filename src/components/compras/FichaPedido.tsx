@@ -25,7 +25,7 @@ import {
 } from '../../utils/compras.ts';
 import { proximasTags } from '../../utils/patrimonio.ts';
 import { formatDate } from '../../utils/formatters.ts';
-import { Dado, Janela } from '../ui/Janela.tsx';
+import { Dado, DadoLinha, Janela } from '../ui/Janela.tsx';
 import { CampoMoeda } from '../ui/Campos.tsx';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
@@ -199,46 +199,45 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </p>
           )}
 
+          {/* Seção 19: resumo compacto — finalidade em destaque, dados em linhas "rótulo valor", vazios escondidos */}
           <section className="cartao space-y-3 p-4">
-            <h3 className="secao-titulo">Resumo</h3>
-            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Dado rotulo="Pedido por">{nome(p.solicitanteId, p.solicitanteNome)}</Dado>
-              <Dado rotulo="Tipo">{p.tipoPedido === 'outros' ? 'Outros (Compras cota)' : 'De T.I. (a T.I. cota)'}</Dado>
-              <Dado rotulo="Gestor">
-                {p.gestorId ? nome(p.gestorId, p.gestorNome) : '—'}
-              </Dado>
-              <Dado rotulo="Em">{formatDate(p.criadoEm.slice(0, 10))}</Dado>
-              <Dado rotulo="Categoria">{ROTULO_CATEGORIA[p.categoria]}</Dado>
-              <Dado rotulo="Área">{p.area || 'Geral'}</Dado>
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+              <div className="min-w-0 flex-1">
+                <h3 className="secao-titulo">Resumo</h3>
+                {p.justificativa && <p className="mt-1 break-words text-slate-900">{p.justificativa}</p>}
+              </div>
+              {valor !== undefined && valor > 0 && (
+                <div className="text-right">
+                  <p className="texto-aux">{p.valorFinal != null ? 'Valor final' : 'Valor'}</p>
+                  <p className="num text-base font-semibold text-slate-900">{brl(valor)}</p>
+                </div>
+              )}
+            </div>
+            <dl className="grid gap-x-6 gap-y-1 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-3">
+              <DadoLinha rotulo="Pedido por">
+                {nome(p.solicitanteId, p.solicitanteNome)} · <span className="num">{formatDate(p.criadoEm.slice(0, 10))}</span>
+              </DadoLinha>
+              <DadoLinha rotulo="Tipo">{p.tipoPedido === 'outros' ? 'Outros (Compras cota)' : 'De T.I. (a T.I. cota)'}</DadoLinha>
+              <DadoLinha rotulo="Categoria">{ROTULO_CATEGORIA[p.categoria]}</DadoLinha>
+              <DadoLinha rotulo="Área">{p.area || 'Geral'}</DadoLinha>
+              <DadoLinha rotulo="Gestor">{p.gestorId ? nome(p.gestorId, p.gestorNome) : null}</DadoLinha>
               {p.aprovadorId && (
-                <Dado rotulo="Aprovado por">
+                <DadoLinha rotulo="Aprovado por">
                   {nome(p.aprovadorId)}
                   {p.aprovacaoForma ? ` · ${ROTULO_FORMA_APROVACAO[p.aprovacaoForma]}` : ''}
                   {p.aprovadoEm ? ` · ${formatDate(p.aprovadoEm.slice(0, 10))}` : ''}
                   {p.aprovadoPor && p.aprovadoPor !== p.aprovadorId ? ` (registrado por ${nome(p.aprovadoPor)})` : ''}
-                </Dado>
+                </DadoLinha>
               )}
-              <Dado rotulo="Para quem">{p.colaboradorDestinoId ? nome(p.colaboradorDestinoId, p.destinoNome) : '—'}</Dado>
-              <Dado rotulo="Precisa até">{p.necessarioEm ? formatDate(p.necessarioEm) : '—'}</Dado>
-              <Dado rotulo="Admissão">
+              <DadoLinha rotulo="Para quem">{p.colaboradorDestinoId ? nome(p.colaboradorDestinoId, p.destinoNome) : null}</DadoLinha>
+              <DadoLinha rotulo="Precisa até">{p.necessarioEm ? <span className="num">{formatDate(p.necessarioEm)}</span> : null}</DadoLinha>
+              <DadoLinha rotulo="Admissão">
                 {admissao ? (
                   <button type="button" className="link text-left" onClick={() => setSelectedTicketIdForDetail(admissao.id)}>
                     {admissao.codigo} · {admissao.onboarding?.nomeColaborador || admissao.titulo}
                   </button>
-                ) : (
-                  '—'
-                )}
-              </Dado>
-              {valor !== undefined && (
-                <Dado rotulo={p.valorFinal != null ? 'Valor final' : 'Valor'}>
-                  <span className="num">{brl(valor)}</span>
-                </Dado>
-              )}
-              {p.justificativa && (
-                <Dado rotulo="Para que é" className="col-span-2 lg:col-span-4">
-                  {p.justificativa}
-                </Dado>
-              )}
+                ) : null}
+              </DadoLinha>
             </dl>
           </section>
 
@@ -345,21 +344,26 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
           {(p.status === 'comprado' || p.status === 'recebido') && !p.semValores && (
             <section className="cartao space-y-2 p-4">
               <h3 className="secao-titulo">Compra</h3>
-              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Dado rotulo="Fornecedor">{p.lojaCompra ? `${p.lojaCompra} (fora do cadastro)` : fornecedor(p.fornecedorId)}</Dado>
-                <Dado rotulo="Nota fiscal">{p.numeroNf || '—'}</Dado>
-                <Dado rotulo="Data da compra">{p.dataCompra ? formatDate(p.dataCompra) : '—'}</Dado>
-                <Dado rotulo="Pagamento">{p.formaPagamento ? ROTULO_FORMA_PAGAMENTO[p.formaPagamento] : '—'}</Dado>
-                <Dado rotulo="Chave da NF-e">{p.nfChave ? <span className="font-mono break-all">{p.nfChave}</span> : '—'}</Dado>
-                <Dado rotulo="Arquivo da NF">{p.nfArquivo ? <AbrirArquivo caminho={p.nfArquivo} rotulo="Abrir NF" /> : '—'}</Dado>
-                {p.fornecedorTrocaMotivo && (
-                  <Dado rotulo="Fornecedor diferente do sugerido pela T.I." className="col-span-2">
-                    {p.fornecedorTrocaMotivo}
-                  </Dado>
-                )}
-                <Dado rotulo="Fatura em Contas a pagar">
-                  {fatura ? `${brl(fatura.valor)} · vence ${formatDate(fatura.vencimento)} · ${fatura.status === 'paga' ? 'paga' : fatura.status === 'cancelada' ? 'cancelada' : 'a pagar'}` : '—'}
-                </Dado>
+              <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
+                <DadoLinha rotulo="Fornecedor">{p.lojaCompra ? `${p.lojaCompra} (fora do cadastro)` : fornecedor(p.fornecedorId)}</DadoLinha>
+                <DadoLinha rotulo="Nota fiscal">{p.numeroNf || null}</DadoLinha>
+                <DadoLinha rotulo="Data da compra">{p.dataCompra ? <span className="num">{formatDate(p.dataCompra)}</span> : null}</DadoLinha>
+                <DadoLinha rotulo="Pagamento">{p.formaPagamento ? ROTULO_FORMA_PAGAMENTO[p.formaPagamento] : null}</DadoLinha>
+                <DadoLinha rotulo="Arquivo da NF">{p.nfArquivo ? <AbrirArquivo caminho={p.nfArquivo} rotulo="Abrir NF" /> : null}</DadoLinha>
+                <DadoLinha rotulo="Fatura">
+                  {fatura ? (
+                    <>
+                      <span className="num">{brl(fatura.valor)}</span> · vence <span className="num">{formatDate(fatura.vencimento)}</span> ·{' '}
+                      {fatura.status === 'paga' ? 'paga' : fatura.status === 'cancelada' ? 'cancelada' : 'a pagar'}
+                    </>
+                  ) : null}
+                </DadoLinha>
+                <DadoLinha rotulo="Chave da NF-e" largo>
+                  {p.nfChave ? <span className="font-mono break-all">{p.nfChave}</span> : null}
+                </DadoLinha>
+                <DadoLinha rotulo="Troca de fornecedor" largo>
+                  {p.fornecedorTrocaMotivo || null}
+                </DadoLinha>
               </dl>
             </section>
           )}

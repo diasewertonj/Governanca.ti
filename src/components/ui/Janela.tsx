@@ -72,10 +72,37 @@ export const Janela: React.FC<{
   );
 };
 
-/** Linha "rótulo: valor" usada nos resumos das fichas */
-export const Dado: React.FC<{ rotulo: string; children: React.ReactNode; className?: string }> = ({ rotulo, children, className = '' }) => (
-  <div className={`min-w-0 ${className}`}>
-    <dt className="texto-aux">{rotulo}</dt>
-    <dd className="font-semibold break-words text-slate-900">{children ?? '—'}</dd>
-  </div>
-);
+/**
+ * Seção 19: resumo compacto — rótulo e valor na mesma linha, em colunas; o que
+ * está vazio não aparece (nada de "—" ocupando espaço). Use dentro de `<dl className="resumo">`.
+ */
+export const DadoLinha: React.FC<{ rotulo: string; children?: React.ReactNode; largo?: boolean }> = ({ rotulo, children, largo }) => {
+  if (children === null || children === undefined || children === '' || children === '—' || children === false) return null;
+  return (
+    <div className={`flex min-w-0 items-baseline gap-2 ${largo ? 'sm:col-span-full' : ''}`}>
+      <dt className="texto-aux w-28 shrink-0">{rotulo}</dt>
+      <dd className="min-w-0 break-words text-slate-900">{children}</dd>
+    </div>
+  );
+};
+
+/**
+ * Rótulo em cima, valor embaixo (resumos das fichas). Seção 19: campo vazio
+ * ("—", vazio ou nulo) não aparece; `mostrarVazio` mantém o "—" quando a falta
+ * do dado é a informação.
+ */
+export const Dado: React.FC<{ rotulo: string; children?: React.ReactNode; className?: string; mostrarVazio?: boolean }> = ({
+  rotulo,
+  children,
+  className = '',
+  mostrarVazio = false,
+}) => {
+  const vazio = children === null || children === undefined || children === '' || children === '—' || children === false;
+  if (vazio && !mostrarVazio) return null;
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <dt className="texto-aux">{rotulo}</dt>
+      <dd className="font-semibold break-words text-slate-900">{vazio ? '—' : children}</dd>
+    </div>
+  );
+};
