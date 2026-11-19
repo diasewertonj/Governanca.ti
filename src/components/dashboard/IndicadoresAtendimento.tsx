@@ -9,7 +9,8 @@ import { ROTULO_CAUSA } from '../../utils/atendimento.ts';
 export const IndicadoresAtendimento: React.FC = () => {
   const { tickets, assets, eventosSla, prazosSla, setSelectedAssetIdFor360 } = useApp();
   const i = indicadoresAtendimento(tickets, eventosSla, prazosSla);
-  const traco = '—';
+  // Seção 19: sem chamados encerrados no período não há média para mostrar
+  const traco = 'Sem dados';
 
   const cartoes: { rotulo: string; valor: string; destaque?: string }[] = [
     { rotulo: 'Em atendimento', valor: String(i.abertos) },

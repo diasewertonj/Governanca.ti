@@ -291,7 +291,7 @@
   /* Nos filtros, seletores e datas têm a largura do conteúdo (a busca tem largura própria) */
   .barra-filtros select.campo,
   .barra-filtros input.campo:not([type='search']) {
-    @apply w-auto px-2.5 py-1;
+    @apply w-full px-2.5 py-1 sm:w-auto;
   }
 
   /* ---------- Abas ---------- */
@@ -352,6 +352,7 @@
     @apply font-semibold;
     background-color: var(--cor-primaria-suave);
     color: var(--cor-primaria-texto);
+    box-shadow: inset 3px 0 0 var(--cor-primaria);
   }
   .nav-item[aria-current='page'] svg {
     color: var(--cor-primaria);
@@ -538,6 +539,13 @@
     border-color: var(--cor-borda-forte);
     background-color: var(--cor-superficie);
     color: var(--cor-texto-aux);
+  }
+  /* Vazio dentro de cartão ou tabela: sem segunda borda (nada de caixa dentro de caixa) */
+  .cartao .vazio,
+  .cartao-tabela .vazio,
+  .tabela .vazio {
+    border: 0;
+    background: transparent;
   }
   .vazio-titulo {
     @apply font-semibold;

@@ -211,7 +211,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                   <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
                     {!alvo && (
                       <td data-label="Origem" className="font-semibold text-slate-900">
-                        {origem(f)}
+                        {origem(f) || 'Conta avulsa'}
                       </td>
                     )}
                     <td data-label="Competência" className="font-semibold text-slate-900">

@@ -229,7 +229,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
         {/* Precisa de atenção */}
         <section className="cartao xl:col-span-2" aria-labelledby="inicio-atencao">
           <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
@@ -271,7 +271,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
           <h2 id="inicio-atalhos" className="secao-titulo">
             Atalhos
           </h2>
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
             {atalhos.map((a) => (
               <button key={a.rotulo} type="button" onClick={a.onClick} className="btn btn-secundario justify-start">
                 {a.icone}

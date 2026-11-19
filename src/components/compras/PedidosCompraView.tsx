@@ -131,7 +131,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
                   </td>
                   {isTI && (
                     <td data-label="Valor" className="num">
-                      {brl(valorDoPedido(p))}
+                      {valorDoPedido(p) > 0 ? brl(valorDoPedido(p)) : <span className="texto-aux">A cotar</span>}
                     </td>
                   )}
                   <td data-label="Ação" className="col-acoes">
