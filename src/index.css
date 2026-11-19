@@ -68,7 +68,7 @@
   --tabela-px: 0.75rem;
 
   /* Altura do cabeçalho do sistema (o cabeçalho das tabelas gruda logo abaixo) */
-  --altura-topo: 57px;
+  --altura-topo: 4rem;
 }
 :root[data-densidade='compacta'] {
   --tabela-py: 0.3125rem;
@@ -443,17 +443,20 @@
   }
   .tabela th {
     @apply font-semibold tracking-wider whitespace-nowrap uppercase;
-    position: sticky;
-    top: var(--altura-topo);
-    z-index: 1;
     padding: 0.5rem var(--tabela-px);
     font-size: var(--fs-secao);
     color: var(--cor-texto-aux);
     background-color: var(--cor-superficie-suave);
     box-shadow: inset 0 -1px 0 var(--cor-borda);
   }
-  /* Dentro de janelas o cabeçalho gruda no topo do corpo que rola */
-  .janela .tabela th {
+  /* Cabeçalho fixo ao rolar: só quando a tabela está num .cartao-tabela (que não
+     corta o sticky); gruda logo abaixo da barra superior, ou no topo do corpo da janela */
+  .cartao-tabela .tabela th {
+    position: sticky;
+    top: var(--altura-topo);
+    z-index: 1;
+  }
+  .janela .cartao-tabela .tabela th {
     top: 0;
   }
   .tabela td {
@@ -636,6 +639,9 @@ body:has(.modal-tela) {
   }
   .tabela-cartoes td.num {
     text-align: left;
+  }
+  .tabela-cartoes td.col-acoes {
+    width: auto;
   }
   .tabela-cartoes td > .block {
     display: inline;

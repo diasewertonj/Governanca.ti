@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
   const papel = ROTULO_PAPEL[currentRole] || ROTULO_PAPEL.colaborador;
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 px-3 sm:px-6 py-3 bg-white border-b border-slate-200 min-h-[57px]">
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 px-3 sm:px-6 bg-white border-b border-slate-200 h-16">
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           type="button"
