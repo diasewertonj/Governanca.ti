@@ -10,6 +10,14 @@ import {
   Ticket,
   ResponsibilityTerm,
 } from '../types/index.ts';
+import {
+  EXTRA_CONTRATOS,
+  EXTRA_EMPLOYEES,
+  EXTRA_FATURAS,
+  EXTRA_FORNECEDORES,
+  ampliarLicencas,
+  montarDemoExtra,
+} from './demoExtra.ts';
 
 export const INITIAL_COMPANY_SETTINGS: CompanySettings = {
   razaoSocial: 'Nexus Tecnologia e Inovação S.A.',
@@ -80,7 +88,8 @@ export const INITIAL_DEPARTMENTS: Department[] = [
   },
 ];
 
-export const INITIAL_EMPLOYEES: Employee[] = [
+// Base original (emp-1..emp-8); as demais pessoas vêm de demoExtra.ts
+const EMPLOYEES_BASE: Employee[] = [
   {
     id: 'emp-1',
     matricula: 'NX-1001',
@@ -187,7 +196,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   },
 ];
 
-export const INITIAL_ASSETS: Asset[] = [
+const ASSETS_BASE: Asset[] = [
   {
     id: 'ast-1',
     tag: '#PAT-1042',
@@ -499,7 +508,7 @@ export const INITIAL_ASSETS: Asset[] = [
   },
 ];
 
-export const INITIAL_LICENSES: SoftwareLicense[] = [
+const LICENSES_BASE: SoftwareLicense[] = [
   {
     id: 'lic-1',
     nome: 'Microsoft 365 E5 Enterprise',
@@ -646,7 +655,7 @@ export const INITIAL_LICENSES: SoftwareLicense[] = [
 ];
 
 // Fase 8: fornecedores, contratos e faturas de demonstração (só no modo sem Supabase)
-export const INITIAL_FORNECEDORES: Fornecedor[] = [
+const FORNECEDORES_BASE: Fornecedor[] = [
   {
     id: 'forn-1',
     nome: 'Dell Computadores do Brasil Ltda',
@@ -666,7 +675,7 @@ export const INITIAL_FORNECEDORES: Fornecedor[] = [
   },
 ];
 
-export const INITIAL_CONTRATOS: Contrato[] = [
+const CONTRATOS_BASE: Contrato[] = [
   {
     id: 'ctr-1',
     fornecedorId: 'forn-1',
@@ -684,7 +693,7 @@ export const INITIAL_CONTRATOS: Contrato[] = [
   },
 ];
 
-export const INITIAL_FATURAS: Fatura[] = [
+const FATURAS_BASE: Fatura[] = [
   {
     id: 'fat-1',
     licencaId: 'lic-1',
@@ -708,7 +717,7 @@ export const INITIAL_FATURAS: Fatura[] = [
   },
 ];
 
-export const INITIAL_TICKETS: Ticket[] = [
+const TICKETS_BASE: Ticket[] = [
   {
     id: 'tkt-1',
     codigo: '#CH-2026-089',
@@ -912,7 +921,7 @@ export const INITIAL_TICKETS: Ticket[] = [
   },
 ];
 
-export const INITIAL_TERMS: ResponsibilityTerm[] = [
+const TERMS_BASE: ResponsibilityTerm[] = [
   {
     id: 'tr-1',
     codigo: '#TR-2024-0012',
@@ -947,3 +956,17 @@ export const INITIAL_TERMS: ResponsibilityTerm[] = [
     responsavelTINome: 'Carlos Eduardo Mendes',
   },
 ];
+
+// -----------------------------------------------------------------------------
+// Base completa da demonstração = base original + extras (src/data/demoExtra.ts)
+// -----------------------------------------------------------------------------
+const EXTRA = montarDemoExtra({ pessoas: EMPLOYEES_BASE, setores: INITIAL_DEPARTMENTS, licencas: LICENSES_BASE });
+
+export const INITIAL_EMPLOYEES: Employee[] = [...EMPLOYEES_BASE, ...EXTRA_EMPLOYEES];
+export const INITIAL_ASSETS: Asset[] = [...ASSETS_BASE, ...EXTRA.assets];
+export const INITIAL_LICENSES: SoftwareLicense[] = ampliarLicencas(LICENSES_BASE);
+export const INITIAL_FORNECEDORES: Fornecedor[] = [...FORNECEDORES_BASE, ...EXTRA_FORNECEDORES];
+export const INITIAL_CONTRATOS: Contrato[] = [...CONTRATOS_BASE, ...EXTRA_CONTRATOS];
+export const INITIAL_FATURAS: Fatura[] = [...FATURAS_BASE, ...EXTRA_FATURAS];
+export const INITIAL_TICKETS: Ticket[] = [...TICKETS_BASE, ...EXTRA.tickets];
+export const INITIAL_TERMS: ResponsibilityTerm[] = [...TERMS_BASE, ...EXTRA.terms];
