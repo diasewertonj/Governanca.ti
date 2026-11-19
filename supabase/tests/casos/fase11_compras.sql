@@ -46,11 +46,8 @@ select harness.rodar('fase11', 'P4 RH não lê a tabela de pedidos (0 linhas)', 
     perform harness.espera($s$select 1 from public.pedidos_compra$s$, 0);
     perform harness.espera($s$select 1 from public.pedido_itens$s$, 0);
   end $x$$q$);
-select harness.rodar('fase11', 'P5 no máximo 3 cotações e uma vencedora', 'erro: Cada pedido tem no máximo 3 cotações', :'sup', 'authenticated',
-  $q$do $x$ begin
-    insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor) values ('pc-1', 'for-f11', 1), ('pc-1', 'for-f11', 2), ('pc-1', 'for-f11', 3);
-    insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor) values ('pc-1', 'for-f11', 4);
-  end $x$$q$);
+select harness.rodar('fase11', 'P5 uma só cotação vencedora por pedido (seção 14: opções sem limite de 3)', 'erro: duplicate key value violates unique constraint "uq_pedido_opcao_escolhida"', :'sup', 'authenticated',
+  $q$insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor, vencedora) values ('pc-1', 'for-f11', 1, true), ('pc-1', 'for-f11', 2, true)$q$);
 
 -- Aprovação: só o admin --------------------------------------------------------------------------
 select harness.rodar('fase11', 'A1 suporte envia e não consegue aprovar', 'bloqueado', :'sup', 'authenticated',
