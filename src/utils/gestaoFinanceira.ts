@@ -281,6 +281,86 @@ export function recorrentesParaProjecao(
   });
 }
 
+// -----------------------------------------------------------------------------
+// Orçamento de gestão: previsto · comprometido · a pagar · realizado · disponível
+// -----------------------------------------------------------------------------
+export type Situacao = 'comprometido' | 'a_pagar' | 'realizado';
+
+/** Um lançamento do "livro" único, já classificado */
+export interface Lancamento {
+  situacao: Situacao;
+  natureza: Natureza;
+  categoria: CategoriaDespesa;
+  /** Departamento (decisão 7); vazio = sem área */
+  area: string;
+  mes: number; // 0–11, pela competência
+  valor: number;
+}
+
+export interface LinhaGestao {
+  chave: string;
+  natureza: Natureza;
+  categoria: CategoriaDespesa;
+  area: string;
+  previsto: number;
+  comprometido: number;
+  aPagar: number;
+  realizado: number;
+  /** previsto − (realizado + a pagar + comprometido) */
+  disponivel: number;
+  /** realizado + a pagar + comprometido + recorrente que falta até dezembro */
+  projecaoDezembro: number;
+  pct?: number;
+}
+
+/**
+ * Junta orçamento, lançamentos e o recorrente restante do ano (vindo da projeção)
+ * por natureza + categoria + área. Linhas sem orçamento também aparecem.
+ */
+export function orcamentoDeGestao(
+  orcamentos: { natureza?: Natureza | null; categoria: CategoriaDespesa; area: string; valorAnual: number }[],
+  lancamentos: Lancamento[],
+  restanteDoAno: { natureza: Natureza; categoria: CategoriaDespesa; area: string; valor: number }[] = []
+): LinhaGestao[] {
+  const m = new Map<string, LinhaGestao>();
+  const pegar = (natureza: Natureza, categoria: CategoriaDespesa, area: string) => {
+    const chave = `${natureza}|${categoria}|${area.trim().toLowerCase()}`;
+    let l = m.get(chave);
+    if (!l) {
+      l = { chave, natureza, categoria, area: area.trim(), previsto: 0, comprometido: 0, aPagar: 0, realizado: 0, disponivel: 0, projecaoDezembro: 0 };
+      m.set(chave, l);
+    }
+    return l;
+  };
+  orcamentos.forEach((o) => {
+    const nat = o.natureza || (o.categoria === 'hardware' ? 'capex' : 'opex');
+    const l = pegar(nat, o.categoria, o.area);
+    l.previsto = c(l.previsto + (Number(o.valorAnual) || 0));
+  });
+  lancamentos.forEach((x) => {
+    const l = pegar(x.natureza, x.categoria, x.area);
+    if (x.situacao === 'realizado') l.realizado = c(l.realizado + x.valor);
+    else if (x.situacao === 'a_pagar') l.aPagar = c(l.aPagar + x.valor);
+    else l.comprometido = c(l.comprometido + x.valor);
+  });
+  const restante = new Map<string, number>();
+  restanteDoAno.forEach((r) => {
+    const l = pegar(r.natureza, r.categoria, r.area);
+    restante.set(l.chave, c((restante.get(l.chave) || 0) + r.valor));
+  });
+  return [...m.values()]
+    .map((l) => {
+      const usado = c(l.realizado + l.aPagar + l.comprometido);
+      return {
+        ...l,
+        disponivel: c(l.previsto - usado),
+        projecaoDezembro: c(usado + (restante.get(l.chave) || 0)),
+        pct: l.previsto > 0 ? usado / l.previsto : undefined,
+      };
+    })
+    .sort((a, b) => a.natureza.localeCompare(b.natureza) || a.categoria.localeCompare(b.categoria) || a.area.localeCompare(b.area));
+}
+
 /** Totais por chave (grupo, área ou local) para o relatório e a exportação */
 export function imobilizadoPor(linhas: LinhaImobilizado[], chave: (l: LinhaImobilizado) => string): { chave: string; totais: TotaisImobilizado }[] {
   const m = new Map<string, LinhaImobilizado[]>();

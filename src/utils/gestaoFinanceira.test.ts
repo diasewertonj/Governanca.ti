@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { imobilizadoDoAno, naturezaDoAtivo, naturezaDoLancamento, projecaoGastos, recorrentesParaProjecao, totaisImobilizado } from './gestaoFinanceira.ts';
+import { imobilizadoDoAno, naturezaDoAtivo, naturezaDoLancamento, orcamentoDeGestao, projecaoGastos, recorrentesParaProjecao, totaisImobilizado } from './gestaoFinanceira.ts';
 
 const ativo = (id: string, valor: number, data: string, extra: Record<string, unknown> = {}) =>
   ({ id, tag: id, nome: id, status: 'em_uso', categoria: 'notebook', fiscal: { valorCompra: valor, dataAquisicao: data }, ...extra }) as never;
@@ -58,6 +58,27 @@ describe('ponte cadastro → projeção', () => {
     );
     expect(r.map((x) => x.renova)).toEqual([false, true, false]);
     expect(r[0].reajusteMes).toBe(3);
+  });
+});
+
+describe('orçamento de gestão', () => {
+  it('separa CAPEX/OPEX e soma comprometido, a pagar e realizado no usado', () => {
+    const linhas = orcamentoDeGestao(
+      [
+        { categoria: 'software', area: 'T.I.', valorAnual: 12000 },
+        { categoria: 'hardware', area: 'T.I.', valorAnual: 20000 },
+      ],
+      [
+        { situacao: 'realizado', natureza: 'opex', categoria: 'software', area: 'T.I.', mes: 0, valor: 9000 },
+        { situacao: 'a_pagar', natureza: 'opex', categoria: 'software', area: 'T.I.', mes: 10, valor: 1000 },
+        { situacao: 'comprometido', natureza: 'capex', categoria: 'hardware', area: 'T.I.', mes: 10, valor: 6000 },
+      ],
+      [{ natureza: 'opex', categoria: 'software', area: 'T.I.', valor: 1000 }]
+    );
+    const sw = linhas.find((l) => l.categoria === 'software')!;
+    expect(sw).toMatchObject({ natureza: 'opex', previsto: 12000, realizado: 9000, aPagar: 1000, disponivel: 2000, projecaoDezembro: 11000 });
+    const hw = linhas.find((l) => l.categoria === 'hardware')!;
+    expect(hw).toMatchObject({ natureza: 'capex', comprometido: 6000, disponivel: 14000 });
   });
 });
 
