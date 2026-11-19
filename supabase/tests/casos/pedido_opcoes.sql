@@ -47,15 +47,13 @@ select harness.rodar('opcoes', 'O3 T.I. inclui opções no item e muda a marca; 
 select harness.rodar('opcoes', 'O4 aprovar exige a opção escolhida de cada item que tem opções', 'erro: Escolha a opção de: Teclado sem fio', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, item_id, fornecedor_id, valor) values ('pop-1', 'poi-1', 'for-op1', 140);
-    perform public.mudar_status_pedido('pop-1', 'enviar');
-    perform public.mudar_status_pedido('pop-1', 'aprovar');
+    perform public.aprovar_pedido('pop-1', 'emp-admin', 'pessoalmente');
   end $x$$q$);
 select harness.rodar('opcoes', 'O5 aprovar copia marca, modelo, link e valor da escolhida para o item', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, item_id, fornecedor_id, link, marca, modelo, valor, vencedora)
       values ('pop-1', 'poi-1', 'for-op1', 'https://op1.test/k', 'Logitech', 'K270', 140, true);
-    perform public.mudar_status_pedido('pop-1', 'enviar');
-    perform public.mudar_status_pedido('pop-1', 'aprovar');
+    perform public.aprovar_pedido('pop-1', 'emp-admin', 'pessoalmente');
     perform harness.espera($s$select 1 from public.pedido_itens where id = 'poi-1' and marca = 'Logitech' and modelo = 'K270'
       and link = 'https://op1.test/k' and valor_unitario = 140$s$, 1);
     perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pop-1' and status = 'aprovado' and fornecedor_id = 'for-op1'$s$, 1);

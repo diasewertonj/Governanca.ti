@@ -47,59 +47,42 @@ select harness.rodar('compras', 'F1 colaborador pede (T.I.): vai para cotação,
     perform harness.espera(format($s$select 1 from public.pedidos_visiveis() where id = %L and status = 'em_cotacao'
       and gestor_id = 'emp-colab' and gestor_nome = 'Colab' and solicitante_nome = 'Outro'$s$, v), 1);
   end $x$$q$);
-select harness.rodar('compras', 'F2 pedido "Outros" vai direto para aprovação, itens como material/serviço', 'ok', :'rh', 'authenticated',
+select harness.rodar('compras', 'F2 pedido "Outros" vai para a cotação (de Compras), itens como material/serviço', 'ok', :'rh', 'authenticated',
   $q$do $x$
   declare v text;
   begin
     v := public.solicitar_compra('{"titulo":"Cadeiras","justificativa":"Sala nova","tipo_pedido":"outros"}', '[{"descricao":"Cadeira","quantidade":4}]');
     perform harness.espera(format($s$select 1 from public.pedidos_visiveis() p, jsonb_array_elements(p.itens) i
-      where p.id = %L and p.status = 'aguardando' and p.tipo_pedido = 'outros' and i ->> 'tipo' = 'servico'$s$, v), 1);
+      where p.id = %L and p.status = 'em_cotacao' and p.tipo_pedido = 'outros' and i ->> 'tipo' = 'servico'$s$, v), 1);
   end $x$$q$);
-select harness.rodar('compras', 'F3 quem pediu não tira o pedido da cotação da T.I.', 'bloqueado', :'outro', 'authenticated',
+select harness.rodar('compras', 'F3 quem pediu não tira o pedido da cotação da T.I.', 'erro: Só um rascunho ou um pedido devolvido vai para cotação', :'outro', 'authenticated',
   $q$select public.mudar_status_pedido('pcd-1', 'enviar')$q$);
 select harness.rodar('compras', 'F4 T.I. devolve com motivo', 'ok', :'sup', 'authenticated',
   $q$do $x$ begin
     perform public.mudar_status_pedido('pcd-1', 'devolver', 'Já temos monitor no estoque');
     perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pcd-1' and status = 'recusado'$s$, 1);
   end $x$$q$);
-select harness.rodar('compras', 'F5 Compras não aprova antes do gestor', 'bloqueado', :'compras', 'authenticated',
+select harness.rodar('compras', 'F5 o gestor de quem pediu aprova ele mesmo pelo sistema', 'ok', :'colab', 'authenticated',
   $q$do $x$ begin
-    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
-    perform public.mudar_status_pedido('pcd-1', 'enviar');
-    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000008","role":"authenticated"}', true);
-    perform public.mudar_status_pedido('pcd-1', 'aprovar');
-  end $x$$q$);
-select harness.rodar('compras', 'F6 gestor aprova (segue aguardando Compras) e Compras aprova', 'ok', :'colab', 'authenticated',
-  $q$do $x$ begin
-    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
-    perform public.mudar_status_pedido('pcd-1', 'enviar');
-    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
-    perform public.mudar_status_pedido('pcd-1', 'aprovar');
-    perform harness.espera($s$select 1 from public.pedidos_visiveis() where id = 'pcd-1' and status = 'aguardando'
+    perform public.aprovar_pedido('pcd-1', 'emp-colab', 'sistema');
+    perform harness.espera($s$select 1 from public.pedidos_visiveis() where id = 'pcd-1' and status = 'aprovado'
       and aprovado_gestor_por = 'emp-colab'$s$, 1);
-    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000008","role":"authenticated"}', true);
-    perform public.mudar_status_pedido('pcd-1', 'aprovar');
-    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pcd-1' and status = 'aprovado' and aprovado_por = 'emp-compras'$s$, 1);
   end $x$$q$);
-select harness.rodar('compras', 'F7 outro colaborador (não gestor) não aprova', 'bloqueado', :'rh', 'authenticated',
+select harness.rodar('compras', 'F6 Compras registra que o gestor aprovou pessoalmente', 'ok', :'compras', 'authenticated',
   $q$do $x$ begin
-    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
-    perform public.mudar_status_pedido('pcd-1', 'enviar');
-    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000005","role":"authenticated"}', true);
-    perform public.mudar_status_pedido('pcd-1', 'aprovar');
+    perform public.aprovar_pedido('pcd-1', 'emp-colab', 'pessoalmente');
+    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pcd-1' and status = 'aprovado' and aprovado_por = 'emp-compras'
+      and aprovador_id = 'emp-colab'$s$, 1);
+    perform harness.espera($s$select 1 from public.pessoas_para_aprovacao() where id = 'emp-colab'$s$, 1);
   end $x$$q$);
-
+select harness.rodar('compras', 'F7 colaborador que não é o gestor não registra aprovação', 'bloqueado', :'rh', 'authenticated',
+  $q$select public.aprovar_pedido('pcd-1', 'emp-rh', 'sistema')$q$);
 -- Compra por Compras -------------------------------------------------------------------------
 select harness.rodar('compras', 'C1 comprar em outro fornecedor exige motivo', 'erro: Explique por que a compra foi feita em outro fornecedor', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pcd-1', 'enviar');
-    perform set_config('app.operacao_pedido', 'sim', true);
-    update public.pedidos_compra set aprovado_gestor_em = now() where id = 'pcd-1';
-    perform set_config('app.operacao_pedido', '', true);
-    perform public.mudar_status_pedido('pcd-1', 'aprovar');
+    perform public.aprovar_pedido('pcd-1', 'emp-colab', 'pessoalmente');
     perform public.registrar_compra_pedido('pcd-1', '{"fornecedor_id":"for-cd2","data_compra":"2026-11-10","vencimento":"2026-12-10"}');
-  end $x$$q$);
-select harness.rodar('compras', 'C2 Compras registra a compra com NF (chave e arquivo) e a fatura leva o arquivo', 'ok', :'compras', 'authenticated',
+  end $x$$q$);select harness.rodar('compras', 'C2 Compras registra a compra com NF (chave e arquivo) e a fatura leva o arquivo', 'ok', :'compras', 'authenticated',
   $q$do $x$ begin
     perform set_config('app.operacao_pedido', 'sim', true);
     update public.pedidos_compra set status = 'aprovado', fornecedor_id = 'for-cd1' where id = 'pcd-1';

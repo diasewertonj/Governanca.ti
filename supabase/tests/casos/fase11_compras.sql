@@ -50,43 +50,36 @@ select harness.rodar('fase11', 'P5 uma só cotação vencedora por pedido (seç�
   $q$insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor, vencedora) values ('pc-1', 'for-f11', 1, true), ('pc-1', 'for-f11', 2, true)$q$);
 
 -- Aprovação: só o admin --------------------------------------------------------------------------
-select harness.rodar('fase11', 'A1 suporte envia e não consegue aprovar', 'bloqueado', :'sup', 'authenticated',
-  $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
-  end $x$$q$);
+select harness.rodar('fase11', 'A1 quem pediu não aprova o próprio pedido', 'erro: Quem pediu não pode aprovar o próprio pedido', :'sup', 'authenticated',
+  $q$select public.aprovar_pedido('pc-1', 'emp-sup', 'pessoalmente')$q$);
 select harness.rodar('fase11', 'A2 com cotações, aprovar exige a vencedora', 'erro: Escolha a cotação vencedora antes de aprovar', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor) values ('pc-1', 'for-f11', 10230);
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
   end $x$$q$);
-select harness.rodar('fase11', 'A3 admin aprova; fornecedor da vencedora e histórico gravados', 'ok', :'admin', 'authenticated',
+select harness.rodar('fase11', 'A3 T.I. registra a aprovação (quem aprovou e como); fornecedor e histórico gravados', 'ok', :'sup', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor, vencedora) values ('pc-1', 'for-f11', 10230, true);
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
-    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pc-1' and status = 'aprovado'
-      and aprovado_por = 'emp-admin' and fornecedor_id = 'for-f11'$s$, 1);
-    perform harness.espera($s$select 1 from public.pedido_eventos where pedido_id = 'pc-1' and para in ('aguardando', 'aprovado')$s$, 2);
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'email', 'Confirmado por e-mail');
+    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pc-1' and status = 'aprovado' and aprovado_por = 'emp-sup'
+      and aprovador_id = 'emp-admin' and aprovacao_forma = 'email' and fornecedor_id = 'for-f11'$s$, 1);
+    perform harness.espera($s$select 1 from public.pedido_eventos where pedido_id = 'pc-1' and para = 'aprovado' and motivo like 'Aprovado por Admin (email)%'$s$, 1);
   end $x$$q$);
-select harness.rodar('fase11', 'A4 recusar exige motivo', 'erro: Explique por que o pedido foi recusado', :'admin', 'authenticated',
+select harness.rodar('fase11', 'A4 aprovado devolvido volta para a cotação e perde a aprovação', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'recusar', 'x');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
+    perform public.mudar_status_pedido('pc-1', 'devolver', 'Fornecedor sem estoque');
+    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pc-1' and status = 'em_cotacao' and aprovador_id is null$s$, 1);
   end $x$$q$);
 select harness.rodar('fase11', 'A5 aprovado não aceita mais itens', 'erro: O pedido não pode mais ser alterado (situação: aprovado)', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
     insert into public.pedido_itens (pedido_id, tipo, descricao) values ('pc-1', 'servico', 'Instalação');
   end $x$$q$);
-
 -- Comprado → fatura; Recebido → ativos, estoque e assentos ----------------------------------------
 select harness.rodar('fase11', 'C1 comprado gera a fatura do pedido em Contas a pagar', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
     perform public.registrar_compra_pedido('pc-1', '{"fornecedor_id":"for-f11","data_compra":"2026-11-10","vencimento":"2026-12-10","numero_nf":"NF-77","forma_pagamento":"boleto","itens":[{"id":"pi-1","valor_unitario":4900}]}');
     perform harness.espera($s$select 1 from public.faturas where pedido_id = 'pc-1' and valor = 10030 and competencia = '2026-11-01'
       and status = 'a_pagar' and numero_documento = 'NF-77'$s$, 1);
@@ -96,15 +89,13 @@ select harness.rodar('fase11', 'C2 compra só de pedido aprovado', 'erro: Só um
   $q$select public.registrar_compra_pedido('pc-1', '{"fornecedor_id":"for-f11","data_compra":"2026-11-10","vencimento":"2026-12-10"}')$q$);
 select harness.rodar('fase11', 'C3 receber exige o patrimônio de cada unidade', 'erro: Informe o patrimônio de cada unidade de "Notebook Dell 5440" (2 unidade(s))', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
     perform public.registrar_compra_pedido('pc-1', '{"fornecedor_id":"for-f11","data_compra":"2026-11-10","vencimento":"2026-12-10"}');
     perform public.receber_pedido('pc-1', '{"ativos":[{"item_id":"pi-1","tag":"#PAT-9001"}]}');
   end $x$$q$);
 select harness.rodar('fase11', 'C4 recebido cria os equipamentos, dá entrada no estoque e soma assentos', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
     perform public.registrar_compra_pedido('pc-1', '{"fornecedor_id":"for-f11","data_compra":"2026-11-10","vencimento":"2026-12-10","numero_nf":"NF-77"}');
     perform public.receber_pedido('pc-1', '{"ativos":[{"item_id":"pi-1","tag":"#PAT-9001"},{"item_id":"pi-1","tag":"#PAT-9002","serial_number":"ABC123"}]}');
     perform harness.espera($s$select 1 from public.ativos where pedido_id = 'pc-1' and status = 'disponivel' and fornecedor_id = 'for-f11'
@@ -116,8 +107,7 @@ select harness.rodar('fase11', 'C4 recebido cria os equipamentos, dá entrada no
   end $x$$q$);
 select harness.rodar('fase11', 'C5 recebido não pode ser cancelado', 'erro: O pedido PC-', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
     perform public.registrar_compra_pedido('pc-1', '{"fornecedor_id":"for-f11","data_compra":"2026-11-10","vencimento":"2026-12-10"}');
     perform public.receber_pedido('pc-1', '{"ativos":[{"item_id":"pi-1","tag":"#PAT-9001"},{"item_id":"pi-1","tag":"#PAT-9002"}]}');
     begin
@@ -163,16 +153,12 @@ select harness.rodar('fase11', 'R4 gestor pede compra e vê só os pedidos dele'
     perform public.mudar_status_pedido(v, 'cancelar', 'Não precisa mais');
     perform harness.espera($s$select 1 from public.pedidos_solicitados() where status = 'cancelado'$s$, 1);
   end $x$$q$);
-select harness.rodar('fase11', 'R5 RH não aprova o próprio pedido (está em cotação)', 'erro: O pedido PC-', :'rh', 'authenticated',
+select harness.rodar('fase11', 'R5 RH não registra aprovação', 'bloqueado', :'rh', 'authenticated',
   $q$do $x$
   declare v text;
   begin
     v := public.solicitar_compra('{"titulo":"Headset","justificativa":"Atendimento"}', '[{"descricao":"Headset"}]');
-    begin
-      perform public.mudar_status_pedido(v, 'aprovar');
-    exception when others then
-      raise exception '%', left(sqlerrm, 12);
-    end;
+    perform public.aprovar_pedido(v, 'emp-admin', 'pessoalmente');
   end $x$$q$);
 select harness.rodar('fase11', 'R6 pedido sem justificativa é recusado na entrada', 'erro: Explique para que é a compra', :'rh', 'authenticated',
   $q$select public.solicitar_compra('{"titulo":"Headset"}', '[{"descricao":"Headset"}]')$q$);
@@ -232,8 +218,7 @@ select harness.rodar('fase11', 'V1 admin grava a vida útil nas configurações'
   end $x$$q$);
 select harness.rodar('fase11', 'L1 limpar base apaga pedidos, faturas do pedido, orçamento e conferências', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
-    perform public.mudar_status_pedido('pc-1', 'enviar');
-    perform public.mudar_status_pedido('pc-1', 'aprovar');
+    perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
     perform public.registrar_compra_pedido('pc-1', '{"fornecedor_id":"for-f11","data_compra":"2026-11-10","vencimento":"2026-12-10"}');
     perform public.abrir_inventario('Casa', 'casa');
     insert into public.orcamentos (ano, categoria, valor_anual) values (2027, 'software', 10);
