@@ -178,9 +178,9 @@ export const FormPedido: React.FC<{
               <CampoSugestoes id={id('area')} value={p.area} onChange={(v) => setP({ ...p, area: v })} sugestoes={areas} placeholder="Ex.: Recursos Humanos" />
             </div>
             <div>
-              <label htmlFor={id('pessoa')} className="rotulo">Para quem (opcional)</label>
+              <label htmlFor={id('pessoa')} className="rotulo">Para quem (opcional; já vem com você)</label>
               <select id={id('pessoa')} value={p.colaboradorDestinoId || ''} onChange={(e) => setP({ ...p, colaboradorDestinoId: e.target.value || undefined })} className="campo">
-                <option value="">Ninguém em especial</option>
+                <option value="">Ninguém (vai para o estoque)</option>
                 {pessoas.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.nome}
