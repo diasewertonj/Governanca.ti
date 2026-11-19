@@ -204,7 +204,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
               <Dado rotulo="Pedido por">{nome(p.solicitanteId, p.solicitanteNome)}</Dado>
               <Dado rotulo="Tipo">{p.tipoPedido === 'outros' ? 'Outros (Compras cota)' : 'De T.I. (a T.I. cota)'}</Dado>
               <Dado rotulo="Gestor">
-                {p.gestorId ? `` : 'sem gestor (só Compras aprova)'}
+                {p.gestorId ? nome(p.gestorId, p.gestorNome) : '—'}
               </Dado>
               <Dado rotulo="Em">{formatDate(p.criadoEm.slice(0, 10))}</Dado>
               <Dado rotulo="Categoria">{ROTULO_CATEGORIA[p.categoria]}</Dado>
