@@ -399,9 +399,19 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!Number.isInteger(i.quantidade) || i.quantidade < 1) return `Quantidade inválida em "${i.descricao}".`;
       if (i.tipo === 'acessorio' && !i.estoqueItemId && !p.semValores) return `Escolha o acessório do estoque em "${i.descricao}".`;
     }
-    if (p.cotacoes.length > 3) return 'Cada pedido tem no máximo 3 cotações.';
-    if (p.cotacoes.some((c) => !c.fornecedorId)) return 'Escolha o fornecedor de cada cotação.';
-    if (p.cotacoes.filter((c) => c.vencedora).length > 1) return 'Só uma cotação pode ser a vencedora.';
+    // Seção 14: opções por item (até 10, nenhuma obrigatória); cada uma com loja, fornecedor ou link (regra do banco)
+    for (const i of p.itens) {
+      const ops = p.cotacoes.filter((c) => c.itemId === i.id);
+      if (ops.length > 10) return `"${i.descricao}" tem mais de 10 opções.`;
+      if (ops.filter((c) => c.vencedora).length > 1) return `Só uma opção pode ser a escolhida em "${i.descricao}".`;
+    }
+    if (p.cotacoes.some((c) => !c.fornecedorId && !(c.loja || '').trim() && !(c.link || '').trim()))
+      return 'Em cada opção, informe a loja, o fornecedor ou o link.';
+    if (p.cotacoes.some((c) => c.link && !/^https?:\/\//i.test(c.link.trim()))) return 'O link da opção precisa começar com https://';
+    if (p.itens.some((i) => i.link && !/^https?:\/\//i.test(i.link.trim()))) return 'O link do produto precisa começar com https://';
+    const gerais = p.cotacoes.filter((c) => !c.itemId);
+    if (gerais.length > 3) return 'Cada pedido tem no máximo 3 cotações do pedido inteiro.';
+    if (gerais.filter((c) => c.vencedora).length > 1) return 'Só uma cotação pode ser a vencedora.';
     return null;
   };
 
