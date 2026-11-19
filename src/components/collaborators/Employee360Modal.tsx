@@ -13,7 +13,7 @@ import { pendenciaTermo, resumoPendenciaTermo, termoVigente } from '../../utils/
 import { historicoAssentos } from '../../utils/licencas.ts';
 import { FileText, FilePlus, Pencil, KeyRound, CheckCircle2, AlertCircle, Copy, ShieldOff } from 'lucide-react';
 import { avisar, confirmar } from '../ui/dialogo.tsx';
-import { Janela, Dado } from '../ui/Janela.tsx';
+import { Janela, DadoLinha } from '../ui/Janela.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
 import { Vazio } from '../ui/Tela.tsx';
 
@@ -322,7 +322,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     <>
       <Janela
         tamanho="ficha"
-        icone={<span className="font-semibold">{employee.nome.charAt(0)}</span>}
+        avatar={employee.nome}
         rotuloCaminho={employee.nome}
         titulo={
           <span className="flex min-w-0 items-center gap-2">
@@ -332,7 +332,12 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         }
         subtitulo={
           <>
-            {employee.cargo} · {department?.nome || 'Departamento'} · Matrícula <span className="font-mono">{employee.matricula}</span>
+            {[employee.cargo, department?.nome].filter(Boolean).join(' · ')}
+            {employee.matricula && (
+              <>
+                {' · '}Matrícula <span className="font-mono">{employee.matricula}</span>
+              </>
+            )}
           </>
         }
         onFechar={onClose}
@@ -384,18 +389,14 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         {/* ---------------- Resumo ---------------- */}
         <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
           {avisoTermo}
+          {/* Seção 19: cargo, setor, matrícula e situação já estão no cabeçalho; aqui só o resto, compacto */}
           <section className="cartao space-y-3 p-4">
             <h3 className="secao-titulo">Dados da pessoa</h3>
-            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Dado rotulo="E-mail corporativo">
+            <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              <DadoLinha rotulo="E-mail">
                 <span className="break-all">{employee.email}</span>
-              </Dado>
-              <Dado rotulo="Matrícula">
-                <span className="font-mono">{employee.matricula || '—'}</span>
-              </Dado>
-              <Dado rotulo="Cargo">{employee.cargo || '—'}</Dado>
-              <Dado rotulo="Setor">{department?.nome || '—'}</Dado>
-              <Dado rotulo="Gestor imediato">
+              </DadoLinha>
+              <DadoLinha rotulo="Gestor imediato">
                 {manager ? (
                   podeAbrirGestor ? (
                     <button type="button" onClick={() => setSelectedEmployeeIdFor360(manager.id)} className="link text-left">
@@ -405,14 +406,11 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                     manager.nome
                   )
                 ) : (
-                  <span className="font-normal text-slate-500">Diretoria / sem gestor</span>
+                  <span className="text-slate-600">Diretoria / sem gestor</span>
                 )}
-              </Dado>
-              <Dado rotulo="Data de admissão">{formatDate(employee.dataAdmissao)}</Dado>
-              <Dado rotulo="Telefone / ramal">{employee.telefone || '—'}</Dado>
-              <Dado rotulo="Situação">
-                <span className={`selo ${situacao.selo}`}>{situacao.rotulo}</span>
-              </Dado>
+              </DadoLinha>
+              <DadoLinha rotulo="Admissão">{employee.dataAdmissao ? <span className="num">{formatDate(employee.dataAdmissao)}</span> : null}</DadoLinha>
+              <DadoLinha rotulo="Telefone / ramal">{employee.telefone || null}</DadoLinha>
             </dl>
           </section>
 
@@ -450,7 +448,14 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           {isTIFicha && (
             <section className="cartao space-y-3 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="secao-titulo">Acesso ao Nexus</h3>
+                <h3 className="secao-titulo flex items-center gap-2">
+                  Acesso ao Nexus
+                  {employee.temLogin !== undefined && (
+                    <span className={`selo normal-case tracking-normal ${employee.temLogin ? 'selo-ok' : 'selo-neutro'}`}>
+                      {employee.temLogin ? 'Tem login' : 'Ainda sem login'}
+                    </span>
+                  )}
+                </h3>
                 {employee.status !== 'desligado' && (
                   <button type="button" onClick={handleSenhaProvisoria} disabled={gerandoSenha} className="btn btn-sm btn-secundario">
                     <KeyRound />
@@ -458,20 +463,9 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                   </button>
                 )}
               </div>
-              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Dado rotulo="Login">
-                  <span className="break-all">{employee.email}</span>
-                </Dado>
-                <Dado rotulo="Situação do acesso">
-                  {employee.temLogin === undefined ? (
-                    '—'
-                  ) : (
-                    <span className={`selo ${employee.temLogin ? 'selo-ok' : 'selo-neutro'}`}>
-                      {employee.temLogin ? 'Tem login' : 'Ainda sem login'}
-                    </span>
-                  )}
-                </Dado>
-              </dl>
+              <p className="texto-aux">
+                Login: <span className="break-all text-slate-900">{employee.email}</span>
+              </p>
 
               {(senhaGerada || erroSenha) && (
                 <div

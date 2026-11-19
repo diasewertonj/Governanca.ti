@@ -31,7 +31,18 @@ export const Janela: React.FC<{
   rotuloCaminho?: string;
   /** false = fica por cima, fora do caminho (padrão: só as pequenas) */
   noCaminho?: boolean;
-}> = ({ titulo, subtitulo, icone, tamanho = 'm', acoes, rodape, onFechar, children, faixa, idTitulo = 'janela-titulo', rotuloCaminho, noCaminho }) => {
+  /** Seção 19: fichas de pessoa mostram as iniciais num avatar no lugar do ícone */
+  avatar?: string;
+}> = ({ titulo, subtitulo, icone, tamanho = 'm', acoes, rodape, onFechar, children, faixa, idTitulo = 'janela-titulo', rotuloCaminho, noCaminho, avatar }) => {
+  const iniciais = avatar
+    ? avatar
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter((_, i, a) => i === 0 || i === a.length - 1)
+        .map((p) => p[0])
+        .join('')
+        .toUpperCase()
+    : '';
   const rotulo = rotuloCaminho || (typeof titulo === 'string' ? titulo : 'Janela');
   const nav = useNivelNavegacao(rotulo, onFechar, noCaminho ?? tamanho !== 'p');
   const temAnterior = nav.noCaminho && nav.indice > 0;
@@ -42,7 +53,13 @@ export const Janela: React.FC<{
         <div className="janela-cabecalho">
           <div className="flex min-w-[12rem] flex-1 items-center gap-3">
             {temAnterior && <BotaoVoltar onClick={onFechar} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
-            {icone && <div className="janela-icone">{icone}</div>}
+            {avatar ? (
+              <span className="avatar avatar-lg" aria-hidden="true">
+                {iniciais}
+              </span>
+            ) : (
+              icone && <div className="janela-icone">{icone}</div>
+            )}
             <div className="min-w-0">
               {temAnterior && <Caminho niveis={nav.niveis} indice={nav.indice} voltarAte={nav.voltarAte} />}
               <h2 id={idTitulo} className="janela-titulo truncate">
@@ -64,7 +81,8 @@ export const Janela: React.FC<{
             )}
           </div>
         </div>
-        {faixa && <div className="border-b border-slate-200 bg-white px-4 py-2 sm:px-6">{faixa}</div>}
+        {/* Seção 19: abas da ficha sublinhadas, coladas ao cabeçalho (sem faixa cinza à parte) */}
+        {faixa && <div className="janela-faixa">{faixa}</div>}
         <div className="janela-corpo">{children}</div>
         {rodape && <div className="janela-rodape">{rodape}</div>}
       </div>
