@@ -370,11 +370,11 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
   // ---------------------------------------------------------------------------
   const icone =
     item.status === 'feito' ? (
-      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-label="Feito" />
+      <CheckCircle2 className="ico mt-0.5 text-emerald-600" aria-label="Feito" />
     ) : item.status === 'nao_se_aplica' ? (
-      <MinusCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-label="Não se aplica" />
+      <MinusCircle className="ico mt-0.5 text-slate-500" aria-label="Não se aplica" />
     ) : (
-      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-label="Pendente" />
+      <Circle className="ico mt-0.5 text-slate-400" aria-label="Pendente" />
     );
   const cadastrada = item.tipo === 'cadastro' ? employees.find((e) => e.id === ticket.colaboradorId) : undefined;
   const registro = [
@@ -588,25 +588,26 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
   };
 
   return (
-    <div className={`rounded-lg border bg-white text-xs ${seloAgenda && dias !== undefined && dias <= 0 ? 'border-amber-300' : 'border-slate-200'}`}>
-      <div className="flex flex-wrap items-start gap-x-2 gap-y-2 p-2.5">
+    <div className={`rounded-lg border bg-white ${seloAgenda && dias !== undefined && dias <= 0 ? 'border-amber-300' : 'border-slate-200'}`}>
+      {/* Seção 19: título em destaque na 1ª linha; tipo e detalhe numa linha auxiliar; ações alinhadas à direita */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2">
         {icone}
-        <div className="min-w-[11rem] flex-1">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold text-slate-500">{ACAO_DO_TIPO[item.tipo]}</span>
-            {item.sugeridoPor === 'rh' && <span className="selo selo-info">pedido do RH</span>}
+        <div className="min-w-[12rem] flex-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={`font-semibold ${item.status === 'nao_se_aplica' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>{item.titulo}</span>
+            {item.sugeridoPor === 'rh' && <span className="selo selo-info">Pedido do RH</span>}
             {seloAgenda}
           </span>
-          <span className={`block font-medium ${item.status === 'nao_se_aplica' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>{item.titulo}</span>
-          {item.tipo === 'cadastro' && item.status === 'feito' && cadastrada ? (
-            <span className="block text-slate-500">
-              {cadastrada.nome} · {cadastrada.email}
-            </span>
-          ) : (
-            item.detalhe && <span className="block text-slate-500">{item.detalhe}</span>
-          )}
+          <span className="texto-aux block">
+            {ACAO_DO_TIPO[item.tipo]}
+            {item.tipo === 'cadastro' && item.status === 'feito' && cadastrada
+              ? ` · ${cadastrada.nome} · ${cadastrada.email}`
+              : item.detalhe
+                ? ` · ${item.detalhe}`
+                : ''}
+          </span>
           {item.tipo === 'conta' && pendente && licencaConta && (
-            <span className="block text-slate-500">
+            <span className="texto-aux block">
               {colabId && licencaConta.colaboradoresIds.includes(colabId)
                 ? `${primeiroNome} já tem a licença ${licencaConta.nome}.`
                 : assentosLivres(licencaConta) > 0
@@ -615,18 +616,18 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
             </span>
           )}
           {item.status !== 'pendente' && (
-            <span className="mt-0.5 block text-slate-500">
+            <span className="texto-aux block">
               {registro.length > 0 && <>{registro.join(' · ')} · </>}
               {item.observacao && <>“{item.observacao}” · </>}
               {nomeDe(item.concluidoPor) !== '—' ? nomeDe(item.concluidoPor) : 'T.I.'}
               {item.concluidoEm ? ` em ${formatDateTime(item.concluidoEm)}` : ''}
             </span>
           )}
-          {pendente && item.lembreteEm && item.observacao && <span className="block text-slate-500">“{item.observacao}”</span>}
+          {pendente && item.lembreteEm && item.observacao && <span className="texto-aux block">“{item.observacao}”</span>}
         </div>
 
         {editavel && !aberto && (
-          <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:self-center">
             {controles()}
             <MenuAcoes
               rotulo={`Mais ações do passo ${item.titulo}`}
@@ -645,14 +646,14 @@ export const PassoProcesso: React.FC<Props> = ({ item, ticket, podeEditar, abert
             onClick={() => executar(() => registrar(item, 'pendente'))}
             title="Voltar para pendente"
             aria-label={`Voltar o passo ${item.titulo} para pendente`}
-            className="btn-icone"
+            className="btn-icone sm:self-center"
           >
             <RotateCcw />
           </button>
         )}
       </div>
       {erro && (
-        <p role="alert" className="erro px-2.5 pb-2.5">
+        <p role="alert" className="erro px-3 pb-2">
           {erro}
         </p>
       )}

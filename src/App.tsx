@@ -10,6 +10,10 @@ import { AppProvider, useApp } from './context/AppContext.tsx';
 import { RecursosProvider } from './context/RecursosContext.tsx';
 import { ComprasProvider, useCompras } from './context/ComprasContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
+import { avisarAlteracaoProcesso, ouvirAlteracoesProcesso, processoDestaJanela } from './utils/janelaProcesso.ts';
+
+// Seção 19: esta aba é a janela própria de um processo (aberta pelo sistema)
+const JANELA_DO_PROCESSO = processoDestaJanela();
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
 import { LoginView } from './components/auth/LoginView.tsx';
@@ -77,6 +81,9 @@ function MainApp() {
     podeDescartarPendencias,
     processoAberto,
     fecharProcesso,
+    processoItens,
+    tickets,
+    refreshSupabaseData,
   } = useApp();
   const { podePedirCompra, ehGestor } = useCompras();
 
@@ -106,6 +113,20 @@ function MainApp() {
     window.addEventListener('keydown', tecla);
     return () => window.removeEventListener('keydown', tecla);
   }, []);
+
+  // Seção 19: a janela do processo avisa a principal a cada mudança; a principal recarrega
+  const [mudancasProcesso, setMudancasProcesso] = useState(0);
+  useEffect(() => {
+    if (!JANELA_DO_PROCESSO) return;
+    setMudancasProcesso((n) => n + 1);
+  }, [processoItens, tickets]);
+  useEffect(() => {
+    if (JANELA_DO_PROCESSO && mudancasProcesso > 1) avisarAlteracaoProcesso();
+  }, [mudancasProcesso]);
+  useEffect(() => {
+    if (JANELA_DO_PROCESSO) return;
+    return ouvirAlteracoesProcesso(() => void refreshSupabaseData());
+  }, [refreshSupabaseData]);
 
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
@@ -150,7 +171,9 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Barra Superior Corporativa (Zone Contract) */}
-      <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} onNavigate={navegar} />
+      {!JANELA_DO_PROCESSO && (
+        <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} onNavigate={navegar} />
+      )}
 
       {/* Fase 2 (CRIT-04): falha de gravação no banco nunca mais passa em silêncio */}
       {dbErro && (
@@ -170,20 +193,22 @@ function MainApp() {
         </div>
       )}
 
-      <div className="flex-1 flex min-h-[calc(100vh-57px)]">
-        {/* Menu por perfil (Fase 7: gaveta abaixo de 1024px) */}
-        <Sidebar
-          currentView={currentView}
-          onNavigate={navegar}
-          onOpenNewTicketModal={() => setShowNewTicketModal(true)}
-          aberto={menuAberto}
-          onFechar={fecharMenu}
-        />
+      <div className="flex-1 flex">
+        {/* Menu por perfil (Fase 7: gaveta abaixo de 1024px); a janela do processo não tem menu */}
+        {!JANELA_DO_PROCESSO && (
+          <Sidebar
+            currentView={currentView}
+            onNavigate={navegar}
+            onOpenNewTicketModal={() => setShowNewTicketModal(true)}
+            aberto={menuAberto}
+            onFechar={fecharMenu}
+          />
+        )}
 
         <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-clip">
           <Suspense fallback={<Carregando />}>
           {mostrarProcesso ? (
-            <TelaProcesso key={processoAberto} chamadoId={processoAberto} onVoltar={fecharProcesso} />
+            <TelaProcesso key={processoAberto} chamadoId={processoAberto} onVoltar={fecharProcesso} emJanela={Boolean(JANELA_DO_PROCESSO)} />
           ) : (
           <>
           {currentView === 'dashboard' &&

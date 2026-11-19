@@ -131,13 +131,12 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     <section aria-label={ehOnb ? 'Checklist de admissão' : 'Checklist de desligamento'} className="cartao p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="secao-titulo flex items-center gap-1.5">
-          <ClipboardList className="h-4 w-4" aria-hidden="true" />
+          <ClipboardList className="ico" aria-hidden="true" />
           {ehOnb ? 'Checklist de admissão' : 'Checklist de desligamento'}
-          {colab ? ` · ${colab.nome}` : ''}
         </h3>
         {itens.length > 0 && (
-          <span className="text-xs font-semibold whitespace-nowrap text-slate-700">
-            {prog.feitos + prog.naoSeAplica}/{prog.total} · {prog.percentual}%
+          <span className="num texto-aux font-semibold">
+            {prog.feitos + prog.naoSeAplica} de {prog.total} · {prog.percentual}%
           </span>
         )}
       </div>
@@ -164,7 +163,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
               Este chamado não identifica o colaborador que sai. Peça ao RH para abrir o desligamento pela tela de Processos de RH.
             </p>
           ) : (
-            <div className="space-y-2 text-xs text-slate-600">
+            <div className="space-y-2 text-slate-600">
               <p>
                 A sugestão vem {ehOnb ? 'do catálogo e do que o RH pediu' : 'de tudo que está vinculado ao colaborador (contas, grupos, equipamentos, acessórios e licenças)'}.
                 Revise antes de salvar: nada é obrigatório.
@@ -175,7 +174,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
             </div>
           )
         ) : (
-          <p className="text-xs text-slate-500">
+          <p className="texto-aux">
             {emAberto
               ? 'A T.I. ainda não montou o checklist deste processo. Acompanhe por aqui e use as mensagens para falar com a equipe.'
               : 'Processo sem checklist guiado.'}
@@ -184,13 +183,13 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
       )}
 
       {/* Etapas empilhadas; cada passo com a ação na própria linha */}
-      <div className="grid grid-cols-1 gap-y-3">
+      <div className="grid grid-cols-1 gap-y-4">
         {grupos.map((g) => (
-          <div key={g.etapa} className="space-y-1.5">
-            <h4 className="secao-titulo">
-              {g.etapa}{' '}
-              <span className="font-normal normal-case tracking-normal text-slate-500">
-                · {g.itens.filter((i) => i.status !== 'pendente').length}/{g.itens.length}
+          <div key={g.etapa} className="space-y-2">
+            <h4 className="secao-titulo flex items-center justify-between gap-2">
+              {g.etapa}
+              <span className="num font-normal normal-case tracking-normal">
+                {g.itens.filter((i) => i.status !== 'pendente').length} de {g.itens.length}
               </span>
             </h4>
             {g.itens.map((item) => (
@@ -227,23 +226,23 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
       )}
 
       {podeEditar && itens.length > 0 && !rascunho && (
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-2 border-t border-slate-100 pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <button type="button" onClick={() => setRascunho([])} className="btn btn-sm btn-secundario">
+            <button type="button" onClick={() => setRascunho([])} className="btn btn-secundario">
               <Plus aria-hidden="true" /> Adicionar passos
             </button>
             <button
               type="button"
               onClick={concluir}
               disabled={!prog.podeConcluir || concluindo}
-              className="btn btn-sm btn-primario"
+              className="btn btn-primario"
             >
               {concluindo ? 'Concluindo...' : ehOnb ? 'Concluir admissão' : 'Concluir desligamento'}
             </button>
           </div>
           {!prog.podeConcluir && (
-            <p className="text-xs text-slate-500">
-              Para concluir, cada passo precisa estar feito ou marcado como "não se aplica" (o termo pode ficar para depois).
+            <p className="texto-aux text-right">
+              Para concluir, cada passo precisa estar feito ou como "não se aplica" (o termo pode ficar para depois).
             </p>
           )}
         </div>
@@ -268,7 +267,7 @@ const JanelaSenha: React.FC<{ email: string; senha: string; onFechar: () => void
   return (
     <Janela
       tamanho="p"
-      icone={<KeyRound className="h-4 w-4" />}
+      icone={<KeyRound className="ico" />}
       titulo="Login criado"
       subtitulo="O passo Acesso ao Nexus foi concluído"
       onFechar={onFechar}
@@ -279,13 +278,13 @@ const JanelaSenha: React.FC<{ email: string; senha: string; onFechar: () => void
         </button>
       }
     >
-      <div className="space-y-2 text-xs">
+      <div className="space-y-2">
         <p className="text-slate-700">
           Login: <span className="font-mono">{email}</span>
         </p>
         <p className="text-slate-700">Senha provisória (aparece só agora):</p>
         <div className="flex flex-wrap items-center gap-2">
-          <code className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-mono text-sm tracking-wider select-all">{senha}</code>
+          <code className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-mono tracking-wider select-all">{senha}</code>
           <button
             type="button"
             onClick={() => {
@@ -344,15 +343,15 @@ const Montagem: React.FC<{
 
   return (
     <div className="space-y-3 rounded-lg border border-dashed border-slate-300 p-3">
-      <p className="text-xs font-semibold text-slate-900">
+      <p className="font-semibold text-slate-900">
         {existentes > 0 ? 'Novos passos (rascunho)' : 'Checklist sugerido (rascunho)'} — tire o que não se aplica e acrescente o
         que faltar.
       </p>
       {rascunho.length === 0 && <p className="ajuda">Nenhum passo ainda.</p>}
       <ul className="space-y-1">
         {rascunho.map((r) => (
-          <li key={r.chave} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs">
-            <span className="w-28 shrink-0 truncate text-xs font-semibold text-slate-500">
+          <li key={r.chave} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1">
+            <span className="texto-aux w-32 shrink-0 truncate">
               {ACAO_DO_TIPO[r.tipo]}
             </span>
             <span className="flex-1 min-w-0 truncate">
@@ -444,18 +443,18 @@ export const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string
   }, [chamadoId, atualizar]);
 
   if (erro) return <p className="erro">{erro}</p>;
-  if (!eventos) return <p className="text-xs text-slate-500">Carregando…</p>;
+  if (!eventos) return <p className="texto-aux">Carregando…</p>;
   return (
     <div className="space-y-1">
-      <p className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-        <History className="h-3.5 w-3.5" aria-hidden="true" /> Passos do checklist
+      <p className="secao-titulo flex items-center gap-1.5">
+        <History className="ico-sm" aria-hidden="true" /> Passos do checklist
       </p>
       {eventos.length === 0 ? (
-        <p className="text-xs text-slate-500">
+        <p className="texto-aux">
           {isSupabaseConfigured ? 'Nenhum passo registrado ainda.' : 'Na demonstração a trilha dos passos fica no banco; aqui aparecem só os registros do checklist acima.'}
         </p>
       ) : (
-        <ul className="max-h-72 space-y-0.5 overflow-y-auto text-xs text-slate-600">
+        <ul className="texto-aux max-h-72 space-y-1 overflow-y-auto">
           {eventos.map((e) => (
             <li key={e.id}>
               {formatDateTime(e.em)} · {nomeDe(e.por) || 'Sistema'} {ROTULO_EVENTO[e.acao] || e.acao}

@@ -524,13 +524,8 @@
   .janela-corpo {
     @apply space-y-4 p-4 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:p-6;
   }
-  /* Fichas e formulários em etapas: altura estável ao trocar de aba (a janela não pula) */
-  .janela-ficha {
-    @apply sm:h-[min(52rem,calc(100dvh-2rem))];
-  }
-  .janela-g {
-    @apply sm:h-[min(44rem,calc(100dvh-2rem))];
-  }
+  /* Seção 19 (pedido do dono): só a LARGURA é padronizada; a altura acompanha o
+     conteúdo, até o limite da tela (aí só o corpo rola) */
   .janela-rodape {
     @apply flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 sm:px-6;
     border-color: var(--cor-borda);
