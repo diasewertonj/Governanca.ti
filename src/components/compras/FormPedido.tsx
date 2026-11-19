@@ -123,11 +123,11 @@ export const FormPedido: React.FC<{
           ) : (
             <>
               <button type="button" disabled={salvando} onClick={() => salvar(false)} className="btn btn-secundario">
-                Salvar rascunho
+                {p.status === 'rascunho' || !p.codigo ? 'Salvar rascunho' : 'Salvar'}
               </button>
-              {(p.status === 'rascunho' || p.status === 'recusado' || p.status === 'em_cotacao') && (
+              {(p.status === 'rascunho' || p.status === 'recusado') && (
                 <button type="button" disabled={salvando} onClick={() => salvar(true)} className="btn btn-primario">
-                  {salvando ? 'Salvando…' : 'Salvar e enviar para aprovação'}
+                  {salvando ? 'Salvando…' : 'Salvar e enviar para cotação'}
                 </button>
               )}
               {p.status === 'aguardando' && (
