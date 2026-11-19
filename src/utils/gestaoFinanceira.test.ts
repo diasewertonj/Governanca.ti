@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { imobilizadoDoAno, naturezaDoAtivo, naturezaDoLancamento, projecaoGastos, totaisImobilizado } from './gestaoFinanceira.ts';
+import { imobilizadoDoAno, naturezaDoAtivo, naturezaDoLancamento, projecaoGastos, recorrentesParaProjecao, totaisImobilizado } from './gestaoFinanceira.ts';
 
 const ativo = (id: string, valor: number, data: string, extra: Record<string, unknown> = {}) =>
   ({ id, tag: id, nome: id, status: 'em_uso', categoria: 'notebook', fiscal: { valorCompra: valor, dataAquisicao: data }, ...extra }) as never;
@@ -43,6 +43,21 @@ describe('projeção de gastos', () => {
     const capex = p.itens.filter((i) => i.natureza === 'capex');
     expect(capex).toHaveLength(1);
     expect(capex[0].valor).toBe(7000);
+  });
+});
+
+describe('ponte cadastro → projeção', () => {
+  it('contrato com fim e sem renovação para; licença renova salvo se desligada', () => {
+    const r = recorrentesParaProjecao(
+      [
+        { origem: 'contrato', id: 'c1', nome: 'Link', categoria: 'internet', mensal: 100 },
+        { origem: 'licenca', id: 'l1', nome: 'Office', categoria: 'software', mensal: 50 },
+        { origem: 'licenca', id: 'l2', nome: 'Velha', categoria: 'software', mensal: 10 },
+      ],
+      { contratos: [{ id: 'c1', fim: '2026-01-31', reajusteMes: 3 }], licencas: [{ id: 'l1' }, { id: 'l2', dataRenovacao: '2026-05-01', renovacaoAutomatica: false }] }
+    );
+    expect(r.map((x) => x.renova)).toEqual([false, true, false]);
+    expect(r[0].reajusteMes).toBe(3);
   });
 });
 

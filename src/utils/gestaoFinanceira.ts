@@ -256,6 +256,31 @@ export function projecaoGastos(
   return { meses: porMes, itens };
 }
 
+/**
+ * Ponte cadastro → projeção: o mesmo custo recorrente da tela Custos recorrentes,
+ * com fim de vigência, renovação e mês de reajuste de cada origem.
+ */
+export function recorrentesParaProjecao(
+  linhas: { origem: 'licenca' | 'contrato' | 'linha'; id: string; nome: string; categoria: CategoriaDespesa; mensal: number }[],
+  dados: {
+    licencas: { id: string; dataRenovacao?: string; renovacaoAutomatica?: boolean }[];
+    contratos: { id: string; fim?: string; reajusteMes?: number; renovacaoAutomatica?: boolean }[];
+  }
+): ItemRecorrente[] {
+  return linhas.map((l) => {
+    if (l.origem === 'contrato') {
+      const ct = dados.contratos.find((x) => x.id === l.id);
+      return { ...l, fim: ct?.fim, renova: !ct?.fim || !!ct?.renovacaoAutomatica, reajusteMes: ct?.reajusteMes || undefined };
+    }
+    if (l.origem === 'licenca') {
+      const lic = dados.licencas.find((x) => x.id === l.id);
+      // Licença: renova por padrão (assinatura); só para quando a renovação automática foi desligada
+      return { ...l, fim: lic?.dataRenovacao, renova: lic?.renovacaoAutomatica !== false };
+    }
+    return { ...l, renova: true };
+  });
+}
+
 /** Totais por chave (grupo, área ou local) para o relatório e a exportação */
 export function imobilizadoPor(linhas: LinhaImobilizado[], chave: (l: LinhaImobilizado) => string): { chave: string; totais: TotaisImobilizado }[] {
   const m = new Map<string, LinhaImobilizado[]>();
