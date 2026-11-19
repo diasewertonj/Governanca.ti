@@ -28,9 +28,9 @@ select harness.rodar('compras', 'D1 papel compras existe e o pedido já tem o ge
     if public.meu_papel() <> 'compras' then raise exception 'papel %', public.meu_papel(); end if;
     perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pcd-1' and gestor_id = 'emp-colab'$s$, 1);
   end $x$$q$);
-select harness.rodar('compras', 'D2 Compras lê fatura de pedido, não a de licença; lê orçamento e não grava', 'bloqueado', :'compras', 'authenticated',
+select harness.rodar('compras', 'D2 Compras lê todas as faturas (seção 17, decisão 1); lê orçamento e não grava', 'bloqueado', :'compras', 'authenticated',
   $q$do $x$ begin
-    perform harness.espera($s$select 1 from public.faturas where id = 'fat-cd-lic'$s$, 0);
+    perform harness.espera($s$select 1 from public.faturas where id = 'fat-cd-lic'$s$, 1);
     perform harness.espera($s$select 1 from public.chamados$s$, 0);
     perform public.ativos_visiveis();
     insert into public.orcamentos (ano, categoria, valor_anual) values (2027, 'hardware', 10);
