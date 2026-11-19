@@ -45,9 +45,9 @@ const ANO_ATUAL = new Date().getFullYear();
 
 const Numero: React.FC<{ rotulo: string; valor: string; detalhe?: React.ReactNode; tom?: 'atencao' | 'problema' }> = ({ rotulo, valor, detalhe, tom }) => (
   <div className="cartao p-3 min-w-0">
-    <p className="text-xs text-slate-500">{rotulo}</p>
+    <p className="texto-aux">{rotulo}</p>
     <p className={`text-lg font-semibold font-mono ${tom === 'problema' ? 'text-red-700' : tom === 'atencao' ? 'text-amber-800' : 'text-slate-900'}`}>{valor}</p>
-    {detalhe && <p className="text-xs text-slate-500">{detalhe}</p>}
+    {detalhe && <p className="texto-aux">{detalhe}</p>}
   </div>
 );
 
@@ -132,20 +132,20 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         <div className="cartao p-3 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="secao-titulo">Mês a mês ({ANO_ATUAL})</h3>
-            <span className="text-xs text-slate-500">
+            <span className="texto-aux">
               <span className="inline-block w-2.5 h-2.5 bg-blue-600 rounded-sm align-middle" /> OPEX{' '}
               <span className="inline-block w-2.5 h-2.5 bg-emerald-600 rounded-sm align-middle ml-2" /> CAPEX
             </span>
           </div>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {porMes.map((m, i) => (
-              <li key={i} className="grid grid-cols-[2.5rem_1fr_6.5rem] items-center gap-2 text-xs">
+              <li key={i} className="grid grid-cols-[2.5rem_1fr_6.5rem] items-center gap-2">
                 <span className="text-slate-600">{MESES[i]}</span>
                 <span className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
                   <span className="block h-full bg-blue-600" style={{ width: `${(m.opex / maior) * 100}%` }} />
                   <span className="block h-full bg-emerald-600" style={{ width: `${(m.capex / maior) * 100}%` }} />
                 </span>
-                <span className="text-right font-mono">{brl(m.opex + m.capex)}</span>
+                <span className="text-right num">{brl(m.opex + m.capex)}</span>
               </li>
             ))}
           </ul>
@@ -153,13 +153,13 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Maiores fornecedores ({ANO_ATUAL}, pago)</h3>
           {top.length === 0 ? (
-            <p className="text-xs text-slate-500">Nada pago no ano.</p>
+            <p className="texto-aux">Nada pago no ano.</p>
           ) : (
-            <ol className="space-y-1 text-xs">
+            <ol className="space-y-1">
               {top.map(([id, v], i) => (
                 <li key={id || i} className="flex justify-between gap-2">
                   <span className="truncate">{i + 1}. {fornecedores.find((f) => f.id === id)?.nome || 'Sem fornecedor'}</span>
-                  <span className="font-mono">{brl(v)}</span>
+                  <span className="num">{brl(v)}</span>
                 </li>
               ))}
             </ol>
@@ -168,9 +168,9 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Contratos que vencem em 90 dias</h3>
           {vencendo.length === 0 ? (
-            <p className="text-xs text-slate-500">Nenhum.</p>
+            <p className="texto-aux">Nenhum.</p>
           ) : (
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-1">
               {vencendo.map((c) => (
                 <li key={c.id} className="flex justify-between gap-2">
                   <span className="truncate">{nomeContrato(c)}</span>
@@ -182,19 +182,19 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         </div>
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Desperdício e reposições</h3>
-          <p className="text-xs">
-            Licenças sem uso: <span className="font-mono font-semibold text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}/mês</span>{' '}
+          <p className="">
+            Licenças sem uso: <span className="num font-semibold text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}/mês</span>{' '}
             <span className="text-slate-500">{ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || ''}</span>
           </p>
-          <p className="text-xs font-medium text-slate-700">Próximas reposições (fim da vida útil)</p>
+          <p className="text-slate-700">Próximas reposições (fim da vida útil)</p>
           {reposicoes.length === 0 ? (
-            <p className="text-xs text-slate-500">Nenhuma nos próximos 36 meses.</p>
+            <p className="texto-aux">Nenhuma nos próximos 36 meses.</p>
           ) : (
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-1">
               {reposicoes.map((r) => (
                 <li key={r.nome + r.mes} className="flex justify-between gap-2">
                   <span className="truncate">{r.nome}</span>
-                  <span className="font-mono">{rotuloMes(r.mes)} · {brl(r.valor)}</span>
+                  <span className="num">{rotuloMes(r.mes)} · {brl(r.valor)}</span>
                 </li>
               ))}
             </ul>
@@ -253,13 +253,13 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
     <tr>
       <td data-label="Categoria">{ROTULO_CATEGORIA[l.categoria]}</td>
       <td data-label="Área">{l.area || 'Geral'}</td>
-      <td data-label="Previsto" className="text-right font-mono">{brl(l.previsto)}</td>
-      <td data-label="Comprometido" className="text-right font-mono">{brl(l.comprometido)}</td>
-      <td data-label="A pagar" className="text-right font-mono">{brl(l.aPagar)}</td>
-      <td data-label="Realizado" className="text-right font-mono">{brl(l.realizado)}</td>
-      <td data-label="Disponível" className={`text-right font-mono ${l.disponivel < 0 ? 'text-red-700' : ''}`}>{brl(l.disponivel)}</td>
-      <td data-label="Projeção dez." className={`text-right font-mono ${l.previsto && l.projecaoDezembro > l.previsto ? 'text-amber-800' : ''}`}>{brl(l.projecaoDezembro)}</td>
-      <td data-label="% usado" className="text-right">{pct(l.pct)}</td>
+      <td data-label="Previsto" className="num">{brl(l.previsto)}</td>
+      <td data-label="Comprometido" className="num">{brl(l.comprometido)}</td>
+      <td data-label="A pagar" className="num">{brl(l.aPagar)}</td>
+      <td data-label="Realizado" className="num">{brl(l.realizado)}</td>
+      <td data-label="Disponível" className={`num ${l.disponivel < 0 ? 'text-red-700' : ''}`}>{brl(l.disponivel)}</td>
+      <td data-label="Projeção dez." className={`num ${l.previsto && l.projecaoDezembro > l.previsto ? 'text-amber-800' : ''}`}>{brl(l.projecaoDezembro)}</td>
+      <td data-label="% usado" className="num">{pct(l.pct)}</td>
     </tr>
   );
 
@@ -300,19 +300,19 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
       {linhas.length === 0 ? (
         <Vazio>Sem orçamento nem gastos em {ano}. Cadastre as linhas na aba Planejamento ou gere a partir da Projeção.</Vazio>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
                 <th>Categoria</th>
                 <th>Área</th>
-                <th className="text-right">Previsto</th>
-                <th className="text-right">Comprometido</th>
-                <th className="text-right">A pagar</th>
-                <th className="text-right">Realizado</th>
-                <th className="text-right">Disponível</th>
-                <th className="text-right">Projeção dez.</th>
-                <th className="text-right">% usado</th>
+                <th className="num">Previsto</th>
+                <th className="num">Comprometido</th>
+                <th className="num">A pagar</th>
+                <th className="num">Realizado</th>
+                <th className="num">Disponível</th>
+                <th className="num">Projeção dez.</th>
+                <th className="num">% usado</th>
               </tr>
             </thead>
             {grupos.map(({ n, ls }) => {
@@ -321,13 +321,13 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
                 <tbody key={n}>
                   <tr className="bg-slate-50">
                     <td colSpan={2} className="font-semibold text-slate-900">{n === 'opex' ? 'OPEX (despesas do dia a dia)' : 'CAPEX (investimentos)'}</td>
-                    <td className="text-right font-mono font-semibold">{brl(s.previsto)}</td>
-                    <td className="text-right font-mono font-semibold">{brl(s.comprometido)}</td>
-                    <td className="text-right font-mono font-semibold">{brl(s.aPagar)}</td>
-                    <td className="text-right font-mono font-semibold">{brl(s.realizado)}</td>
-                    <td className="text-right font-mono font-semibold">{brl(s.disponivel)}</td>
-                    <td className="text-right font-mono font-semibold">{brl(s.projecaoDezembro)}</td>
-                    <td className="text-right">{s.previsto ? pct((s.realizado + s.aPagar + s.comprometido) / s.previsto) : '—'}</td>
+                    <td className="num font-semibold">{brl(s.previsto)}</td>
+                    <td className="num font-semibold">{brl(s.comprometido)}</td>
+                    <td className="num font-semibold">{brl(s.aPagar)}</td>
+                    <td className="num font-semibold">{brl(s.realizado)}</td>
+                    <td className="num font-semibold">{brl(s.disponivel)}</td>
+                    <td className="num font-semibold">{brl(s.projecaoDezembro)}</td>
+                    <td className="num">{s.previsto ? pct((s.realizado + s.aPagar + s.comprometido) / s.previsto) : '—'}</td>
                   </tr>
                   {ls.map((l) => (
                     <Linha key={l.chave} l={l} />
@@ -434,7 +434,7 @@ export const ProjecaoView: React.FC = () => {
           </select>
         }
       />
-      {aviso && <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700" role="status">{aviso}</p>}
+      {aviso && <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700" role="status">{aviso}</p>}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Numero rotulo={`Total em ${meses} meses`} valor={brl(total)} />
         <Numero rotulo="OPEX" valor={brl(total - capex)} />
@@ -442,26 +442,26 @@ export const ProjecaoView: React.FC = () => {
         <Numero rotulo="Média mensal" valor={brl(lista.length ? total / lista.length : 0)} />
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-3">
-        <div className="cartao p-3 space-y-1.5">
+        <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Mês a mês</h3>
           {lista.map((m) => (
-            <div key={m.mes} className="grid grid-cols-[3.5rem_1fr_6.5rem] items-center gap-2 text-xs">
+            <div key={m.mes} className="grid grid-cols-[3.5rem_1fr_6.5rem] items-center gap-2">
               <span className="text-slate-600">{rotuloMes(m.mes)}</span>
               <span className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
                 <span className="block h-full bg-blue-600" style={{ width: `${(m.opex / maior) * 100}%` }} />
                 <span className="block h-full bg-emerald-600" style={{ width: `${(m.capex / maior) * 100}%` }} />
               </span>
-              <span className="text-right font-mono">{brl(m.total)}</span>
+              <span className="text-right num">{brl(m.total)}</span>
             </div>
           ))}
         </div>
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Por categoria</h3>
-          <ul className="space-y-1 text-xs">
+          <ul className="space-y-1">
             {porCategoria.map(([cat, v]) => (
               <li key={cat} className="flex justify-between gap-2">
                 <span>{ROTULO_CATEGORIA[cat as CategoriaDespesa] || cat}</span>
-                <span className="font-mono">{brl(v)}</span>
+                <span className="num">{brl(v)}</span>
               </li>
             ))}
           </ul>
@@ -567,11 +567,11 @@ export const PatrimonioView: React.FC = () => {
 
   const Totais = ({ t }: { t: TotaisImobilizado }) => (
     <>
-      <td className="text-right font-mono">{brl(t.liquidoInicial)}</td>
-      <td className="text-right font-mono">{brl(t.aquisicoes)}</td>
-      <td className="text-right font-mono">{brl(t.baixasCusto - t.baixasDepAcum)}</td>
-      <td className="text-right font-mono">{brl(t.depreciacaoAno)}</td>
-      <td className="text-right font-mono font-semibold">{brl(t.liquidoFinal)}</td>
+      <td className="num">{brl(t.liquidoInicial)}</td>
+      <td className="num">{brl(t.aquisicoes)}</td>
+      <td className="num">{brl(t.baixasCusto - t.baixasDepAcum)}</td>
+      <td className="num">{brl(t.depreciacaoAno)}</td>
+      <td className="num font-semibold">{brl(t.liquidoFinal)}</td>
     </>
   );
 
@@ -609,7 +609,7 @@ export const PatrimonioView: React.FC = () => {
       />
       {erro && <p className="erro" role="alert">{erro}</p>}
       {reaberturas.length > 0 && (
-        <p className="text-xs text-slate-600">
+        <p className="texto-aux">
           Reaberturas: {reaberturas.map((r) => `${formatDate(r.reabertoEm || '')} — ${r.reaberturaMotivo || ''}`).join(' · ')}
         </p>
       )}
@@ -624,22 +624,22 @@ export const PatrimonioView: React.FC = () => {
         <Vazio>Nenhum equipamento CAPEX com valor e data de compra em {ano}.</Vazio>
       ) : (
         <>
-          <div className="cartao overflow-hidden">
+          <div className="cartao-tabela">
             <table className="tabela tabela-cartoes">
               <thead>
                 <tr>
                   <th>{agrupar === 'grupo' ? 'Grupo' : 'Área'}</th>
-                  <th className="text-right">Saldo inicial</th>
-                  <th className="text-right">Aquisições</th>
-                  <th className="text-right">Baixas</th>
-                  <th className="text-right">Depreciação</th>
-                  <th className="text-right">Saldo final</th>
+                  <th className="num">Saldo inicial</th>
+                  <th className="num">Aquisições</th>
+                  <th className="num">Baixas</th>
+                  <th className="num">Depreciação</th>
+                  <th className="num">Saldo final</th>
                 </tr>
               </thead>
               <tbody>
                 {grupos.map((gr) => (
                   <tr key={gr.chave}>
-                    <td className="font-medium text-slate-900">{gr.chave}</td>
+                    <td className="font-semibold text-slate-900">{gr.chave}</td>
                     <Totais t={gr.totais} />
                   </tr>
                 ))}
@@ -647,16 +647,16 @@ export const PatrimonioView: React.FC = () => {
             </table>
           </div>
           <details className="cartao p-3">
-            <summary className="cursor-pointer text-xs font-semibold text-slate-700">Detalhe por equipamento ({linhas.length})</summary>
+            <summary className="cursor-pointer font-semibold text-slate-700">Detalhe por equipamento ({linhas.length})</summary>
             <table className="tabela tabela-cartoes mt-2">
               <thead>
                 <tr>
                   <th>Patrimônio</th>
                   <th>Aquisição</th>
-                  <th className="text-right">Custo</th>
-                  <th className="text-right">Depreciação do ano</th>
+                  <th className="num">Custo</th>
+                  <th className="num">Depreciação do ano</th>
                   <th>Baixa</th>
-                  <th className="text-right">Líquido final</th>
+                  <th className="num">Líquido final</th>
                 </tr>
               </thead>
               <tbody>
@@ -664,10 +664,10 @@ export const PatrimonioView: React.FC = () => {
                   <tr key={l.ativoId}>
                     <td data-label="Patrimônio">{l.tag} · {l.nome}</td>
                     <td data-label="Aquisição">{l.dataAquisicao ? formatDate(l.dataAquisicao) : '—'}</td>
-                    <td data-label="Custo" className="text-right font-mono">{brl(l.custo)}</td>
-                    <td data-label="Depreciação" className="text-right font-mono">{brl(l.depreciacaoAno)}</td>
+                    <td data-label="Custo" className="num">{brl(l.custo)}</td>
+                    <td data-label="Depreciação" className="num">{brl(l.depreciacaoAno)}</td>
                     <td data-label="Baixa">{l.baixa ? `${formatDate(l.baixa.data)} · venda ${brl(l.baixa.valorVenda)}` : '—'}</td>
-                    <td data-label="Líquido final" className="text-right font-mono">{brl(l.custoFinal - l.depAcumFinal)}</td>
+                    <td data-label="Líquido final" className="num">{brl(l.custoFinal - l.depAcumFinal)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -773,8 +773,8 @@ export const RelatoriosView: React.FC = () => {
           .map((r) => (
             <div key={r.titulo} className="flex flex-wrap items-center justify-between gap-2 p-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900">{r.titulo}</p>
-                <p className="text-xs text-slate-500">{r.descricao}</p>
+                <p className="font-semibold text-slate-900">{r.titulo}</p>
+                <p className="texto-aux">{r.descricao}</p>
               </div>
               <span className="flex gap-2">
                 <button type="button" onClick={() => r.gerar(false)} className="btn btn-sm btn-secundario"><Download /> CSV</button>
@@ -787,13 +787,13 @@ export const RelatoriosView: React.FC = () => {
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Custo por área ({ano}, realizado)</h3>
           {porArea.length === 0 ? (
-            <p className="text-xs text-slate-500">Nada pago no ano.</p>
+            <p className="texto-aux">Nada pago no ano.</p>
           ) : (
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-1">
               {porArea.map((a) => (
                 <li key={a.area} className="flex justify-between gap-2">
                   <span>{a.area}</span>
-                  <span className="font-mono">{brl(a.valor)}</span>
+                  <span className="num">{brl(a.valor)}</span>
                 </li>
               ))}
             </ul>
@@ -803,7 +803,7 @@ export const RelatoriosView: React.FC = () => {
           <div className="cartao p-3 space-y-2">
             <h3 className="secao-titulo">Rateio entre áreas</h3>
             <p className="ajuda">Divide o custo de um contrato ou licença entre as áreas que usam. Não é cobrança: só muda o relatório de custo por área.</p>
-            <ul className="space-y-1 text-xs max-h-72 overflow-auto">
+            <ul className="space-y-1 max-h-72 overflow-auto">
               {recorrentesRateaveis.map((r) => {
                 const partes = rateios.filter((x) => x.origemTipo === r.origem && x.origemId === r.id);
                 return (
@@ -870,7 +870,7 @@ const JanelaRateio: React.FC<{
       tamanho="p"
       titulo="Rateio entre áreas"
       subtitulo={alvo.nome}
-      icone={<Split className="h-4 w-4" />}
+      icone={<Split className="ico" />}
       onFechar={onFechar}
       rodape={
         <div className="ml-auto flex gap-2">
@@ -893,7 +893,7 @@ const JanelaRateio: React.FC<{
           </div>
         ))}
         <button type="button" onClick={() => setPartes([...partes, { departamentoId: '', percentual: Math.max(0, 100 - soma) }])} className="btn btn-sm btn-secundario">Mais uma área</button>
-        <p className={`text-xs ${soma > 100 ? 'text-red-700' : 'text-slate-600'}`}>Total: {soma.toFixed(2)}% {soma < 100 ? `(os ${(100 - soma).toFixed(2)}% restantes ficam na área do cadastro)` : ''}</p>
+        <p className={` ${soma > 100 ? 'text-red-700' : 'text-slate-600'}`}>Total: {soma.toFixed(2)}% {soma < 100 ? `(os ${(100 - soma).toFixed(2)}% restantes ficam na área do cadastro)` : ''}</p>
         {erro && <p className="erro" role="alert">{erro}</p>}
       </div>
     </Janela>
@@ -937,23 +937,23 @@ export const CustosMinhaAreaView: React.FC = () => {
             <Numero rotulo="Pago" valor={brl(realizado)} />
             <Numero rotulo="Disponível" valor={brl(previsto - realizado)} tom={previsto - realizado < 0 ? 'problema' : undefined} />
           </div>
-          <div className="cartao overflow-hidden">
+          <div className="cartao-tabela">
             <table className="tabela tabela-cartoes">
               <thead>
                 <tr>
                   <th>Categoria</th>
-                  <th className="text-right">Previsto</th>
-                  <th className="text-right">Pago</th>
-                  <th className="text-right">% usado</th>
+                  <th className="num">Previsto</th>
+                  <th className="num">Pago</th>
+                  <th className="num">% usado</th>
                 </tr>
               </thead>
               <tbody>
                 {linhas.map((l) => (
                   <tr key={l.categoria}>
                     <td data-label="Categoria">{ROTULO_CATEGORIA[l.categoria as CategoriaDespesa] || l.categoria}</td>
-                    <td data-label="Previsto" className="text-right font-mono">{brl(l.previsto)}</td>
-                    <td data-label="Pago" className="text-right font-mono">{brl(l.realizado)}</td>
-                    <td data-label="% usado" className="text-right">{l.previsto ? pct(l.realizado / l.previsto) : '—'}</td>
+                    <td data-label="Previsto" className="num">{brl(l.previsto)}</td>
+                    <td data-label="Pago" className="num">{brl(l.realizado)}</td>
+                    <td data-label="% usado" className="num">{l.previsto ? pct(l.realizado / l.previsto) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

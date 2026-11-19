@@ -31,11 +31,11 @@ export const DepreciacaoAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
     <section className="cartao space-y-3 p-4">
       <h3 className="secao-titulo">Valor e depreciação</h3>
       {d.semDados ? (
-        <p className="text-xs text-amber-800">Informe o valor e a data de compra (Editar) para calcular o valor atual.</p>
+        <p className="text-amber-800">Informe o valor e a data de compra (Editar) para calcular o valor atual.</p>
       ) : (
         <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Dado rotulo="Valor de compra">
-            <span className="font-mono">{brl(d.valorCompra)}</span>
+            <span className="num">{brl(d.valorCompra)}</span>
           </Dado>
           <Dado rotulo="Depreciação acumulada">
             <span className="font-mono">
@@ -43,14 +43,14 @@ export const DepreciacaoAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
             </span>
           </Dado>
           <Dado rotulo="Valor atual">
-            <span className="font-mono font-semibold">{brl(d.valorAtual)}</span>
+            <span className="num font-semibold">{brl(d.valorAtual)}</span>
           </Dado>
           <Dado rotulo={d.residual > 0 ? 'Chega ao residual em' : 'Zera em'}>{d.anos ? mesAno(d.zeraEm) : 'não deprecia'}</Dado>
         </dl>
       )}
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label htmlFor={`grupo-${asset.id}`} className="text-xs text-slate-600">
+          <label htmlFor={`grupo-${asset.id}`} className="texto-aux">
             Grupo de vida útil
           </label>
           <select

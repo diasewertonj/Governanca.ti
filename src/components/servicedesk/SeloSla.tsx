@@ -56,11 +56,11 @@ export const PrazosChamado: React.FC<{ tkt: Ticket; embutido?: boolean }> = ({ t
   if (!s) return null;
   const { resposta, solucao } = s;
   return (
-    <section aria-label="Prazos" className={embutido ? 'w-full space-y-1.5 text-xs lg:w-72 lg:shrink-0' : 'cartao p-4 space-y-3 text-xs'}>
+    <section aria-label="Prazos" className={embutido ? 'w-full space-y-2 lg:w-72 lg:shrink-0' : 'cartao p-4 space-y-3'}>
       <h3 className="secao-titulo">Prazos</h3>
       <div className="flex items-center justify-between gap-2">
         <span className="text-slate-600">1ª resposta</span>
-        <span className={resposta.atrasada ? 'font-semibold text-red-700' : 'font-medium text-slate-900'}>
+        <span className={resposta.atrasada ? 'font-semibold text-red-700' : 'font-semibold text-slate-900'}>
           {resposta.respondidaEm
             ? `${resposta.atrasada ? 'Fora do prazo' : 'No prazo'} (${formatDateTime(resposta.respondidaEm.toISOString())})`
             : `${resposta.atrasada ? 'Atrasada' : 'Até'} ${formatDateTime(resposta.vence.toISOString())}`}

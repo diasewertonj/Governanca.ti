@@ -63,7 +63,7 @@ export const CollaboratorsView: React.FC = () => {
         }
       />
 
-      <div className="cartao overflow-hidden">
+      <div className="cartao-tabela">
         <table className="tabela tabela-cartoes">
           <thead>
             <tr>
@@ -73,7 +73,7 @@ export const CollaboratorsView: React.FC = () => {
               <th className="hidden 2xl:table-cell">Líder imediato</th>
               <th className="hidden xl:table-cell">Equipamentos em uso</th>
               <th>Situação</th>
-              <th className="text-right">Ações</th>
+              <th className="col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -87,8 +87,8 @@ export const CollaboratorsView: React.FC = () => {
                 return (
                   <tr key={emp.id} onClick={() => setSelectedEmployeeIdFor360(emp.id)} className="hover:bg-slate-50/70 cursor-pointer">
                     <td data-label="Colaborador">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 shrink-0 rounded-full bg-blue-600/10 text-blue-700 font-bold flex items-center justify-center text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 shrink-0 rounded-full bg-blue-600/10 text-blue-700 font-semibold flex items-center justify-center">
                           {emp.nome.charAt(0)}
                         </div>
                         <div>
@@ -98,7 +98,7 @@ export const CollaboratorsView: React.FC = () => {
                       </div>
                     </td>
 
-                    <td data-label="Matrícula" className="hidden xl:table-cell font-mono font-medium text-slate-600">
+                    <td data-label="Matrícula" className="hidden xl:table-cell font-mono text-slate-600">
                       {emp.matricula}
                     </td>
 
@@ -109,7 +109,7 @@ export const CollaboratorsView: React.FC = () => {
                     <td data-label="Líder imediato" className="hidden 2xl:table-cell">
                       {manager ? (
                         <span className="text-slate-800 flex items-center gap-1">
-                          <User className="w-3 h-3 text-slate-500" />
+                          <User className="ico-sm text-slate-500" />
                           {manager.nome}
                         </span>
                       ) : (
@@ -118,8 +118,8 @@ export const CollaboratorsView: React.FC = () => {
                     </td>
 
                     <td data-label="Equipamentos em uso" className="hidden xl:table-cell">
-                      <div className="flex items-center gap-1.5">
-                        <Laptop className="w-3.5 h-3.5 text-blue-600" />
+                      <div className="flex items-center gap-2">
+                        <Laptop className="ico-sm text-blue-600" />
                         <span className="font-semibold text-slate-900">{custodyCount} item(ns)</span>
                         {licCount > 0 && <span className="selo selo-neutro">+{licCount} licença(s)</span>}
                       </div>
@@ -129,7 +129,7 @@ export const CollaboratorsView: React.FC = () => {
                       <span className={`selo ${SELO_STATUS[emp.status] || 'selo-neutro'}`}>{ROTULO_STATUS[emp.status] || emp.status}</span>
                     </td>
 
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       <span className="acoes-linha">
                         <button
                           type="button"
@@ -150,7 +150,16 @@ export const CollaboratorsView: React.FC = () => {
             ) : (
               <tr>
                 <td colSpan={7}>
-                  <Vazio>Nenhum colaborador encontrado com os filtros aplicados.</Vazio>
+                  <Vazio
+                    titulo="Nenhum colaborador encontrado"
+                    acao={
+                      <button type="button" onClick={() => { setSearchTerm(''); setDepartmentFilter('todos'); setStatusFilter('todos'); }} className="btn btn-sm btn-secundario">
+                        Limpar filtros
+                      </button>
+                    }
+                  >
+                    Nenhuma pessoa com os filtros aplicados.
+                  </Vazio>
                 </td>
               </tr>
             )}

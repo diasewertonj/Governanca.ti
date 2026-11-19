@@ -37,7 +37,7 @@ const BarraAssentos: React.FC<{ license: SoftwareLicense }> = ({ license }) => {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-xs text-slate-600">
+        <p className="texto-aux">
           <span className="font-mono text-base font-semibold text-slate-900">
             {license.assentosAlocados} / {license.assentosTotais}
           </span>{' '}
@@ -82,7 +82,7 @@ const ValoresCusto: React.FC<{ fonte: FonteCusto; license: SoftwareLicense; pg?:
       <span className="block font-normal text-slate-500">{fonte.origem}</span>
     </Dado>
     <Dado rotulo="Por assento">
-      <span className="font-mono">{formatCurrency(license.assentosTotais > 0 ? fonte.mensalDaLicenca / license.assentosTotais : 0)}/mês</span>
+      <span className="num">{formatCurrency(license.assentosTotais > 0 ? fonte.mensalDaLicenca / license.assentosTotais : 0)}/mês</span>
       {(fonte.licencasNoContrato || 0) > 1 && (
         <span className="block font-normal text-slate-500">
           {formatCurrency(fonte.mensalDaLicenca)}/mês deste software (contrato dividido entre {fonte.licencasNoContrato} softwares)
@@ -312,7 +312,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     if (fonte.forma === 'contrato' && fonte.contrato) {
       return (
         <div className="space-y-2">
-          <p className="text-xs text-slate-600">Faturas do contrato {nomeContrato(fonte.contrato)} (que paga este software):</p>
+          <p className="texto-aux">Faturas do contrato {nomeContrato(fonte.contrato)} (que paga este software):</p>
           <FaturasSecao alvo={{ contratoId: fonte.contrato.id }} periodicidade={fonte.contrato.periodicidade} valorPadrao={fonte.contrato.valor} />
           {faturas.some((f) => f.licencaId === license.id) && (
             <FaturasSecao alvo={{ licencaId: license.id }} bloqueioLancamento="Faturas antigas, de quando a cobrança era no próprio software." />
@@ -332,7 +332,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   })();
 
   const avisoSemContrato = (
-    <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+    <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
       <p>Este software é pago por contrato, mas nenhum contrato vigente o cobre.</p>
       {isTI && (
         <div className="flex flex-wrap gap-2">
@@ -354,7 +354,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     <>
       <Janela
         tamanho="ficha"
-        icone={<Key className="h-4 w-4" />}
+        icone={<Key className="ico" />}
         rotuloCaminho={license.nome}
         titulo={
           <span className="flex min-w-0 items-center gap-2">
@@ -409,11 +409,11 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
         {feedbackMsg && (
           <p
             role="status"
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
               feedbackMsg.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'
             }`}
           >
-            {feedbackMsg.type === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
+            {feedbackMsg.type === 'success' ? <CheckCircle2 className="ico" /> : <AlertCircle className="ico" />}
             <span>{feedbackMsg.text}</span>
           </p>
         )}
@@ -421,7 +421,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
         {/* ---------------- Resumo ---------------- */}
         <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
           {!ativa && (
-            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
               Inativada{license.inativadaEm ? ` em ${formatDate(license.inativadaEm)}` : ''}
               {license.inativadaPor ? ` por ${nomePessoa(license.inativadaPor)}` : ''}: {license.inativacaoMotivo || 'sem motivo'}
             </p>
@@ -445,7 +445,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                 <Dado rotulo="Painel de administração">
                   <a href={license.urlPainel} target="_blank" rel="noreferrer" className="link inline-flex items-center gap-1">
                     Abrir painel
-                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    <ExternalLink className="ico-sm" aria-hidden="true" />
                   </a>
                 </Dado>
               )}
@@ -469,7 +469,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
           {license.observacoes && (
             <section className="cartao space-y-2 p-4">
               <h3 className="secao-titulo">Observações</h3>
-              <p className="text-xs whitespace-pre-line text-slate-700">{license.observacoes}</p>
+              <p className="whitespace-pre-line text-slate-700">{license.observacoes}</p>
             </section>
           )}
         </div>
@@ -574,14 +574,14 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   : 'Nenhum colaborador alocado neste software no momento.'}
               </Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
                       <th>Pessoa</th>
                       <th>E-mail</th>
                       <th>Cargo e setor</th>
-                      <th className="text-right">Ações</th>
+                      <th className="col-acoes">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -602,10 +602,10 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                             {emp.email}
                           </td>
                           <td data-label="Cargo e setor">
-                            <span className="block font-medium text-slate-800">{emp.cargo}</span>
+                            <span className="block font-semibold text-slate-800">{emp.cargo}</span>
                             <span className="text-slate-500">{dep?.nome || '-'}</span>
                           </td>
-                          <td data-label="Ações" className="text-right">
+                          <td data-label="Ações" className="col-acoes">
                             {isTI ? (
                               <span className="acoes-linha">
                                 <button type="button" onClick={() => handleRevoke(emp.id, emp.nome)} className="btn btn-sm btn-perigo">
@@ -633,14 +633,14 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               {historico.length === 0 ? (
                 <Vazio>Nenhuma atribuição registrada ainda.</Vazio>
               ) : (
-                <div className="cartao overflow-hidden">
+                <div className="cartao-tabela">
                   <table className="tabela tabela-cartoes">
                     <thead>
                       <tr>
                         <th>Pessoa</th>
                         <th>Entrou</th>
                         <th>Saiu</th>
-                        <th className="text-right">Situação</th>
+                        <th className="num">Situação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -660,7 +660,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                             {a.fim && a.removidoPor && <span className="block text-slate-500">por {nomePessoa(a.removidoPor)}</span>}
                             {a.fim && a.motivoRemocao && <span className="block text-slate-500">motivo: {a.motivoRemocao}</span>}
                           </td>
-                          <td data-label="Situação" className="text-right">
+                          <td data-label="Situação" className="num">
                             <span className={`selo ${a.fim ? 'selo-neutro' : 'selo-ok'}`}>{a.fim ? 'Encerrado' : 'Em uso'}</span>
                           </td>
                         </tr>
@@ -683,7 +683,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               </span>
             </div>
             {fonte.contrato && (
-              <p className="text-xs text-slate-600">
+              <p className="texto-aux">
                 Pago pelo contrato {linkContrato(fonte.contrato.id, nomeContrato(fonte.contrato))}
                 {fonte.contrato.fim ? `, vigente até ${formatDate(fonte.contrato.fim)}` : ''}.
               </p>
@@ -691,7 +691,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
             {fonte.semContratoVigente ? (
               avisoSemContrato
             ) : fonte.forma === 'sem_custo' ? (
-              <p className="text-xs text-slate-600">Software sem custo.</p>
+              <p className="texto-aux">Software sem custo.</p>
             ) : (
               <ValoresCusto fonte={fonte} license={license} pg={pg} limite={limite} />
             )}
@@ -723,7 +723,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                   </Dado>
                 </dl>
               ) : (
-                <p className="text-xs text-slate-500">
+                <p className="texto-aux">
                   Nenhum dado de pagamento informado{fonte.forma === 'contrato' ? ' no contrato' : ''}.
                 </p>
               )}

@@ -423,15 +423,15 @@ export const SettingsView: React.FC = () => {
       <CabecalhoTela titulo="Configurações" subtitulo="Edite os campos de qualquer seção: a barra Salvar alterações aparece embaixo assim que houver mudança. Nada grava sozinho." />
 
       {successMsg && (
-        <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
+          <CheckCircle2 className="ico text-emerald-600" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-800">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+          <AlertTriangle className="ico text-red-600" />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -529,7 +529,7 @@ export const SettingsView: React.FC = () => {
               {activeTab === 'documentos' && (
                 <>
                   {/* Fase 6: documentos controlados (Qualidade) com o texto legal de cada um */}
-                  <p className="text-xs text-slate-500">
+                  <p className="texto-aux">
                     Código, versão e referência aparecem no cabeçalho dos termos. Mantenha igual à versão aprovada pela
                     Qualidade no POP.
                   </p>
@@ -577,7 +577,7 @@ export const SettingsView: React.FC = () => {
                           ['monitor', 'Monitores'],
                         ] as const
                       ).map(([chave, rotulo]) => (
-                        <label key={chave} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                        <label key={chave} className="inline-flex items-center gap-2 font-semibold text-slate-700">
                           <input
                             type="checkbox"
                             checked={termoExige[chave]}
@@ -649,7 +649,7 @@ export const SettingsView: React.FC = () => {
                 </div>
               </form>
 
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <div className="border-b border-slate-100 p-4">
                   <h3 className="secao-titulo">Setores cadastrados ({departments.length})</h3>
                   <p className="ajuda">Regra de integridade: setores com colaboradores vinculados não podem ser excluídos, apenas inativados</p>
@@ -663,7 +663,7 @@ export const SettingsView: React.FC = () => {
                         <th>Descrição</th>
                         <th>Colaboradores vinculados</th>
                         <th>Situação</th>
-                        <th className="text-right">Ações</th>
+                        <th className="col-acoes">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -672,7 +672,7 @@ export const SettingsView: React.FC = () => {
                         const ativoExibido = setoresPendentes[dep.id] ?? dep.ativo;
                         return (
                           <tr key={dep.id}>
-                            <td data-label="Código" className="font-mono font-bold text-slate-900">{dep.codigo}</td>
+                            <td data-label="Código" className="font-mono font-semibold text-slate-900">{dep.codigo}</td>
                             <td data-label="Nome do setor" className="font-semibold text-slate-900">{dep.nome}</td>
                             <td data-label="Descrição" className="text-slate-500">{dep.descricao || '-'}</td>
                             <td data-label="Colaboradores vinculados">{linkedCount} colaborador(es)</td>
@@ -687,7 +687,7 @@ export const SettingsView: React.FC = () => {
                                 {dep.id in setoresPendentes && ' (não salvo)'}
                               </button>
                             </td>
-                            <td data-label="Ações" className="text-right">
+                            <td data-label="Ações" className="col-acoes">
                               <div className="acoes-linha">
                                 <button
                                   type="button"
@@ -746,7 +746,7 @@ export const SettingsView: React.FC = () => {
 
               <div className="cartao space-y-4 p-4">
                 <h3 className="secao-titulo">Campos criados</h3>
-                {settings.camposPersonalizados.length === 0 && <p className="text-xs text-slate-500">Nenhum campo criado.</p>}
+                {settings.camposPersonalizados.length === 0 && <p className="texto-aux">Nenhum campo criado.</p>}
                 {(Object.keys(ROTULO_CATEGORIA) as AssetCategory[]).map((cat) => {
                   const doGrupo = settings.camposPersonalizados.filter((cf) => cf.categoria === cat);
                   if (doGrupo.length === 0) return null;
@@ -755,10 +755,10 @@ export const SettingsView: React.FC = () => {
                       <h4 className="rotulo">{ROTULO_CATEGORIA[cat]}</h4>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {doGrupo.map((cf) => (
-                          <div key={cf.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                          <div key={cf.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <div>
                               <span className="block font-semibold text-slate-900">{cf.label}</span>
-                              <span className="font-mono text-xs text-slate-500 uppercase">
+                              <span className="font-mono texto-aux uppercase">
                                 {cf.categoria} · {cf.tipo}
                               </span>
                             </div>
@@ -793,7 +793,7 @@ export const SettingsView: React.FC = () => {
                 <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                   <div>
                     <h3 className="secao-titulo flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-blue-600" />
+                      <Shield className="ico text-blue-600" />
                       <span>Usuários e permissões</span>
                     </h3>
                     <p className="ajuda">O perfil define o que cada pessoa vê e faz no sistema</p>
@@ -801,8 +801,8 @@ export const SettingsView: React.FC = () => {
                   <div className="barra-filtros">
                     <div className="relative">
                       <label htmlFor="equipe-busca" className="sr-only">Buscar colaborador</label>
-                      <input id="equipe-busca" type="text" value={equipeSearch} onChange={(e) => setEquipeSearch(e.target.value)} placeholder="Buscar colaborador..." className="campo campo-sm w-48 pl-7" />
-                      <Search className="absolute top-2.5 left-2.5 h-3 w-3 text-slate-500" />
+                      <input id="equipe-busca" type="text" value={equipeSearch} onChange={(e) => setEquipeSearch(e.target.value)} placeholder="Buscar colaborador..." className="campo campo-sm w-48 pl-6" />
+                      <Search className="ico-sm absolute top-2.5 left-2.5 text-slate-500" />
                     </div>
                     <select
                       value={equipeFilter}
@@ -817,7 +817,7 @@ export const SettingsView: React.FC = () => {
                 </div>
 
                 {/* Explicação das 4 permissões */}
-                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {(
                     [
                       ['bg-blue-600', 'Admin de T.I.', 'Acesso integral: inventário 1:1, fila de chamados, configurações, termos, setores e gestão de operadores.'],
@@ -827,17 +827,17 @@ export const SettingsView: React.FC = () => {
                     ] as const
                   ).map(([cor, titulo, texto]) => (
                     <div key={titulo} className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <span className="flex items-center gap-1.5 font-semibold text-slate-900">
+                      <span className="flex items-center gap-2 font-semibold text-slate-900">
                         <span className={`h-2 w-2 rounded-full ${cor}`} />
                         {titulo}
                       </span>
-                      <p className="text-xs leading-tight text-slate-600">{texto}</p>
+                      <p className="texto-aux leading-tight">{texto}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <div className="overflow-x-auto">
                   <table className="tabela tabela-cartoes">
                     <thead>
@@ -846,7 +846,7 @@ export const SettingsView: React.FC = () => {
                         <th>E-mail corporativo</th>
                         <th>Setor / cargo</th>
                         <th>Papel atual</th>
-                        <th className="text-right">Alterar nível de acesso</th>
+                        <th className="num">Alterar nível de acesso</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -866,25 +866,25 @@ export const SettingsView: React.FC = () => {
                           return (
                             <tr key={emp.id} className={papelPendente ? 'bg-amber-50' : ''}>
                               <td data-label="Colaborador">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-800">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-800">
                                     {emp.nome.charAt(0)}
                                   </div>
                                   <div>
                                     <span className="block font-semibold text-slate-900">{emp.nome}</span>
-                                    <span className="font-mono text-xs text-slate-500">{emp.matricula}</span>
+                                    <span className="font-mono texto-aux">{emp.matricula}</span>
                                   </div>
                                 </div>
                               </td>
                               <td data-label="E-mail corporativo" className="whitespace-nowrap text-slate-600">{emp.email}</td>
                               <td data-label="Setor / cargo" className="whitespace-nowrap">
                                 <span className="block text-slate-800">{emp.cargo}</span>
-                                <span className="text-xs text-slate-500">{departments.find((d) => d.id === emp.setorId)?.nome || '-'}</span>
+                                <span className="texto-aux">{departments.find((d) => d.id === emp.setorId)?.nome || '-'}</span>
                               </td>
                               <td data-label="Papel atual" className="whitespace-nowrap">
                                 <span className={`selo ${papeisSelo[currentEmpRole]}`}>{ROTULO_PAPEL[currentEmpRole]}</span>
                               </td>
-                              <td data-label="Alterar nível de acesso" className="text-right whitespace-nowrap">
+                              <td data-label="Alterar nível de acesso" className="num whitespace-nowrap">
                                 <select
                                   value={papelPendente ?? currentEmpRole}
                                   onChange={(e) => alterarPapel(emp, e.target.value as UserRole)}
@@ -913,7 +913,7 @@ export const SettingsView: React.FC = () => {
             <div className="cartao space-y-4 p-4">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <h3 className="secao-titulo flex items-center gap-2">
-                  <Database className="h-4 w-4 text-emerald-600" />
+                  <Database className="ico text-emerald-600" />
                   Conexão com o banco de dados
                 </h3>
                 <div className="flex items-center gap-2">
@@ -943,10 +943,10 @@ export const SettingsView: React.FC = () => {
               {!isSupabaseConnected && (
                 <div className="space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-4">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+                    <AlertTriangle className="ico-lg text-red-600" />
                     <div>
-                      <h4 className="text-xs font-bold tracking-wide text-red-900 uppercase">Zona de produção: zerar dados de exemplo</h4>
-                      <p className="mt-0.5 text-xs text-red-700">
+                      <h4 className="secao-titulo text-red-900">Zona de produção: zerar dados de exemplo</h4>
+                      <p className="mt-0.5 text-red-700">
                         Utilize esta opção para iniciar a operação real da sua empresa, limpando ativos fictícios, licenças e chamados de demonstração.
                       </p>
                     </div>
@@ -982,7 +982,7 @@ export const SettingsView: React.FC = () => {
       {showResetModal && !isSupabaseConnected && (
         <Janela
           tamanho="p"
-          icone={<AlertTriangle className="h-4 w-4" />}
+          icone={<AlertTriangle className="ico" />}
           titulo="Confirmar limpeza completa da base"
           onFechar={() => {
             if (isResetting) return;
@@ -1035,12 +1035,12 @@ export const SettingsView: React.FC = () => {
           }
         >
           <div className="space-y-3">
-            <p className="text-xs text-slate-600">
+            <p className="texto-aux">
               Esta ação apagará todos os ativos, licenças e chamados de teste tanto do sistema quanto do Supabase (se conectado), deixando a plataforma zerada e pronta para seus dados reais.
             </p>
             <div>
               <label htmlFor="reset-confirmacao" className="rotulo">
-                Digite <span className="font-mono font-bold text-red-600">ZERAR</span> para liberar a limpeza
+                Digite <span className="font-mono font-semibold text-red-600">ZERAR</span> para liberar a limpeza
               </label>
               <input
                 id="reset-confirmacao"
@@ -1049,7 +1049,7 @@ export const SettingsView: React.FC = () => {
                 value={resetConfirmText}
                 onChange={(e) => setResetConfirmText(e.target.value)}
                 placeholder="Digite ZERAR"
-                className="campo text-center font-mono font-bold tracking-wider"
+                className="campo text-center font-mono font-semibold tracking-wider"
               />
             </div>
           </div>

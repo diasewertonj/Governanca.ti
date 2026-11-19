@@ -20,7 +20,7 @@ const DadosDaBaixa: React.FC<{ baixa: BaixaAtivo; asset: Asset }> = ({ baixa, as
     ['Destinatário', baixa.destinatario || '-'],
     ['Documento', baixa.documento || '-'],
     ...(baixa.destino === 'venda'
-      ? [['Valor de venda', <span className="font-mono">{formatCurrency(baixa.valorVenda || 0)}</span>] as [string, React.ReactNode]]
+      ? [['Valor de venda', <span className="num">{formatCurrency(baixa.valorVenda || 0)}</span>] as [string, React.ReactNode]]
       : []),
     ['Registrada por', `${nome(baixa.criadoPor)} em ${formatDate(baixa.criadoEm)}`],
   ];
@@ -34,10 +34,10 @@ const DadosDaBaixa: React.FC<{ baixa: BaixaAtivo; asset: Asset }> = ({ baixa, as
           </Dado>
         ))}
       </dl>
-      {baixa.observacoes && <p className="text-xs break-words whitespace-pre-wrap text-slate-700">{baixa.observacoes}</p>}
+      {baixa.observacoes && <p className="break-words whitespace-pre-wrap text-slate-700">{baixa.observacoes}</p>}
       {evidencias.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs text-slate-500">Evidências</p>
+          <p className="texto-aux">Evidências</p>
           <ul className="flex flex-wrap gap-x-2 gap-y-1">
             {evidencias.map((a) => (
               <li key={a.id} className="min-w-0">
@@ -48,7 +48,7 @@ const DadosDaBaixa: React.FC<{ baixa: BaixaAtivo; asset: Asset }> = ({ baixa, as
         </div>
       )}
       {baixa.estornadaEm && (
-        <p className="text-xs break-words text-slate-700">
+        <p className="break-words text-slate-700">
           <span className="selo selo-neutro mr-1">Estornada</span> em {formatDate(baixa.estornadaEm)} por {nome(baixa.estornadaPor)}
           {baixa.motivoEstorno ? `: ${baixa.motivoEstorno}` : ''}
         </p>

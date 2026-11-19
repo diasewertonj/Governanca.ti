@@ -738,7 +738,7 @@ const JanelaAgendar: React.FC<{ item: ProcessoItem; onFechar: () => void }> = ({
   return (
     <Janela
       tamanho="p"
-      icone={<CalendarClock className="h-4 w-4" />}
+      icone={<CalendarClock className="ico" />}
       titulo={item.lembreteEm ? 'Reagendar passo' : 'Agendar passo'}
       subtitulo={`${ACAO_DO_TIPO[item.tipo]}: ${item.titulo}`}
       onFechar={onFechar}
@@ -764,7 +764,7 @@ const JanelaAgendar: React.FC<{ item: ProcessoItem; onFechar: () => void }> = ({
       }
     >
       <div className="space-y-3">
-        <p className="text-xs text-slate-600">
+        <p className="texto-aux">
           O passo continua pendente e aparece como "Agendado para…". No dia, entra no Precisa de atenção e nos Lembretes.
           {item.lembreteEm ? ` Hoje está marcado para ${formatDate(item.lembreteEm)}.` : ''}
         </p>
@@ -819,7 +819,7 @@ const CadastroRapidoAcessorio: React.FC<{ nome: string; tipo: TipoAcessorio; onC
   return (
     <Janela
       tamanho="p"
-      icone={<Package className="h-4 w-4" />}
+      icone={<Package className="ico" />}
       titulo="Cadastrar acessório no estoque"
       subtitulo="Item controlado por quantidade (sem patrimônio)"
       onFechar={onFechar}

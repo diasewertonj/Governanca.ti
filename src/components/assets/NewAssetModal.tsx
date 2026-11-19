@@ -377,7 +377,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo, in
     <>
       <Janela
         tamanho="g"
-        icone={duplicarDe ? <Copy className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+        icone={duplicarDe ? <Copy className="ico" /> : <Package className="ico" />}
         titulo={ativo ? `Editar ativo ${ativo.tag}` : duplicarDe ? `Duplicar ativo ${duplicarDe.tag} (mesmo lote)` : 'Novo ativo patrimonial de T.I.'}
         subtitulo={
           ativo
@@ -412,7 +412,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo, in
       >
         <form id="form-ativo" noValidate onSubmit={handleSubmit} className="space-y-4">
           {erroSalvar && (
-            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
               {erroSalvar}
             </p>
           )}
@@ -465,7 +465,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo, in
                     className="campo"
                   />
                   {nomeEditado && sugestao && sugestao !== nomeManual.trim() ? (
-                    <button type="button" onClick={() => setNomeEditado(false)} className="link mt-1 block text-left text-xs break-words">
+                    <button type="button" onClick={() => setNomeEditado(false)} className="link mt-1 block text-left break-words">
                       Usar sugestão: {sugestao}
                     </button>
                   ) : (
@@ -474,7 +474,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo, in
                 </div>
                 <div>
                   <label htmlFor="ativo-tag" className="rotulo">Patrimônio (tag) *</label>
-                  <input id="ativo-tag" type="text" value={tag} onChange={(e) => setTag(e.target.value)} className="campo font-mono font-bold" />
+                  <input id="ativo-tag" type="text" value={tag} onChange={(e) => setTag(e.target.value)} className="campo font-mono font-semibold" />
                 </div>
                 <div>
                   <label htmlFor="ativo-serie" className="rotulo">Número de série *</label>
@@ -586,7 +586,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo, in
                 </>
               )}
               {availableCustomFields.length === 0 && categoria !== 'hardware' && (
-                <p className="text-xs text-slate-500">Esta categoria não tem especificações técnicas para preencher.</p>
+                <p className="texto-aux">Esta categoria não tem especificações técnicas para preencher.</p>
               )}
               {availableCustomFields.length > 0 && (
                 <div className={`${gradeTecnica} ${categoria === 'hardware' ? 'border-t border-slate-100 pt-3' : ''}`}>
@@ -685,7 +685,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({ onClose, ativo, in
                     </button>
                   </div>
                   {!fornecedorId && fornecedor && (
-                    <p className="mt-1 text-xs text-amber-800">
+                    <p className="mt-1 text-amber-800">
                       Registro antigo: "{fornecedor}" (texto). Escolha o fornecedor do cadastro para vincular.
                     </p>
                   )}

@@ -146,22 +146,22 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="cartao min-w-0 p-3">
-          <p className="text-xs text-slate-500">Previsto no ano</p>
-          <p className="font-mono text-lg font-semibold text-slate-900">{brl(total.previsto)}</p>
+          <p className="texto-aux">Previsto no ano</p>
+          <p className="num text-lg font-semibold text-slate-900">{brl(total.previsto)}</p>
         </div>
         <div className="cartao min-w-0 p-3">
-          <p className="text-xs text-slate-500">Realizado</p>
-          <p className="font-mono text-lg font-semibold text-slate-900">{brl(total.realizado)}</p>
-          <p className={`text-xs ${usoTotal !== undefined && usoTotal >= 0.9 ? 'text-red-700 font-semibold' : 'text-slate-500'}`}>{pct(usoTotal)} do previsto</p>
+          <p className="texto-aux">Realizado</p>
+          <p className="num text-lg font-semibold text-slate-900">{brl(total.realizado)}</p>
+          <p className={` ${usoTotal !== undefined && usoTotal >= 0.9 ? 'text-red-700 font-semibold' : 'text-slate-500'}`}>{pct(usoTotal)} do previsto</p>
         </div>
         <div className="cartao min-w-0 p-3">
-          <p className="text-xs text-slate-500">Saldo</p>
-          <p className={`font-mono text-lg font-semibold ${total.previsto - total.realizado < 0 ? 'text-red-700' : 'text-slate-900'}`}>{brl(total.previsto - total.realizado)}</p>
+          <p className="texto-aux">Saldo</p>
+          <p className={`num text-lg font-semibold ${total.previsto - total.realizado < 0 ? 'text-red-700' : 'text-slate-900'}`}>{brl(total.previsto - total.realizado)}</p>
         </div>
         <div className="cartao min-w-0 p-3">
-          <p className="text-xs text-slate-500">Tendência até dezembro</p>
-          <p className="font-mono text-lg font-semibold text-slate-900">{ano === anoAtual ? brl(total.tendencia) : '—'}</p>
-          <p className="text-xs text-slate-500">{ano === anoAtual ? 'no ritmo de gasto atual' : 'só no ano corrente'}</p>
+          <p className="texto-aux">Tendência até dezembro</p>
+          <p className="num text-lg font-semibold text-slate-900">{ano === anoAtual ? brl(total.tendencia) : '—'}</p>
+          <p className="texto-aux">{ano === anoAtual ? 'no ritmo de gasto atual' : 'só no ano corrente'}</p>
         </div>
       </div>
 
@@ -171,41 +171,41 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
             Nenhum orçamento nem gasto em {ano}{fCategoria ? ` para ${ROTULO_CATEGORIA[fCategoria]}` : ''}.
           </Vazio>
         ) : (
-          <div className="cartao overflow-hidden">
+          <div className="cartao-tabela">
             <table className="tabela tabela-cartoes">
               <thead>
                 <tr>
                   <th>Categoria · área</th>
-                  <th className="text-right">Previsto</th>
-                  <th className="text-right">Realizado</th>
+                  <th className="num">Previsto</th>
+                  <th className="num">Realizado</th>
                   <th>Uso</th>
-                  <th className="text-right">Tendência</th>
-                  {isAdmin && <th className="text-right">Ações</th>}
+                  <th className="num">Tendência</th>
+                  {isAdmin && <th className="col-acoes">Ações</th>}
                 </tr>
               </thead>
               <tbody>
                 {visiveis.map((l) => (
                   <tr key={l.chave}>
                     <td data-label="Categoria · área">
-                      <span className="font-medium text-slate-900">{ROTULO_CATEGORIA[l.categoria]}</span>
+                      <span className="font-semibold text-slate-900">{ROTULO_CATEGORIA[l.categoria]}</span>
                       <span className="block text-slate-500">{l.area || 'Geral (sem área)'}</span>
                       {!l.orcamentoId && <span className="selo selo-atencao mt-1">Sem orçamento</span>}
                     </td>
-                    <td data-label="Previsto" className="text-right font-mono">{l.previsto ? brl(l.previsto) : '—'}</td>
-                    <td data-label="Realizado" className="text-right font-mono">{brl(l.realizado)}</td>
+                    <td data-label="Previsto" className="num">{l.previsto ? brl(l.previsto) : '—'}</td>
+                    <td data-label="Realizado" className="num">{brl(l.realizado)}</td>
                     <td data-label="Uso">
                       <div className="flex min-w-[8rem] items-center gap-2">
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                           <div className={`h-full rounded-full ${corPct(l.pct)}`} style={{ width: `${Math.min(100, (l.pct || 0) * 100)}%` }} />
                         </div>
-                        <span className={`text-xs font-semibold ${l.pct !== undefined && l.pct >= 1 ? 'text-red-700' : l.pct !== undefined && l.pct >= 0.9 ? 'text-amber-800' : 'text-slate-700'}`}>{pct(l.pct)}</span>
+                        <span className={`font-semibold ${l.pct !== undefined && l.pct >= 1 ? 'text-red-700' : l.pct !== undefined && l.pct >= 0.9 ? 'text-amber-800' : 'text-slate-700'}`}>{pct(l.pct)}</span>
                       </div>
                     </td>
-                    <td data-label="Tendência" className={`text-right font-mono ${l.tendencia !== undefined && l.previsto > 0 && l.tendencia > l.previsto ? 'text-red-700' : ''}`}>
+                    <td data-label="Tendência" className={`num ${l.tendencia !== undefined && l.previsto > 0 && l.tendencia > l.previsto ? 'text-red-700' : ''}`}>
                       {l.tendencia !== undefined ? brl(l.tendencia) : '—'}
                     </td>
                     {isAdmin && (
-                      <td data-label="Ações" className="text-right">
+                      <td data-label="Ações" className="col-acoes">
                         <span className="acoes-linha">
                           <button type="button" onClick={() => editar(l)} className="btn btn-sm btn-secundario">
                             {l.orcamentoId ? <><Pencil /> Editar</> : <><Plus /> Orçar</>}
@@ -225,15 +225,15 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
           </div>
         )
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
                 <th>Mês</th>
-                <th className="text-right">Previsto</th>
-                <th className="text-right">Realizado</th>
-                <th className="text-right">Diferença</th>
-                <th className="text-right">Acumulado (real/previsto)</th>
+                <th className="num">Previsto</th>
+                <th className="num">Realizado</th>
+                <th className="num">Diferença</th>
+                <th className="num">Acumulado (real/previsto)</th>
               </tr>
             </thead>
             <tbody>
@@ -244,10 +244,10 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
                 return (
                   <tr key={m}>
                     <td data-label="Mês" className="capitalize">{m}/{ano}</td>
-                    <td data-label="Previsto" className="text-right font-mono">{brl(total.previstoMeses[i])}</td>
-                    <td data-label="Realizado" className="text-right font-mono">{brl(total.realizadoMeses[i])}</td>
-                    <td data-label="Diferença" className={`text-right font-mono ${dif < 0 ? 'text-red-700' : ''}`}>{brl(dif)}</td>
-                    <td data-label="Acumulado" className="text-right font-mono">{prevAc > 0 ? pct(realAc / prevAc) : '—'}</td>
+                    <td data-label="Previsto" className="num">{brl(total.previstoMeses[i])}</td>
+                    <td data-label="Realizado" className="num">{brl(total.realizadoMeses[i])}</td>
+                    <td data-label="Diferença" className={`num ${dif < 0 ? 'text-red-700' : ''}`}>{brl(dif)}</td>
+                    <td data-label="Acumulado" className="num">{prevAc > 0 ? pct(realAc / prevAc) : '—'}</td>
                   </tr>
                 );
               })}
@@ -366,8 +366,8 @@ const FormOrcamento: React.FC<{
             <p className="ajuda">Divide em 12 meses iguais; depois ajuste mês a mês, se precisar.</p>
           </div>
           <div className="self-end">
-            <p className="text-xs text-slate-500">Soma dos meses (o que vale)</p>
-            <p className="font-mono text-lg font-semibold text-slate-900">{brl(soma)}</p>
+            <p className="texto-aux">Soma dos meses (o que vale)</p>
+            <p className="num text-lg font-semibold text-slate-900">{brl(soma)}</p>
           </div>
         </div>
         <fieldset>
@@ -375,7 +375,7 @@ const FormOrcamento: React.FC<{
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {MESES_CURTOS.map((m, i) => (
               <div key={m}>
-                <label htmlFor={id(`mes-${i}`)} className="text-xs capitalize text-slate-600">{m}</label>
+                <label htmlFor={id(`mes-${i}`)} className="texto-aux capitalize">{m}</label>
                 <CampoMoeda
                   id={id(`mes-${i}`)}
                   className="campo campo-sm"
@@ -434,12 +434,12 @@ const CopiarOrcamento: React.FC<{
       }
     >
       <div className="space-y-3">
-        <fieldset className="space-y-1.5">
+        <fieldset className="space-y-2">
           <legend className="rotulo">Base</legend>
-          <label className="flex items-center gap-2 text-xs text-slate-700">
+          <label className="flex items-center gap-2 text-slate-700">
             <input type="radio" name="base-copia" checked={base === 'previsto'} onChange={() => setBase('previsto')} /> Orçamento (previsto) de {anoDestino - 1}
           </label>
-          <label className="flex items-center gap-2 text-xs text-slate-700">
+          <label className="flex items-center gap-2 text-slate-700">
             <input type="radio" name="base-copia" checked={base === 'realizado'} onChange={() => setBase('realizado')} /> O que foi gasto (realizado) em {anoDestino - 1}
           </label>
         </fieldset>

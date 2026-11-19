@@ -25,12 +25,12 @@ export const PedidoDesligamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => 
   );
 
   return (
-    <section aria-label="Pedido do RH" className="cartao p-4 space-y-3 text-xs">
-      <h3 className="secao-titulo flex items-center gap-1.5">
-        <UserMinus className="h-4 w-4" aria-hidden="true" />
+    <section aria-label="Pedido do RH" className="cartao p-4 space-y-3">
+      <h3 className="secao-titulo flex items-center gap-2">
+        <UserMinus className="ico" aria-hidden="true" />
         Pedido do RH
       </h3>
-      <div className="grid grid-cols-1 gap-y-1.5">
+      <div className="grid grid-cols-1 gap-y-2">
         {linha('Quem sai', pessoa ? `${pessoa.nome} · ${pessoa.cargo}` : 'colaborador não encontrado')}
         {linha('Último dia', formatDate(off.dataDesligamento))}
         {linha('E-mail', off.redirecionarEmail ? `redirecionar/dar acesso para ${nome(off.redirecionarEmailParaId)}` : 'não redirecionar')}
@@ -73,7 +73,7 @@ const ListaEtiquetas: React.FC<{
       {itens.length === 0 ? (
         <p className="text-slate-500">Nenhum.</p>
       ) : (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {visiveis.map((i) => {
             const conteudo = (
               <>

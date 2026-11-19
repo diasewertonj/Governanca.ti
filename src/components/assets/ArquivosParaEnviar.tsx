@@ -80,8 +80,8 @@ export const ArquivosParaEnviar: React.FC<ArquivosParaEnviarProps> = ({ id, rotu
       {itens.length > 0 && (
         <ul className="cartao divide-y divide-slate-100">
           {itens.map((i) => (
-            <li key={i.chave} className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
-              <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+            <li key={i.chave} className="flex flex-wrap items-center gap-2 px-3 py-2">
+              <Paperclip className="ico-sm text-slate-500" aria-hidden="true" />
               <span className="min-w-0 flex-1 break-all text-slate-800">
                 {i.arquivo.name} <span className="text-slate-500">· {formatarTamanho(i.arquivo.size)}</span>
               </span>

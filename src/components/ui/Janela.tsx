@@ -40,7 +40,7 @@ export const Janela: React.FC<{
     <div className={`janela-fundo modal-tela ${nav.topo ? '' : 'hidden'}`}>
       <div role="dialog" aria-modal="true" aria-labelledby={idTitulo} className={`janela janela-${tamanho}`}>
         <div className="janela-cabecalho">
-          <div className="flex min-w-[12rem] flex-1 items-center gap-2.5">
+          <div className="flex min-w-[12rem] flex-1 items-center gap-3">
             {temAnterior && <BotaoVoltar onClick={onFechar} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
             {icone && <div className="janela-icone">{icone}</div>}
             <div className="min-w-0">
@@ -51,7 +51,7 @@ export const Janela: React.FC<{
               {subtitulo && <p className="texto-aux truncate">{subtitulo}</p>}
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-1.5 ml-auto">
+          <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
             {acoes}
             {temAnterior ? (
               <button type="button" aria-label="Fechar tudo" title="Fechar tudo" onClick={() => void nav.fecharTudo?.()} className="btn-icone">

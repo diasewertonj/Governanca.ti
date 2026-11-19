@@ -83,14 +83,14 @@ export const PainelCotacao: React.FC<{ pedido: PedidoCompra; onAlterado: (altera
     <section className="cartao space-y-3 p-4" aria-label="Cotação">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="secao-titulo">Cotação ({p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'})</h3>
-        <p className="text-xs text-slate-500">Inclua opções pelo "+ Opção"; recomendar uma é opcional (sem recomendação, Compras escolhe).</p>
+        <p className="texto-aux">Inclua opções pelo "+ Opção"; recomendar uma é opcional (sem recomendação, Compras escolhe).</p>
       </div>
       {p.itens.map((i, n) => (
         <div key={i.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_6rem_auto] lg:grid-cols-[12rem_minmax(0,1fr)_6rem_auto]">
             {p.tipoPedido !== 'outros' && (
               <div>
-                <label htmlFor={id(`tipo-${n}`)} className="text-xs text-slate-600">Tipo</label>
+                <label htmlFor={id(`tipo-${n}`)} className="texto-aux">Tipo</label>
                 <select
                   id={id(`tipo-${n}`)}
                   value={i.tipo}
@@ -106,11 +106,11 @@ export const PainelCotacao: React.FC<{ pedido: PedidoCompra; onAlterado: (altera
               </div>
             )}
             <div>
-              <label htmlFor={id(`desc-${n}`)} className="text-xs text-slate-600">Item {n + 1}</label>
+              <label htmlFor={id(`desc-${n}`)} className="texto-aux">Item {n + 1}</label>
               <input id={id(`desc-${n}`)} value={i.descricao} onChange={(e) => mudarItem(i.id, { descricao: e.target.value })} placeholder="O que é" className="campo campo-sm" />
             </div>
             <div>
-              <label htmlFor={id(`qtd-${n}`)} className="text-xs text-slate-600">Quantidade</label>
+              <label htmlFor={id(`qtd-${n}`)} className="texto-aux">Quantidade</label>
               <input id={id(`qtd-${n}`)} type="number" min={1} step={1} value={i.quantidade} onChange={(e) => mudarItem(i.id, { quantidade: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="campo campo-sm" />
             </div>
             <div className="flex items-end">

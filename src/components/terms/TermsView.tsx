@@ -46,7 +46,7 @@ export const TermsView: React.FC = () => {
         filtros={<Busca id="termos-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar por código ou colaborador..." />}
       />
 
-      <div className="cartao overflow-hidden">
+      <div className="cartao-tabela">
         <table className="tabela tabela-cartoes">
           <thead>
             <tr>
@@ -57,7 +57,7 @@ export const TermsView: React.FC = () => {
               <th className="hidden xl:table-cell">Emissão</th>
               <th className="hidden 2xl:table-cell">Responsável T.I.</th>
               <th>Assinatura</th>
-              <th className="text-right">Ações</th>
+              <th className="col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -67,7 +67,7 @@ export const TermsView: React.FC = () => {
                 const Icone = s.tom === 'ok' ? CheckCircle2 : s.tom === 'cancelado' ? Ban : Clock;
                 return (
                   <tr key={term.id} onClick={() => setSelectedTermForPrint(term)} className="hover:bg-slate-50/70 cursor-pointer">
-                    <td data-label="Código" className="font-mono font-bold text-blue-700">
+                    <td data-label="Código" className="font-mono font-semibold text-blue-700">
                       {term.codigo}
                     </td>
 
@@ -84,7 +84,7 @@ export const TermsView: React.FC = () => {
                         }}
                         className="link flex items-center gap-1"
                       >
-                        <User className="w-3 h-3" />
+                        <User className="ico-sm" />
                         <span>{term.colaboradorNome}</span>
                       </button>
                       <span className="text-slate-500 block font-mono">
@@ -111,7 +111,7 @@ export const TermsView: React.FC = () => {
                       </span>
                     </td>
 
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       <span className="acoes-linha">
                         <button
                           type="button"
@@ -132,7 +132,14 @@ export const TermsView: React.FC = () => {
             ) : (
               <tr>
                 <td colSpan={8}>
-                  <Vazio>Nenhum termo encontrado.</Vazio>
+                  <Vazio
+                    titulo="Nenhum termo encontrado"
+                    acao={
+                      <button type="button" onClick={() => { setSearchTerm(''); setTypeFilter('todos'); }} className="btn btn-sm btn-secundario">
+                        Limpar filtros
+                      </button>
+                    }
+                  />
                 </td>
               </tr>
             )}

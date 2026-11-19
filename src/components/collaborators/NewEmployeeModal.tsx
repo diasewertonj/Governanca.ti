@@ -122,7 +122,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
   return createPortal(
     <Janela
       tamanho="m"
-      icone={<UserPlus className="h-4 w-4" />}
+      icone={<UserPlus className="ico" />}
       titulo={editando ? `Editar dados de ${colaborador.nome}` : 'Novo colaborador'}
       onFechar={onClose}
       rodape={
@@ -164,7 +164,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
               )}
               {editando && !temLogin && !podeMudarEmail && <p className="ajuda">Só o administrador de T.I. altera o e-mail de perfis de gestão.</p>}
               {emailMudou && (
-                <p className="mt-1 text-xs text-amber-800">Confira o novo e-mail: ele será usado quando a pessoa receber o acesso ao sistema.</p>
+                <p className="mt-1 text-amber-800">Confira o novo e-mail: ele será usado quando a pessoa receber o acesso ao sistema.</p>
               )}
             </div>
             <div>
@@ -223,7 +223,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
         </div>
 
         {erro && (
-          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800">
             {erro}
           </p>
         )}

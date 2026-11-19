@@ -11,7 +11,6 @@ import type { AguardandoMotivo, Ticket, TicketStatus } from '../../types/index.t
 import { formatDate, formatDateTime } from '../../utils/formatters.ts';
 import { chamadoEncerrado, rotuloSituacao } from '../../utils/atendimento.ts';
 import { situacaoSla } from '../../utils/sla.ts';
-import { progresso } from '../../utils/processos.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { ChecklistProcesso, TrilhaAuditoria } from './ChecklistProcesso.tsx';
 import { PedidoDesligamento } from '../servicedesk/PedidoDesligamento.tsx';
@@ -99,7 +98,6 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
   const colab = employees.find((e) => e.id === colabId);
   const nomePessoa = colab?.nome || ticket.onboarding?.nomeColaborador || 'colaborador';
   const itens = processoItens.filter((i) => i.chamadoId === ticket.id);
-  const prog = progresso(itens);
   const proximo = itens
     .filter((i) => i.status === 'pendente' && i.lembreteEm)
     .sort((a, b) => (a.lembreteEm || '').localeCompare(b.lembreteEm || ''))[0];
@@ -166,7 +164,7 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
         </div>
         {/* O andamento (barra e contagem) fica só no checklist; aqui, o próximo agendado */}
         {itens.length > 0 && proximo?.lembreteEm && !encerrado && (
-          <p className="texto-aux inline-flex items-center gap-1.5">
+          <p className="texto-aux inline-flex items-center gap-2">
             <CalendarClock className="ico-sm" aria-hidden="true" />
             Próximo agendado: {proximo.titulo} em <span className="num">{formatDate(proximo.lembreteEm)}</span>
           </p>
@@ -263,7 +261,7 @@ const PedidoAdmissao: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   const gestor = employees.find((e) => e.id === ob.gestorId);
   return (
     <section aria-label="Pedido do RH" className="cartao space-y-3 p-4">
-      <h3 className="secao-titulo flex items-center gap-1.5">
+      <h3 className="secao-titulo flex items-center gap-2">
         <UserPlus className="ico" aria-hidden="true" /> Pedido do RH
       </h3>
       <div className="grid grid-cols-1 gap-y-2">
@@ -341,7 +339,7 @@ const AnotacoesProcesso: React.FC<{ ticket: Ticket; podeEditar: boolean; onSalva
 
   return (
     <section aria-label="Anotações do processo" className="cartao space-y-2 p-4">
-      <h3 className="secao-titulo flex items-center gap-1.5">
+      <h3 className="secao-titulo flex items-center gap-2">
         <StickyNote className="ico" aria-hidden="true" /> Anotações do processo
       </h3>
       {podeEditar ? (
@@ -406,7 +404,7 @@ const Conversa: React.FC<{
               {isTI ? 'Escrever para o RH' : 'Escrever para a T.I.'}
             </label>
             {isTI && (
-              <label className="texto-aux flex cursor-pointer items-center gap-1.5 select-none">
+              <label className="texto-aux flex cursor-pointer items-center gap-2 select-none">
                 <input type="checkbox" checked={interna} onChange={(e) => setInterna(e.target.checked)} />
                 <Lock className="ico-sm text-slate-500" aria-hidden="true" />
                 Nota interna (só a T.I.)
@@ -456,7 +454,7 @@ const ChecklistLegado: React.FC<{
   return (
     <section aria-label="Checklist de desligamento (formato antigo)" className="cartao space-y-3 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="secao-titulo flex items-center gap-1.5">
+        <h3 className="secao-titulo flex items-center gap-2">
           <FileCheck className="ico" aria-hidden="true" /> Checklist de desligamento
         </h3>
         <span className="num texto-aux font-semibold">
@@ -464,7 +462,7 @@ const ChecklistLegado: React.FC<{
         </span>
       </div>
       <p className="ajuda">Processo aberto antes do checklist guiado: marque cada item; a conclusão faz as devoluções automaticamente.</p>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {off.checklist.map((c) => (
           <label key={c.id} className={`flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 ${c.concluido ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
             <input

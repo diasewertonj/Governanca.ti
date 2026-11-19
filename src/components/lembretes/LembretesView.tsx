@@ -90,21 +90,30 @@ export const LembretesView: React.FC = () => {
         </p>
       )}
 
-      <div className="cartao overflow-hidden">
+      <div className="cartao-tabela">
         <table className="tabela tabela-cartoes">
           <thead>
             <tr>
               <th>Lembrete</th>
               <th>Vencimento</th>
               <th>Situação</th>
-              <th className="text-right">Ações</th>
+              <th className="col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
             {lista.length === 0 ? (
               <tr>
                 <td colSpan={4}>
-                  <Vazio>{filtro === 'abertos' ? 'Nenhum lembrete em aberto.' : 'Nenhum lembrete encerrado.'}</Vazio>
+                  <Vazio
+                    titulo={filtro === 'abertos' ? 'Nenhum lembrete em aberto' : 'Nenhum lembrete encerrado'}
+                    acao={
+                      filtro === 'abertos' && (
+                        <button type="button" onClick={() => setNovo({ titulo: '', descricao: '', venceEm: hoje })} className="btn btn-sm btn-primario">
+                          Novo lembrete
+                        </button>
+                      )
+                    }
+                  />
                 </td>
               </tr>
             ) : (
@@ -143,7 +152,7 @@ export const LembretesView: React.FC = () => {
                       {sit === 'feito' && <span className="selo selo-ok">Concluído</span>}
                       {sit === 'cancelado' && <span className="selo selo-neutro">Cancelado</span>}
                     </td>
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       {l.status === 'aberto' && (
                         <span className="acoes-linha">
                           <button type="button" onClick={() => setEncerrando({ id: l.id, status: 'feito', obs: '' })} className="btn btn-sm btn-secundario">
@@ -174,7 +183,7 @@ export const LembretesView: React.FC = () => {
           tamanho="p"
           titulo="Novo lembrete"
           subtitulo="Aviso com data para a equipe de T.I."
-          icone={<Bell className="h-4 w-4" />}
+          icone={<Bell className="ico" />}
           onFechar={() => {
             setNovo(null);
             setErro(null);
@@ -237,7 +246,7 @@ export const LembretesView: React.FC = () => {
         <Janela
           tamanho="p"
           titulo={encerrando.status === 'feito' ? 'Concluir lembrete' : 'Cancelar lembrete'}
-          icone={<Bell className="h-4 w-4" />}
+          icone={<Bell className="ico" />}
           subtitulo={lembreteEncerrando?.titulo}
           onFechar={() => {
             setEncerrando(null);

@@ -37,7 +37,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
         }
       />
 
-      <div className="cartao overflow-hidden">
+      <div className="cartao-tabela">
         <table className="tabela tabela-cartoes">
           <thead>
             <tr>
@@ -45,7 +45,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
               <th>Chamado</th>
               <th>Abertura</th>
               <th>Situação</th>
-              <th className="text-right">Ações</th>
+              <th className="col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -54,16 +54,16 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
                 const asset = getAsset(tkt.ativoId);
                 return (
                   <tr key={tkt.id} onClick={() => setSelectedTicketIdForDetail(tkt.id)} className="hover:bg-slate-50/70 cursor-pointer">
-                    <td data-label="Código" className="font-mono font-bold text-slate-800">
+                    <td data-label="Código" className="font-mono font-semibold text-slate-800">
                       {tkt.codigo}
                     </td>
                     <td data-label="Chamado">
                       <span className="font-semibold text-slate-900 block">{tkt.titulo}</span>
-                      <span className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2">
+                      <span className="texto-aux flex flex-wrap items-center gap-x-2">
                         <span className="capitalize">{tkt.categoria}</span>
                         {asset && (
-                          <span className="text-blue-700 font-medium flex items-center gap-1">
-                            <Laptop className="w-3 h-3" />
+                          <span className="text-blue-700 flex items-center gap-1">
+                            <Laptop className="ico-sm" />
                             {asset.tag} ({asset.nome})
                           </span>
                         )}
@@ -75,7 +75,7 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
                     <td data-label="Situação">
                       <span className={`selo ${SELO_STATUS[tkt.status] || 'selo-neutro'}`}>{rotuloStatus(tkt.status)}</span>
                     </td>
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       <span className="acoes-linha">
                         <button
                           type="button"
@@ -96,7 +96,16 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({ onOpenNewTicketMod
             ) : (
               <tr>
                 <td colSpan={5}>
-                  <Vazio>Você não possui nenhum chamado aberto no momento.</Vazio>
+                  <Vazio
+                    titulo="Nenhum chamado aberto"
+                    acao={
+                      <button type="button" onClick={onOpenNewTicketModal} className="btn btn-sm btn-primario">
+                        Abrir chamado
+                      </button>
+                    }
+                  >
+                    Precisa de ajuda da T.I.? Abra um chamado.
+                  </Vazio>
                 </td>
               </tr>
             )}

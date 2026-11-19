@@ -125,15 +125,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     conciliar: qtdConciliar,
     pedidos: pedidosParaMim.length,
   };
+  // Seção 19: contadores por classe (neutro, atenção ou alerta)
   const corContador: Record<Contador, string> = {
-    chamados: 'bg-slate-100 text-slate-700',
-    meus_chamados: 'bg-slate-100 text-slate-700',
-    lembretes: 'bg-red-100 text-red-800',
-    termos_para_assinar: 'bg-amber-100 text-amber-900',
-    vencimentos: 'bg-amber-100 text-amber-900',
-    conciliar: 'bg-amber-100 text-amber-900',
-    pedidos: 'bg-amber-100 text-amber-900',
-    processos: 'bg-slate-100 text-slate-700',
+    chamados: '',
+    meus_chamados: '',
+    lembretes: 'contador-alerta',
+    termos_para_assinar: 'contador-atencao',
+    vencimentos: 'contador-atencao',
+    conciliar: 'contador-atencao',
+    pedidos: 'contador-atencao',
+    processos: '',
   };
   const dicaContador: Record<Contador, string> = {
     chamados: 'chamados em aberto',
@@ -176,19 +177,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
       <aside
         id="menu-principal"
         aria-label="Menu principal"
-        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-200 lg:sticky lg:top-[57px] lg:z-auto lg:h-[calc(100vh-57px)] lg:w-64 lg:max-w-none lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-200 lg:sticky lg:top-16 lg:z-auto lg:h-[calc(100vh-4rem)] lg:w-64 lg:max-w-none lg:translate-x-0 ${
           aberto ? 'translate-x-0' : '-translate-x-full'
         } shrink-0 bg-white border-r border-slate-200 flex flex-col overflow-y-auto`}
       >
         <div className="flex items-center justify-between px-4 pt-4 lg:hidden">
-          <span className="text-sm font-semibold text-slate-900">Menu</span>
-          <button
-            type="button"
-            onClick={onFechar}
-            aria-label="Fechar menu"
-            className="p-2 -mr-2 rounded-lg text-slate-500 hover:bg-slate-100"
-          >
-            <X className="w-5 h-5" />
+          <span className="font-semibold text-slate-900">Menu</span>
+          <button type="button" onClick={onFechar} aria-label="Fechar menu" className="btn-icone -mr-2 p-2">
+            <X className="ico-lg" />
           </button>
         </div>
 
@@ -201,28 +197,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
             }}
             className="btn btn-primario w-full"
           >
-            <PlusCircle className="w-4 h-4" />
+            <PlusCircle aria-hidden="true" />
             <span>Abrir chamado</span>
           </button>
 
-          <nav className="space-y-2">
+          <nav className="space-y-3">
             {menuDoPapel(currentRole, { pedeCompra: podePedirCompra, gestor: ehGestor }).map((grupo, gi) => {
               // Grupos recolhíveis: o do item atual fica sempre aberto; recolhido mostra a soma dos contadores
               const temAtual = grupo.itens.some((it) => it.vista === currentView);
               const recolhido = !!grupo.titulo && !temAtual && recolhidos.includes(grupo.titulo);
               const somaGrupo = grupo.itens.reduce((s, it) => s + (it.contador ? contadores[it.contador] : 0), 0);
               return (
-              <div key={grupo.titulo || gi} className="space-y-0.5">
+              <div key={grupo.titulo || gi} className="space-y-1">
                 {grupo.titulo && (
                   <button
                     type="button"
                     onClick={() => alternarGrupo(grupo.titulo as string)}
                     aria-expanded={!recolhido}
-                    className="w-full flex items-center gap-1 px-3 pb-0.5 text-xs font-medium text-slate-500 hover:text-slate-800"
+                    className="secao-titulo flex w-full items-center gap-1 rounded-md px-3 py-1 hover:text-slate-900"
                   >
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${recolhido ? "-rotate-90" : ""}`} aria-hidden="true" />
+                    <ChevronDown className={`ico-sm transition-transform ${recolhido ? "-rotate-90" : ""}`} aria-hidden="true" />
                     <span className="flex-1 text-left">{grupo.titulo}</span>
-                    {recolhido && somaGrupo > 0 && <span className="rounded-full bg-slate-100 px-1.5 text-slate-700">{somaGrupo}</span>}
+                    {recolhido && somaGrupo > 0 && <span className="contador normal-case tracking-normal">{somaGrupo}</span>}
                   </button>
                 )}
                 {!recolhido && grupo.itens.map((it) => {
@@ -235,15 +231,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
                       type="button"
                       onClick={() => ir(it.vista)}
                       aria-current={ativo ? 'page' : undefined}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        ativo ? 'bg-blue-50 text-blue-800 font-semibold' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
+                      className="nav-item gap-3 px-3 py-2"
                     >
-                      <Icon className={`w-4 h-4 shrink-0 ${ativo ? 'text-blue-700' : 'text-slate-500'}`} aria-hidden="true" />
+                      <Icon aria-hidden="true" />
                       <span className="flex-1 text-left truncate">{it.rotulo}</span>
                       {it.contador && n > 0 && (
                         <span
-                          className={`text-xs font-semibold rounded-full px-2 py-0.5 ${corContador[it.contador]}`}
+                          className={`contador ${corContador[it.contador]}`}
                           title={`${n} ${dicaContador[it.contador]}`}
                         >
                           {n}

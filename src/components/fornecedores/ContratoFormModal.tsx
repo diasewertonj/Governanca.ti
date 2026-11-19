@@ -301,7 +301,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
         tamanho="g"
         titulo={contrato ? `Editar contrato ${nomeContrato(contrato)}` : 'Novo contrato'}
         subtitulo={contrato ? `${ROTULO_TIPO_CONTRATO[contrato.tipo]} · ${fornecedores.find((f) => f.id === contrato.fornecedorId)?.nome || 'Fornecedor'}` : 'Suporte, garantia estendida, locação, licenciamento, telefonia, internet e outros'}
-        icone={<FileSignature className="h-4 w-4" />}
+        icone={<FileSignature className="ico" />}
         idTitulo="contrato-form-titulo"
         onFechar={fechar}
         faixa={<Abas itens={abas} ativa={etapa} onMudar={setEtapa} rotulo="Etapas do contrato" />}
@@ -329,7 +329,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
         {/* noValidate: a validação é a do sistema, que leva à etapa com problema */}
         <form id="form-contrato" onSubmit={salvar} noValidate className="space-y-4">
           {mensagemErro && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800" role="alert">
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800" role="alert">
               {mensagemErro}
             </p>
           )}
@@ -341,11 +341,11 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                 <div className={GRADE}>
                   <div>
                     <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                      <label htmlFor="ctr-fornecedor" className="text-xs font-semibold text-slate-700">
+                      <label htmlFor="ctr-fornecedor" className="font-semibold text-slate-700">
                         Fornecedor *
                       </label>
-                      <button type="button" onClick={() => setNovoFornecedor(true)} className="link inline-flex items-center gap-0.5 text-xs">
-                        <Plus className="h-3 w-3" aria-hidden="true" /> Novo fornecedor
+                      <button type="button" onClick={() => setNovoFornecedor(true)} className="link inline-flex items-center gap-0.5">
+                        <Plus className="ico-sm" aria-hidden="true" /> Novo fornecedor
                       </button>
                     </div>
                     <select
@@ -603,7 +603,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                     </label>
                     <input id="ctr-multa" value={multa} onChange={(e) => setMulta(e.target.value)} placeholder="Ex.: 20% do restante" className={CLASSE_CAMPO} />
                   </div>
-                  <label className="inline-flex items-center gap-2 text-xs text-slate-700 md:col-span-2 xl:col-span-4">
+                  <label className="inline-flex items-center gap-2 text-slate-700 md:col-span-2 xl:col-span-4">
                     <input type="checkbox" checked={renovacaoAutomatica} onChange={(e) => setRenovacaoAutomatica(e.target.checked)} /> Renova
                     automaticamente se ninguém cancelar
                   </label>
@@ -663,7 +663,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                 <h3 className="secao-titulo">Itens cobertos</h3>
                 <SeletorItensContrato itens={itens} onChange={setItens} fornecedorId={fornecedorId} />
                 {TIPOS_COM_LINHAS.includes(tipo) && (
-                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 texto-aux">
                     {contrato
                       ? `Linhas deste contrato: ${linhasDoContrato}. Para incluir ou alterar linhas, use Inventário › Linhas telefônicas.`
                       : 'Depois de cadastrar, inclua as linhas em Inventário › Linhas telefônicas, escolhendo este contrato.'}
@@ -713,7 +713,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                   Arquivo do contrato (PDF)
                 </label>
                 {contrato?.arquivoCaminho && (
-                  <p className="mb-1 flex flex-wrap items-center gap-1 text-xs text-slate-600">
+                  <p className="mb-1 flex flex-wrap items-center gap-1 texto-aux">
                     Atual: <AbrirArquivo caminho={contrato.arquivoCaminho} />
                   </p>
                 )}

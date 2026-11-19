@@ -74,7 +74,7 @@ export const PrazosSettings: React.FC = () => {
   };
 
   return (
-    <div className="cartao p-4 space-y-4 text-xs">
+    <div className="cartao p-4 space-y-4">
       <div>
         <h3 className="secao-titulo">Prazos de atendimento</h3>
         <p className="ajuda">
@@ -86,15 +86,15 @@ export const PrazosSettings: React.FC = () => {
       <table className="w-full max-w-xl">
         <thead>
           <tr className="text-left text-slate-500">
-            <th className="py-1.5 font-semibold">Prioridade</th>
-            <th className="py-1.5 font-semibold">1ª resposta (h)</th>
-            <th className="py-1.5 font-semibold">Solução (h)</th>
+            <th className="py-2 font-semibold">Prioridade</th>
+            <th className="py-2 font-semibold">1ª resposta (h)</th>
+            <th className="py-2 font-semibold">Solução (h)</th>
           </tr>
         </thead>
         <tbody>
           {PRIORIDADES.map((p) => (
             <tr key={p} className="border-t border-slate-100">
-              <td className="py-2 font-medium text-slate-800">{rotuloPrioridade(p)}</td>
+              <td className="py-2 font-semibold text-slate-800">{rotuloPrioridade(p)}</td>
               {(['resposta', 'solucao'] as const).map((campo) => (
                 <td key={campo} className="py-2 pr-3">
                   <input

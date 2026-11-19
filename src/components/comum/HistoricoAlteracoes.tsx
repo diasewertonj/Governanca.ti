@@ -72,7 +72,7 @@ export const HistoricoAlteracoes: React.FC<{ entidade: string; registro: string;
   const lista = (
     <div className="space-y-2">
       {!isSupabaseConnected && <Vazio>Na demonstração o histórico não é gravado.</Vazio>}
-      {isSupabaseConnected && eventos === null && <p className="text-xs text-slate-500">Carregando histórico…</p>}
+      {isSupabaseConnected && eventos === null && <p className="texto-aux">Carregando histórico…</p>}
       {eventos && eventos.length === 0 && isSupabaseConnected && <Vazio>Nenhuma alteração registrada.</Vazio>}
       {eventos && eventos.length > 0 && (
         <ol className="cartao divide-y divide-slate-100">
@@ -81,10 +81,10 @@ export const HistoricoAlteracoes: React.FC<{ entidade: string; registro: string;
             const campos =
               ev.acao === 'alterado' && ev.depois ? Object.keys(ev.depois).filter((k) => !IGNORAR.has(k)) : [];
             return (
-              <li key={ev.id} className="space-y-1 px-4 py-3 text-xs">
+              <li key={ev.id} className="space-y-1 px-4 py-3">
                 <p className="flex flex-wrap items-center gap-2 text-slate-600">
                   <span className={`selo ${acao?.selo || 'selo-neutro'}`}>{acao?.texto || ev.acao}</span>
-                  <span className="font-medium text-slate-900">{nome(ev.por)}</span>
+                  <span className="font-semibold text-slate-900">{nome(ev.por)}</span>
                   <span>{new Date(ev.em).toLocaleString('pt-BR')}</span>
                 </p>
                 {campos.length > 0 && (
@@ -92,7 +92,7 @@ export const HistoricoAlteracoes: React.FC<{ entidade: string; registro: string;
                     {campos.map((k) => (
                       <li key={k} className="break-words">
                         <span className="text-slate-500">{ROTULO_CAMPO[k] || k}:</span> {mostrar(ev.antes?.[k])} →{' '}
-                        <span className="font-medium text-slate-900">{mostrar(ev.depois?.[k])}</span>
+                        <span className="font-semibold text-slate-900">{mostrar(ev.depois?.[k])}</span>
                       </li>
                     ))}
                   </ul>

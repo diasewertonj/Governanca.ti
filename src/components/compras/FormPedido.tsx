@@ -108,7 +108,7 @@ export const FormPedido: React.FC<{
     <Janela
       titulo={novo ? (simples ? 'Pedir compra' : 'Novo pedido de compra') : `Editar ${p.codigo}`}
       subtitulo={simples ? 'Pedido de T.I.: a T.I. cota; depois o seu gestor e Compras aprovam' : 'Cotação → aprovação do gestor e de Compras → compra → recebimento'}
-      icone={<ShoppingCart className="h-4 w-4" />}
+      icone={<ShoppingCart className="ico" />}
       tamanho="g"
       onFechar={fechar}
       rodape={
@@ -146,12 +146,12 @@ export const FormPedido: React.FC<{
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <fieldset className="md:col-span-2">
               <legend className="rotulo">Tipo de pedido</legend>
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:gap-5">
-                <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+              <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+                <label className="inline-flex items-center gap-2 text-slate-700">
                   <input type="radio" name={id('tipo')} checked={p.tipoPedido !== 'outros'} onChange={() => setP({ ...p, tipoPedido: 'ti', categoria: p.categoria === 'outros' ? 'hardware' : p.categoria, itens: p.itens.map((i) => (i.tipo === 'servico' ? { ...i, tipo: 'equipamento', categoriaAtivo: 'hardware' } : i)) })} />
                   De T.I. (equipamento, acessório, software) — a T.I. cota
                 </label>
-                <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+                <label className="inline-flex items-center gap-2 text-slate-700">
                   <input type="radio" name={id('tipo')} checked={p.tipoPedido === 'outros'} onChange={() => setP({ ...p, tipoPedido: 'outros', categoria: 'outros', itens: p.itens.map((i) => ({ ...i, tipo: 'servico', estoqueItemId: undefined, licencaId: undefined })) })} />
                   Outros (móveis, material, serviços) — Compras cota
                 </label>
@@ -214,13 +214,13 @@ export const FormPedido: React.FC<{
         <section className="cartao space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="secao-titulo">Itens ({p.itens.length})</h3>
-            {!simples && <span className="text-xs text-slate-600">Estimado: <span className="font-mono font-semibold text-slate-900">{brl(estimado)}</span></span>}
+            {!simples && <span className="texto-aux">Estimado: <span className="num font-semibold text-slate-900">{brl(estimado)}</span></span>}
           </div>
           {p.itens.map((i, n) => (
             <div key={i.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[12rem_minmax(0,1fr)_6rem] lg:grid-cols-[12rem_minmax(0,1fr)_6rem_10rem_auto]">
                 <div className={p.tipoPedido === 'outros' ? 'hidden' : ''}>
-                  <label htmlFor={id(`tipo-${n}`)} className="text-xs text-slate-600">Tipo</label>
+                  <label htmlFor={id(`tipo-${n}`)} className="texto-aux">Tipo</label>
                   <select id={id(`tipo-${n}`)} value={i.tipo} onChange={(e) => mudarItem(i.id, { tipo: e.target.value as TipoItemPedido, estoqueItemId: undefined, licencaId: undefined })} className="campo campo-sm">
                     {(Object.keys(ROTULO_TIPO_ITEM) as TipoItemPedido[]).filter((t) => !simples || t === 'equipamento' || t === 'servico').map((t) => (
                       <option key={t} value={t}>
@@ -230,16 +230,16 @@ export const FormPedido: React.FC<{
                   </select>
                 </div>
                 <div>
-                  <label htmlFor={id(`desc-${n}`)} className="text-xs text-slate-600">Descrição</label>
+                  <label htmlFor={id(`desc-${n}`)} className="texto-aux">Descrição</label>
                   <input id={id(`desc-${n}`)} value={i.descricao} onChange={(e) => mudarItem(i.id, { descricao: e.target.value })} placeholder="Ex.: Notebook 14&quot; i5 16 GB" className="campo campo-sm" />
                 </div>
                 <div>
-                  <label htmlFor={id(`qtd-${n}`)} className="text-xs text-slate-600">Quantidade</label>
+                  <label htmlFor={id(`qtd-${n}`)} className="texto-aux">Quantidade</label>
                   <input id={id(`qtd-${n}`)} type="number" min={1} step={1} value={i.quantidade} onChange={(e) => mudarItem(i.id, { quantidade: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="campo campo-sm" />
                 </div>
                 {!simples && (
                   <div>
-                    <label htmlFor={id(`valor-${n}`)} className="text-xs text-slate-600">Valor unitário estimado</label>
+                    <label htmlFor={id(`valor-${n}`)} className="texto-aux">Valor unitário estimado</label>
                     <CampoMoeda id={id(`valor-${n}`)} className="campo campo-sm" valor={i.valorUnitario} onMudar={(v) => mudarItem(i.id, { valorUnitario: v })} />
                   </div>
                 )}
@@ -252,7 +252,7 @@ export const FormPedido: React.FC<{
               {i.tipo === 'equipamento' && p.tipoPedido !== 'outros' && (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
-                    <label htmlFor={id(`catat-${n}`)} className="text-xs text-slate-600">Tipo de equipamento</label>
+                    <label htmlFor={id(`catat-${n}`)} className="texto-aux">Tipo de equipamento</label>
                     <select id={id(`catat-${n}`)} value={i.categoriaAtivo || 'hardware'} onChange={(e) => mudarItem(i.id, { categoriaAtivo: e.target.value as AssetCategory })} className="campo campo-sm">
                       {Object.entries(ROTULO_CAT_ATIVO).map(([k, r]) => (
                         <option key={k} value={k}>
@@ -262,14 +262,14 @@ export const FormPedido: React.FC<{
                     </select>
                   </div>
                   <div className="sm:col-span-1 lg:col-span-3">
-                    <label htmlFor={id(`espec-${n}`)} className="text-xs text-slate-600">Especificação</label>
+                    <label htmlFor={id(`espec-${n}`)} className="texto-aux">Especificação</label>
                     <input id={id(`espec-${n}`)} value={i.especificacao || ''} onChange={(e) => mudarItem(i.id, { especificacao: e.target.value })} placeholder="Processador, memória, tela…" className="campo campo-sm" />
                   </div>
                 </div>
               )}
               {i.tipo === 'acessorio' && (
                 <div>
-                  <label htmlFor={id(`est-${n}`)} className="text-xs text-slate-600">Acessório do estoque (a entrada é feita ao receber)</label>
+                  <label htmlFor={id(`est-${n}`)} className="texto-aux">Acessório do estoque (a entrada é feita ao receber)</label>
                   <select
                     id={id(`est-${n}`)}
                     value={i.estoqueItemId || ''}
@@ -290,7 +290,7 @@ export const FormPedido: React.FC<{
               )}
               {i.tipo === 'licenca' && (
                 <div>
-                  <label htmlFor={id(`lic-${n}`)} className="text-xs text-slate-600">Licença (os assentos aumentam ao receber)</label>
+                  <label htmlFor={id(`lic-${n}`)} className="texto-aux">Licença (os assentos aumentam ao receber)</label>
                   <select
                     id={id(`lic-${n}`)}
                     value={i.licencaId || ''}
@@ -322,13 +322,13 @@ export const FormPedido: React.FC<{
           <section className="cartao space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="secao-titulo">Cotações do pedido inteiro (formato antigo)</h3>
-              <p className="text-xs text-slate-500">As opções novas ficam em cada item, pelo botão &quot;+ Opção&quot;.</p>
+              <p className="texto-aux">As opções novas ficam em cada item, pelo botão &quot;+ Opção&quot;.</p>
             </div>
             {p.cotacoes.filter((c) => !c.itemId).map((c, n) => (
               <div key={c.id} className={`space-y-2 rounded-lg border p-3 ${c.vencedora ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200'}`}>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_6rem_9rem_auto]">
                   <div>
-                    <label htmlFor={id(`cforn-${n}`)} className="text-xs text-slate-600">Fornecedor</label>
+                    <label htmlFor={id(`cforn-${n}`)} className="texto-aux">Fornecedor</label>
                     <select id={id(`cforn-${n}`)} value={c.fornecedorId} onChange={(e) => mudarCot(c.id, { fornecedorId: e.target.value })} className="campo campo-sm">
                       <option value="">Escolha…</option>
                       {fornecedores.filter((f) => f.ativo || f.id === c.fornecedorId).map((f) => (
@@ -339,15 +339,15 @@ export const FormPedido: React.FC<{
                     </select>
                   </div>
                   <div>
-                    <label htmlFor={id(`cval-${n}`)} className="text-xs text-slate-600">Valor total</label>
+                    <label htmlFor={id(`cval-${n}`)} className="texto-aux">Valor total</label>
                     <CampoMoeda id={id(`cval-${n}`)} className="campo campo-sm" valor={c.valor} onMudar={(v) => mudarCot(c.id, { valor: v || 0 })} />
                   </div>
                   <div>
-                    <label htmlFor={id(`cprazo-${n}`)} className="text-xs text-slate-600">Prazo (dias)</label>
+                    <label htmlFor={id(`cprazo-${n}`)} className="texto-aux">Prazo (dias)</label>
                     <input id={id(`cprazo-${n}`)} type="number" min={0} value={c.prazoDias ?? ''} onChange={(e) => mudarCot(c.id, { prazoDias: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value))) })} className="campo campo-sm" />
                   </div>
                   <div>
-                    <label htmlFor={id(`cvalid-${n}`)} className="text-xs text-slate-600">Válida até</label>
+                    <label htmlFor={id(`cvalid-${n}`)} className="texto-aux">Válida até</label>
                     <input id={id(`cvalid-${n}`)} type="date" value={c.validade || ''} onChange={(e) => mudarCot(c.id, { validade: e.target.value || undefined })} className="campo campo-sm" />
                   </div>
                   <div className="flex items-end gap-1">
@@ -357,7 +357,7 @@ export const FormPedido: React.FC<{
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  <label className="inline-flex items-center gap-2 font-semibold text-slate-700">
                     <input type="radio" name={id('vencedora')} checked={c.vencedora} onChange={() => setP({ ...p, cotacoes: p.cotacoes.map((x) => (x.itemId ? x : { ...x, vencedora: x.id === c.id })) })} /> Vencedora
                   </label>
                   {c.arquivoCaminho ? (
@@ -439,11 +439,11 @@ export const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, s
   };
 
   return (
-    <div className="space-y-2 rounded-md bg-slate-50 p-2.5">
+    <div className="space-y-2 rounded-md bg-slate-50 p-3">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_10rem]">
         <div>
-          <label htmlFor={id(`link-${n}`)} className="text-xs text-slate-600">Link do produto (opcional)</label>
-          <div className="flex gap-1.5">
+          <label htmlFor={id(`link-${n}`)} className="texto-aux">Link do produto (opcional)</label>
+          <div className="flex gap-2">
             <input id={id(`link-${n}`)} type="url" inputMode="url" value={i.link || ''} onChange={(e) => mudarItem(i.id, { link: e.target.value })} placeholder="https://loja.com.br/produto" className="campo campo-sm min-w-0" />
             <button type="button" disabled={buscando === 'item' || !i.link} onClick={() => buscar('item', i.link)} title="Buscar nome, marca, modelo e preço na página da loja" className="btn btn-sm btn-secundario shrink-0">
               <Search /> {buscando === 'item' ? 'Buscando…' : 'Buscar'}
@@ -456,30 +456,30 @@ export const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, s
           </div>
         </div>
         <div>
-          <label htmlFor={id(`marca-${n}`)} className="text-xs text-slate-600">Marca</label>
+          <label htmlFor={id(`marca-${n}`)} className="texto-aux">Marca</label>
           <input id={id(`marca-${n}`)} value={i.marca || ''} onChange={(e) => mudarItem(i.id, { marca: e.target.value })} className="campo campo-sm" />
         </div>
         <div>
-          <label htmlFor={id(`modelo-${n}`)} className="text-xs text-slate-600">Modelo</label>
+          <label htmlFor={id(`modelo-${n}`)} className="texto-aux">Modelo</label>
           <input id={id(`modelo-${n}`)} value={i.modelo || ''} onChange={(e) => mudarItem(i.id, { modelo: e.target.value })} className="campo campo-sm" />
         </div>
         {simples ? (
           <div>
-            <label htmlFor={id(`ref-${n}`)} className="text-xs text-slate-600">Valor que você viu (opcional)</label>
+            <label htmlFor={id(`ref-${n}`)} className="texto-aux">Valor que você viu (opcional)</label>
             <CampoMoeda id={id(`ref-${n}`)} className="campo campo-sm" valor={i.valorReferencia} onMudar={(v) => mudarItem(i.id, { valorReferencia: v })} />
           </div>
         ) : (
-          <div className="self-end text-xs text-slate-500">{i.valorReferencia != null ? `Quem pediu viu: ${brl(i.valorReferencia)}` : ''}</div>
+          <div className="self-end texto-aux">{i.valorReferencia != null ? `Quem pediu viu: ${brl(i.valorReferencia)}` : ''}</div>
         )}
       </div>
       {i.imagemUrl && <img src={i.imagemUrl} alt={`Imagem de ${i.descricao || 'produto'}`} referrerPolicy="no-referrer" className="h-16 w-16 rounded border border-slate-200 bg-white object-contain" />}
 
-      <div className="space-y-1.5">
-        <p className="text-xs font-semibold text-slate-700">
+      <div className="space-y-2">
+        <p className="font-semibold text-slate-700">
           Opções de compra ({opcoes.length}){!simples && opcoes.length > 0 ? ' · recomendar uma é opcional' : ''}
         </p>
         {opcoes.map((c, k) => (
-          <div key={c.id} className={`grid grid-cols-1 gap-1.5 rounded-md border bg-white p-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_9rem_auto] ${c.vencedora ? 'border-emerald-300' : 'border-slate-200'}`}>
+          <div key={c.id} className={`grid grid-cols-1 gap-2 rounded-md border bg-white p-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_9rem_auto] ${c.vencedora ? 'border-emerald-300' : 'border-slate-200'}`}>
             {simples ? (
               <input aria-label={`Loja da opção ${k + 1}`} value={c.loja || ''} onChange={(e) => mudarOp(c.id, { loja: e.target.value })} placeholder="Loja" className="campo campo-sm" />
             ) : (
@@ -492,7 +492,7 @@ export const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, s
                 ))}
               </select>
             )}
-            <div className="flex gap-1.5">
+            <div className="flex gap-2">
               <input aria-label={`Link da opção ${k + 1}`} type="url" value={c.link || ''} onChange={(e) => mudarOp(c.id, { link: e.target.value })} placeholder="https://…" className="campo campo-sm min-w-0" />
               <button type="button" disabled={buscando === c.id || !c.link} onClick={() => buscar(c.id, c.link)} aria-label={`Buscar dados do link da opção ${k + 1}`} title="Buscar dados do link" className="btn-icone shrink-0">
                 <Search />
@@ -503,7 +503,7 @@ export const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, s
             <CampoMoeda aria-label={`Valor unitário da opção ${k + 1}`} className="campo campo-sm" valor={c.valor || undefined} onMudar={(v) => mudarOp(c.id, { valor: v || 0 })} />
             <div className="flex items-center gap-1">
               {!simples && (
-                <label className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" title="Opção recomendada para Compras (opcional)">
+                <label className="inline-flex items-center gap-1 font-semibold text-slate-700" title="Opção recomendada para Compras (opcional)">
                   <input type="radio" name={id(`escolhida-${n}`)} checked={c.vencedora} onChange={() => setP((x) => ({ ...x, cotacoes: x.cotacoes.map((o) => (o.itemId === i.id ? { ...o, vencedora: o.id === c.id } : o)) }))} />
                   Recomendada
                 </label>

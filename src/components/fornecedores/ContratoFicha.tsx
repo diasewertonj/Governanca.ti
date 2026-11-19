@@ -241,19 +241,19 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
         tamanho="ficha"
         titulo={`Contrato ${nomeContrato(contrato)}`}
         subtitulo={`${fornecedor?.nome || 'Fornecedor não encontrado'} · ${ROTULO_TIPO_CONTRATO[contrato.tipo]}`}
-        icone={<FileSignature className="h-4 w-4" />}
+        icone={<FileSignature className="ico" />}
         idTitulo="ficha-contrato-titulo"
         acoes={acoes}
         onFechar={fechar}
         faixa={<Abas itens={abas} ativa={abaAtiva} onMudar={setAba} rotulo="Seções do contrato" />}
       >
         {aviso && (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800" role="status">
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800" role="status">
             {aviso}
           </p>
         )}
         {erro && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800" role="alert">
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800" role="alert">
             {erro}
           </p>
         )}
@@ -261,14 +261,14 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
         {abaAtiva === 'resumo' && (
           <>
             {encerrado && (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
                 Encerrado em <strong className="font-semibold text-slate-900">{formatDate(contrato.encerradoEm)}</strong>
                 {contrato.encerramentoMotivo ? ` · ${contrato.encerramentoMotivo}` : ''}
               </p>
             )}
 
             {contrato.fim && (
-              <div className="cartao flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs">
+              <div className="cartao flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                 <span className="text-slate-700">
                   {situacao === 'encerrado' ? 'Venceu em ' : 'Vence em '}
                   <strong className="font-semibold text-slate-900">{formatDate(contrato.fim)}</strong>
@@ -291,13 +291,13 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
               <Dado rotulo="Tipo">{ROTULO_TIPO_CONTRATO[contrato.tipo]}</Dado>
               <Dado rotulo="Número">{contrato.numero ? <span className="font-mono">{contrato.numero}</span> : undefined}</Dado>
               <Dado rotulo="Vigência">
-                <span className="inline-flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex flex-wrap items-center gap-2">
                   {formatDate(contrato.inicio)} a {contrato.fim ? formatDate(contrato.fim) : 'sem data de fim'}
                   <SeloContrato contrato={contrato} />
                 </span>
               </Dado>
               <Dado rotulo="Valor">
-                <span className="font-mono">{formatCurrency(contrato.valor)}</span> · {ROTULO_PERIODICIDADE[contrato.periodicidade]}
+                <span className="num">{formatCurrency(contrato.valor)}</span> · {ROTULO_PERIODICIDADE[contrato.periodicidade]}
               </Dado>
               <Dado rotulo="Itens cobertos">{resumoItens(contrato.itens)}</Dado>
               <Dado rotulo="Categoria da despesa">{ROTULO_CATEGORIA[contrato.categoriaDespesa || CATEGORIA_DO_TIPO[contrato.tipo]]}</Dado>
@@ -380,7 +380,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
             {contrato.observacoes && (
               <section className="cartao space-y-2 p-4">
                 <h3 className="secao-titulo">Observações</h3>
-                <p className="text-xs whitespace-pre-line text-slate-700">{contrato.observacoes}</p>
+                <p className="whitespace-pre-line text-slate-700">{contrato.observacoes}</p>
               </section>
             )}
           </>
@@ -388,11 +388,11 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
 
         {abaAtiva === 'itens' && (
           <>
-            <p className="text-xs text-slate-600">{resumoItens(contrato.itens)}. Para incluir ou tirar itens, use Editar.</p>
+            <p className="texto-aux">{resumoItens(contrato.itens)}. Para incluir ou tirar itens, use Editar.</p>
             {contrato.itens.length === 0 ? (
               <Vazio>Nenhum equipamento ou software coberto por este contrato.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
@@ -408,7 +408,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                         const a = assets.find((x) => x.id === i.ativoId);
                         return (
                           <tr key={`a:${i.ativoId}`}>
-                            <td data-label="Item" className="font-medium text-slate-900">
+                            <td data-label="Item" className="font-semibold text-slate-900">
                               {a ? (
                                 <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: a.id })} className="link text-left">
                                   <span className="font-mono">{a.tag}</span> · {a.nome}
@@ -419,7 +419,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                             </td>
                             <td data-label="Tipo">
                               <span className="inline-flex items-center gap-1">
-                                <Laptop className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" /> Equipamento
+                                <Laptop className="ico-sm text-slate-500" aria-hidden="true" /> Equipamento
                               </span>
                             </td>
                             <td data-label="Detalhe">{a ? `${a.marca} ${a.modelo}`.trim() || '-' : '-'}</td>
@@ -430,7 +430,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                       const l = licenses.find((x) => x.id === i.licencaId);
                       return (
                         <tr key={`l:${i.licencaId}`}>
-                          <td data-label="Item" className="font-medium text-slate-900">
+                          <td data-label="Item" className="font-semibold text-slate-900">
                             {l ? (
                               <button type="button" onClick={() => abrirFicha({ tipo: 'software', id: l.id })} className="link text-left">
                                 {l.nome}
@@ -441,7 +441,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                           </td>
                           <td data-label="Tipo">
                             <span className="inline-flex items-center gap-1">
-                              <Key className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" /> Software
+                              <Key className="ico-sm text-slate-500" aria-hidden="true" /> Software
                             </span>
                           </td>
                           <td data-label="Detalhe">{l ? `${l.colaboradoresIds.length} de ${l.assentosTotais} assentos em uso` : '-'}</td>
@@ -458,11 +458,11 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
 
         {abaAtiva === 'linhas' && (
           <>
-            <p className="text-xs text-slate-600">Para incluir, editar ou cancelar linhas, use Inventário › Linhas telefônicas.</p>
+            <p className="texto-aux">Para incluir, editar ou cancelar linhas, use Inventário › Linhas telefônicas.</p>
             {linhasDoContrato.length === 0 ? (
               <Vazio>Nenhuma linha ligada a este contrato.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
@@ -523,7 +523,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
             {!contrato.arquivoCaminho && anexos.length === 0 ? (
               <Vazio>Nenhum arquivo neste contrato.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
@@ -531,7 +531,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                       <th>Tipo</th>
                       <th>Descrição</th>
                       <th>Data</th>
-                      <th className="text-right">Ações</th>
+                      <th className="col-acoes">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -545,7 +545,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                           Troque em Editar › Arquivo e observações
                         </td>
                         <td data-label="Data">-</td>
-                        <td data-label="Ações" className="text-right" />
+                        <td data-label="Ações" className="col-acoes" />
                       </tr>
                     )}
                     {anexos.map((a) => (
@@ -553,12 +553,12 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                         <td data-label="Arquivo">
                           <AbrirArquivo caminho={a.arquivoCaminho} />
                         </td>
-                        <td data-label="Tipo" className="font-medium text-slate-900">
+                        <td data-label="Tipo" className="font-semibold text-slate-900">
                           {ROTULO_ANEXO[a.tipo]}
                         </td>
                         <td data-label="Descrição">{a.descricao || '-'}</td>
                         <td data-label="Data">{formatDate(a.criadoEm.slice(0, 10))}</td>
-                        <td data-label="Ações" className="text-right">
+                        <td data-label="Ações" className="col-acoes">
                           <span className="acoes-linha">
                             <button
                               type="button"
@@ -580,7 +580,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
 
             <section className="cartao space-y-3 p-4">
               <h3 className="secao-titulo">Novo anexo</h3>
-              <p className="text-xs text-slate-500">Proposta, contrato assinado, aditivos e notas. Até 10 MB; só a T.I. abre.</p>
+              <p className="texto-aux">Proposta, contrato assinado, aditivos e notas. Até 10 MB; só a T.I. abre.</p>
               <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-4">
                 <div>
                   <label htmlFor="anx-tipo" className={CLASSE_ROTULO}>
@@ -648,7 +648,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
           tamanho="p"
           titulo="Renovar contrato"
           subtitulo={nomeContrato(contrato)}
-          icone={<RefreshCw className="h-4 w-4" />}
+          icone={<RefreshCw className="ico" />}
           idTitulo="janela-renovar-contrato"
           onFechar={() => setRenovacao(null)}
           rodape={
@@ -664,7 +664,7 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
           }
         >
           <form id="form-renovar-contrato" onSubmit={renovar} noValidate className="space-y-3">
-            <p className="text-xs text-slate-600">
+            <p className="texto-aux">
               Cria um contrato novo com os mesmos itens e linhas; este termina na véspera do novo início e fica no histórico.
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

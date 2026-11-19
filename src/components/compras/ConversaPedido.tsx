@@ -49,7 +49,7 @@ export const ConversaPedido: React.FC<{ pedido: PedidoCompra }> = ({ pedido: p }
     <section className="cartao space-y-3 p-4">
       <h3 className="secao-titulo">Conversa ({lista.length})</h3>
       {lista.length === 0 ? (
-        <p className="text-xs text-slate-500">Nenhuma mensagem. Use para tirar dúvidas sobre o pedido.</p>
+        <p className="texto-aux">Nenhuma mensagem. Use para tirar dúvidas sobre o pedido.</p>
       ) : (
         <ol className="space-y-2">
           {lista.map((m) => {
@@ -57,19 +57,19 @@ export const ConversaPedido: React.FC<{ pedido: PedidoCompra }> = ({ pedido: p }
             return (
               <li
                 key={m.id}
-                className={`rounded-lg border p-2.5 text-xs ${m.interna ? 'border-amber-200 bg-amber-50' : minha ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white'}`}
+                className={`rounded-lg border p-3 ${m.interna ? 'border-amber-200 bg-amber-50' : minha ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white'}`}
               >
                 <p className="text-slate-500">
                   <span className="font-semibold text-slate-800">{minha ? 'Você' : nome(m.autorId)}</span> · {quando(m.criadoEm)}
                   {m.interna && (
                     <span className="ml-1 inline-flex items-center gap-1 font-semibold text-amber-900">
-                      <Lock className="h-3 w-3" aria-hidden="true" /> nota interna
+                      <Lock className="ico-sm" aria-hidden="true" /> nota interna
                     </span>
                   )}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap text-slate-900">{m.texto}</p>
                 {m.anexoCaminho && (
-                  <div className="mt-1.5">
+                  <div className="mt-2">
                     <AbrirArquivo caminho={m.anexoCaminho} />
                   </div>
                 )}
@@ -94,7 +94,7 @@ export const ConversaPedido: React.FC<{ pedido: PedidoCompra }> = ({ pedido: p }
           <div className="flex flex-wrap items-center gap-3">
             {equipeCompras && (
               <>
-                <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+                <label className="inline-flex items-center gap-2 text-slate-700">
                   <input type="checkbox" checked={interna} onChange={(e) => setInterna(e.target.checked)} /> Nota interna (só T.I. e Compras)
                 </label>
                 <label className="btn btn-sm btn-secundario cursor-pointer">

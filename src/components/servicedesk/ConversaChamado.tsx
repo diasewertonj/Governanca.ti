@@ -21,19 +21,19 @@ export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titu
     <h3 id={`problema-${ticket.id}`} className="secao-titulo">
       {titulo || 'Problema relatado'}
     </h3>
-    <p className="text-sm leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{ticket.descricao}</p>
+    <p className="leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{ticket.descricao}</p>
 
     {(ativo || ticket.softwareNome) && (
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 texto-aux">
         {ativo && (
           <span className="inline-flex items-center gap-1">
-            <Laptop className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+            <Laptop className="ico-sm text-slate-500" aria-hidden="true" />
             <span className="font-semibold text-slate-800">{ativo.tag}</span> · {ativo.nome}
           </span>
         )}
         {ticket.softwareNome && (
           <span className="inline-flex items-center gap-1">
-            <Key className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+            <Key className="ico-sm text-slate-500" aria-hidden="true" />
             {ticket.softwareNome}
           </span>
         )}
@@ -41,7 +41,7 @@ export const ProblemaRelatado: React.FC<ProblemaRelatadoProps> = ({ ticket, titu
     )}
 
     {ticket.anexos && ticket.anexos.length > 0 && (
-      <div className="space-y-1.5 text-xs">
+      <div className="space-y-2">
         {erroArquivo && <p className="erro">{erroArquivo}</p>}
         <div className="flex flex-wrap gap-2">
           {ticket.anexos.map((att) => (
@@ -102,7 +102,7 @@ export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVe
       {aba === 'historico' ? (
         <HistoricoChamado ticket={ticket} />
       ) : lista.length === 0 ? (
-        <p className="text-xs text-slate-500">
+        <p className="texto-aux">
           {aba === 'notas' ? 'Nenhuma nota interna.' : 'Ainda sem respostas.'}
         </p>
       ) : (
@@ -113,7 +113,7 @@ export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVe
               <li key={msg.id} className="flex gap-3">
                 <span
                   aria-hidden="true"
-                  className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold ${
+                  className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-semibold ${
                     msg.ehNotaInterna
                       ? 'bg-amber-100 text-amber-800'
                       : minha
@@ -124,7 +124,7 @@ export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVe
                   {inicial(msg.autorNome)}
                 </span>
                 <div
-                  className={`min-w-0 flex-1 rounded-lg border p-3 text-xs ${
+                  className={`min-w-0 flex-1 rounded-lg border p-3 ${
                     msg.ehNotaInterna
                       ? 'bg-amber-50/70 border-amber-200'
                       : minha
@@ -143,11 +143,11 @@ export const ConversaChamado: React.FC<ConversaChamadoProps> = ({ ticket, podeVe
                   </div>
                   {msg.ehNotaInterna && (
                     <span className="mt-1 inline-flex items-center gap-1 text-amber-900">
-                      <Lock className="w-3 h-3" aria-hidden="true" />
+                      <Lock className="ico-sm" aria-hidden="true" />
                       Nota interna (só a T.I. vê)
                     </span>
                   )}
-                  <p className="mt-1.5 text-slate-800 leading-relaxed whitespace-pre-wrap break-words">{msg.texto}</p>
+                  <p className="mt-2 text-slate-800 leading-relaxed whitespace-pre-wrap break-words">{msg.texto}</p>
                 </div>
               </li>
             );

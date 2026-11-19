@@ -104,15 +104,15 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
     <>
       <Janela
         tamanho="m"
-        icone={<ShieldCheck className="h-4 w-4" />}
+        icone={<ShieldCheck className="ico" />}
         titulo="Meus dados (LGPD)"
         subtitulo="Cópia dos seus dados e pedidos do titular"
         onFechar={onClose}
       >
-        <div className="space-y-4 text-xs text-slate-700">
+        <div className="space-y-4 text-slate-700">
           <div>
-            <button type="button" onClick={() => setMostrarPolitica(true)} className="link inline-flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5" /> Ler o aviso de privacidade
+            <button type="button" onClick={() => setMostrarPolitica(true)} className="link inline-flex items-center gap-2">
+              <FileText className="ico-sm" /> Ler o aviso de privacidade
             </button>
           </div>
 
@@ -127,8 +127,8 @@ export const MeusDadosModal: React.FC<Props> = ({ onClose }) => {
           <div className="cartao space-y-2 p-4">
             <h3 className="secao-titulo">Fazer um pedido</h3>
             {protocolo && (
-              <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
+                <CheckCircle2 className="ico" />
                 Pedido registrado no chamado {protocolo}. A T.I. responde por lá.
               </div>
             )}

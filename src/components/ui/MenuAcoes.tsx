@@ -65,7 +65,7 @@ export const MenuAcoes: React.FC<{ acoes: AcaoMenu[]; rotulo?: string }> = ({ ac
                 setAberto(false);
                 a.onClick();
               }}
-              className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+              className={`flex w-full items-center gap-2 px-3 py-2 whitespace-nowrap ${
                 a.perigo ? 'text-red-700 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'
               } [&_svg]:h-3.5 [&_svg]:w-3.5`}
             >

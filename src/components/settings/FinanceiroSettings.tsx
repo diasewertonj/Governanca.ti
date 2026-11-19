@@ -77,7 +77,7 @@ export const FinanceiroSettings: React.FC = () => {
   };
 
   return (
-    <div className="cartao p-4 space-y-5 text-xs">
+    <div className="cartao p-4 space-y-4">
       <div>
         <h3 className="secao-titulo">Premissas financeiras</h3>
         <p className="ajuda">Valem para CAPEX × OPEX, projeção, orçamento, patrimônio e exportações da Gestão de T.I.</p>
@@ -162,8 +162,8 @@ export const FinanceiroSettings: React.FC = () => {
             <tbody>
               {textos.map(([k, rotulo]) => (
                 <tr key={k} className="border-t border-slate-100">
-                  <td className="py-1.5 pr-3 text-slate-800">{rotulo}</td>
-                  <td className="py-1.5">
+                  <td className="py-2 pr-3 text-slate-800">{rotulo}</td>
+                  <td className="py-2">
                     <select
                       aria-label={`Departamento de "${rotulo}"`}
                       disabled={!podeEditar}

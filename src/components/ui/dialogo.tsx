@@ -152,8 +152,8 @@ const CaixaMovimento: React.FC<{ op: OpcoesMovimento; resolver: (v: RespostaMovi
   const lista = (titulo: string, itens?: string[]) =>
     itens && itens.length > 0 ? (
       <div>
-        <p className="text-xs font-semibold text-slate-700">{titulo}</p>
-        <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-xs text-slate-600">
+        <p className="font-semibold text-slate-700">{titulo}</p>
+        <ul className="mt-0.5 list-disc space-y-0.5 pl-4 texto-aux">
           {itens.map((t) => (
             <li key={t}>{t}</li>
           ))}
@@ -173,28 +173,28 @@ const CaixaMovimento: React.FC<{ op: OpcoesMovimento; resolver: (v: RespostaMovi
       }}
     >
       <div role="alertdialog" aria-modal="true" aria-labelledby="movimento-titulo" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col rounded-xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start gap-3 overflow-y-auto p-5">
-          <span className={`mt-0.5 shrink-0 rounded-full p-1.5 ${op.perigo ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-            {op.perigo ? <AlertTriangle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+        <div className="flex items-start gap-3 overflow-y-auto p-4">
+          <span className={`mt-0.5 shrink-0 rounded-full p-2 ${op.perigo ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+            {op.perigo ? <AlertTriangle className="ico" /> : <Info className="ico" />}
           </span>
           <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <h2 id="movimento-titulo" className="text-sm font-semibold text-slate-900">
+              <h2 id="movimento-titulo" className="janela-titulo">
                 {op.titulo}
               </h2>
-              {op.item && <p className="text-xs text-slate-600">{op.item}</p>}
+              {op.item && <p className="texto-aux">{op.item}</p>}
             </div>
             {(op.de || op.para) && (
-              <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="De quem para quem">
+              <div className="flex flex-wrap items-center gap-2" aria-label="De quem para quem">
                 <span className="selo selo-neutro whitespace-normal">{op.de || '—'}</span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                <ArrowRight className="ico text-slate-500" aria-hidden="true" />
                 <span className="selo selo-info whitespace-normal">{op.para || '—'}</span>
               </div>
             )}
             {lista('O que acontece no Nexus', op.efeitos)}
             {lista('O que falta fazer fora do Nexus', op.foraDoNexus)}
             {op.termo && (
-              <p className="text-xs text-slate-700">
+              <p className="text-slate-700">
                 <span className="font-semibold">Termo: </span>
                 {op.termo}
               </p>
@@ -226,8 +226,8 @@ const CaixaMovimento: React.FC<{ op: OpcoesMovimento; resolver: (v: RespostaMovi
               </div>
             )}
             {op.justificativa && (
-              <div className="space-y-1 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
-                <p className="text-xs text-amber-900">{op.justificativa.aviso}</p>
+              <div className="space-y-1 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-amber-900">{op.justificativa.aviso}</p>
                 <label htmlFor="movimento-justificativa" className="rotulo">
                   {op.justificativa.rotulo || 'Por que mais um? *'}
                 </label>
@@ -247,7 +247,7 @@ const CaixaMovimento: React.FC<{ op: OpcoesMovimento; resolver: (v: RespostaMovi
             )}
             {(op.confirmacoes || []).map((c, i) => (
               <div key={c.texto} className="space-y-0.5">
-                <label className="flex cursor-pointer items-start gap-2 text-xs font-medium text-slate-800">
+                <label className="flex cursor-pointer items-start gap-2 font-semibold text-slate-800">
                   <input
                     type="checkbox"
                     checked={marcadas[i]}
@@ -257,7 +257,7 @@ const CaixaMovimento: React.FC<{ op: OpcoesMovimento; resolver: (v: RespostaMovi
                   <span>{c.texto}</span>
                 </label>
                 {c.link && (
-                  <a href={c.link.url} target="_blank" rel="noopener noreferrer" className="link ml-6 inline-block text-xs">
+                  <a href={c.link.url} target="_blank" rel="noopener noreferrer" className="link ml-6 inline-block">
                     {c.link.rotulo} ↗
                   </a>
                 )}
@@ -266,8 +266,8 @@ const CaixaMovimento: React.FC<{ op: OpcoesMovimento; resolver: (v: RespostaMovi
             {op.desfazer && <p className="ajuda">{op.desfazer}</p>}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          {faltas.length > 0 && <span className="mr-auto text-xs text-slate-500">Falta: {faltas.join(', ')}.</span>}
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-4 py-3">
+          {faltas.length > 0 && <span className="mr-auto texto-aux">Falta: {faltas.join(', ')}.</span>}
           <button type="button" onClick={() => fechar(false)} className="btn btn-secundario">
             {op.cancelar || (/^cancelar/i.test(op.confirmar || '') ? 'Voltar' : 'Cancelar')}
           </button>
@@ -310,15 +310,15 @@ const Caixa: React.FC<{ pedido: Exclude<Pedido, { tipo: 'movimento' }>; onFim: (
       }}
     >
       <div role="alertdialog" aria-modal="true" aria-labelledby="dialogo-titulo" className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start gap-3 p-5">
-          <span className={`mt-0.5 shrink-0 rounded-full p-1.5 ${op.perigo ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-            {op.perigo ? <AlertTriangle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+        <div className="flex items-start gap-3 p-4">
+          <span className={`mt-0.5 shrink-0 rounded-full p-2 ${op.perigo ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+            {op.perigo ? <AlertTriangle className="ico" /> : <Info className="ico" />}
           </span>
           <div className="min-w-0 flex-1 space-y-2">
-            <h2 id="dialogo-titulo" className="text-sm font-semibold text-slate-900">
+            <h2 id="dialogo-titulo" className="janela-titulo">
               {op.titulo}
             </h2>
-            {op.mensagem && <p className="text-xs whitespace-pre-line text-slate-600">{op.mensagem}</p>}
+            {op.mensagem && <p className="texto-aux whitespace-pre-line">{op.mensagem}</p>}
             {pedido.tipo === 'texto' && (
               <div>
                 <label htmlFor="dialogo-texto" className="rotulo">
@@ -338,7 +338,7 @@ const Caixa: React.FC<{ pedido: Exclude<Pedido, { tipo: 'movimento' }>; onFim: (
             )}
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
           {pedido.tipo !== 'aviso' && (
             <button type="button" onClick={() => fechar(false)} className="btn btn-secundario">
               {op.cancelar || (op.confirmar === 'Cancelar' ? 'Voltar' : 'Cancelar')}

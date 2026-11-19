@@ -86,8 +86,8 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
               <option value="todos">Todos</option>
             </select>
             {isTI && (
-              <span className="ml-auto text-xs text-slate-600">
-                Total na lista: <span className="font-mono font-semibold text-slate-900">{brl(totalLista)}</span>
+              <span className="ml-auto texto-aux">
+                Total na lista: <span className="num font-semibold text-slate-900">{brl(totalLista)}</span>
               </span>
             )}
           </>
@@ -98,15 +98,15 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
           {pedidos.length === 0 ? 'Nenhum pedido de compra ainda.' : 'Nenhum pedido com estes filtros.'}
         </Vazio>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
                 <th>Pedido</th>
                 <th>Situação</th>
                 <th>Área · quem pediu</th>
-                {isTI && <th className="text-right">Valor</th>}
-                <th className="text-right">Ação</th>
+                {isTI && <th className="num">Valor</th>}
+                <th className="num">Ação</th>
               </tr>
             </thead>
             <tbody>
@@ -114,7 +114,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
                 <tr key={p.id}>
                   <td data-label="Pedido">
                     <span className="font-mono text-slate-500">{p.codigo}</span>
-                    <span className="block font-medium text-slate-900">{p.titulo}</span>
+                    <span className="block font-semibold text-slate-900">{p.titulo}</span>
                     <span className="block text-slate-500">
                       {p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'} · {formatDate(p.criadoEm.slice(0, 10))}
                       {p.necessarioEm ? ` · precisa até ${formatDate(p.necessarioEm)}` : ''}
@@ -130,11 +130,11 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
                     <span className="block text-slate-500">{nome(p.solicitanteId, p.solicitanteNome)}</span>
                   </td>
                   {isTI && (
-                    <td data-label="Valor" className="text-right font-mono">
+                    <td data-label="Valor" className="num">
                       {brl(valorDoPedido(p))}
                     </td>
                   )}
-                  <td data-label="Ação" className="text-right">
+                  <td data-label="Ação" className="col-acoes">
                     <span className="acoes-linha">
                       <button type="button" onClick={() => setAberto(p.id)} className="btn btn-sm btn-secundario">
                         Abrir

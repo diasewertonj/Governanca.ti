@@ -40,10 +40,10 @@ export const DefinirSenhaView: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="inline-flex w-12 h-12 rounded-xl bg-blue-600 text-white items-center justify-center shadow-md mb-3">
-          <KeyRound className="w-6 h-6" />
+          <KeyRound className="ico-lg" />
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">{titulo}</h1>
-        <p className="mt-1 text-xs text-slate-500">{settings.razaoSocial} · Nexus IT & HR</p>
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{titulo}</h1>
+        <p className="mt-1 texto-aux">{settings.razaoSocial} · Nexus IT & HR</p>
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
@@ -73,14 +73,14 @@ export const DefinirSenhaView: React.FC = () => {
 
           <ul className="space-y-1">
             {regras.map((r) => (
-              <li key={r.texto} className={`text-xs ${r.ok ? 'text-emerald-700' : 'text-slate-500'}`}>
+              <li key={r.texto} className={` ${r.ok ? 'text-emerald-700' : 'text-slate-500'}`}>
                 {r.ok ? '✓' : '○'} {r.texto}
               </li>
             ))}
           </ul>
 
           {erro && (
-            <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">{erro}</div>
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700">{erro}</div>
           )}
 
           <button

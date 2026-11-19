@@ -261,11 +261,11 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     <div className={`janela-fundo modal-tela ${nav.topo ? '' : 'hidden'}`}>
       <div role="dialog" aria-modal="true" aria-labelledby={`chamado-titulo-${ticket.id}`} className="janela janela-ficha">
         {/* Cabeçalho fixo: código, tipo, situação, prioridade e título; abaixo, a faixa de ações do atendimento */}
-        <div className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+        <div className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
             {temAnterior && <BotaoVoltar onClick={fecharChamado} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
-            <span className="font-mono text-xs font-semibold text-slate-700">{ticket.codigo}</span>
-            <span className="text-xs text-slate-500">
+            <span className="font-mono font-semibold text-slate-700">{ticket.codigo}</span>
+            <span className="texto-aux">
               · {ROTULO_TIPO_CHAMADO[ticket.tipo]} · {ticket.categoria}
             </span>
             <span className="flex-1" />
@@ -286,11 +286,11 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </button>
             {temAnterior ? (
               <button type="button" onClick={() => void nav.fecharTudo?.()} aria-label="Fechar tudo" title="Fechar tudo" className="btn-icone">
-                <X className="!h-5 !w-5" />
+                <X className="ico-lg" />
               </button>
             ) : (
               <button type="button" onClick={fechar} aria-label="Fechar chamado" title="Fechar" className="btn-icone">
-                <X className="!h-5 !w-5" />
+                <X className="ico-lg" />
               </button>
             )}
           </div>
@@ -307,14 +307,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               <button
                 type="button"
                 onClick={() => setRascDados({ titulo: ticket.titulo, categoria: ticket.categoria, prioridade: ticket.prioridade })}
-                className="link text-xs"
+                className="link"
               >
                 Corrigir título, categoria ou prioridade
               </button>
             )}
           </div>
           {rascDados && (
-            <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
               <div>
                 <label htmlFor={`chamado-${ticket.id}-titulo`} className="rotulo">
                   Título
@@ -368,7 +368,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </div>
           )}
           {/* Solicitante na linha de abertura (antes era um cartão à parte) */}
-          <p className="mt-0.5 text-xs text-slate-600">
+          <p className="mt-0.5 texto-aux">
             Aberto por{' '}
             {currentRole === 'colaborador' && ticket.solicitanteId !== currentUser?.id ? (
               <span className="font-semibold text-slate-900">{ticket.solicitanteNome}</span>
@@ -385,7 +385,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           </p>
           {/* Ações do atendimento numa faixa compacta do cabeçalho */}
           {isTI && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               {encerrado ? (
                 <span className="text-slate-600">
                   {ticket.tipo === 'suporte'
@@ -394,7 +394,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                 </span>
               ) : (
                 <>
-                  <label className="flex items-center gap-1.5">
+                  <label className="flex items-center gap-2">
                     <span className="text-slate-600">Situação</span>
                     <select
                       value={statusExibido}
@@ -421,7 +421,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   )}
                 </>
               )}
-              <label className="flex items-center gap-1.5">
+              <label className="flex items-center gap-2">
                 <span className="text-slate-600">Técnico</span>
                 <select
                   value={tecnicoExibido}
@@ -456,7 +456,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
         <div className="sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
           {/* Prazos e vínculos numa faixa fina (sem cartões) */}
-          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-2.5 sm:px-5 lg:flex-row lg:items-start lg:gap-8">
+          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-start lg:gap-8">
             <PrazosChamado tkt={ticket} embutido />
             <div className="min-w-0 flex-1">
               <VinculosChamado
@@ -470,7 +470,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
           </div>
           {/* O pedido, o checklist e a solução ocupam 2/3; anotações e conversa ficam ao lado (1/3) */}
           <div className="grid grid-cols-1 gap-0 divide-y divide-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
-            <div className="min-w-0 space-y-3 p-4 sm:p-5">
+            <div className="min-w-0 space-y-3 p-4 sm:p-6">
               {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
               {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
               {ticket.tipo === 'suporte' && (
@@ -496,21 +496,21 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               {usaChecklistLegado && ticket.offboarding && (
                 <section aria-label="Checklist operacional de desligamento" className="cartao space-y-3 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="secao-titulo flex items-center gap-1.5">
-                      <FileCheck className="h-4 w-4" aria-hidden="true" />
+                    <h3 className="secao-titulo flex items-center gap-2">
+                      <FileCheck className="ico" aria-hidden="true" />
                       Checklist operacional de desligamento
                     </h3>
-                    <span className="text-xs font-semibold whitespace-nowrap text-slate-700">
+                    <span className="font-semibold whitespace-nowrap text-slate-700">
                       {ticket.offboarding.checklist.filter((c) => concluidoExibido(c)).length}/{ticket.offboarding.checklist.length}{' '}
                       concluídos
                     </span>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {ticket.offboarding.checklist.map((item) => (
                       <label
                         key={item.id}
-                        className={`flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-2.5 text-xs transition-colors hover:bg-slate-50 ${
+                        className={`flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50 ${
                           concluidoExibido(item) ? 'text-slate-500 line-through' : 'text-slate-900'
                         }`}
                       >
@@ -527,7 +527,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   </div>
 
                   {ticket.offboarding.recolhimentoInstrucoes && (
-                    <p className="text-xs text-slate-700">
+                    <p className="text-slate-700">
                       <span className="font-semibold">Logística:</span> {ticket.offboarding.recolhimentoInstrucoes}
                     </p>
                   )}
@@ -562,10 +562,10 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
               {/* Admissão: o "Pedido do RH" (kit de entrada solicitado), no mesmo formato do desligamento */}
               {ticket.tipo === 'onboarding' && ticket.onboarding && (
-                <section aria-label="Pedido do RH" className="cartao space-y-3 p-4 text-xs">
+                <section aria-label="Pedido do RH" className="cartao space-y-3 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="secao-titulo flex items-center gap-1.5">
-                      <UserPlus className="h-4 w-4" aria-hidden="true" />
+                    <h3 className="secao-titulo flex items-center gap-2">
+                      <UserPlus className="ico" aria-hidden="true" />
                       Pedido do RH
                     </h3>
                     {isColaboradorJaCadastrado && colaboradorDoEmail?.status !== 'ativo' ? (
@@ -584,7 +584,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                           <button
                             type="button"
                             onClick={() => salvarAlteracoesChamado(ticket.id, { colaboradorId: colaboradorDoEmail.id })}
-                            className="link text-xs"
+                            className="link"
                           >
                             Ligar a este chamado
                           </button>
@@ -602,7 +602,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-y-1.5">
+                  <div className="grid grid-cols-1 gap-y-2">
                     {linha('Novo colaborador', ticket.onboarding.nomeColaborador)}
                     {linha('Cargo', ticket.onboarding.cargo)}
                     {linha('E-mail', <span className="font-mono">{ticket.onboarding.emailColaborador}</span>)}
@@ -611,7 +611,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     {linha(
                       'Acesso sugerido',
                       <span className="inline-flex items-center gap-1">
-                        <ShieldCheck className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+                        <ShieldCheck className="ico-sm text-slate-500" aria-hidden="true" />
                         {papelSugerido}
                       </span>
                     )}
@@ -620,7 +620,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     {ticket.onboarding.perifericos.length > 0 &&
                       linha(
                         'Periféricos',
-                        <span className="flex flex-wrap gap-1.5">
+                        <span className="flex flex-wrap gap-2">
                           {ticket.onboarding.perifericos.map((p, idx) => (
                             <span key={idx} className="selo selo-neutro">
                               {p}
@@ -631,7 +631,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                     {ticket.onboarding.acessosSoftwares.length > 0 &&
                       linha(
                         'Acessos e licenças',
-                        <span className="flex flex-wrap gap-1.5">
+                        <span className="flex flex-wrap gap-2">
                           {ticket.onboarding.acessosSoftwares.map((a, idx) => (
                             <span key={idx} className="selo selo-neutro">
                               {a}
@@ -651,7 +651,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               )}
             </div>
 
-            <div className="flex min-w-0 flex-col gap-4 p-4 sm:p-5">
+            <div className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
               <div className="flex-1">
                 {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
                 <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} abaInicial={isTI ? 'notas' : 'conversa'} />
@@ -670,14 +670,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                       Responder
                     </label>
                     {isTI && (
-                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-700 select-none">
+                      <label className="flex cursor-pointer items-center gap-2 text-slate-700 select-none">
                         <input
                           type="checkbox"
                           checked={isInternalNote}
                           onChange={(e) => setIsInternalNote(e.target.checked)}
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <Lock className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+                        <Lock className="ico-sm text-slate-500" aria-hidden="true" />
                         <span>Nota interna (só a T.I. vê)</span>
                       </label>
                     )}

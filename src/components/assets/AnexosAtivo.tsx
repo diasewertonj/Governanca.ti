@@ -73,7 +73,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
       {anexos.length === 0 ? (
         <Vazio>Nenhum arquivo anexado.</Vazio>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
@@ -81,13 +81,13 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
                 <th>Tipo</th>
                 <th>Enviado em</th>
                 <th>Tamanho</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
               {anexos.map((a) => (
                 <tr key={a.id}>
-                  <td data-label="Arquivo" className="font-medium break-all text-slate-900">
+                  <td data-label="Arquivo" className="font-semibold break-all text-slate-900">
                     {a.nome}
                   </td>
                   <td data-label="Tipo">{ROTULO_CATEGORIA_ANEXO[a.categoria]}</td>
@@ -95,7 +95,7 @@ export const AnexosAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> = ({ a
                   <td data-label="Tamanho" className="font-mono">
                     {a.tamanho ? formatarTamanho(a.tamanho) : '—'}
                   </td>
-                  <td data-label="Ações" className="text-right">
+                  <td data-label="Ações" className="col-acoes">
                     <span className="acoes-linha">
                       <button type="button" onClick={() => abrir(a.caminho)} className="btn btn-sm btn-secundario">
                         <ExternalLink aria-hidden="true" /> Abrir

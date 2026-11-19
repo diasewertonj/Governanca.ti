@@ -143,7 +143,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
       />
 
       {ehContratos ? (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
@@ -153,7 +153,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                 <th>Fim</th>
                 <th className="hidden xl:table-cell">Itens cobertos</th>
                 <th>Valor</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -162,7 +162,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                   <tr key={c.id} onClick={() => setFichaContratoId(c.id)} className="hover:bg-slate-50/70 cursor-pointer">
                     <td data-label="Contrato" className="min-w-0">
                       <span className="font-semibold text-slate-900 text-left break-words">
-                        {c.numero && <span className="font-mono text-blue-700 mr-1.5">{c.numero}</span>}
+                        {c.numero && <span className="font-mono text-blue-700 mr-2">{c.numero}</span>}
                         {c.descricao}
                       </span>
                     </td>
@@ -173,7 +173,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                       {ROTULO_TIPO_CONTRATO[c.tipo]}
                     </td>
                     <td data-label="Fim">
-                      <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="flex flex-wrap items-center gap-2">
                         <span className="text-slate-800">{c.fim ? formatDate(c.fim) : 'Sem data'}</span>
                         <SeloFim contrato={c} />
                       </span>
@@ -185,7 +185,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                       {formatCurrency(c.valor)}
                       <span className="font-sans text-slate-500">{SUFIXO_PERIODICIDADE[c.periodicidade]}</span>
                     </td>
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       <span className="acoes-linha">
                         <button
                           type="button"
@@ -217,7 +217,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               ) : (
                 <tr>
                   <td colSpan={7}>
-                    <Vazio>
+                    <Vazio acao={novoContrato}>
                       {contratos.length === 0
                         ? 'Nenhum contrato cadastrado. Use "Novo contrato" para começar.'
                         : 'Nenhum contrato encontrado com os filtros aplicados.'}
@@ -229,7 +229,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
           </table>
         </div>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
@@ -237,7 +237,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                 <th className="hidden xl:table-cell">CNPJ</th>
                 <th>Contato</th>
                 <th>Vínculos</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -246,7 +246,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                   <tr key={f.id} onClick={() => setFichaFornecedorId(f.id)} className={`hover:bg-slate-50/70 cursor-pointer ${f.ativo ? '' : 'opacity-60'}`}>
                     <td data-label="Fornecedor" className="min-w-0">
                       <span className="font-semibold text-slate-900 text-left break-words">{f.nome}</span>
-                      {!f.ativo && <span className="selo selo-neutro ml-1.5">Inativo</span>}
+                      {!f.ativo && <span className="selo selo-neutro ml-2">Inativo</span>}
                     </td>
                     <td data-label="CNPJ" className="hidden xl:table-cell font-mono text-slate-600">
                       {f.cnpj || '-'}
@@ -256,7 +256,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
                       {(f.telefone || f.email) && <span className="block text-slate-500">{[f.telefone, f.email].filter(Boolean).join(' · ')}</span>}
                     </td>
                     <td data-label="Vínculos">{resumoVinculos(vinculosDoFornecedor(f.id, { contratos, ativos: assets, licencas: licenses }))}</td>
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       <span className="acoes-linha">
                         <button
                           type="button"
@@ -288,7 +288,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               ) : (
                 <tr>
                   <td colSpan={5}>
-                    <Vazio>
+                    <Vazio acao={novoFornecedor}>
                       {fornecedores.length === 0
                         ? 'Nenhum fornecedor cadastrado. Use "Novo fornecedor" para começar.'
                         : 'Nenhum fornecedor encontrado com os filtros aplicados.'}

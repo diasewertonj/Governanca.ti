@@ -153,7 +153,7 @@ export const CampoMoeda: React.FC<
   const exibido = texto ?? textoDaMoeda(valor);
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-xs text-slate-500" aria-hidden="true">
+      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 texto-aux" aria-hidden="true">
         {simbolo}
       </span>
       <input

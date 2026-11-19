@@ -130,7 +130,7 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   return (
     <section aria-label={ehOnb ? 'Checklist de admissão' : 'Checklist de desligamento'} className="cartao p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="secao-titulo flex items-center gap-1.5">
+        <h3 className="secao-titulo flex items-center gap-2">
           <ClipboardList className="ico" aria-hidden="true" />
           {ehOnb ? 'Checklist de admissão' : 'Checklist de desligamento'}
         </h3>
@@ -284,7 +284,7 @@ const JanelaSenha: React.FC<{ email: string; senha: string; onFechar: () => void
         </p>
         <p className="text-slate-700">Senha provisória (aparece só agora):</p>
         <div className="flex flex-wrap items-center gap-2">
-          <code className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-mono tracking-wider select-all">{senha}</code>
+          <code className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 font-mono tracking-wider select-all">{senha}</code>
           <button
             type="button"
             onClick={() => {
@@ -446,7 +446,7 @@ export const TrilhaAuditoria: React.FC<{ chamadoId: string; nomeDe: (id?: string
   if (!eventos) return <p className="texto-aux">Carregando…</p>;
   return (
     <div className="space-y-1">
-      <p className="secao-titulo flex items-center gap-1.5">
+      <p className="secao-titulo flex items-center gap-2">
         <History className="ico-sm" aria-hidden="true" /> Passos do checklist
       </p>
       {eventos.length === 0 ? (
