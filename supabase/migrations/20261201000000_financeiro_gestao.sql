@@ -132,7 +132,7 @@ create or replace function public.fechar_imobilizado(p_ano integer, p_foto jsonb
 returns text language plpgsql security definer set search_path = public as $$
 declare v_id text;
 begin
-  if public.meu_papel() <> 'ti_admin' then
+  if public.meu_papel() is distinct from 'ti_admin' then
     raise exception 'Só o administrador fecha o imobilizado' using errcode = '42501';
   end if;
   if exists (select 1 from public.imobilizado_fechamentos where ano = p_ano and reaberto_em is null) then
@@ -146,7 +146,7 @@ end $$;
 create or replace function public.reabrir_imobilizado(p_ano integer, p_motivo text)
 returns void language plpgsql security definer set search_path = public as $$
 begin
-  if public.meu_papel() <> 'ti_admin' then
+  if public.meu_papel() is distinct from 'ti_admin' then
     raise exception 'Só o administrador reabre o imobilizado' using errcode = '42501';
   end if;
   if nullif(trim(p_motivo), '') is null then
@@ -171,7 +171,7 @@ create or replace function public.contratos_resumo()
 returns table (id text, fornecedor_id text, tipo text, valor numeric, periodicidade text, inicio date, fim date, status text)
 language plpgsql stable security definer set search_path = public as $$
 begin
-  if public.meu_papel() not in ('ti_admin', 'ti_suporte', 'compras') then
+  if coalesce(public.meu_papel(), '') not in ('ti_admin', 'ti_suporte', 'compras') then
     raise exception 'Sem acesso' using errcode = '42501';
   end if;
   return query select c.id, c.fornecedor_id, c.tipo::text, c.valor::numeric, c.periodicidade::text, c.inicio::date, c.fim::date, c.status::text from public.contratos c;
@@ -181,7 +181,7 @@ create or replace function public.licencas_resumo()
 returns table (id text, nome text, fornecedor_id text)
 language plpgsql stable security definer set search_path = public as $$
 begin
-  if public.meu_papel() not in ('ti_admin', 'ti_suporte', 'compras') then
+  if coalesce(public.meu_papel(), '') not in ('ti_admin', 'ti_suporte', 'compras') then
     raise exception 'Sem acesso' using errcode = '42501';
   end if;
   return query select l.id, l.nome, l.fornecedor_id from public.licencas_software l;
@@ -201,6 +201,10 @@ alter table public.configuracoes_empresa add column if not exists premissas_fina
 alter table public.rateios                 enable row level security;
 alter table public.recebimentos            enable row level security;
 alter table public.imobilizado_fechamentos enable row level security;
+grant select, insert, update, delete on public.rateios to authenticated;
+grant select, insert, update on public.recebimentos to authenticated;
+-- A foto fechada só muda pelas funções (security definer)
+grant select on public.imobilizado_fechamentos to authenticated;
 
 do $$
 declare
