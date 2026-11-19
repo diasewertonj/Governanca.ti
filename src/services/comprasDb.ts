@@ -108,11 +108,22 @@ const deItem = (r: Linha): ItemPedido => ({
   quantidade: Number(r.quantidade) || 1,
   valorUnitario: num(r.valor_unitario),
   ordem: Number(r.ordem) || 0,
+  link: txt(r.link),
+  valorReferencia: num(r.valor_referencia),
+  imagemUrl: txt(r.imagem_url),
 });
 
 const deCotacao = (r: Linha): CotacaoPedido => ({
   id: String(r.id),
-  fornecedorId: String(r.fornecedor_id),
+  itemId: txt(r.item_id),
+  fornecedorId: txt(r.fornecedor_id) || '',
+  loja: txt(r.loja),
+  link: txt(r.link),
+  marca: txt(r.marca),
+  modelo: txt(r.modelo),
+  descricao: txt(r.descricao),
+  imagemUrl: txt(r.imagem_url),
+  criadoPor: txt(r.criado_por),
   valor: Number(r.valor) || 0,
   prazoDias: num(r.prazo_dias),
   validade: txt(r.validade),
@@ -127,6 +138,7 @@ const deEvento = (r: Linha): EventoPedido => ({
   motivo: txt(r.motivo),
   por: txt(r.por),
   porNome: txt(r.por_nome),
+  campo: txt(r.campo),
   em: String(r.em),
 });
 
@@ -201,9 +213,12 @@ export async function fetchPedidosVisiveisDb(): Promise<PedidoCompra[] | null> {
   if (!supabase) return null;
   const data = await ler(bd().rpc('pedidos_visiveis'));
   if (!data) return null;
-  return (data as Linha[]).map((r) =>
-    dePedido(r, ((r.itens || []) as Linha[]).map((x, n) => deItem({ ...x, ordem: n })), [], ((r.eventos || []) as Linha[]).map(deEvento), true)
-  );
+  return (data as Linha[]).map((r) => {
+    const itens = (r.itens || []) as Linha[];
+    // Opções: as de quem pediu (valor só para ele) e a escolhida
+    const opcoes = itens.flatMap((x) => ((x.opcoes || []) as Linha[]).map((o) => deCotacao({ ...o, item_id: x.id })));
+    return dePedido(r, itens.map((x, n) => deItem({ ...x, ordem: n })), opcoes, ((r.eventos || []) as Linha[]).map(deEvento), true);
+  });
 }
 
 /** (Fase 11, mantida para compatibilidade) RH e gestor sem valores */
@@ -248,12 +263,22 @@ const linhaItem = (pedidoId: string, i: ItemPedido) => ({
   quantidade: i.quantidade,
   valor_unitario: i.valorUnitario ?? null,
   ordem: i.ordem,
+  link: i.link?.trim() || null,
+  valor_referencia: i.valorReferencia ?? null,
+  imagem_url: i.imagemUrl || null,
 });
 
 const linhaCotacao = (pedidoId: string, c: CotacaoPedido) => ({
   id: c.id,
   pedido_id: pedidoId,
-  fornecedor_id: c.fornecedorId,
+  item_id: c.itemId || null,
+  fornecedor_id: c.fornecedorId || null,
+  loja: c.loja?.trim() || null,
+  link: c.link?.trim() || null,
+  marca: c.marca?.trim() || null,
+  modelo: c.modelo?.trim() || null,
+  descricao: c.descricao?.trim() || null,
+  imagem_url: c.imagemUrl || null,
   valor: c.valor,
   prazo_dias: c.prazoDias ?? null,
   validade: c.validade || null,
@@ -284,8 +309,8 @@ export async function salvarPedidoDb(p: PedidoCompra, novo: boolean): Promise<st
   if (p.cotacoes.length) {
     // Primeiro todas sem vencedora; depois marca a escolhida (índice único por pedido)
     await checar(bd().from('pedido_cotacoes').upsert(p.cotacoes.map((c) => ({ ...linhaCotacao(p.id, c), vencedora: false })), { onConflict: 'id' }));
-    const vencedora = p.cotacoes.find((c) => c.vencedora);
-    if (vencedora) await atualizar('pedido_cotacoes', vencedora.id, { vencedora: true });
+    // Uma escolhida por item (e a do pedido inteiro, nas cotações antigas)
+    for (const v of p.cotacoes.filter((c) => c.vencedora)) await atualizar('pedido_cotacoes', v.id, { vencedora: true });
   }
   return codigo;
 }
@@ -305,7 +330,21 @@ export async function solicitarCompraDb(p: PedidoCompra): Promise<string | undef
         necessario_em: p.necessarioEm,
         tipo_pedido: p.tipoPedido || 'ti',
       },
-      p_itens: p.itens.map((i) => ({ tipo: i.tipo, descricao: i.descricao, categoria_ativo: i.categoriaAtivo, especificacao: i.especificacao, quantidade: i.quantidade })),
+      p_itens: p.itens.map((i) => ({
+        tipo: i.tipo,
+        descricao: i.descricao,
+        categoria_ativo: i.categoriaAtivo,
+        especificacao: i.especificacao,
+        quantidade: i.quantidade,
+        marca: i.marca,
+        modelo: i.modelo,
+        link: i.link,
+        valor_referencia: i.valorReferencia,
+        imagem_url: i.imagemUrl,
+        opcoes: p.cotacoes
+          .filter((c) => c.itemId === i.id)
+          .map((c) => ({ link: c.link, loja: c.loja, marca: c.marca, modelo: c.modelo, descricao: c.descricao, valor: c.valor, observacoes: c.observacoes, imagem_url: c.imagemUrl })),
+      })),
     })
   );
   return data as string;
@@ -352,7 +391,9 @@ export async function registrarCompraDb(id: string, d: DadosCompra): Promise<str
 
 export interface DadosRecebimento {
   localizacao: string;
-  ativos: { itemId: string; tag: string; serial?: string }[];
+  ativos: { itemId: string; tag: string; serial?: string; marca?: string; modelo?: string }[];
+  /** Seção 14: acessórios sem item de estoque que viram item novo */
+  criarEstoque?: string[];
 }
 
 export async function receberPedidoDb(id: string, d: DadosRecebimento) {
@@ -360,7 +401,11 @@ export async function receberPedidoDb(id: string, d: DadosRecebimento) {
   await checar(
     bd().rpc('receber_pedido', {
       p_pedido: id,
-      p_dados: { localizacao: d.localizacao, ativos: d.ativos.map((a) => ({ item_id: a.itemId, tag: a.tag, serial_number: a.serial || '' })) },
+      p_dados: {
+        localizacao: d.localizacao,
+        criar_estoque: d.criarEstoque || [],
+        ativos: d.ativos.map((a) => ({ item_id: a.itemId, tag: a.tag, serial_number: a.serial || '', marca: a.marca || '', modelo: a.modelo || '' })),
+      },
     })
   );
 }
@@ -474,4 +519,25 @@ export async function enviarMensagemPedidoDb(m: MensagemPedido) {
       .insert({ id: m.id, pedido_id: m.pedidoId, texto: m.texto.trim(), interna: m.interna, anexo_caminho: m.anexoCaminho || null })
       .select('id')
   );
+}
+// -----------------------------------------------------------------------------
+// Seção 14 · Dados do produto pelo link (função no servidor; a página não lê a loja)
+// -----------------------------------------------------------------------------
+export interface DadosDoLink {
+  nome?: string;
+  marca?: string;
+  modelo?: string;
+  preco?: number;
+  imagem?: string;
+  loja?: string;
+}
+
+export async function lerDadosDoLinkDb(url: string): Promise<{ dados?: DadosDoLink; erro?: string }> {
+  if (!supabase) return { erro: 'No modo demonstração a busca pelo link não está disponível: preencha à mão.' };
+  const { data, error } = await supabase.functions.invoke('dados-do-link', { body: { url } });
+  if (error) return { erro: 'Não foi possível ler este link agora. Preencha à mão.' };
+  const r = data as { dados?: DadosDoLink; achou?: boolean; erro?: string };
+  if (r?.erro) return { erro: r.erro };
+  if (!r?.achou) return { erro: 'A loja não publica os dados do produto nesta página. Preencha à mão.' };
+  return { dados: r.dados };
 }

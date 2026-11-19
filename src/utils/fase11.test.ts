@@ -12,6 +12,7 @@ import {
   valorDoPedido,
   esperaPorMim,
   vezDoPedido,
+  itensSemEscolha,
 } from './compras.ts';
 import { listarVencimentos, valorPatrimonio } from './financeiro.ts';
 
@@ -163,6 +164,24 @@ describe('Fase 11 · orçamento', () => {
     expect(imp.saldoDepois).toBe(3000);
     expect(imp.semOrcamento).toBe(false);
     expect(impactoNoOrcamento(pedido({ area: 'RH' }), linhas, [], [], 2026).semOrcamento).toBe(true);
+  });
+});
+
+describe('Seção 14 · opções por item', () => {
+  it('valor do pedido usa a opção escolhida de cada item; aprovar exige escolha onde há opções', () => {
+    const p = pedido({
+      itens: [
+        { id: 'i1', tipo: 'equipamento', descricao: 'Notebook', quantidade: 2, valorUnitario: 5000, ordem: 1 },
+        { id: 'i2', tipo: 'acessorio', descricao: 'Mouse', quantidade: 3, valorUnitario: 50, ordem: 2 },
+      ],
+      cotacoes: [
+        { id: 'o1', itemId: 'i1', fornecedorId: '', loja: 'A', valor: 4800, vencedora: true },
+        { id: 'o2', itemId: 'i1', fornecedorId: '', loja: 'B', valor: 4900, vencedora: false },
+        { id: 'o3', itemId: 'i2', fornecedorId: '', loja: 'C', valor: 40, vencedora: false },
+      ],
+    });
+    expect(valorDoPedido(p)).toBe(2 * 4800 + 3 * 50);
+    expect(itensSemEscolha(p)).toEqual(['Mouse']);
   });
 });
 

@@ -248,9 +248,20 @@ export function esperaPorMim(p: PedidoCompra, papel: string, eu?: string): boole
 /** Valor do pedido: o final (comprado), a cotação vencedora ou a soma estimada dos itens */
 export function valorDoPedido(p: Pick<PedidoCompra, 'valorFinal' | 'cotacoes' | 'itens'>): number {
   if (p.valorFinal != null) return p.valorFinal;
-  const vencedora = p.cotacoes.find((c) => c.vencedora);
-  if (vencedora) return vencedora.valor;
-  return centavos(p.itens.reduce((s, i) => s + i.quantidade * (i.valorUnitario || 0), 0));
+  // Cotação antiga (do pedido inteiro): valor total
+  const geral = p.cotacoes.find((c) => c.vencedora && !c.itemId);
+  if (geral) return geral.valor;
+  // Seção 14: por item, a opção escolhida (valor unitário) ou o estimado do item
+  return centavos(p.itens.reduce((s, i) => s + i.quantidade * (opcaoEscolhida(p, i.id)?.valor || i.valorUnitario || 0), 0));
+}
+
+/** Opções de um item (seção 14) e a escolhida */
+export const opcoesDoItem = (p: Pick<PedidoCompra, 'cotacoes'>, itemId: string) => p.cotacoes.filter((c) => c.itemId === itemId);
+export const opcaoEscolhida = (p: Pick<PedidoCompra, 'cotacoes'>, itemId: string) => p.cotacoes.find((c) => c.itemId === itemId && c.vencedora);
+
+/** Itens com opções e sem a escolhida (aprovar exige escolher) */
+export function itensSemEscolha(p: Pick<PedidoCompra, 'cotacoes' | 'itens'>): string[] {
+  return p.itens.filter((i) => opcoesDoItem(p, i.id).length > 0 && !opcaoEscolhida(p, i.id)).map((i) => i.descricao);
 }
 
 /** Pedido que ainda vai virar gasto (aprovado ou comprado e não pago) */

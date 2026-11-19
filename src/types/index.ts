@@ -803,11 +803,26 @@ export interface ItemPedido {
   /** Estimado até a compra; depois, o valor pago (RH e gestor não recebem) */
   valorUnitario?: number;
   ordem: number;
+  /** Seção 14: link do produto, valor que quem pediu viu (só ele e a equipe veem) e imagem */
+  link?: string;
+  valorReferencia?: number;
+  imagemUrl?: string;
 }
 
 export interface CotacaoPedido {
   id: string;
+  /** Seção 14: opção de um item (vazio = cotação antiga do pedido inteiro, valor total) */
+  itemId?: string;
+  /** Fornecedor do cadastro ou só o nome da loja */
   fornecedorId: string;
+  loja?: string;
+  link?: string;
+  marca?: string;
+  modelo?: string;
+  descricao?: string;
+  imagemUrl?: string;
+  criadoPor?: string;
+  /** Por item: valor unitário; cotação antiga: valor total */
   valor: number;
   prazoDias?: number;
   validade?: string;
@@ -822,6 +837,8 @@ export interface EventoPedido {
   motivo?: string;
   por?: string;
   porNome?: string;
+  /** Seção 14: 'item' = alteração de campo do item (motivo descreve) */
+  campo?: string;
   em: string;
 }
 
