@@ -8,11 +8,13 @@ import React, { useMemo, useState } from 'react';
 import { Ban, Check, ExternalLink, PackageCheck, Pencil, Send, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
-import type { FormaPagamento, PedidoCompra } from '../../types/index.ts';
+import type { FormaAprovacao, FormaPagamento, PedidoCompra } from '../../types/index.ts';
 import { ROTULO_CATEGORIA, ROTULO_FORMA_PAGAMENTO, brl } from '../../utils/financeiro.ts';
 import {
+  ROTULO_FORMA_APROVACAO,
   opcaoEscolhida,
   opcoesDoItem,
+  itensSemEscolha,
   fluxoDoPedido,
   vezDoPedido,
   ROTULO_STATUS_PEDIDO,
@@ -40,11 +42,12 @@ const dataHora = (iso?: string) => (iso ? new Date(iso).toLocaleString('pt-BR', 
 
 export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = ({ pedidoId, onClose }) => {
   const { currentRole, currentUser, employees, fornecedores, assets, tickets, faturas, abrirFicha, setSelectedTicketIdForDetail } = useApp();
-  const { pedidos, linhasAnoAtual, mudarStatusPedido, equipeCompras } = useCompras();
+  const { pedidos, linhasAnoAtual, mudarStatusPedido, equipeCompras, registrarAprovacao } = useCompras();
   const p = pedidos.find((x) => x.id === pedidoId);
   const [editando, setEditando] = useState(false);
   const [comprando, setComprando] = useState(false);
   const [recebendo, setRecebendo] = useState(false);
+  const [registrando, setRegistrando] = useState(false);
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   // T.I. e Compras ("equipe") veem valores e operam; a T.I. recebe; Compras/admin aprovam e compram
@@ -67,14 +70,17 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
   const vez = vezDoPedido(p);
   const aberto = ['rascunho', 'em_cotacao', 'aguardando', 'recusado'].includes(p.status);
   const podeEditar = isTI && aberto;
-  const podeEnviar = (isTI && ['rascunho', 'em_cotacao', 'recusado'].includes(p.status)) || (souSolicitante && (p.status === 'rascunho' || p.status === 'recusado'));
-  const podeDevolver = isTI && p.status === 'em_cotacao';
-  const podeAprovar = (vez === 'gestor' && !!eu && p.gestorId === eu) || (vez === 'compras_aprovacao' && (ehCompras || isAdmin));
+  // Seção 15 (fluxo enxuto): quem cota registra a aprovação (com quem aprovou); o gestor de quem pediu pode aprovar ele mesmo
+  const podeEnviar = (isTI || souSolicitante) && (p.status === 'rascunho' || p.status === 'recusado');
+  const podeDevolver = isTI && ['em_cotacao', 'aguardando', 'aprovado'].includes(p.status) && !(p.status === 'aprovado' && !(ehCompras || isAdmin));
+  const souGestor = !!eu && p.gestorId === eu && !souSolicitante;
+  const podeRegistrar = aberto && p.status !== 'rascunho' && (isTI || souGestor);
   const podeComprar = p.status === 'aprovado' && (ehCompras || isAdmin);
   const podeReceber = p.status === 'comprado' && (ehTI || (ehCompras && p.tipoPedido === 'outros'));
   const podeCancelar = isTI ? ['rascunho', 'em_cotacao', 'aguardando', 'aprovado', 'recusado'].includes(p.status) : souSolicitante && ['rascunho', 'em_cotacao', 'aguardando'].includes(p.status);
   const valor = p.semValores ? undefined : valorDoPedido(p);
-  const esperando = !podeAprovar && !podeComprar && !podeReceber && !podeEnviar ? proximoPasso(p) : '';
+  const esperando = !podeRegistrar && !podeComprar && !podeReceber && !podeEnviar ? proximoPasso(p) : '';
+  void vez;
 
   const agir = async (fn: () => Promise<string | null>) => {
     setOcupado(true);
@@ -83,35 +89,33 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
     setErro(r || '');
   };
 
-  const aprovar = async () => {
-    const linhas = [
-      `Valor: ${brl(valor || 0)}${p.cotacoes.find((c) => c.vencedora) ? ` · vencedora: ${fornecedor(p.cotacoes.find((c) => c.vencedora)?.fornecedorId)}` : ''}.`,
-      impacto && !impacto.semOrcamento
-        ? `Orçamento de ${ROTULO_CATEGORIA[p.categoria]}${p.area ? ` · ${p.area}` : ''} em ${ano}: depois deste pedido sobram ${brl(impacto.saldoDepois)} (${Math.round((impacto.pctDepois || 0) * 100)}% usado).`
-        : `Não há orçamento para ${ROTULO_CATEGORIA[p.categoria]}${p.area ? ` · ${p.area}` : ''} em ${ano}.`,
-      vez === 'gestor' ? 'Como gestor, a sua aprovação libera o pedido para Compras.' : 'Compras poderá registrar a compra. Dá para desfazer: cancele o pedido enquanto não for comprado.',
-    ];
-    if (!(await confirmar({ titulo: `Aprovar ${p.codigo}?`, mensagem: (vez === 'gestor' ? linhas.slice(2) : linhas).join('\n\n'), confirmar: 'Aprovar' }))) return;
-    await agir(() => mudarStatusPedido(p.id, 'aprovar'));
-  };
-  const recusar = async () => {
-    const motivo = await pedirTexto({ titulo: `Recusar ${p.codigo}?`, mensagem: 'Quem pediu vê o motivo. O pedido pode ser ajustado e reenviado.', rotulo: 'Motivo', minimo: 5, confirmar: 'Recusar', cancelar: 'Voltar', perigo: true });
-    if (motivo !== null) await agir(() => mudarStatusPedido(p.id, 'recusar', motivo));
-  };
   const cancelar = async () => {
     const motivo = await pedirTexto({ titulo: `Cancelar ${p.codigo}?`, mensagem: 'O pedido fica no histórico como cancelado. Não dá para desfazer: faça outro pedido se precisar.', rotulo: 'Motivo', minimo: 5, confirmar: 'Cancelar pedido', cancelar: 'Voltar', perigo: true });
     if (motivo !== null) await agir(() => mudarStatusPedido(p.id, 'cancelar', motivo));
   };
   const devolver = async () => {
-    const motivo = await pedirTexto({ titulo: `Devolver ${p.codigo} a quem pediu?`, mensagem: 'Ex.: já existe no estoque, não é de T.I., falta informação. Quem pediu vê o motivo e pode ajustar e reenviar.', rotulo: 'Motivo', minimo: 5, confirmar: 'Devolver', cancelar: 'Voltar' });
+    const aprovado = p.status === 'aprovado';
+    const motivo = await pedirTexto({
+      titulo: aprovado ? `Devolver ${p.codigo} para a cotação?` : `Devolver ${p.codigo} a quem pediu?`,
+      mensagem: aprovado
+        ? 'Ex.: a opção acabou, o preço mudou. O pedido volta para a cotação e precisa de nova aprovação.'
+        : 'Ex.: já existe no estoque, não é de T.I., falta informação. Quem pediu vê o motivo e pode ajustar e reenviar.',
+      rotulo: 'Motivo',
+      minimo: 5,
+      confirmar: 'Devolver',
+      cancelar: 'Voltar',
+    });
     if (motivo !== null) await agir(() => mudarStatusPedido(p.id, 'devolver', motivo));
   };
   const enviar = async () => {
-    const destino = !isTI && p.tipoPedido === 'ti' ? 'A T.I. cota o pedido e depois envia para aprovação.' : p.gestorId ? 'O gestor de quem pediu aprova primeiro; depois, Compras.' : 'Compras recebe o pedido para aprovar.';
-    if (!(await confirmar({ titulo: `Enviar ${p.codigo}?`, mensagem: destino, confirmar: 'Enviar' }))) return;
+    const destino = p.tipoPedido === 'outros' ? 'Compras cota e registra a aprovação.' : 'A T.I. cota e registra a aprovação com a liderança.';
+    if (!(await confirmar({ titulo: `Enviar ${p.codigo} para cotação?`, mensagem: destino, confirmar: 'Enviar' }))) return;
     await agir(() => mudarStatusPedido(p.id, 'enviar'));
   };
-
+  const aprovarComoGestor = async () => {
+    if (!(await confirmar({ titulo: `Aprovar ${p.codigo}?`, mensagem: 'Fica registrado "Aprovado por você (pelo sistema)" e o pedido segue para Compras comprar.', confirmar: 'Aprovar' }))) return;
+    await agir(() => registrarAprovacao(p.id, eu!, 'sistema'));
+  };
   const fluxo = fluxoDoPedido(p);
   const passoAtual = fluxo.indexOf(p.status);
 
@@ -148,20 +152,19 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             )}
             {podeEnviar && (
               <button type="button" disabled={ocupado} onClick={enviar} className="btn btn-primario">
-                <Send /> {p.status === 'recusado' ? 'Reenviar' : p.status === 'em_cotacao' || isTI ? 'Enviar para aprovação' : 'Enviar'}
+                <Send /> {p.status === 'recusado' ? 'Reenviar para cotação' : 'Enviar para cotação'}
               </button>
             )}
-            {podeAprovar && (
-              <>
-                <button type="button" disabled={ocupado} onClick={recusar} className="btn btn-perigo">
-                  <X /> Recusar
-                </button>
-                <button type="button" disabled={ocupado} onClick={aprovar} className="btn btn-primario">
-                  <Check /> {vez === 'gestor' ? 'Aprovar como gestor' : 'Aprovar'}
-                </button>
-              </>
+            {podeRegistrar && isTI && (
+              <button type="button" disabled={ocupado} onClick={() => setRegistrando(true)} className="btn btn-primario">
+                <Check /> Registrar aprovação
+              </button>
             )}
-            {podeComprar && (
+            {podeRegistrar && !isTI && souGestor && (
+              <button type="button" disabled={ocupado} onClick={aprovarComoGestor} className="btn btn-primario">
+                <Check /> Aprovar (sou o gestor)
+              </button>
+            )}            {podeComprar && (
               <button type="button" onClick={() => setComprando(true)} className="btn btn-primario">
                 <ShoppingCart /> Registrar compra
               </button>
@@ -206,6 +209,14 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
               <Dado rotulo="Em">{formatDate(p.criadoEm.slice(0, 10))}</Dado>
               <Dado rotulo="Categoria">{ROTULO_CATEGORIA[p.categoria]}</Dado>
               <Dado rotulo="Área">{p.area || 'Geral'}</Dado>
+              {p.aprovadorId && (
+                <Dado rotulo="Aprovado por">
+                  {nome(p.aprovadorId)}
+                  {p.aprovacaoForma ? ` · ${ROTULO_FORMA_APROVACAO[p.aprovacaoForma]}` : ''}
+                  {p.aprovadoEm ? ` · ${formatDate(p.aprovadoEm.slice(0, 10))}` : ''}
+                  {p.aprovadoPor && p.aprovadoPor !== p.aprovadorId ? ` (registrado por ${nome(p.aprovadoPor)})` : ''}
+                </Dado>
+              )}
               <Dado rotulo="Para quem">{p.colaboradorDestinoId ? nome(p.colaboradorDestinoId, p.destinoNome) : '—'}</Dado>
               <Dado rotulo="Precisa até">{p.necessarioEm ? formatDate(p.necessarioEm) : '—'}</Dado>
               <Dado rotulo="Admissão">
@@ -360,6 +371,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                     <li key={a.id}>
                       <button type="button" className="btn btn-sm btn-secundario" onClick={() => (ehTI ? abrirFicha({ tipo: 'ativo', id: a.id }) : undefined)} disabled={!ehTI}>
                         <span className="font-mono">{a.tag}</span> · {a.nome}
+                        {ehTI && p.colaboradorDestinoId && a.status === 'disponivel' && <span className="selo selo-info ml-1">entregar a {nome(p.colaboradorDestinoId, p.destinoNome)}</span>}
                         {a.serialNumber.startsWith('A-PREENCHER') && ehTI && <span className="selo selo-atencao ml-1">série a preencher</span>}
                       </button>
                     </li>
@@ -397,6 +409,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
       {editando && <FormPedido inicial={p} onClose={() => setEditando(false)} />}
       {comprando && <FormCompra pedido={p} onClose={() => setComprando(false)} />}
       {recebendo && <FormRecebimento pedido={p} onClose={() => setRecebendo(false)} />}
+      {registrando && <FormAprovacao pedido={p} impacto={impacto} onClose={() => setRegistrando(false)} />}
     </>
   );
 };
@@ -694,6 +707,87 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
             ))}
           </ul>
         </div>
+        {erro && (
+          <p role="alert" className="erro">
+            {erro}
+          </p>
+        )}
+      </div>
+    </Janela>
+  );
+};
+
+/** Seção 15: registrar a aprovação — quem aprovou (nunca quem pediu), como e quando */
+const FormAprovacao: React.FC<{ pedido: PedidoCompra; impacto: ReturnType<typeof impactoNoOrcamento> | null; onClose: () => void }> = ({ pedido: p, impacto, onClose }) => {
+  const { pessoasAprovacao, registrarAprovacao } = useCompras();
+  const [aprovador, setAprovador] = useState(p.gestorId && p.gestorId !== p.solicitanteId ? p.gestorId : '');
+  const [forma, setForma] = useState<FormaAprovacao>('pessoalmente');
+  const [obs, setObs] = useState('');
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const sem = itensSemEscolha(p);
+  const salvar = async () => {
+    setSalvando(true);
+    const r = await registrarAprovacao(p.id, aprovador, forma, obs);
+    setSalvando(false);
+    if (r) setErro(r);
+    else onClose();
+  };
+  return (
+    <Janela
+      titulo="Registrar aprovação"
+      subtitulo={`${p.codigo} · ${p.titulo}`}
+      tamanho="p"
+      onFechar={onClose}
+      rodape={
+        <>
+          <button type="button" onClick={onClose} className="btn btn-secundario">
+            Cancelar
+          </button>
+          <button type="button" disabled={salvando || !aprovador || sem.length > 0} onClick={salvar} className="btn btn-primario">
+            {salvando ? 'Registrando…' : 'Aprovado: seguir para compra'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {sem.length > 0 && <p className="erro">Escolha a opção de: {sem.join(', ')} (Editar).</p>}
+        <div>
+          <label htmlFor="aprov-quem" className="rotulo">Aprovado por</label>
+          <select id="aprov-quem" value={aprovador} onChange={(e) => setAprovador(e.target.value)} className="campo">
+            <option value="">Escolha…</option>
+            {pessoasAprovacao
+              .filter((x) => x.id !== p.solicitanteId)
+              .map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.nome}
+                  {x.id === p.gestorId ? ' (gestor de quem pediu)' : x.cargo ? ` · ${x.cargo}` : ''}
+                </option>
+              ))}
+          </select>
+          <p className="ajuda">Quem pediu não pode aprovar o próprio pedido.</p>
+        </div>
+        <div>
+          <label htmlFor="aprov-forma" className="rotulo">Como foi a aprovação</label>
+          <select id="aprov-forma" value={forma} onChange={(e) => setForma(e.target.value as FormaAprovacao)} className="campo">
+            {(Object.keys(ROTULO_FORMA_APROVACAO) as FormaAprovacao[]).map((f) => (
+              <option key={f} value={f}>
+                {ROTULO_FORMA_APROVACAO[f]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="aprov-obs" className="rotulo">Observação (opcional)</label>
+          <input id="aprov-obs" value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: conversado na reunião de segunda" className="campo" />
+        </div>
+        {impacto && (
+          <p className={`text-xs ${impacto.saldoDepois < 0 ? 'text-red-700' : 'text-slate-600'}`}>
+            {impacto.semOrcamento
+              ? 'Não há orçamento para esta categoria e área no ano.'
+              : `Orçamento depois deste pedido: sobram ${brl(impacto.saldoDepois)} (${Math.round((impacto.pctDepois || 0) * 100)}% usado).`}
+          </p>
+        )}
         {erro && (
           <p role="alert" className="erro">
             {erro}

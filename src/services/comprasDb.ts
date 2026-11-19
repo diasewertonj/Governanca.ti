@@ -13,6 +13,7 @@ import type {
   CategoriaDespesa,
   CotacaoPedido,
   EventoPedido,
+  FormaAprovacao,
   FormaPagamento,
   InventarioFisico,
   ItemInventario,
@@ -161,6 +162,9 @@ const dePedido = (r: Linha, itens: ItemPedido[], cotacoes: CotacaoPedido[], even
   nfChave: txt(r.nf_chave),
   nfArquivo: txt(r.nf_arquivo),
   fornecedorTrocaMotivo: txt(r.fornecedor_troca_motivo),
+  aprovadorId: txt(r.aprovador_id),
+  aprovacaoForma: txt(r.aprovacao_forma) as FormaAprovacao | undefined,
+  aprovacaoObs: txt(r.aprovacao_obs),
   colaboradorDestinoId: txt(r.colaborador_destino_id),
   chamadoId: txt(r.chamado_id),
   processoItemId: txt(r.processo_item_id),
@@ -348,6 +352,19 @@ export async function solicitarCompraDb(p: PedidoCompra): Promise<string | undef
     })
   );
   return data as string;
+}
+
+/** Seção 15: registra quem aprovou e como (a opção escolhida vira o produto do item) */
+export async function aprovarPedidoDb(id: string, aprovadorId: string, forma: FormaAprovacao, obs?: string) {
+  if (!supabase) return;
+  await checar(bd().rpc('aprovar_pedido', { p_pedido: id, p_aprovador: aprovadorId, p_forma: forma, p_obs: obs || null }));
+}
+
+/** Nomes para escolher "Aprovado por" (T.I. e Compras) */
+export async function fetchPessoasAprovacaoDb(): Promise<{ id: string; nome: string; cargo?: string }[] | null> {
+  if (!supabase) return null;
+  const data = await ler(bd().rpc('pessoas_para_aprovacao'));
+  return data ? (data as Linha[]).map((r) => ({ id: String(r.id), nome: String(r.nome), cargo: txt(r.cargo) })) : null;
 }
 
 export async function mudarStatusPedidoDb(id: string, acao: 'enviar' | 'devolver' | 'aprovar' | 'recusar' | 'cancelar', motivo?: string) {
