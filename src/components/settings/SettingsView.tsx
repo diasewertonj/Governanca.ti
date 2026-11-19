@@ -7,6 +7,7 @@ import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
 import { FinanceiroSettings } from './FinanceiroSettings.tsx';
+import { GaleriaVisual } from './GaleriaVisual.tsx';
 import { UnidadesLista } from '../fornecedores/UnidadesLista.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { NavLateral, type GrupoNav } from '../ui/Abas.tsx';
@@ -58,7 +59,7 @@ const ROTULO_CAMPO_EMPRESA = {
 } as const;
 
 // Fase 7: abas com nomes do glossário (a chave interna não muda)
-type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'vida_util' | 'financeiro' | 'banco';
+type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'vida_util' | 'financeiro' | 'banco' | 'galeria';
 const GRUPOS: GrupoNav<Aba>[] = [
   {
     titulo: 'Empresa',
@@ -93,6 +94,10 @@ const GRUPOS: GrupoNav<Aba>[] = [
   { titulo: 'Financeiro', itens: [{ id: 'financeiro', rotulo: 'Premissas e áreas' }] },
   { titulo: 'Sistema', itens: [{ id: 'banco', rotulo: 'Conexão' }] },
 ];
+// Seção 19: galeria de componentes (só admin)
+const GRUPOS_ADMIN: GrupoNav<Aba>[] = GRUPOS.map((g) =>
+  g.titulo === 'Sistema' ? { ...g, itens: [...g.itens, { id: 'galeria', rotulo: 'Galeria visual' }] } : g
+);
 
 export const SettingsView: React.FC = () => {
   const {
@@ -109,6 +114,7 @@ export const SettingsView: React.FC = () => {
     isSupabaseConnected,
     supabaseHealth,
     refreshSupabaseData,
+    currentRole,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<Aba>('empresa');
@@ -431,7 +437,7 @@ export const SettingsView: React.FC = () => {
       )}
 
       <div className="grid gap-4 md:grid-cols-[14rem_minmax(0,1fr)]">
-        <NavLateral rotulo="Seções das configurações" grupos={GRUPOS} ativa={activeTab} onMudar={setActiveTab} />
+        <NavLateral rotulo="Seções das configurações" grupos={currentRole === 'ti_admin' ? GRUPOS_ADMIN : GRUPOS} ativa={activeTab} onMudar={setActiveTab} />
 
         <div className="min-w-0 space-y-4">
           {/* DADOS DA EMPRESA E DOCUMENTOS E TERMOS */}
@@ -778,6 +784,7 @@ export const SettingsView: React.FC = () => {
           {activeTab === 'catalogo' && <CatalogoSettings />}
           {activeTab === 'prazos' && <PrazosSettings />}
           {activeTab === 'financeiro' && <FinanceiroSettings />}
+          {activeTab === 'galeria' && currentRole === 'ti_admin' && <GaleriaVisual />}
 
           {/* USUÁRIOS E PERMISSÕES: quem opera o sistema */}
           {activeTab === 'equipe' && (

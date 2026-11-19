@@ -47,10 +47,11 @@ export function situacaoTermo(t: TermoBase, paraColaborador = false, codigoSubst
 }
 
 export const CLASSE_TOM: Record<TomSituacao, string> = {
-  ok: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-  pendente: 'text-amber-700 bg-amber-50 border-amber-200',
-  neutro: 'text-slate-700 bg-slate-100 border-slate-200',
-  cancelado: 'text-rose-700 bg-rose-50 border-rose-200 line-through decoration-rose-300',
+  // Seção 19: mapa único de situação — só os selos do padrão
+  ok: 'selo-ok',
+  pendente: 'selo-atencao',
+  neutro: 'selo-neutro',
+  cancelado: 'selo-problema line-through',
 };
 
 /**

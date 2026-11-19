@@ -180,7 +180,7 @@ function MainApp() {
           onFechar={fecharMenu}
         />
 
-        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-clip">
           <Suspense fallback={<Carregando />}>
           {mostrarProcesso ? (
             <TelaProcesso key={processoAberto} chamadoId={processoAberto} onVoltar={fecharProcesso} />

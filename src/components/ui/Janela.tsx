@@ -42,29 +42,29 @@ export const Janela: React.FC<{
         <div className="janela-cabecalho">
           <div className="flex min-w-[12rem] flex-1 items-center gap-2.5">
             {temAnterior && <BotaoVoltar onClick={onFechar} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
-            {icone && <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100/70 text-blue-700">{icone}</div>}
+            {icone && <div className="janela-icone">{icone}</div>}
             <div className="min-w-0">
               {temAnterior && <Caminho niveis={nav.niveis} indice={nav.indice} voltarAte={nav.voltarAte} />}
-              <h2 id={idTitulo} className="truncate text-sm font-semibold text-slate-900">
+              <h2 id={idTitulo} className="janela-titulo truncate">
                 {titulo}
               </h2>
-              {subtitulo && <p className="truncate text-xs text-slate-500">{subtitulo}</p>}
+              {subtitulo && <p className="texto-aux truncate">{subtitulo}</p>}
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 ml-auto">
             {acoes}
             {temAnterior ? (
               <button type="button" aria-label="Fechar tudo" title="Fechar tudo" onClick={() => void nav.fecharTudo?.()} className="btn-icone">
-                <X className="!h-5 !w-5" />
+                <X className="ico-lg" />
               </button>
             ) : (
               <button type="button" aria-label="Fechar" onClick={onFechar} className="btn-icone">
-                <X className="!h-5 !w-5" />
+                <X className="ico-lg" />
               </button>
             )}
           </div>
         </div>
-        {faixa && <div className="border-b border-slate-200 bg-white px-5 py-2">{faixa}</div>}
+        {faixa && <div className="border-b border-slate-200 bg-white px-4 py-2 sm:px-6">{faixa}</div>}
         <div className="janela-corpo">{children}</div>
         {rodape && <div className="janela-rodape">{rodape}</div>}
       </div>
@@ -75,7 +75,7 @@ export const Janela: React.FC<{
 /** Linha "rótulo: valor" usada nos resumos das fichas */
 export const Dado: React.FC<{ rotulo: string; children: React.ReactNode; className?: string }> = ({ rotulo, children, className = '' }) => (
   <div className={`min-w-0 ${className}`}>
-    <dt className="text-xs text-slate-500">{rotulo}</dt>
-    <dd className="text-xs font-medium break-words text-slate-900">{children ?? '—'}</dd>
+    <dt className="texto-aux">{rotulo}</dt>
+    <dd className="font-semibold break-words text-slate-900">{children ?? '—'}</dd>
   </div>
 );
