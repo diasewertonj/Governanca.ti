@@ -46,11 +46,8 @@ select harness.rodar('fase11', 'P4 RH não lê a tabela de pedidos (0 linhas)', 
     perform harness.espera($s$select 1 from public.pedidos_compra$s$, 0);
     perform harness.espera($s$select 1 from public.pedido_itens$s$, 0);
   end $x$$q$);
-select harness.rodar('fase11', 'P5 no máximo 3 cotações e uma vencedora', 'erro: Cada pedido tem no máximo 3 cotações', :'sup', 'authenticated',
-  $q$do $x$ begin
-    insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor) values ('pc-1', 'for-f11', 1), ('pc-1', 'for-f11', 2), ('pc-1', 'for-f11', 3);
-    insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor) values ('pc-1', 'for-f11', 4);
-  end $x$$q$);
+select harness.rodar('fase11', 'P5 uma só cotação vencedora por pedido (seção 14: opções sem limite de 3)', 'erro: duplicate key value violates unique constraint "uq_pedido_opcao_escolhida"', :'sup', 'authenticated',
+  $q$insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor, vencedora) values ('pc-1', 'for-f11', 1, true), ('pc-1', 'for-f11', 2, true)$q$);
 
 -- Aprovação: só o admin --------------------------------------------------------------------------
 select harness.rodar('fase11', 'A1 suporte envia e não consegue aprovar', 'bloqueado', :'sup', 'authenticated',
@@ -95,7 +92,7 @@ select harness.rodar('fase11', 'C1 comprado gera a fatura do pedido em Contas a 
       and status = 'a_pagar' and numero_documento = 'NF-77'$s$, 1);
     perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pc-1' and status = 'comprado' and valor_final = 10030 and fatura_id is not null$s$, 1);
   end $x$$q$);
-select harness.rodar('fase11', 'C2 compra só de pedido aprovado', 'erro: Só um pedido aprovado pode ser registrado como comprado', :'sup', 'authenticated',
+select harness.rodar('fase11', 'C2 compra só de pedido aprovado', 'erro: Só um pedido aprovado pode ser registrado como comprado', :'admin', 'authenticated',
   $q$select public.registrar_compra_pedido('pc-1', '{"fornecedor_id":"for-f11","data_compra":"2026-11-10","vencimento":"2026-12-10"}')$q$);
 select harness.rodar('fase11', 'C3 receber exige o patrimônio de cada unidade', 'erro: Informe o patrimônio de cada unidade de "Notebook Dell 5440" (2 unidade(s))', :'admin', 'authenticated',
   $q$do $x$ begin
@@ -133,13 +130,13 @@ select harness.rodar('fase11', 'C6 RH não registra o recebimento', 'bloqueado',
   $q$select public.receber_pedido('pc-1')$q$);
 
 -- RH e gestor pedem compra sem ver valores --------------------------------------------------------
-select harness.rodar('fase11', 'R1 RH pede compra e o pedido já vai para aprovação', 'ok', :'rh', 'authenticated',
+select harness.rodar('fase11', 'R1 RH pede compra e o pedido vai para a cotação da T.I.', 'ok', :'rh', 'authenticated',
   $q$do $x$
   declare v text;
   begin
     v := public.solicitar_compra('{"titulo":"Notebook para nova analista","justificativa":"Admissão em dezembro","chamado_id":"tkt-3"}',
                                  '[{"tipo":"equipamento","descricao":"Notebook","quantidade":1}]');
-    perform harness.espera(format($s$select 1 from public.pedidos_solicitados() where id = %L and status = 'aguardando'
+    perform harness.espera(format($s$select 1 from public.pedidos_solicitados() where id = %L and status = 'em_cotacao'
       and solicitante_id = 'emp-rh' and chamado_id = 'tkt-3' and jsonb_array_length(itens) = 1$s$, v), 1);
   end $x$$q$);
 select harness.rodar('fase11', 'R2 RH vê os pedidos sem valores (nenhuma chave de valor nos itens)', 'ok', :'rh', 'authenticated',
@@ -154,7 +151,7 @@ select harness.rodar('fase11', 'R2b RH não vê rascunho de outra pessoa', 'ok',
   $q$do $x$ begin
     perform harness.espera($s$select 1 from public.pedidos_solicitados() where id = 'pc-1'$s$, 0);
   end $x$$q$);
-select harness.rodar('fase11', 'R3 colaborador que não é gestor não pede compra', 'bloqueado', :'colab', 'authenticated',
+select harness.rodar('fase11', 'R3 qualquer colaborador pede compra (seção 13)', 'ok', :'colab', 'authenticated',
   $q$select public.solicitar_compra('{"titulo":"Monitor","justificativa":"Trabalho remoto"}', '[{"descricao":"Monitor"}]')$q$);
 update public.colaboradores set gestor_id = 'emp-colab' where id = 'emp-outro';
 select harness.rodar('fase11', 'R4 gestor pede compra e vê só os pedidos dele', 'ok', :'colab', 'authenticated',
@@ -166,12 +163,16 @@ select harness.rodar('fase11', 'R4 gestor pede compra e vê só os pedidos dele'
     perform public.mudar_status_pedido(v, 'cancelar', 'Não precisa mais');
     perform harness.espera($s$select 1 from public.pedidos_solicitados() where status = 'cancelado'$s$, 1);
   end $x$$q$);
-select harness.rodar('fase11', 'R5 RH não aprova o próprio pedido', 'bloqueado', :'rh', 'authenticated',
+select harness.rodar('fase11', 'R5 RH não aprova o próprio pedido (está em cotação)', 'erro: O pedido PC-', :'rh', 'authenticated',
   $q$do $x$
   declare v text;
   begin
     v := public.solicitar_compra('{"titulo":"Headset","justificativa":"Atendimento"}', '[{"descricao":"Headset"}]');
-    perform public.mudar_status_pedido(v, 'aprovar');
+    begin
+      perform public.mudar_status_pedido(v, 'aprovar');
+    exception when others then
+      raise exception '%', left(sqlerrm, 12);
+    end;
   end $x$$q$);
 select harness.rodar('fase11', 'R6 pedido sem justificativa é recusado na entrada', 'erro: Explique para que é a compra', :'rh', 'authenticated',
   $q$select public.solicitar_compra('{"titulo":"Headset"}', '[{"descricao":"Headset"}]')$q$);

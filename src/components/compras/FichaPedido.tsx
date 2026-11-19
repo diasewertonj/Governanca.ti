@@ -5,13 +5,16 @@
  * Só o administrador aprova ou recusa. RH e gestor veem o pedido sem valores.
  */
 import React, { useMemo, useState } from 'react';
-import { Ban, Check, PackageCheck, Pencil, Send, ShoppingCart, X } from 'lucide-react';
+import { Ban, Check, ExternalLink, PackageCheck, Pencil, Send, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { FormaPagamento, PedidoCompra } from '../../types/index.ts';
 import { ROTULO_CATEGORIA, ROTULO_FORMA_PAGAMENTO, brl } from '../../utils/financeiro.ts';
 import {
-  FLUXO_PEDIDO,
+  opcaoEscolhida,
+  opcoesDoItem,
+  fluxoDoPedido,
+  vezDoPedido,
   ROTULO_STATUS_PEDIDO,
   ROTULO_TIPO_ITEM,
   SELO_STATUS_PEDIDO,
@@ -26,6 +29,8 @@ import { CampoMoeda } from '../ui/Campos.tsx';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { FormPedido } from './FormPedido.tsx';
+import { ConversaPedido } from './ConversaPedido.tsx';
+import { CampoMascara } from '../ui/Campos.tsx';
 
 const hoje = () => {
   const d = new Date();
@@ -35,31 +40,41 @@ const dataHora = (iso?: string) => (iso ? new Date(iso).toLocaleString('pt-BR', 
 
 export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = ({ pedidoId, onClose }) => {
   const { currentRole, currentUser, employees, fornecedores, assets, tickets, faturas, abrirFicha, setSelectedTicketIdForDetail } = useApp();
-  const { pedidos, linhasAnoAtual, mudarStatusPedido } = useCompras();
+  const { pedidos, linhasAnoAtual, mudarStatusPedido, equipeCompras } = useCompras();
   const p = pedidos.find((x) => x.id === pedidoId);
   const [editando, setEditando] = useState(false);
   const [comprando, setComprando] = useState(false);
   const [recebendo, setRecebendo] = useState(false);
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
-  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  // T.I. e Compras ("equipe") veem valores e operam; a T.I. recebe; Compras/admin aprovam e compram
+  const isTI = equipeCompras;
+  const ehTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   const isAdmin = currentRole === 'ti_admin';
+  const ehCompras = currentRole === 'compras';
+  const eu = currentUser?.id;
 
   const ano = new Date().getFullYear();
   const impacto = useMemo(() => (p && isTI ? impactoNoOrcamento(p, linhasAnoAtual, pedidos, faturas, ano) : null), [p, isTI, linhasAnoAtual, pedidos, faturas, ano]);
   if (!p) return null;
 
-  const nome = (id?: string) => employees.find((e) => e.id === id)?.nome || '—';
+  const nome = (id?: string, reserva?: string) => employees.find((e) => e.id === id)?.nome || reserva || '—';
   const fornecedor = (id?: string) => fornecedores.find((f) => f.id === id)?.nome || '—';
   const admissao = tickets.find((t) => t.id === p.chamadoId);
   const ativosRecebidos = assets.filter((a) => a.pedidoId === p.id).sort((a, b) => a.tag.localeCompare(b.tag));
   const fatura = faturas.find((f) => f.id === p.faturaId || (f.pedidoId === p.id && f.status !== 'cancelada'));
-  const souSolicitante = !!currentUser && p.solicitanteId === currentUser.id;
-  const aberto = p.status === 'rascunho' || p.status === 'aguardando' || p.status === 'recusado';
+  const souSolicitante = !!eu && p.solicitanteId === eu;
+  const vez = vezDoPedido(p);
+  const aberto = ['rascunho', 'em_cotacao', 'aguardando', 'recusado'].includes(p.status);
   const podeEditar = isTI && aberto;
-  const podeEnviar = (isTI || souSolicitante) && (p.status === 'rascunho' || p.status === 'recusado');
-  const podeCancelar = isTI ? ['rascunho', 'aguardando', 'aprovado', 'recusado'].includes(p.status) : souSolicitante && (p.status === 'rascunho' || p.status === 'aguardando');
+  const podeEnviar = (isTI && ['rascunho', 'em_cotacao', 'recusado'].includes(p.status)) || (souSolicitante && (p.status === 'rascunho' || p.status === 'recusado'));
+  const podeDevolver = isTI && p.status === 'em_cotacao';
+  const podeAprovar = (vez === 'gestor' && !!eu && p.gestorId === eu) || (vez === 'compras_aprovacao' && (ehCompras || isAdmin));
+  const podeComprar = p.status === 'aprovado' && (ehCompras || isAdmin);
+  const podeReceber = p.status === 'comprado' && (ehTI || (ehCompras && p.tipoPedido === 'outros'));
+  const podeCancelar = isTI ? ['rascunho', 'em_cotacao', 'aguardando', 'aprovado', 'recusado'].includes(p.status) : souSolicitante && ['rascunho', 'em_cotacao', 'aguardando'].includes(p.status);
   const valor = p.semValores ? undefined : valorDoPedido(p);
+  const esperando = !podeAprovar && !podeComprar && !podeReceber && !podeEnviar ? proximoPasso(p) : '';
 
   const agir = async (fn: () => Promise<string | null>) => {
     setOcupado(true);
@@ -74,9 +89,9 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
       impacto && !impacto.semOrcamento
         ? `Orçamento de ${ROTULO_CATEGORIA[p.categoria]}${p.area ? ` · ${p.area}` : ''} em ${ano}: depois deste pedido sobram ${brl(impacto.saldoDepois)} (${Math.round((impacto.pctDepois || 0) * 100)}% usado).`
         : `Não há orçamento para ${ROTULO_CATEGORIA[p.categoria]}${p.area ? ` · ${p.area}` : ''} em ${ano}.`,
-      'A T.I. poderá registrar a compra. Dá para desfazer: cancele o pedido enquanto não for comprado.',
+      vez === 'gestor' ? 'Como gestor, a sua aprovação libera o pedido para Compras.' : 'Compras poderá registrar a compra. Dá para desfazer: cancele o pedido enquanto não for comprado.',
     ];
-    if (!(await confirmar({ titulo: `Aprovar ${p.codigo}?`, mensagem: linhas.join('\n\n'), confirmar: 'Aprovar' }))) return;
+    if (!(await confirmar({ titulo: `Aprovar ${p.codigo}?`, mensagem: (vez === 'gestor' ? linhas.slice(2) : linhas).join('\n\n'), confirmar: 'Aprovar' }))) return;
     await agir(() => mudarStatusPedido(p.id, 'aprovar'));
   };
   const recusar = async () => {
@@ -87,12 +102,18 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
     const motivo = await pedirTexto({ titulo: `Cancelar ${p.codigo}?`, mensagem: 'O pedido fica no histórico como cancelado. Não dá para desfazer: faça outro pedido se precisar.', rotulo: 'Motivo', minimo: 5, confirmar: 'Cancelar pedido', cancelar: 'Voltar', perigo: true });
     if (motivo !== null) await agir(() => mudarStatusPedido(p.id, 'cancelar', motivo));
   };
+  const devolver = async () => {
+    const motivo = await pedirTexto({ titulo: `Devolver ${p.codigo} a quem pediu?`, mensagem: 'Ex.: já existe no estoque, não é de T.I., falta informação. Quem pediu vê o motivo e pode ajustar e reenviar.', rotulo: 'Motivo', minimo: 5, confirmar: 'Devolver', cancelar: 'Voltar' });
+    if (motivo !== null) await agir(() => mudarStatusPedido(p.id, 'devolver', motivo));
+  };
   const enviar = async () => {
-    if (!(await confirmar({ titulo: `Enviar ${p.codigo} para aprovação?`, mensagem: 'O administrador recebe o pedido em Precisa de atenção.', confirmar: 'Enviar' }))) return;
+    const destino = !isTI && p.tipoPedido === 'ti' ? 'A T.I. cota o pedido e depois envia para aprovação.' : p.gestorId ? 'O gestor de quem pediu aprova primeiro; depois, Compras.' : 'Compras recebe o pedido para aprovar.';
+    if (!(await confirmar({ titulo: `Enviar ${p.codigo}?`, mensagem: destino, confirmar: 'Enviar' }))) return;
     await agir(() => mudarStatusPedido(p.id, 'enviar'));
   };
 
-  const passoAtual = FLUXO_PEDIDO.indexOf(p.status);
+  const fluxo = fluxoDoPedido(p);
+  const passoAtual = fluxo.indexOf(p.status);
 
   return (
     <>
@@ -119,28 +140,33 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
         }
         rodape={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
-            {p.status === 'aguardando' && !isAdmin && <span className="mr-auto text-xs text-slate-500">Aguardando o administrador aprovar.</span>}
-            {podeEnviar && (
-              <button type="button" disabled={ocupado} onClick={enviar} className="btn btn-primario">
-                <Send /> {p.status === 'recusado' ? 'Reenviar para aprovação' : 'Enviar para aprovação'}
+            {esperando && <span className="mr-auto text-xs text-slate-500">Aguardando: {esperando}.</span>}
+            {podeDevolver && (
+              <button type="button" disabled={ocupado} onClick={devolver} className="btn btn-secundario">
+                <X /> Devolver
               </button>
             )}
-            {p.status === 'aguardando' && isAdmin && (
+            {podeEnviar && (
+              <button type="button" disabled={ocupado} onClick={enviar} className="btn btn-primario">
+                <Send /> {p.status === 'recusado' ? 'Reenviar' : p.status === 'em_cotacao' || isTI ? 'Enviar para aprovação' : 'Enviar'}
+              </button>
+            )}
+            {podeAprovar && (
               <>
                 <button type="button" disabled={ocupado} onClick={recusar} className="btn btn-perigo">
                   <X /> Recusar
                 </button>
                 <button type="button" disabled={ocupado} onClick={aprovar} className="btn btn-primario">
-                  <Check /> Aprovar
+                  <Check /> {vez === 'gestor' ? 'Aprovar como gestor' : 'Aprovar'}
                 </button>
               </>
             )}
-            {p.status === 'aprovado' && isTI && (
+            {podeComprar && (
               <button type="button" onClick={() => setComprando(true)} className="btn btn-primario">
                 <ShoppingCart /> Registrar compra
               </button>
             )}
-            {p.status === 'comprado' && isTI && (
+            {podeReceber && (
               <button type="button" onClick={() => setRecebendo(true)} className="btn btn-primario">
                 <PackageCheck /> Registrar recebimento
               </button>
@@ -156,7 +182,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
           )}
           {/* Linha do tempo do fluxo */}
           <ol className="flex flex-wrap gap-1.5" aria-label="Etapas do pedido">
-            {FLUXO_PEDIDO.map((s, i) => (
+            {fluxo.map((s, i) => (
               <li key={s} className={`selo ${p.status === s ? SELO_STATUS_PEDIDO[s] : passoAtual > i ? 'selo-ok' : 'selo-neutro'}`}>
                 {i + 1}. {ROTULO_STATUS_PEDIDO[s]}
               </li>
@@ -172,11 +198,15 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
           <section className="cartao space-y-3 p-4">
             <h3 className="secao-titulo">Resumo</h3>
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Dado rotulo="Pedido por">{nome(p.solicitanteId)}</Dado>
+              <Dado rotulo="Pedido por">{nome(p.solicitanteId, p.solicitanteNome)}</Dado>
+              <Dado rotulo="Tipo">{p.tipoPedido === 'outros' ? 'Outros (Compras cota)' : 'De T.I. (a T.I. cota)'}</Dado>
+              <Dado rotulo="Gestor">
+                {p.gestorId ? `` : 'sem gestor (só Compras aprova)'}
+              </Dado>
               <Dado rotulo="Em">{formatDate(p.criadoEm.slice(0, 10))}</Dado>
               <Dado rotulo="Categoria">{ROTULO_CATEGORIA[p.categoria]}</Dado>
               <Dado rotulo="Área">{p.area || 'Geral'}</Dado>
-              <Dado rotulo="Para quem">{p.colaboradorDestinoId ? nome(p.colaboradorDestinoId) : '—'}</Dado>
+              <Dado rotulo="Para quem">{p.colaboradorDestinoId ? nome(p.colaboradorDestinoId, p.destinoNome) : '—'}</Dado>
               <Dado rotulo="Precisa até">{p.necessarioEm ? formatDate(p.necessarioEm) : '—'}</Dado>
               <Dado rotulo="Admissão">
                 {admissao ? (
@@ -217,6 +247,29 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                   <tr key={i.id}>
                     <td data-label="Item">
                       <span className="font-medium text-slate-900">{i.descricao}</span>
+                      {i.link && /^https?:\/\//i.test(i.link) && (
+                        <a href={i.link} target="_blank" rel="noopener noreferrer" className="link ml-1.5 inline-flex items-center gap-0.5 text-xs">
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" /> ver produto
+                        </a>
+                      )}
+                      {i.valorReferencia != null && <span className="block text-slate-500">quem pediu viu {brl(i.valorReferencia)}</span>}
+                      {opcoesDoItem(p, i.id).length > 0 && (
+                        <ul className="mt-1 space-y-0.5">
+                          {opcoesDoItem(p, i.id).map((o) => (
+                            <li key={o.id} className={`text-xs ${o.vencedora ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
+                              {o.vencedora ? '✓ ' : '· '}
+                              {fornecedores.find((f) => f.id === o.fornecedorId)?.nome || o.loja || 'Opção'}
+                              {[o.marca, o.modelo].filter(Boolean).length ? ` · ${[o.marca, o.modelo].filter(Boolean).join(' ')}` : ''}
+                              {o.valor > 0 && !p.semValores ? ` · ${brl(o.valor)}` : o.valor > 0 && p.semValores ? ` · ${brl(o.valor)} (o seu)` : ''}
+                              {o.link && /^https?:\/\//i.test(o.link) && (
+                                <a href={o.link} target="_blank" rel="noopener noreferrer" className="link ml-1">
+                                  link
+                                </a>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       {(i.marca || i.modelo || i.especificacao) && <span className="block text-slate-500">{[i.marca, i.modelo, i.especificacao].filter(Boolean).join(' · ')}</span>}
                     </td>
                     <td data-label="Tipo">{ROTULO_TIPO_ITEM[i.tipo]}</td>
@@ -229,14 +282,14 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </table>
           </section>
 
-          {!p.semValores && (
+          {!p.semValores && p.cotacoes.some((c) => !c.itemId) && (
             <section className="cartao space-y-2 p-4">
-              <h3 className="secao-titulo">Cotações ({p.cotacoes.length})</h3>
+              <h3 className="secao-titulo">Cotações do pedido inteiro ({p.cotacoes.filter((c) => !c.itemId).length})</h3>
               {p.cotacoes.length === 0 ? (
                 <p className="text-xs text-slate-500">Sem cotações{aberto && isTI ? ': use Editar para incluir até 3.' : '.'}</p>
               ) : (
                 <ul className="space-y-2">
-                  {p.cotacoes.map((c) => (
+                  {p.cotacoes.filter((c) => !c.itemId).map((c) => (
                     <li key={c.id} className={`flex flex-wrap items-center gap-2 rounded-lg border p-2.5 text-xs ${c.vencedora ? 'border-emerald-300 bg-emerald-50/60' : 'border-slate-200'}`}>
                       <span className="font-semibold text-slate-900">{fornecedor(c.fornecedorId)}</span>
                       <span className="font-mono">{brl(c.valor)}</span>
@@ -252,7 +305,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </section>
           )}
 
-          {impacto && (p.status === 'rascunho' || p.status === 'aguardando' || p.status === 'recusado') && (
+          {impacto && aberto && (
             <section className={`cartao space-y-2 p-4 ${impacto.pctDepois !== undefined && impacto.pctDepois > 1 ? 'border-red-300' : ''}`}>
               <h3 className="secao-titulo">
                 Impacto no orçamento de {ano} · {ROTULO_CATEGORIA[p.categoria]}
@@ -284,6 +337,13 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                 <Dado rotulo="Nota fiscal">{p.numeroNf || '—'}</Dado>
                 <Dado rotulo="Data da compra">{p.dataCompra ? formatDate(p.dataCompra) : '—'}</Dado>
                 <Dado rotulo="Pagamento">{p.formaPagamento ? ROTULO_FORMA_PAGAMENTO[p.formaPagamento] : '—'}</Dado>
+                <Dado rotulo="Chave da NF-e">{p.nfChave ? <span className="font-mono break-all">{p.nfChave}</span> : '—'}</Dado>
+                <Dado rotulo="Arquivo da NF">{p.nfArquivo ? <AbrirArquivo caminho={p.nfArquivo} rotulo="Abrir NF" /> : '—'}</Dado>
+                {p.fornecedorTrocaMotivo && (
+                  <Dado rotulo="Fornecedor diferente do sugerido pela T.I." className="col-span-2">
+                    {p.fornecedorTrocaMotivo}
+                  </Dado>
+                )}
                 <Dado rotulo="Fatura em Contas a pagar">
                   {fatura ? `${brl(fatura.valor)} · vence ${formatDate(fatura.vencimento)} · ${fatura.status === 'paga' ? 'paga' : fatura.status === 'cancelada' ? 'cancelada' : 'a pagar'}` : '—'}
                 </Dado>
@@ -298,9 +358,9 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                 <ul className="flex flex-wrap gap-2">
                   {ativosRecebidos.map((a) => (
                     <li key={a.id}>
-                      <button type="button" className="btn btn-sm btn-secundario" onClick={() => (isTI ? abrirFicha({ tipo: 'ativo', id: a.id }) : undefined)} disabled={!isTI}>
+                      <button type="button" className="btn btn-sm btn-secundario" onClick={() => (ehTI ? abrirFicha({ tipo: 'ativo', id: a.id }) : undefined)} disabled={!ehTI}>
                         <span className="font-mono">{a.tag}</span> · {a.nome}
-                        {a.serialNumber.startsWith('A-PREENCHER') && isTI && <span className="selo selo-atencao ml-1">série a preencher</span>}
+                        {a.serialNumber.startsWith('A-PREENCHER') && ehTI && <span className="selo selo-atencao ml-1">série a preencher</span>}
                       </button>
                     </li>
                   ))}
@@ -311,6 +371,8 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </section>
           )}
 
+          <ConversaPedido pedido={p} />
+
           <section className="cartao space-y-2 p-4">
             <h3 className="secao-titulo">Histórico</h3>
             {p.eventos.length === 0 ? (
@@ -319,9 +381,11 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
               <ol className="space-y-1.5">
                 {p.eventos.map((e, n) => (
                   <li key={n} className="text-xs text-slate-700">
-                    <span className="text-slate-500">{dataHora(e.em)}</span> · <span className="font-medium">{nome(e.por)}</span> ·{' '}
-                    {e.de ? `${ROTULO_STATUS_PEDIDO[e.de]} → ` : 'Criado como '}
-                    <span className="font-semibold">{ROTULO_STATUS_PEDIDO[e.para]}</span>
+                    <span className="text-slate-500">{dataHora(e.em)}</span> · <span className="font-medium">{nome(e.por, e.porNome)}</span> ·{' '}
+                    {e.campo || (e.de && e.de === e.para) ? '' : e.de ? `${ROTULO_STATUS_PEDIDO[e.de]} → ` : 'Criado como '}
+                    <span className="font-semibold">
+                      {e.campo === 'item' ? 'Item alterado' : e.de === 'aguardando' && e.para === 'aguardando' ? 'Aprovação do gestor' : ROTULO_STATUS_PEDIDO[e.para]}
+                    </span>
                     {e.motivo && <span className="text-slate-600"> — {e.motivo}</span>}
                   </li>
                 ))}
@@ -340,16 +404,32 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
 /** Comprado: NF, data, vencimento, forma de pagamento e valor pago por item → fatura */
 const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ pedido: p, onClose }) => {
   const { fornecedores } = useApp();
-  const { registrarCompra } = useCompras();
-  const vencedora = p.cotacoes.find((c) => c.vencedora);
-  const [fornecedorId, setFornecedorId] = useState(p.fornecedorId || vencedora?.fornecedorId || '');
+  const { registrarCompra, anexarCotacao } = useCompras();
+  const vencedora = p.cotacoes.find((c) => c.vencedora && !c.itemId);
+  // Seção 14: fornecedores das opções escolhidas (por item)
+  const sugeridos = [...new Set(p.cotacoes.filter((c) => c.vencedora && c.fornecedorId).map((c) => c.fornecedorId))];
+  const [fornecedorId, setFornecedorId] = useState(p.fornecedorId || sugeridos[0] || '');
   const [numeroNf, setNumeroNf] = useState('');
   const [dataCompra, setDataCompra] = useState(hoje());
   const [vencimento, setVencimento] = useState('');
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento | ''>('');
+  // Seção 13: NF (chave e arquivo) e motivo quando Compras escolhe outro fornecedor
+  const [nfChave, setNfChave] = useState('');
+  const [nfArquivo, setNfArquivo] = useState<string | undefined>();
+  const [enviandoNf, setEnviandoNf] = useState(false);
+  const [motivoTroca, setMotivoTroca] = useState('');
+  const trocou = sugeridos.length > 0 && !!fornecedorId && !sugeridos.includes(fornecedorId);
+  const anexarNf = async (arquivo?: File) => {
+    if (!arquivo) return;
+    setEnviandoNf(true);
+    const r = await anexarCotacao(p.id, arquivo);
+    setEnviandoNf(false);
+    if (r.erro) setErro(`Não foi possível enviar a NF: ${r.erro}`);
+    else setNfArquivo(r.caminho);
+  };
   // Um item só e cotação vencedora: o unitário sai da cotação
   const [valores, setValores] = useState<Record<string, number | undefined>>(() =>
-    Object.fromEntries(p.itens.map((i) => [i.id, p.itens.length === 1 && vencedora ? Math.round((vencedora.valor / i.quantidade) * 100) / 100 : i.valorUnitario]))
+    Object.fromEntries(p.itens.map((i) => [i.id, p.itens.length === 1 && vencedora && !opcaoEscolhida(p, i.id) ? Math.round((vencedora.valor / i.quantidade) * 100) / 100 : i.valorUnitario]))
   );
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -359,6 +439,9 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
     if (!fornecedorId) return setErro('Escolha o fornecedor.');
     if (!vencimento) return setErro('Informe o vencimento da fatura.');
     if (!(total > 0)) return setErro('Informe o valor pago de cada item.');
+    if (trocou && motivoTroca.trim().length < 5) return setErro('Explique por que a compra foi feita em outro fornecedor.');
+    const chave = nfChave.replace(/\D/g, '');
+    if (chave && chave.length !== 44) return setErro('A chave da NF-e tem 44 dígitos.');
     const ok = await confirmar({
       titulo: `Registrar a compra de ${p.codigo}?`,
       mensagem: `Gera a fatura de ${brl(total)} em Contas a pagar (vence em ${formatDate(vencimento)}). Os valores do pedido ficam fixos. Não dá para desfazer pela tela: a fatura pode ser cancelada em Contas a pagar.`,
@@ -372,6 +455,9 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
       dataCompra,
       vencimento,
       formaPagamento: formaPagamento || undefined,
+      nfChave: nfChave.replace(/\D/g, '') || undefined,
+      nfArquivo,
+      motivoTroca: trocou ? motivoTroca.trim() : undefined,
       itens: p.itens.map((i) => ({ id: i.id, valorUnitario: valores[i.id] || 0 })),
     });
     setSalvando(false);
@@ -409,9 +495,36 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
               ))}
             </select>
           </div>
+          {trocou && (
+            <div className="sm:col-span-2">
+              <label htmlFor="compra-motivo" className="rotulo">Por que outro fornecedor? (a T.I. sugeriu {sugeridos.map((s) => fornecedores.find((f) => f.id === s)?.nome).filter(Boolean).join(', ') || 'outro'})</label>
+              <input id="compra-motivo" value={motivoTroca} onChange={(e) => setMotivoTroca(e.target.value)} placeholder="Ex.: preço menor, entrega no mesmo dia" className="campo" />
+            </div>
+          )}
           <div>
             <label htmlFor="compra-nf" className="rotulo">Número da NF</label>
             <input id="compra-nf" value={numeroNf} onChange={(e) => setNumeroNf(e.target.value)} className="campo" />
+          </div>
+          <div>
+            <span className="rotulo">Arquivo da NF (PDF ou imagem)</span>
+            {nfArquivo ? (
+              <span className="inline-flex items-center gap-1">
+                <AbrirArquivo caminho={nfArquivo} />
+                <button type="button" onClick={() => setNfArquivo(undefined)} className="btn btn-sm btn-discreto">
+                  Trocar
+                </button>
+              </span>
+            ) : (
+              <label className="btn btn-secundario cursor-pointer">
+                {enviandoNf ? 'Enviando…' : 'Anexar NF'}
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" className="sr-only" onChange={(e) => anexarNf(e.target.files?.[0])} />
+              </label>
+            )}
+            <p className="ajuda">Vai junto com a fatura em Contas a pagar.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="compra-chave" className="rotulo">Chave de acesso da NF-e (44 dígitos)</label>
+            <CampoMascara id="compra-chave" tipo="chave_nfe" value={nfChave} onChange={setNfChave} />
           </div>
           <div>
             <label htmlFor="compra-data" className="rotulo">Data da compra</label>
@@ -468,12 +581,14 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
   const [linhas, setLinhas] = useState(() => {
     const tags = proximasTags(assets, totalUnidades);
     let n = 0;
-    return equipamentos.flatMap((i) => Array.from({ length: i.quantidade }, (_, k) => ({ chave: `${i.id}-${k}`, itemId: i.id, descricao: i.descricao, tag: tags[n++], serial: '' })));
+    return equipamentos.flatMap((i) => Array.from({ length: i.quantidade }, (_, k) => ({ chave: `${i.id}-${k}`, itemId: i.id, descricao: i.descricao, tag: tags[n++], serial: '', marca: i.marca || '', modelo: i.modelo || '' })));
   });
   const [localizacao, setLocalizacao] = useState('Almoxarifado T.I.');
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
   const outros = p.itens.filter((i) => i.tipo !== 'equipamento');
+  // Seção 14: acessório sem item de estoque vira item novo (marcado por padrão)
+  const [criarEstoque, setCriarEstoque] = useState<string[]>(() => outros.filter((i) => i.tipo === 'acessorio' && !i.estoqueItemId).map((i) => i.id));
 
   const efeitos = [
     ...(totalUnidades ? [`Cria ${totalUnidades} equipamento(s) disponível(is) em "${localizacao}", com NF, fornecedor e valor da compra`] : []),
@@ -481,7 +596,9 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
       i.tipo === 'acessorio'
         ? i.estoqueItemId
           ? `Entrada de ${i.quantidade} em "${i.descricao}" no estoque`
-          : `"${i.descricao}": sem item de estoque ligado (nada muda no estoque)`
+          : criarEstoque.includes(i.id)
+            ? `Cria "${i.descricao}"${i.marca ? ` (${[i.marca, i.modelo].filter(Boolean).join(' ')})` : ''} no estoque com ${i.quantidade} unidade(s)`
+            : `"${i.descricao}": sem item de estoque ligado (nada muda no estoque)`
         : i.tipo === 'licenca'
           ? i.licencaId
             ? `+${i.quantidade} assento(s) em ${licenses.find((l) => l.id === i.licencaId)?.nome || i.descricao}`
@@ -499,7 +616,7 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
     });
     if (!ok) return;
     setSalvando(true);
-    const r = await receberPedido(p.id, { localizacao: localizacao.trim(), ativos: linhas.map((l) => ({ itemId: l.itemId, tag: l.tag, serial: l.serial })) });
+    const r = await receberPedido(p.id, { localizacao: localizacao.trim(), ativos: linhas.map((l) => ({ itemId: l.itemId, tag: l.tag, serial: l.serial, marca: l.marca, modelo: l.modelo })), criarEstoque });
     setSalvando(false);
     if (r) setErro(r);
     else onClose();
@@ -533,11 +650,19 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
               <legend className="rotulo">Patrimônio de cada unidade</legend>
               <p className="ajuda">Patrimônio sugerido em sequência. O número de série pode ficar para depois (fica marcado "a preencher").</p>
               {linhas.map((l, n) => (
-                <div key={l.chave} className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_9rem_12rem] sm:items-end">
+                <div key={l.chave} className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_10rem] lg:items-end">
                   <span className="text-xs text-slate-700">{l.descricao}</span>
                   <div>
                     <label htmlFor={`rec-tag-${n}`} className="text-xs text-slate-600">Patrimônio</label>
                     <input id={`rec-tag-${n}`} value={l.tag} onChange={(e) => setLinhas(linhas.map((x) => (x.chave === l.chave ? { ...x, tag: e.target.value } : x)))} className="campo campo-sm font-mono" />
+                  </div>
+                  <div>
+                    <label htmlFor={`rec-marca-${n}`} className="text-xs text-slate-600">Marca</label>
+                    <input id={`rec-marca-${n}`} value={l.marca} onChange={(e) => setLinhas(linhas.map((x) => (x.chave === l.chave ? { ...x, marca: e.target.value } : x)))} className="campo campo-sm" />
+                  </div>
+                  <div>
+                    <label htmlFor={`rec-modelo-${n}`} className="text-xs text-slate-600">Modelo</label>
+                    <input id={`rec-modelo-${n}`} value={l.modelo} onChange={(e) => setLinhas(linhas.map((x) => (x.chave === l.chave ? { ...x, modelo: e.target.value } : x)))} className="campo campo-sm" />
                   </div>
                   <div>
                     <label htmlFor={`rec-serie-${n}`} className="text-xs text-slate-600">Número de série (opcional)</label>
@@ -547,6 +672,19 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
               ))}
             </fieldset>
           </>
+        )}
+        {outros.some((i) => i.tipo === 'acessorio' && !i.estoqueItemId) && (
+          <fieldset className="space-y-1">
+            <legend className="rotulo">Acessórios que ainda não estão no estoque</legend>
+            {outros
+              .filter((i) => i.tipo === 'acessorio' && !i.estoqueItemId)
+              .map((i) => (
+                <label key={i.id} className="flex items-center gap-2 text-xs text-slate-700">
+                  <input type="checkbox" checked={criarEstoque.includes(i.id)} onChange={(e) => setCriarEstoque(e.target.checked ? [...criarEstoque, i.id] : criarEstoque.filter((x) => x !== i.id))} />
+                  Criar &quot;{i.descricao}&quot; no estoque ({[i.marca, i.modelo].filter(Boolean).join(' ') || 'sem marca'}, {i.quantidade} un.)
+                </label>
+              ))}
+          </fieldset>
         )}
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
           <p className="font-semibold text-slate-900">O que acontece ao confirmar</p>

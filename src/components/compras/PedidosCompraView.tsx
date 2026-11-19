@@ -9,20 +9,22 @@ import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { PedidoCompra, StatusPedido } from '../../types/index.ts';
 import { ROTULO_CATEGORIA, baixarCsv, brl, paraCsv } from '../../utils/financeiro.ts';
-import { ROTULO_STATUS_PEDIDO, SELO_STATUS_PEDIDO, proximoPasso, valorDoPedido } from '../../utils/compras.ts';
+import { ROTULO_STATUS_PEDIDO, SELO_STATUS_PEDIDO, esperaPorMim, proximoPasso, valorDoPedido } from '../../utils/compras.ts';
 import { normalizar } from '../../utils/processos.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 import { FichaPedido } from './FichaPedido.tsx';
 import { FormPedido, pedidoVazio } from './FormPedido.tsx';
 
-type Filtro = 'andamento' | 'aguardando' | 'encerrados' | 'todos';
-const EM_ANDAMENTO: StatusPedido[] = ['rascunho', 'aguardando', 'aprovado', 'comprado', 'recusado'];
+type Filtro = 'andamento' | 'aguardando' | 'cotacao' | 'meus' | 'encerrados' | 'todos';
+const EM_ANDAMENTO: StatusPedido[] = ['rascunho', 'em_cotacao', 'aguardando', 'aprovado', 'comprado', 'recusado'];
 
 export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
-  const { currentRole, employees } = useApp();
-  const { pedidos, podePedirCompra } = useCompras();
-  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const { currentRole, employees, currentUser } = useApp();
+  const { pedidos, podePedirCompra, equipeCompras } = useCompras();
+  // T.I. e Compras veem valores e usam o formulário completo
+  const isTI = equipeCompras;
+  const ehCompras = currentRole === 'compras';
   const [filtro, setFiltro] = useState<Filtro>('andamento');
   const [busca, setBusca] = useState('');
   const [aberto, setAberto] = useState<string | null>(null);
@@ -31,10 +33,14 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
   const termo = normalizar(busca.trim());
   const lista = pedidos
     .filter((p) =>
-      filtro === 'todos' ? true : filtro === 'encerrados' ? !EM_ANDAMENTO.includes(p.status) : filtro === 'aguardando' ? p.status === 'aguardando' : EM_ANDAMENTO.includes(p.status)
+      filtro === 'meus'
+        ? esperaPorMim(p, currentRole, currentUser?.id)
+        : filtro === 'cotacao'
+          ? p.status === 'em_cotacao'
+          : filtro === 'todos' ? true : filtro === 'encerrados' ? !EM_ANDAMENTO.includes(p.status) : filtro === 'aguardando' ? p.status === 'aguardando' : EM_ANDAMENTO.includes(p.status)
     )
     .filter((p) => !termo || normalizar(`${p.codigo} ${p.titulo} ${p.area} ${p.itens.map((i) => i.descricao).join(' ')}`).includes(termo));
-  const nome = (id?: string) => employees.find((e) => e.id === id)?.nome || '—';
+  const nome = (id?: string, reserva?: string) => employees.find((e) => e.id === id)?.nome || reserva || '—';
   const totalLista = isTI ? lista.filter((p) => p.status !== 'cancelado' && p.status !== 'recusado').reduce((s, p) => s + valorDoPedido(p), 0) : 0;
 
   const exportar = () =>
@@ -42,7 +48,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
       'pedidos-de-compra.csv',
       paraCsv(
         ['Código', 'Pedido', 'Situação', 'Categoria', 'Área', 'Pedido por', 'Criado em', ...(isTI ? ['Valor (R$)'] : [])],
-        lista.map((p) => [p.codigo, p.titulo, ROTULO_STATUS_PEDIDO[p.status], ROTULO_CATEGORIA[p.categoria], p.area, nome(p.solicitanteId), p.criadoEm.slice(0, 10), ...(isTI ? [valorDoPedido(p)] : [])])
+        lista.map((p) => [p.codigo, p.titulo, ROTULO_STATUS_PEDIDO[p.status], ROTULO_CATEGORIA[p.categoria], p.area, nome(p.solicitanteId, p.solicitanteNome), p.criadoEm.slice(0, 10), ...(isTI ? [valorDoPedido(p)] : [])])
       )
     );
 
@@ -52,8 +58,8 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
         titulo={abas ? 'Financeiro' : 'Pedidos de compra'}
         subtitulo={
           isTI
-            ? 'Rascunho → aprovação do administrador → compra (gera a fatura) → recebimento (entra no inventário)'
-            : 'Peça equipamentos e acompanhe a situação. A T.I. cota e o administrador aprova; os valores ficam com a T.I.'
+            ? 'Cotação (T.I.) → aprovação do gestor e de Compras → compra com NF (gera a fatura) → recebimento (entra no inventário)'
+            : 'Peça o que precisa e acompanhe como um chamado: a T.I. cota, o seu gestor e Compras aprovam. Os valores ficam com a T.I. e Compras.'
         }
         acoes={
           <>
@@ -62,7 +68,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
             </button>
             {podePedirCompra && (
               <button type="button" onClick={() => setNovo(pedidoVazio())} className="btn btn-primario">
-                <Plus /> {isTI ? 'Novo pedido' : 'Pedir compra'}
+                <Plus /> {isTI && !ehCompras ? 'Novo pedido' : 'Pedir compra'}
               </button>
             )}
           </>
@@ -74,6 +80,8 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
             <select aria-label="Situação" value={filtro} onChange={(e) => setFiltro(e.target.value as Filtro)} className="campo campo-sm">
               <option value="andamento">Em andamento</option>
               <option value="aguardando">Aguardando aprovação</option>
+              <option value="cotacao">Em cotação (T.I.)</option>
+              <option value="meus">Esperando por mim</option>
               <option value="encerrados">Recebidos e cancelados</option>
               <option value="todos">Todos</option>
             </select>
@@ -86,7 +94,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
         }
       />
       {lista.length === 0 ? (
-        <Vazio acao={podePedirCompra ? <button type="button" onClick={() => setNovo(pedidoVazio())} className="btn btn-sm btn-primario"><Plus /> {isTI ? 'Novo pedido' : 'Pedir compra'}</button> : undefined}>
+        <Vazio acao={podePedirCompra ? <button type="button" onClick={() => setNovo(pedidoVazio())} className="btn btn-sm btn-primario"><Plus /> {isTI && !ehCompras ? 'Novo pedido' : 'Pedir compra'}</button> : undefined}>
           {pedidos.length === 0 ? 'Nenhum pedido de compra ainda.' : 'Nenhum pedido com estes filtros.'}
         </Vazio>
       ) : (
@@ -114,11 +122,12 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
                   </td>
                   <td data-label="Situação">
                     <span className={`selo ${SELO_STATUS_PEDIDO[p.status]}`}>{ROTULO_STATUS_PEDIDO[p.status]}</span>
+                    {esperaPorMim(p, currentRole, currentUser?.id) && <span className="selo selo-atencao ml-1">sua vez</span>}
                     {proximoPasso(p) && <span className="block text-slate-500">{proximoPasso(p)}</span>}
                   </td>
                   <td data-label="Área · quem pediu">
                     {p.area || 'Geral'}
-                    <span className="block text-slate-500">{nome(p.solicitanteId)}</span>
+                    <span className="block text-slate-500">{nome(p.solicitanteId, p.solicitanteNome)}</span>
                   </td>
                   {isTI && (
                     <td data-label="Valor" className="text-right font-mono">

@@ -173,6 +173,7 @@ export function alertasOrcamento(linhas: LinhaOrcamento[], ano: number): AlertaO
 // -----------------------------------------------------------------------------
 export const ROTULO_STATUS_PEDIDO: Record<StatusPedido, string> = {
   rascunho: 'Rascunho',
+  em_cotacao: 'Em cotação (T.I.)',
   aguardando: 'Aguardando aprovação',
   aprovado: 'Aprovado',
   recusado: 'Recusado',
@@ -183,6 +184,7 @@ export const ROTULO_STATUS_PEDIDO: Record<StatusPedido, string> = {
 
 export const SELO_STATUS_PEDIDO: Record<StatusPedido, string> = {
   rascunho: 'selo-neutro',
+  em_cotacao: 'selo-info',
   aguardando: 'selo-atencao',
   aprovado: 'selo-info',
   recusado: 'selo-problema',
@@ -198,15 +200,68 @@ export const ROTULO_TIPO_ITEM: Record<TipoItemPedido, string> = {
   servico: 'Serviço',
 };
 
-/** Ordem do fluxo (para a linha do tempo) */
-export const FLUXO_PEDIDO: StatusPedido[] = ['rascunho', 'aguardando', 'aprovado', 'comprado', 'recebido'];
+/** Ordem do fluxo (para a linha do tempo); pedido "Outros" não passa pela cotação da T.I. */
+export const FLUXO_PEDIDO: StatusPedido[] = ['rascunho', 'em_cotacao', 'aguardando', 'aprovado', 'comprado', 'recebido'];
+export const fluxoDoPedido = (p: Pick<PedidoCompra, 'tipoPedido'>) => FLUXO_PEDIDO.filter((s) => p.tipoPedido !== 'outros' || s !== 'em_cotacao');
+
+/** De quem é a vez (seção 13): T.I. cota, gestor aprova, Compras aprova e compra, T.I. recebe */
+export type VezPedido = 'solicitante' | 'ti_cotacao' | 'gestor' | 'compras_aprovacao' | 'compras_compra' | 'recebimento' | null;
+export function vezDoPedido(p: Pick<PedidoCompra, 'status' | 'gestorId' | 'aprovadoGestorEm' | 'tipoPedido'>): VezPedido {
+  switch (p.status) {
+    case 'rascunho':
+    case 'recusado':
+      return 'solicitante';
+    case 'em_cotacao':
+      return 'ti_cotacao';
+    case 'aguardando':
+      return p.gestorId && !p.aprovadoGestorEm ? 'gestor' : 'compras_aprovacao';
+    case 'aprovado':
+      return 'compras_compra';
+    case 'comprado':
+      return 'recebimento';
+    default:
+      return null;
+  }
+}
+
+/** O pedido espera uma ação desta pessoa? (contador do menu e Precisa de atenção) */
+export function esperaPorMim(p: PedidoCompra, papel: string, eu?: string): boolean {
+  const ti = papel === 'ti_admin' || papel === 'ti_suporte';
+  const vez = vezDoPedido(p);
+  switch (vez) {
+    case 'solicitante':
+      return p.status === 'recusado' && !!eu && p.solicitanteId === eu;
+    case 'ti_cotacao':
+      return ti;
+    case 'gestor':
+      return !!eu && p.gestorId === eu;
+    case 'compras_aprovacao':
+    case 'compras_compra':
+      return papel === 'compras' || papel === 'ti_admin';
+    case 'recebimento':
+      return ti || (papel === 'compras' && p.tipoPedido === 'outros');
+    default:
+      return false;
+  }
+}
 
 /** Valor do pedido: o final (comprado), a cotação vencedora ou a soma estimada dos itens */
 export function valorDoPedido(p: Pick<PedidoCompra, 'valorFinal' | 'cotacoes' | 'itens'>): number {
   if (p.valorFinal != null) return p.valorFinal;
-  const vencedora = p.cotacoes.find((c) => c.vencedora);
-  if (vencedora) return vencedora.valor;
-  return centavos(p.itens.reduce((s, i) => s + i.quantidade * (i.valorUnitario || 0), 0));
+  // Cotação antiga (do pedido inteiro): valor total
+  const geral = p.cotacoes.find((c) => c.vencedora && !c.itemId);
+  if (geral) return geral.valor;
+  // Seção 14: por item, a opção escolhida (valor unitário) ou o estimado do item
+  return centavos(p.itens.reduce((s, i) => s + i.quantidade * (opcaoEscolhida(p, i.id)?.valor || i.valorUnitario || 0), 0));
+}
+
+/** Opções de um item (seção 14) e a escolhida */
+export const opcoesDoItem = (p: Pick<PedidoCompra, 'cotacoes'>, itemId: string) => p.cotacoes.filter((c) => c.itemId === itemId);
+export const opcaoEscolhida = (p: Pick<PedidoCompra, 'cotacoes'>, itemId: string) => p.cotacoes.find((c) => c.itemId === itemId && c.vencedora);
+
+/** Itens com opções e sem a escolhida (aprovar exige escolher) */
+export function itensSemEscolha(p: Pick<PedidoCompra, 'cotacoes' | 'itens'>): string[] {
+  return p.itens.filter((i) => opcoesDoItem(p, i.id).length > 0 && !opcaoEscolhida(p, i.id)).map((i) => i.descricao);
 }
 
 /** Pedido que ainda vai virar gasto (aprovado ou comprado e não pago) */
@@ -260,18 +315,20 @@ export function impactoNoOrcamento(
 }
 
 /** O que falta para cada situação andar (texto curto para a lista e o Precisa de atenção) */
-export function proximoPasso(p: Pick<PedidoCompra, 'status'>): string {
-  switch (p.status) {
-    case 'rascunho':
-      return 'enviar para aprovação';
-    case 'aguardando':
-      return 'aprovação do administrador';
-    case 'aprovado':
-      return 'registrar a compra';
-    case 'comprado':
-      return 'registrar o recebimento';
-    case 'recusado':
-      return 'ajustar e reenviar, ou cancelar';
+export function proximoPasso(p: Pick<PedidoCompra, 'status' | 'gestorId' | 'aprovadoGestorEm' | 'tipoPedido' | 'gestorNome'>): string {
+  switch (vezDoPedido(p)) {
+    case 'solicitante':
+      return p.status === 'recusado' ? 'ajustar e reenviar, ou cancelar' : 'enviar o pedido';
+    case 'ti_cotacao':
+      return 'a T.I. está cotando';
+    case 'gestor':
+      return `aprovação do gestor${p.gestorNome ? ` (${p.gestorNome})` : ''}`;
+    case 'compras_aprovacao':
+      return 'aprovação de Compras';
+    case 'compras_compra':
+      return 'Compras registrar a compra';
+    case 'recebimento':
+      return p.tipoPedido === 'outros' ? 'registrar o recebimento' : 'a T.I. registrar o recebimento';
     default:
       return '';
   }

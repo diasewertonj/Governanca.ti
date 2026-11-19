@@ -34,6 +34,7 @@ import { CartaoPatrimonio, ComprasView } from './ComprasView.tsx';
 import { Abas } from '../ui/Abas.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import { PedidosCompraView } from '../compras/PedidosCompraView.tsx';
+import { esperaPorMim } from '../../utils/compras.ts';
 import { OrcamentoView } from '../compras/OrcamentoView.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
@@ -101,10 +102,11 @@ interface Origem {
 
 export const FinanceiroView: React.FC = () => {
   const { pedidos } = useCompras();
-  const { currentRole } = useApp();
-  // Admin: os que esperam a aprovação dele; T.I.: os que esperam compra ou recebimento
-  const pedidosPendentes = pedidos.filter((p) => (currentRole === 'ti_admin' ? p.status === 'aguardando' : p.status === 'aprovado' || p.status === 'comprado')).length;
-  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras' | 'pedidos' | 'orcamento'>('contas');
+  const { currentRole, currentUser } = useApp();
+  // Seção 13: pedidos que esperam esta pessoa; Compras vê só Contas a pagar, Pedidos e Orçamento
+  const pedidosPendentes = pedidos.filter((p) => esperaPorMim(p, currentRole, currentUser?.id)).length;
+  const ehCompras = currentRole === 'compras';
+  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras' | 'pedidos' | 'orcamento'>(() => (currentRole === 'compras' ? 'pedidos' : 'contas'));
   // Período em comum entre Despesas e Compras
   const [atalho, setAtalho] = useState<Atalho>('ult6');
   const [deManual, setDeManual] = useState('');
@@ -120,12 +122,12 @@ export const FinanceiroView: React.FC = () => {
       ativa={aba}
       onMudar={setAba}
       itens={[
-        { id: 'contas', rotulo: 'Contas a pagar' },
-        { id: 'despesas', rotulo: 'Despesas' },
-        { id: 'compras', rotulo: 'Compras' },
-        { id: 'pedidos', rotulo: 'Pedidos de compra', contador: pedidosPendentes },
-        { id: 'orcamento', rotulo: 'Orçamento' },
-      ]}
+        { id: 'contas' as const, rotulo: 'Contas a pagar' },
+        { id: 'despesas' as const, rotulo: 'Despesas' },
+        { id: 'compras' as const, rotulo: 'Compras' },
+        { id: 'pedidos' as const, rotulo: 'Pedidos de compra', contador: pedidosPendentes },
+        { id: 'orcamento' as const, rotulo: 'Orçamento' },
+      ].filter((a) => !ehCompras || a.id === 'contas' || a.id === 'pedidos' || a.id === 'orcamento')}
     />
   );
   const filtroPeriodo = (

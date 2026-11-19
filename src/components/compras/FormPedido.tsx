@@ -1,17 +1,18 @@
 /**
- * Fase 11 · Formulário do pedido de compra.
+ * Fase 11 + seções 13/14 · Formulário do pedido de compra. Cada item pode ter link,
+ * marca, modelo e valor de referência, e opções (links de lojas) incluídas pelo \"+\".
  * T.I.: itens com valor estimado e até 3 cotações (anexo e vencedora); salva como
  * rascunho ou já envia para aprovação. RH e gestor: só o que precisa e para quê
  * (sem valores, fornecedor nem cotações) — o pedido vai direto para aprovação.
  */
 import React, { useMemo, useState } from 'react';
-import { Paperclip, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { ExternalLink, Paperclip, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { AssetCategory, CategoriaDespesa, CotacaoPedido, ItemPedido, PedidoCompra, TipoItemPedido } from '../../types/index.ts';
 import { ROTULO_CATEGORIA, brl } from '../../utils/financeiro.ts';
-import { ROTULO_TIPO_ITEM } from '../../utils/compras.ts';
+import { ROTULO_TIPO_ITEM, opcoesDoItem } from '../../utils/compras.ts';
 import { validarArquivo } from '../../services/supabaseDb.ts';
 import { Janela } from '../ui/Janela.tsx';
 import { CampoMoeda, CampoSugestoes } from '../ui/Campos.tsx';
@@ -32,6 +33,7 @@ export function pedidoVazio(base: Partial<PedidoCompra> = {}): PedidoCompra {
     categoria: 'hardware',
     area: '',
     status: 'rascunho',
+    tipoPedido: 'ti',
     criadoEm: new Date().toISOString(),
     itens: [itemVazio(1)],
     cotacoes: [],
@@ -103,7 +105,7 @@ export const FormPedido: React.FC<{
   return (
     <Janela
       titulo={novo ? (simples ? 'Pedir compra' : 'Novo pedido de compra') : `Editar ${p.codigo}`}
-      subtitulo={simples ? 'O pedido vai para a T.I. cotar e para o administrador aprovar' : 'Rascunho → aprovação do administrador → compra → recebimento'}
+      subtitulo={simples ? 'Pedido de T.I.: a T.I. cota; depois o seu gestor e Compras aprovam' : 'Cotação → aprovação do gestor e de Compras → compra → recebimento'}
       icone={<ShoppingCart className="h-4 w-4" />}
       tamanho="g"
       onFechar={fechar}
@@ -121,7 +123,7 @@ export const FormPedido: React.FC<{
               <button type="button" disabled={salvando} onClick={() => salvar(false)} className="btn btn-secundario">
                 Salvar rascunho
               </button>
-              {(p.status === 'rascunho' || p.status === 'recusado') && (
+              {(p.status === 'rascunho' || p.status === 'recusado' || p.status === 'em_cotacao') && (
                 <button type="button" disabled={salvando} onClick={() => salvar(true)} className="btn btn-primario">
                   {salvando ? 'Salvando…' : 'Salvar e enviar para aprovação'}
                 </button>
@@ -140,6 +142,19 @@ export const FormPedido: React.FC<{
         <section className="cartao space-y-3 p-4">
           <h3 className="secao-titulo">O que e para quê</h3>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <fieldset className="md:col-span-2">
+              <legend className="rotulo">Tipo de pedido</legend>
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:gap-5">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+                  <input type="radio" name={id('tipo')} checked={p.tipoPedido !== 'outros'} onChange={() => setP({ ...p, tipoPedido: 'ti', categoria: p.categoria === 'outros' ? 'hardware' : p.categoria, itens: p.itens.map((i) => (i.tipo === 'servico' ? { ...i, tipo: 'equipamento', categoriaAtivo: 'hardware' } : i)) })} />
+                  De T.I. (equipamento, acessório, software) — a T.I. cota
+                </label>
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+                  <input type="radio" name={id('tipo')} checked={p.tipoPedido === 'outros'} onChange={() => setP({ ...p, tipoPedido: 'outros', categoria: 'outros', itens: p.itens.map((i) => ({ ...i, tipo: 'servico', estoqueItemId: undefined, licencaId: undefined })) })} />
+                  Outros (móveis, material, serviços) — Compras cota
+                </label>
+              </div>
+            </fieldset>
             <div className="md:col-span-2">
               <label htmlFor={id('titulo')} className="rotulo">O que precisa ser comprado</label>
               <input id={id('titulo')} value={p.titulo} onChange={(e) => setP({ ...p, titulo: e.target.value })} placeholder="Ex.: Notebook para nova analista de RH" className="campo" />
@@ -201,7 +216,7 @@ export const FormPedido: React.FC<{
           {p.itens.map((i, n) => (
             <div key={i.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[12rem_minmax(0,1fr)_6rem] lg:grid-cols-[12rem_minmax(0,1fr)_6rem_10rem_auto]">
-                <div>
+                <div className={p.tipoPedido === 'outros' ? 'hidden' : ''}>
                   <label htmlFor={id(`tipo-${n}`)} className="text-xs text-slate-600">Tipo</label>
                   <select id={id(`tipo-${n}`)} value={i.tipo} onChange={(e) => mudarItem(i.id, { tipo: e.target.value as TipoItemPedido, estoqueItemId: undefined, licencaId: undefined })} className="campo campo-sm">
                     {(Object.keys(ROTULO_TIPO_ITEM) as TipoItemPedido[]).filter((t) => !simples || t === 'equipamento' || t === 'servico').map((t) => (
@@ -231,7 +246,7 @@ export const FormPedido: React.FC<{
                   </button>
                 </div>
               </div>
-              {i.tipo === 'equipamento' && (
+              {i.tipo === 'equipamento' && p.tipoPedido !== 'outros' && (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <label htmlFor={id(`catat-${n}`)} className="text-xs text-slate-600">Tipo de equipamento</label>
@@ -243,19 +258,7 @@ export const FormPedido: React.FC<{
                       ))}
                     </select>
                   </div>
-                  {!simples && (
-                    <>
-                      <div>
-                        <label htmlFor={id(`marca-${n}`)} className="text-xs text-slate-600">Marca</label>
-                        <input id={id(`marca-${n}`)} value={i.marca || ''} onChange={(e) => mudarItem(i.id, { marca: e.target.value })} className="campo campo-sm" />
-                      </div>
-                      <div>
-                        <label htmlFor={id(`modelo-${n}`)} className="text-xs text-slate-600">Modelo</label>
-                        <input id={id(`modelo-${n}`)} value={i.modelo || ''} onChange={(e) => mudarItem(i.id, { modelo: e.target.value })} className="campo campo-sm" />
-                      </div>
-                    </>
-                  )}
-                  <div className={simples ? 'lg:col-span-3' : ''}>
+                  <div className="sm:col-span-1 lg:col-span-3">
                     <label htmlFor={id(`espec-${n}`)} className="text-xs text-slate-600">Especificação</label>
                     <input id={id(`espec-${n}`)} value={i.especificacao || ''} onChange={(e) => mudarItem(i.id, { especificacao: e.target.value })} placeholder="Processador, memória, tela…" className="campo campo-sm" />
                   </div>
@@ -303,6 +306,7 @@ export const FormPedido: React.FC<{
                   </select>
                 </div>
               )}
+              <ProdutoDoItem pedido={p} item={i} n={n} simples={!!simples} id={id} mudarItem={mudarItem} setP={setP} anexar={anexar} enviandoArquivo={enviandoArquivo} />
             </div>
           ))}
           <button type="button" onClick={() => setP({ ...p, itens: [...p.itens, itemVazio(p.itens.length + 1)] })} className="btn btn-sm btn-secundario">
@@ -310,14 +314,13 @@ export const FormPedido: React.FC<{
           </button>
         </section>
 
-        {!simples && (
+        {!simples && p.cotacoes.some((c) => !c.itemId) && (
           <section className="cartao space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="secao-titulo">Cotações ({p.cotacoes.length} de 3)</h3>
-              <p className="text-xs text-slate-500">Com cotações, o administrador só aprova depois de escolhida a vencedora.</p>
+              <h3 className="secao-titulo">Cotações do pedido inteiro (formato antigo)</h3>
+              <p className="text-xs text-slate-500">As opções novas ficam em cada item, pelo botão &quot;+ Opção&quot;.</p>
             </div>
-            {p.cotacoes.length === 0 && <p className="text-xs text-slate-500">Nenhuma cotação ainda.</p>}
-            {p.cotacoes.map((c, n) => (
+            {p.cotacoes.filter((c) => !c.itemId).map((c, n) => (
               <div key={c.id} className={`space-y-2 rounded-lg border p-3 ${c.vencedora ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200'}`}>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_6rem_9rem_auto]">
                   <div>
@@ -351,7 +354,7 @@ export const FormPedido: React.FC<{
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
-                    <input type="radio" name={id('vencedora')} checked={c.vencedora} onChange={() => setP({ ...p, cotacoes: p.cotacoes.map((x) => ({ ...x, vencedora: x.id === c.id })) })} /> Vencedora
+                    <input type="radio" name={id('vencedora')} checked={c.vencedora} onChange={() => setP({ ...p, cotacoes: p.cotacoes.map((x) => (x.itemId ? x : { ...x, vencedora: x.id === c.id })) })} /> Vencedora
                   </label>
                   {c.arquivoCaminho ? (
                     <span className="inline-flex items-center gap-1">
@@ -370,15 +373,7 @@ export const FormPedido: React.FC<{
                 </div>
               </div>
             ))}
-            {p.cotacoes.length < 3 && (
-              <button
-                type="button"
-                onClick={() => setP({ ...p, cotacoes: [...p.cotacoes, { id: `cot-${crypto.randomUUID()}`, fornecedorId: '', valor: 0, vencedora: p.cotacoes.length === 0 }] })}
-                className="btn btn-sm btn-secundario"
-              >
-                <Plus /> Adicionar cotação
-              </button>
-            )}
+
           </section>
         )}
         {erro && (
@@ -388,5 +383,149 @@ export const FormPedido: React.FC<{
         )}
       </div>
     </Janela>
+  );
+};
+
+type PropsProduto = {
+  pedido: PedidoCompra;
+  item: ItemPedido;
+  n: number;
+  simples: boolean;
+  id: (c: string) => string;
+  mudarItem: (id: string, mud: Partial<ItemPedido>) => void;
+  setP: React.Dispatch<React.SetStateAction<PedidoCompra>>;
+  anexar: (c: CotacaoPedido, arquivo?: File) => Promise<void>;
+  enviandoArquivo: string | null;
+};
+
+/** Seção 14: produto do item (link, marca, modelo, valor de referência) e as opções de compra */
+const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, simples, id, mudarItem, setP, anexar, enviandoArquivo }) => {
+  const { fornecedores } = useApp();
+  const { lerDadosDoLink } = useCompras();
+  const [buscando, setBuscando] = useState<string | null>(null);
+  const [aviso, setAviso] = useState('');
+  const opcoes = opcoesDoItem(p, i.id);
+  const mudarOp = (oid: string, mud: Partial<CotacaoPedido>) => setP((x) => ({ ...x, cotacoes: x.cotacoes.map((c) => (c.id === oid ? { ...c, ...mud } : c)) }));
+  const novaOpcao = () =>
+    setP((x) => ({
+      ...x,
+      cotacoes: [...x.cotacoes, { id: `cot-${crypto.randomUUID()}`, itemId: i.id, fornecedorId: '', valor: 0, vencedora: false }],
+    }));
+  // Busca e preenche só o que está vazio (tudo continua editável)
+  const buscar = async (alvo: 'item' | string, url?: string) => {
+    if (!url || !/^https:\/\//i.test(url.trim())) return setAviso('Cole um link que começa com https://');
+    setBuscando(alvo);
+    const r = await lerDadosDoLink(url.trim());
+    setBuscando(null);
+    if (r.erro || !r.dados) return setAviso(r.erro || 'Nada encontrado no link.');
+    const d = r.dados;
+    if (alvo === 'item') {
+      mudarItem(i.id, {
+        descricao: i.descricao || d.nome || '',
+        marca: i.marca || d.marca,
+        modelo: i.modelo || d.modelo,
+        imagemUrl: i.imagemUrl || d.imagem,
+        ...(simples ? { valorReferencia: i.valorReferencia ?? d.preco } : { valorUnitario: i.valorUnitario ?? d.preco }),
+      });
+    } else {
+      const o = opcoes.find((x) => x.id === alvo);
+      if (o) mudarOp(o.id, { descricao: o.descricao || d.nome, marca: o.marca || d.marca, modelo: o.modelo || d.modelo, loja: o.loja || d.loja, imagemUrl: o.imagemUrl || d.imagem, valor: o.valor || d.preco || 0 });
+    }
+    setAviso('Dados preenchidos a partir do link. Confira.');
+  };
+
+  return (
+    <div className="space-y-2 rounded-md bg-slate-50 p-2.5">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_10rem]">
+        <div>
+          <label htmlFor={id(`link-${n}`)} className="text-xs text-slate-600">Link do produto (opcional)</label>
+          <div className="flex gap-1.5">
+            <input id={id(`link-${n}`)} type="url" inputMode="url" value={i.link || ''} onChange={(e) => mudarItem(i.id, { link: e.target.value })} placeholder="https://loja.com.br/produto" className="campo campo-sm min-w-0" />
+            <button type="button" disabled={buscando === 'item' || !i.link} onClick={() => buscar('item', i.link)} title="Buscar nome, marca, modelo e preço na página da loja" className="btn btn-sm btn-secundario shrink-0">
+              <Search /> {buscando === 'item' ? 'Buscando…' : 'Buscar'}
+            </button>
+            {i.link && /^https?:\/\//i.test(i.link) && (
+              <a href={i.link} target="_blank" rel="noopener noreferrer" title="Abrir o link" aria-label="Abrir o link do produto" className="btn-icone shrink-0">
+                <ExternalLink />
+              </a>
+            )}
+          </div>
+        </div>
+        <div>
+          <label htmlFor={id(`marca-${n}`)} className="text-xs text-slate-600">Marca</label>
+          <input id={id(`marca-${n}`)} value={i.marca || ''} onChange={(e) => mudarItem(i.id, { marca: e.target.value })} className="campo campo-sm" />
+        </div>
+        <div>
+          <label htmlFor={id(`modelo-${n}`)} className="text-xs text-slate-600">Modelo</label>
+          <input id={id(`modelo-${n}`)} value={i.modelo || ''} onChange={(e) => mudarItem(i.id, { modelo: e.target.value })} className="campo campo-sm" />
+        </div>
+        {simples ? (
+          <div>
+            <label htmlFor={id(`ref-${n}`)} className="text-xs text-slate-600">Valor que você viu (opcional)</label>
+            <CampoMoeda id={id(`ref-${n}`)} className="campo campo-sm" valor={i.valorReferencia} onMudar={(v) => mudarItem(i.id, { valorReferencia: v })} />
+          </div>
+        ) : (
+          <div className="self-end text-xs text-slate-500">{i.valorReferencia != null ? `Quem pediu viu: ${brl(i.valorReferencia)}` : ''}</div>
+        )}
+      </div>
+      {i.imagemUrl && <img src={i.imagemUrl} alt={`Imagem de ${i.descricao || 'produto'}`} referrerPolicy="no-referrer" className="h-16 w-16 rounded border border-slate-200 bg-white object-contain" />}
+
+      <div className="space-y-1.5">
+        <p className="text-xs font-semibold text-slate-700">
+          Opções de compra ({opcoes.length}){!simples && opcoes.length > 0 ? ' · marque a escolhida' : ''}
+        </p>
+        {opcoes.map((c, k) => (
+          <div key={c.id} className={`grid grid-cols-1 gap-1.5 rounded-md border bg-white p-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_9rem_auto] ${c.vencedora ? 'border-emerald-300' : 'border-slate-200'}`}>
+            {simples ? (
+              <input aria-label={`Loja da opção ${k + 1}`} value={c.loja || ''} onChange={(e) => mudarOp(c.id, { loja: e.target.value })} placeholder="Loja" className="campo campo-sm" />
+            ) : (
+              <select aria-label={`Fornecedor da opção ${k + 1}`} value={c.fornecedorId} onChange={(e) => mudarOp(c.id, { fornecedorId: e.target.value })} className="campo campo-sm">
+                <option value="">{c.loja ? `Loja: ${c.loja}` : 'Loja / fornecedor…'}</option>
+                {fornecedores.filter((f) => f.ativo || f.id === c.fornecedorId).map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-1.5">
+              <input aria-label={`Link da opção ${k + 1}`} type="url" value={c.link || ''} onChange={(e) => mudarOp(c.id, { link: e.target.value })} placeholder="https://…" className="campo campo-sm min-w-0" />
+              <button type="button" disabled={buscando === c.id || !c.link} onClick={() => buscar(c.id, c.link)} aria-label={`Buscar dados do link da opção ${k + 1}`} title="Buscar dados do link" className="btn-icone shrink-0">
+                <Search />
+              </button>
+            </div>
+            <input aria-label={`Marca da opção ${k + 1}`} value={c.marca || ''} onChange={(e) => mudarOp(c.id, { marca: e.target.value })} placeholder="Marca" className="campo campo-sm" />
+            <input aria-label={`Modelo da opção ${k + 1}`} value={c.modelo || ''} onChange={(e) => mudarOp(c.id, { modelo: e.target.value })} placeholder="Modelo" className="campo campo-sm" />
+            <CampoMoeda aria-label={`Valor unitário da opção ${k + 1}`} className="campo campo-sm" valor={c.valor || undefined} onMudar={(v) => mudarOp(c.id, { valor: v || 0 })} />
+            <div className="flex items-center gap-1">
+              {!simples && (
+                <label className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" title="Opção escolhida para este item">
+                  <input type="radio" name={id(`escolhida-${n}`)} checked={c.vencedora} onChange={() => setP((x) => ({ ...x, cotacoes: x.cotacoes.map((o) => (o.itemId === i.id ? { ...o, vencedora: o.id === c.id } : o)) }))} />
+                  Escolhida
+                </label>
+              )}
+              {!simples &&
+                (c.arquivoCaminho ? (
+                  <AbrirArquivo caminho={c.arquivoCaminho} rotulo="Proposta" />
+                ) : (
+                  <label className="btn-icone cursor-pointer" title="Anexar proposta" aria-label={`Anexar proposta da opção ${k + 1}`}>
+                    {enviandoArquivo === c.id ? '…' : <Paperclip />}
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" className="sr-only" onChange={(e) => anexar(c, e.target.files?.[0])} />
+                  </label>
+                ))}
+              <button type="button" onClick={() => setP((x) => ({ ...x, cotacoes: x.cotacoes.filter((o) => o.id !== c.id) }))} aria-label={`Remover a opção ${k + 1}`} title="Remover opção" className="btn-icone btn-icone-perigo">
+                <Trash2 />
+              </button>
+            </div>
+          </div>
+        ))}
+        {opcoes.length < 10 && (
+          <button type="button" onClick={novaOpcao} className="btn btn-sm btn-secundario">
+            <Plus /> Opção
+          </button>
+        )}
+        {aviso && <p className="ajuda">{aviso}</p>}
+      </div>
+    </div>
   );
 };

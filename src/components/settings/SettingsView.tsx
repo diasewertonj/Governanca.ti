@@ -33,6 +33,7 @@ const ROTULO_PAPEL: Record<UserRole, string> = {
   ti_suporte: 'Suporte de T.I.',
   rh: 'Recursos Humanos',
   colaborador: 'Colaborador',
+  compras: 'Compras',
 };
 
 const ROTULO_CATEGORIA: Record<AssetCategory, string> = {
@@ -396,6 +397,7 @@ export const SettingsView: React.FC = () => {
     ti_suporte: 'selo-ok',
     rh: 'selo-atencao',
     colaborador: 'selo-neutro',
+    compras: 'selo-atencao',
   };
 
   const secao = (titulo: string, descricao?: string) => (
@@ -881,6 +883,7 @@ export const SettingsView: React.FC = () => {
                                   <option value="ti_admin">Administrador de T.I.</option>
                                   <option value="ti_suporte">Suporte de T.I.</option>
                                   <option value="rh">Recursos Humanos (RH)</option>
+                                  <option value="compras">Compras (aprova e compra pedidos)</option>
                                   <option value="colaborador">Colaborador Padrão (Sem Acesso de Gestão)</option>
                                 </select>
                               </td>
