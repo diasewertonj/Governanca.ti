@@ -128,7 +128,7 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         <Numero rotulo="Patrimônio (valor atual)" valor={brl(patrimonio.totalAtual)} detalhe={`custo ${brl(patrimonio.total)}`} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+      <div className="grid items-start grid-cols-1 xl:grid-cols-2 gap-3">
         <div className="cartao p-3 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="secao-titulo">Mês a mês ({ANO_ATUAL})</h3>
@@ -441,7 +441,7 @@ export const ProjecaoView: React.FC = () => {
         <Numero rotulo="CAPEX (reposição e compras)" valor={brl(capex)} />
         <Numero rotulo="Média mensal" valor={brl(lista.length ? total / lista.length : 0)} />
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-3">
+      <div className="grid items-start grid-cols-1 xl:grid-cols-[2fr_1fr] gap-3">
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Mês a mês</h3>
           {lista.map((m) => (
@@ -783,7 +783,7 @@ export const RelatoriosView: React.FC = () => {
             </div>
           ))}
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+      <div className="grid items-start grid-cols-1 xl:grid-cols-2 gap-3">
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Custo por área ({ano}, realizado)</h3>
           {porArea.length === 0 ? (

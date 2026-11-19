@@ -333,7 +333,7 @@ export const DespesasView: React.FC<{
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+      <div className="grid items-start grid-cols-1 xl:grid-cols-2 gap-3">
         {/* Mês a mês */}
         <div className="cartao p-3 space-y-2">
           <div className="flex items-center justify-between">

@@ -218,7 +218,7 @@ export const ComprasView: React.FC<{
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <div className="grid items-start grid-cols-1 gap-3 xl:grid-cols-2">
         <BlocoSoma titulo="Por fornecedor" grupos={porFornecedor} total={total} />
         <BlocoSoma titulo="Por categoria" grupos={porCategoria} total={total} />
       </div>

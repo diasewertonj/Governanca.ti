@@ -266,66 +266,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
           )}
         </section>
 
-        {/* Atalhos */}
-        <section className="cartao space-y-3 p-4" aria-labelledby="inicio-atalhos">
-          <h2 id="inicio-atalhos" className="secao-titulo">
-            Atalhos
-          </h2>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-            {atalhos.map((a) => (
-              <button key={a.rotulo} type="button" onClick={a.onClick} className="btn btn-secundario justify-start">
-                {a.icone}
-                <span className="truncate">{a.rotulo}</span>
+        {/* Coluna da direita: atalhos e chamados recentes (sem espaço vazio ao lado do "Precisa de atenção") */}
+        <div className="space-y-4">
+          {/* Atalhos */}
+          <section className="cartao space-y-3 p-4" aria-labelledby="inicio-atalhos">
+            <h2 id="inicio-atalhos" className="secao-titulo">
+              Atalhos
+            </h2>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              {atalhos.map((a) => (
+                <button key={a.rotulo} type="button" onClick={a.onClick} className="btn btn-secundario justify-start">
+                  {a.icone}
+                  <span className="truncate">{a.rotulo}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+          {/* Chamados recentes */}
+          <section className="cartao" aria-labelledby="inicio-recentes">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+              <h2 id="inicio-recentes" className="secao-titulo">
+                Chamados recentes
+              </h2>
+              <button type="button" onClick={() => onNavigate('servicedesk')} className="btn btn-sm btn-discreto">
+                Ver todos <ArrowRight aria-hidden="true" />
               </button>
-            ))}
-          </div>
-        </section>
+            </div>
+            {recentes.length === 0 ? (
+              <div className="p-4">
+                <Vazio
+                  titulo="Nenhum chamado ainda"
+                  acao={
+                    onAbrirChamado && (
+                      <button type="button" onClick={onAbrirChamado} className="btn btn-sm btn-primario">
+                        <Plus aria-hidden="true" /> Abrir chamado
+                      </button>
+                    )
+                  }
+                />
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {recentes.map((t) => (
+                  <li key={t.id}>
+                    <button type="button" onClick={() => setSelectedTicketIdForDetail(t.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-slate-900">{t.titulo}</span>
+                        <span className="texto-aux block truncate">
+                          <span className="font-mono">{t.codigo}</span> · {t.solicitanteNome} · <span className="num">{formatDate(t.dataCriacao)}</span>
+                        </span>
+                      </span>
+                      <span className={`selo ${SELO_STATUS[t.status] || 'selo-ok'}`}>{rotuloStatus(t.status)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       </div>
 
       {/* Fase 10 C1: prazos, médias e rankings do atendimento (só a T.I.) */}
       {isTI && <IndicadoresAtendimento />}
-
-      {/* Chamados recentes */}
-      <section className="cartao" aria-labelledby="inicio-recentes">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
-          <h2 id="inicio-recentes" className="secao-titulo">
-            Chamados recentes
-          </h2>
-          <button type="button" onClick={() => onNavigate('servicedesk')} className="btn btn-sm btn-discreto">
-            Ver todos <ArrowRight aria-hidden="true" />
-          </button>
-        </div>
-        {recentes.length === 0 ? (
-          <div className="p-4">
-            <Vazio
-              titulo="Nenhum chamado ainda"
-              acao={
-                onAbrirChamado && (
-                  <button type="button" onClick={onAbrirChamado} className="btn btn-sm btn-primario">
-                    <Plus aria-hidden="true" /> Abrir chamado
-                  </button>
-                )
-              }
-            />
-          </div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {recentes.map((t) => (
-              <li key={t.id}>
-                <button type="button" onClick={() => setSelectedTicketIdForDetail(t.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold text-slate-900">{t.titulo}</span>
-                    <span className="texto-aux block truncate">
-                      <span className="font-mono">{t.codigo}</span> · {t.solicitanteNome} · <span className="num">{formatDate(t.dataCriacao)}</span>
-                    </span>
-                  </span>
-                  <span className={`selo ${SELO_STATUS[t.status] || 'selo-ok'}`}>{rotuloStatus(t.status)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       {/* Vencimentos e prazos em detalhe (ex-menu Vencimentos) */}
       <section id="vencimentos-prazos" className="scroll-mt-20">
