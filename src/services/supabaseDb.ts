@@ -1116,7 +1116,24 @@ const linhaFatura = (f: Fatura): TablesInsert<'faturas'> => ({
   forma_pagamento: f.formaPagamento || null,
   // Só vai quando existe (assim o lançamento funciona mesmo antes da coluna existir no banco)
   ...(f.status === 'paga' && f.valorPago != null ? { valor_pago: f.valorPago } : {}),
+  // Seção 17: campos novos só vão quando preenchidos (funciona antes da migration)
+  ...secao17Fatura(f),
 });
+
+function secao17Fatura(f: Fatura): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (f.fornecedorId) out.fornecedor_id = f.fornecedorId;
+  if (f.descricao?.trim()) out.descricao = f.descricao.trim();
+  if (f.departamentoId) out.departamento_id = f.departamentoId;
+  if (f.categoriaDespesa) out.categoria_despesa = f.categoriaDespesa;
+  if (f.ativoId) out.ativo_id = f.ativoId;
+  if (f.natureza) out.natureza = f.natureza;
+  if (f.naturezaManual) {
+    out.natureza_manual = true;
+    out.natureza_motivo = f.naturezaMotivo?.trim() || null;
+  }
+  return out;
+}
 
 export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
   if (!supabase) return null;
@@ -1142,7 +1159,22 @@ export async function fetchFaturasFromDb(): Promise<Fatura[] | null> {
     formaPagamento: (l.forma_pagamento || undefined) as FormaPagamento | undefined,
     estornoMotivo: l.estorno_motivo || undefined,
     valorPago: l.valor_pago != null ? Number(l.valor_pago) : undefined,
+    ...lerSecao17Fatura(l as unknown as Record<string, unknown>),
   }));
+}
+
+function lerSecao17Fatura(l: Record<string, unknown>): Partial<Fatura> {
+  const t = (v: unknown) => (v == null || v === '' ? undefined : String(v));
+  return {
+    fornecedorId: t(l.fornecedor_id),
+    descricao: t(l.descricao),
+    departamentoId: t(l.departamento_id),
+    categoriaDespesa: t(l.categoria_despesa) as Fatura['categoriaDespesa'],
+    ativoId: t(l.ativo_id),
+    natureza: t(l.natureza) as Fatura['natureza'],
+    naturezaManual: l.natureza_manual === true ? true : undefined,
+    naturezaMotivo: t(l.natureza_motivo),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1741,6 +1773,7 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     sla: (data.sla || undefined) as CompanySettings['sla'],
     termoExige: (data.termo_exige || undefined) as CompanySettings['termoExige'],
     vidaUtil: (data.vida_util || undefined) as CompanySettings['vidaUtil'],
+    premissasFinanceiras: (data.premissas_financeiras || undefined) as CompanySettings['premissasFinanceiras'],
   };
 }
 
@@ -1768,6 +1801,8 @@ export async function saveSettingsDb(st: CompanySettings) {
         ...(st.termoExige ? { termo_exige: json(st.termoExige) } : {}),
         // Fase 11: idem para a vida útil (depreciação)
         ...(st.vidaUtil ? { vida_util: json(st.vidaUtil) } : {}),
+        // Seção 17: premissas financeiras (idem)
+        ...(st.premissasFinanceiras ? { premissas_financeiras: json(st.premissasFinanceiras) } : {}),
         logo_url: st.logoUrl || null,
         sla: st.sla ? json(st.sla) : null,
         updated_at: new Date().toISOString(),

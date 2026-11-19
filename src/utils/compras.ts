@@ -165,7 +165,7 @@ export function alertasOrcamento(linhas: LinhaOrcamento[], ano: number): AlertaO
       id: `orc-${ano}-${l.chave}`,
       nivel: (l.pct! >= 1 ? 'estourado' : 'perto') as AlertaOrcamento['nivel'],
       titulo: `${ROTULO_CATEGORIA[l.categoria]}${l.area ? ` · ${l.area}` : ''}`,
-      detalhe: `${Math.round(l.pct! * 100)}% do orçamento de ${ano} (${brl(l.realizado)} de ${brl(l.previsto)})`,
+      detalhe: `${Math.round(l.pct! * 100)}% do orçamento de ${ano} (${brl(l.realizado)} pagos e comprometidos de ${brl(l.previsto)})`,
     }));
 }
 

@@ -65,6 +65,9 @@ const deOrcamento = (r: Linha): Orcamento => ({
   valorAnual: Number(r.valor_anual) || 0,
   meses: Array.isArray(r.meses) ? (r.meses as unknown[]).map((v) => Number(v) || 0) : [],
   observacoes: txt(r.observacoes),
+  natureza: (txt(r.natureza) as Orcamento['natureza']) || undefined,
+  departamentoId: txt(r.departamento_id),
+  origem: (txt(r.origem) as Orcamento['origem']) || undefined,
 });
 
 export async function fetchOrcamentosDb(): Promise<Orcamento[] | null> {
@@ -80,7 +83,18 @@ export async function salvarOrcamentosDb(linhas: Orcamento[]) {
     bd()
       .from('orcamentos')
       .upsert(
-        linhas.map((o) => ({ id: o.id, ano: o.ano, categoria: o.categoria, area: o.area.trim(), meses: o.meses, observacoes: o.observacoes || null })),
+        linhas.map((o) => ({
+          id: o.id,
+          ano: o.ano,
+          categoria: o.categoria,
+          area: o.area.trim(),
+          meses: o.meses,
+          observacoes: o.observacoes || null,
+          // Seção 17: só vão quando preenchidos (funciona antes da migration)
+          ...(o.natureza ? { natureza: o.natureza } : {}),
+          ...(o.departamentoId ? { departamento_id: o.departamentoId } : {}),
+          ...(o.origem ? { origem: o.origem } : {}),
+        })),
         { onConflict: 'id' }
       )
       .select('id')

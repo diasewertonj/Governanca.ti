@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
 import { DIAS_ALERTA_CONTRATO, garantiaEfetiva, situacaoContrato } from '../../utils/contratos.ts';
 import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts';
-import { brl, despesasRecorrentes, listarVencimentos, valorPatrimonio } from '../../utils/financeiro.ts';
+import { listarVencimentos } from '../../utils/financeiro.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { VencimentosView } from '../financeiro/FinanceiroViews.tsx';
 import { termoAberto } from '../../utils/termos.ts';
@@ -18,7 +18,6 @@ import {
   ShieldAlert,
   ArrowRight,
   AlertTriangle,
-  Landmark,
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -38,7 +37,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     currentRole,
     terms,
     abrirFicha,
-    settings,
   } = useApp();
   const { linhas, estoque } = useRecursos();
   const termosAguardando = terms.filter((t) => termoAberto(t) && (!t.formaAssinatura || t.formaAssinatura === 'pendente'));
@@ -67,16 +65,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   // Fase 8: contratos que vencem em 60 dias e faturas a pagar vencidas ou vencendo em 7 dias
   const contratosVencendo = contratos.filter((c) => situacaoContrato(c).situacao === 'vencendo').length;
   const faturasAPagar = resumoFaturasAPagar(faturas);
-  // Seção 6: custo recorrente (fonte única) e renovações/prazos de cancelamento em 30 dias
-  const custoMensal = despesasRecorrentes({ licencas: licenses, contratos, linhas }).reduce((s, i) => s + i.mensal, 0);
+  // Seção 6: renovações/prazos de cancelamento em 30 dias (o custo foi para a Gestão de T.I., seção 17)
   const renovacoes30 = listarVencimentos(
     { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees },
     30
   ).filter((v) => v.tipo === 'contrato' || v.tipo === 'licenca' || v.tipo === 'cancelamento' || v.tipo === 'sem_contrato').length;
   const emManutencao = assets.filter((a) => a.status === 'manutencao').length;
-  // Seção 9.4: valor do patrimônio (ficha fiscal + acessórios em estoque), só para a T.I.
-  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
-  const patrimonio = isTI ? valorPatrimonio(assets, estoque, settings.vidaUtil) : null;
   const mostrarQuadro =
     garantiasProximas.length > 0 ||
     contratosVencendo > 0 ||
@@ -93,8 +87,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     <div className="space-y-6">
       <CabecalhoTela titulo="Início" subtitulo="Visão geral do parque de T.I., do atendimento e do que precisa de atenção" />
 
-      {/* Cards de métricas principais (T.I.: + valor do patrimônio, 5 numa linha a partir de 1536 px) */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${patrimonio ? 'lg:grid-cols-3 2xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
+      {/* Cards de métricas principais */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="cartao p-5">
           <div className="flex items-center justify-between">
             <span className="secao-titulo">
@@ -177,30 +171,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {patrimonio && (
-          <button
-            type="button"
-            onClick={() => onNavigate('financeiro')}
-            title="Abrir o Financeiro (Despesas e Compras)"
-            className="cartao p-5 w-full min-w-0 text-left transition-colors hover:border-blue-300 sm:col-span-2 2xl:col-span-1"
-          >
-            <div className="flex items-center justify-between">
-              <span className="secao-titulo">Valor do patrimônio</span>
-              <Landmark className="w-4 h-4 text-blue-600" aria-hidden="true" />
-            </div>
-            <div className="mt-2 text-2xl 2xl:text-xl font-bold font-mono tracking-tight text-slate-900">{brl(patrimonio.totalAtual)}</div>
-            <div className="text-xs text-slate-500">valor atual (com depreciação)</div>
-            <div className="mt-2 text-xs text-slate-500">
-              compra <span className="font-mono">{brl(patrimonio.total)}</span> · depreciado <span className="font-mono">{brl(patrimonio.depreciacaoAcumulada)}</span> · acessórios{' '}
-              <span className="font-mono">{brl(patrimonio.acessorios)}</span>
-            </div>
-            {patrimonio.semValor > 0 && (
-              <div className="mt-1 text-xs text-amber-800">
-                {patrimonio.semValor} {patrimonio.semValor === 1 ? 'equipamento sem valor de compra' : 'equipamentos sem valor de compra'}
-              </div>
-            )}
-          </button>
-        )}
+        {/* Seção 17: valor do patrimônio e custos saíram do Início (Gestão de T.I. › Painel executivo e Patrimônio) */}
       </div>
 
       {/* Quadro de garantias e contratos (se houver algo a decidir) */}
@@ -231,10 +202,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                   <div className="text-xs text-amber-800 underline-offset-2 hover:underline">
                     {contratosVencendo === 1 ? 'contrato vence' : 'contratos vencem'} em {DIAS_ALERTA_CONTRATO} dias
                   </div>
-                </button>
-                <button type="button" onClick={() => onNavigate('financeiro')} className="btn-icone text-left -m-1">
-                  <div className="text-xl font-bold text-amber-900 font-mono">{brl(custoMensal)}</div>
-                  <div className="text-xs text-amber-800 underline-offset-2 hover:underline">custo mensal recorrente</div>
                 </button>
                 <button type="button" onClick={() => document.getElementById('precisa-atencao')?.scrollIntoView({ behavior: 'smooth' })} className="btn-icone text-left -m-1">
                   <div className="text-xl font-bold text-amber-900">{renovacoes30}</div>

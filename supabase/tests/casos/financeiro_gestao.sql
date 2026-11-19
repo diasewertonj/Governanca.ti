@@ -14,6 +14,16 @@ insert into public.faturas (id, competencia, valor, vencimento, fornecedor_id, d
   values ('fat-fg1', '2026-11-01', 350, '2026-11-20', 'for-fg1', 'Conserto de impressora');
 insert into public.recebimentos (id, tipo, descricao, valor, previsto_para, fornecedor_id)
   values ('rec-fg1', 'reembolso_fornecedor', 'Crédito por falha no link', 120, '2026-12-05', 'for-fg1');
+-- Gestor (tem equipe) da Área FG: uma conta paga da área e o orçamento dela
+insert into public.colaboradores (id, matricula, nome, email, cargo, setor_id, status, role, data_admissao)
+  values ('emp-fg-gestor', 'MFGG', 'Gestor FG', 'gestor-fg@x.test', 'Gerente', 'dep-fg1', 'ativo', 'colaborador', '2026-01-01');
+insert into public.colaboradores (id, matricula, nome, email, cargo, setor_id, status, role, data_admissao, gestor_id)
+  values ('emp-fg-sub', 'MFGS', 'Equipe FG', 'equipe-fg@x.test', 'Analista', 'dep-fg1', 'ativo', 'colaborador', '2026-01-01', 'emp-fg-gestor');
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-000000000010', 'gestor-fg@x.test');
+insert into public.faturas (id, competencia, valor, vencimento, fornecedor_id, descricao, status, pago_em, departamento_id, categoria_despesa)
+  values ('fat-fg2', '2026-10-01', 350, '2026-10-20', 'for-fg1', 'Manutenção da área', 'paga', '2026-10-20', 'dep-fg1', 'outros');
+insert into public.orcamentos (id, ano, categoria, area, valor_anual, departamento_id) values ('orc-fg1', 2026, 'outros', 'Área FG', 1000, 'dep-fg1');
+\set gestor '{"sub":"00000000-0000-0000-0000-000000000010","email":"gestor-fg@x.test","role":"authenticated"}'
 
 select harness.rodar('financeiro', 'G1 T.I. lança fatura avulsa (fornecedor + descrição) com natureza e área', 'ok', :'sup', 'authenticated',
   $q$insert into public.faturas (competencia, valor, vencimento, fornecedor_id, descricao, natureza, departamento_id)
@@ -69,12 +79,31 @@ select harness.rodar('financeiro', 'G12 admin fecha, não fecha de novo, reabre 
   end $x$$q$);
 select harness.rodar('financeiro', 'G13 ninguém altera a foto fechada direto na tabela', 'bloqueado', :'admin', 'authenticated',
   $q$update public.imobilizado_fechamentos set foto = '{}'::jsonb where ano = 2025$q$);
+select harness.rodar('financeiro', 'G14 suporte não registra pagamento (decisão 2)', 'bloqueado', :'sup', 'authenticated',
+  $q$update public.faturas set status = 'paga', pago_em = '2026-11-19' where id = 'fat-fg1'$q$);
+select harness.rodar('financeiro', 'G15 suporte não lança fatura já paga', 'bloqueado', :'sup', 'authenticated',
+  $q$insert into public.faturas (competencia, valor, vencimento, fornecedor_id, descricao, status, pago_em)
+     values ('2026-11-01', 10, '2026-11-20', 'for-fg1', 'Teste', 'paga', '2026-11-19')$q$);
+select harness.rodar('financeiro', 'G16 admin registra pagamento', 'ok', :'admin', 'authenticated',
+  $q$update public.faturas set status = 'paga', pago_em = '2026-11-19' where id = 'fat-fg1'$q$);
+select harness.rodar('financeiro', 'G17 gestor vê os totais da própria área', 'ok', :'gestor', 'authenticated',
+  $q$do $x$ begin
+    perform harness.espera($s$select 1 from public.custos_da_minha_area(2026) where area = 'Área FG' and categoria = 'outros' and realizado = 350 and previsto = 1000$s$, 1);
+  end $x$$q$);
+select harness.rodar('financeiro', 'G18 colaborador sem equipe não vê custos de área', 'ok', :'colab', 'authenticated',
+  $q$do $x$ begin
+    perform harness.espera($s$select 1 from public.custos_da_minha_area(2026)$s$, 0);
+  end $x$$q$);
 
 -- Limpeza
 delete from public.imobilizado_fechamentos where ano = 2025;
 delete from public.rateios where origem_id = 'fat-fg1';
 delete from public.recebimentos where fornecedor_id = 'for-fg1';
 delete from public.faturas where fornecedor_id = 'for-fg1';
+delete from public.orcamentos where id = 'orc-fg1';
+update public.colaboradores set auth_user_id = null where id = 'emp-fg-gestor';
+delete from auth.users where id = '00000000-0000-0000-0000-000000000010';
+delete from public.colaboradores where id in ('emp-fg-sub', 'emp-fg-gestor');
 delete from public.fornecedores where id = 'for-fg1';
 delete from public.departamentos where id in ('dep-fg1', 'dep-fg2');
 update public.colaboradores set auth_user_id = null where id = 'emp-fg-compras';

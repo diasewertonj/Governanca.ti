@@ -12,6 +12,7 @@ import { formatDate } from '../../utils/formatters.ts';
 import { normalizar } from '../../utils/processos.ts';
 import { baixarCsv, brl, comprasDeEquipamentos, paraCsv, somarPor, valorPatrimonio, type CompraEquipamento } from '../../utils/financeiro.ts';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
+import { BotaoContaDoAtivo } from './FaturasSecao.tsx';
 import { ROTULO_GRUPO_DEPRECIACAO, depreciacao } from '../../utils/patrimonio.ts';
 
 const ROTULO_CATEGORIA_ATIVO: Record<AssetCategory, string> = {
@@ -76,7 +77,7 @@ export const ComprasView: React.FC<{
   /** Seletor de período (atalhos ou de/até), montado pelo Financeiro */
   filtroPeriodo: React.ReactNode;
 }> = ({ abas, periodo, filtroPeriodo }) => {
-  const { assets, fornecedores, abrirFicha, departments, settings } = useApp();
+  const { assets, fornecedores, abrirFicha, departments, settings, faturas } = useApp();
   const [fFornecedor, setFFornecedor] = useState('');
   const [fCategoria, setFCategoria] = useState<AssetCategory | ''>('');
   const [busca, setBusca] = useState('');
@@ -98,6 +99,11 @@ export const ComprasView: React.FC<{
   const semData = filtradas.filter((c) => !c.data).length;
   const semValor = lista.filter((c) => !(c.valor > 0)).length;
   const total = lista.reduce((s, c) => s + c.valor, 0);
+  // Decisão 11: comprado sem pedido e sem conta lançada
+  const semConta = lista.filter((c) => {
+    const a = assets.find((x) => x.id === c.ativoId);
+    return !!a && c.valor > 0 && !a.pedidoId && !faturas.some((f) => f.ativoId === a.id && f.status !== 'cancelada');
+  });
   const porFornecedor = somarPor(lista, (c) => nomeForn(c) || 'Sem fornecedor', (c) => c.valor);
   const porCategoria = somarPor(lista, (c) => ROTULO_CATEGORIA_ATIVO[c.categoria] || c.categoria, (c) => c.valor);
 
@@ -148,7 +154,7 @@ export const ComprasView: React.FC<{
   return (
     <div className="space-y-4">
       <CabecalhoTela
-        titulo="Financeiro"
+        titulo="Custos recorrentes"
         subtitulo={`Compras de equipamento de ${formatDate(periodo.de)} a ${formatDate(periodo.ate)}, pela data de aquisição · valor da ficha fiscal, sem lançamento novo`}
         acoes={
           <>
@@ -205,7 +211,11 @@ export const ComprasView: React.FC<{
             {semValor > 0 ? `${semValor} sem valor de compra na ficha` : lista.length === 1 ? 'equipamento comprado' : 'equipamentos comprados'}
           </p>
         </div>
-        <CartaoPatrimonio className="col-span-2 lg:col-span-1" />
+        <div className="cartao min-w-0 p-3">
+          <p className="text-xs text-slate-500">Sem conta a pagar</p>
+          <p className={`font-mono text-lg font-semibold ${semConta.length ? 'text-amber-800' : 'text-slate-900'}`}>{semConta.length}</p>
+          <p className="text-xs text-slate-500">comprados sem pedido e sem fatura: lance para entrar no orçamento</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -256,6 +266,14 @@ export const ComprasView: React.FC<{
                   </td>
                   <td data-label="Valor" className="text-right font-mono">
                     {c.valor > 0 ? brl(c.valor) : <span className="font-sans text-slate-500">sem valor</span>}
+                    {(() => {
+                      const a = assets.find((x) => x.id === c.ativoId);
+                      return a ? (
+                        <span className="mt-1 block font-sans">
+                          <BotaoContaDoAtivo ativo={a} compacto />
+                        </span>
+                      ) : null;
+                    })()}
                   </td>
                 </tr>
               ))}

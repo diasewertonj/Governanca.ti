@@ -295,6 +295,8 @@ export interface Lancamento {
   area: string;
   mes: number; // 0–11, pela competência
   valor: number;
+  /** De onde veio (para o rateio entre áreas) */
+  origem?: { fatura?: string; contrato?: string; licenca?: string };
 }
 
 export interface LinhaGestao {
@@ -430,6 +432,7 @@ export function lancamentosDoLivro(
       area: ar,
       mes: Number(f.competencia.slice(5, 7)) - 1,
       valor: c(valor),
+      origem: { fatura: f.id, contrato: f.contratoId, licenca: f.licencaId },
     });
   });
 
@@ -542,6 +545,36 @@ export function indicadoresExecutivos(lancs: Lancamento[], orcamentoAnual: numbe
     custoPorColaborador: colaboradoresAtivos > 0 ? c(opexAno / colaboradoresAtivos) : undefined,
     projecao12m: c(projecao.meses.slice(0, 12).reduce((s, m) => s + m.total, 0)),
   };
+}
+
+/**
+ * Custo por área (decisão 3): o realizado de cada lançamento vai para a área dele,
+ * a não ser que haja rateio (da fatura; sem ele, do contrato ou da licença). A parte
+ * que o rateio não cobre fica na área original.
+ */
+export function custoPorArea(
+  lancs: Lancamento[],
+  rateios: { origemTipo: string; origemId: string; departamentoId: string; percentual: number }[],
+  nomeDep: (id: string) => string
+): { area: string; valor: number }[] {
+  const m = new Map<string, number>();
+  const somar = (area: string, v: number) => m.set(area || 'Sem área', c((m.get(area || 'Sem área') || 0) + v));
+  const de = (tipo: string, id?: string) => (id ? rateios.filter((r) => r.origemTipo === tipo && r.origemId === id) : []);
+  lancs
+    .filter((l) => l.situacao === 'realizado')
+    .forEach((l) => {
+      let partes = de('fatura', l.origem?.fatura);
+      if (!partes.length) partes = de('contrato', l.origem?.contrato);
+      if (!partes.length) partes = de('licenca', l.origem?.licenca);
+      let usado = 0;
+      partes.forEach((p) => {
+        const v = c((l.valor * p.percentual) / 100);
+        usado += v;
+        somar(nomeDep(p.departamentoId), v);
+      });
+      if (l.valor - usado > 0.004) somar(l.area, c(l.valor - usado));
+    });
+  return [...m.entries()].map(([area, valor]) => ({ area, valor })).sort((a, b) => b.valor - a.valor);
 }
 
 /** Totais por chave (grupo, área ou local) para o relatório e a exportação */

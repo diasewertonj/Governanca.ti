@@ -2,7 +2,8 @@
  * Seção 6 · Telas do menu: Vencimentos, Contas a pagar, Despesas e Conciliar fornecedores.
  * Tudo calculado a partir da fonte única (utils/financeiro.ts); nada é digitado duas vezes.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { contratosResumo, licencasResumo, type ContratoResumo } from '../../services/financeiroDb.ts';
 import { Download } from 'lucide-react';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
@@ -174,26 +175,44 @@ export const ContratoPorId: React.FC<{ id: string; onClose: () => void }> = ({ i
 // Contas a pagar
 // -----------------------------------------------------------------------------
 export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
-  const { faturas, contratos, licenses, fornecedores } = useApp();
+  const { faturas, contratos, licenses, fornecedores, currentRole } = useApp();
   const [status, setStatus] = useState<'abertas' | 'vencidas' | 'pagas' | 'todas'>('abertas');
   const [fornecedorId, setFornecedorId] = useState('');
   const [mes, setMes] = useState('');
   const [busca, setBusca] = useState('');
+  // Decisão 1: Compras paga todas as faturas e vê só o resumo de contratos e licenças
+  const [resumo, setResumo] = useState<{ contratos: ContratoResumo[]; licencas: { id: string; nome: string; fornecedorId?: string }[] }>({ contratos: [], licencas: [] });
+  useEffect(() => {
+    if (currentRole !== 'compras') return;
+    let vivo = true;
+    Promise.all([contratosResumo(), licencasResumo()]).then(([c, l]) => {
+      if (vivo) setResumo({ contratos: c || [], licencas: l || [] });
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [currentRole]);
 
   const { pedidos: pedidosCompra } = useCompras();
   const fornecedorDe = (f: Fatura) =>
-    f.pedidoId
+    f.fornecedorId ||
+    (f.pedidoId
       ? pedidosCompra.find((p) => p.id === f.pedidoId)?.fornecedorId
       : f.contratoId
-        ? contratos.find((c) => c.id === f.contratoId)?.fornecedorId
-        : licenses.find((l) => l.id === f.licencaId)?.fornecedorId;
+        ? contratos.find((c) => c.id === f.contratoId)?.fornecedorId || resumo.contratos.find((c) => c.id === f.contratoId)?.fornecedorId
+        : licenses.find((l) => l.id === f.licencaId)?.fornecedorId || resumo.licencas.find((l) => l.id === f.licencaId)?.fornecedorId);
   const nomeOrigem = (f: Fatura) => {
     const c = contratos.find((x) => x.id === f.contratoId);
     if (f.pedidoId) {
       const p = pedidosCompra.find((x) => x.id === f.pedidoId);
       return p ? `Pedido ${p.codigo} · ${p.titulo}` : 'Pedido de compra';
     }
-    return c ? nomeContrato(c) : licenses.find((l) => l.id === f.licencaId)?.nome || '';
+    if (!f.contratoId && !f.licencaId) return f.descricao || 'Conta avulsa';
+    if (f.contratoId && !c) {
+      const r = resumo.contratos.find((x) => x.id === f.contratoId);
+      return r ? `Contrato ${fornecedores.find((x) => x.id === r.fornecedorId)?.nome || ''} (${r.tipo})` : 'Contrato';
+    }
+    return c ? nomeContrato(c) : licenses.find((l) => l.id === f.licencaId)?.nome || resumo.licencas.find((l) => l.id === f.licencaId)?.nome || '';
   };
   const agora = new Date();
   const lista = faturas
@@ -231,8 +250,8 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
   return (
     <div className="space-y-3">
       <CabecalhoTela
-        titulo="Financeiro"
-        subtitulo="Faturas a pagar e despesas por período"
+        titulo="Contas a pagar"
+        subtitulo="Todas as faturas: contratos, licenças, pedidos de compra e contas avulsas"
         acoes={
           <button type="button" onClick={exportar} className="btn btn-secundario">
             <Download /> Exportar CSV
@@ -261,7 +280,7 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
           </>
         }
       />
-      <FaturasSecao listaGlobal={lista} />
+      <FaturasSecao listaGlobal={lista} nomeOrigem={nomeOrigem} />
     </div>
   );
 };

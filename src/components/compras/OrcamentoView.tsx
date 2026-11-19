@@ -94,7 +94,7 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
   return (
     <div className="space-y-4">
       <CabecalhoTela
-        titulo="Financeiro"
+        titulo="Orçamento"
         subtitulo={`Orçamento de ${ano}: previsto × realizado por categoria e área · realizado = faturas pagas e compras de equipamento${isAdmin ? '' : ' · só o administrador edita'}`}
         acoes={
           <>

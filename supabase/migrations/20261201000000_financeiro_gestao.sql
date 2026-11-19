@@ -236,3 +236,86 @@ begin
     end if;
   end loop;
 end $$;
+
+-- Decisão 2: o suporte de T.I. lança e confere faturas, mas não registra pagamento
+create or replace function public.faturas_suporte_nao_paga()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if public.meu_papel() = 'ti_suporte' and new.status = 'paga'
+     and (tg_op = 'INSERT' or old.status is distinct from 'paga') then
+    raise exception 'O suporte de T.I. lança e confere as faturas; o pagamento é registrado pelo administrador ou por Compras'
+      using errcode = '42501';
+  end if;
+  return new;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'trg_faturas_suporte_nao_paga') then
+    create trigger trg_faturas_suporte_nao_paga before insert or update on public.faturas
+      for each row execute function public.faturas_suporte_nao_paga();
+  end if;
+end $$;
+
+-- Decisão 10: o gestor (quem tem equipe) vê só os totais da própria área, sem detalhe
+create or replace function public.custos_da_minha_area(p_ano integer)
+returns table (area text, categoria text, previsto numeric, realizado numeric)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with eu as (
+    select c.id, c.setor_id
+      from public.colaboradores c
+     where c.id = public.meu_colaborador_id()
+       and c.setor_id is not null
+       and exists (select 1 from public.colaboradores s
+                    where s.gestor_id = c.id and s.id <> c.id and s.status <> 'desligado')
+  ),
+  dep as (
+    select d.id, d.nome, lower(btrim(d.nome)) as chave
+      from public.departamentos d join eu on eu.setor_id = d.id
+  ),
+  -- Decisão 7: textos de área antigos ligados a um departamento nas premissas
+  mapa as (
+    select coalesce((select c.premissas_financeiras -> 'mapaAreas' from public.configuracoes_empresa c limit 1), '{}'::jsonb) as m
+  ),
+  orc as (
+    select o.categoria::text as categoria, sum(o.valor_anual) as valor
+      from public.orcamentos o, dep, mapa
+     where o.ano = p_ano
+       and (o.departamento_id = dep.id or lower(btrim(o.area)) = dep.chave
+            or (o.departamento_id is null and mapa.m ->> lower(btrim(o.area)) = dep.id))
+     group by 1
+  ),
+  pago as (
+    select coalesce(f.categoria_despesa, ct.categoria_despesa, l.categoria_despesa, p.categoria, 'outros')::text as categoria,
+           sum(coalesce(f.valor_pago, f.valor)) as valor
+      from public.faturas f
+      cross join dep
+      cross join mapa
+      left join public.contratos ct on ct.id = f.contrato_id
+      left join public.licencas_software l on l.id = f.licenca_id
+      left join public.pedidos_compra p on p.id = f.pedido_id
+     where f.status = 'paga'
+       and extract(year from f.competencia) = p_ano
+       and (f.departamento_id = dep.id
+            or (f.departamento_id is null and (
+                 ct.departamento_id = dep.id or l.departamento_id = dep.id or p.departamento_id = dep.id
+                 or lower(btrim(coalesce(ct.centro_custo, l.centro_custo, p.area, ''))) = dep.chave
+                 or mapa.m ->> lower(btrim(coalesce(ct.centro_custo, l.centro_custo, p.area, ''))) = dep.id)))
+     group by 1
+  )
+  select dep.nome, cats.categoria, coalesce(orc.valor, 0), coalesce(pago.valor, 0)
+    from dep
+    cross join (select categoria from orc union select categoria from pago) cats
+    left join orc on orc.categoria = cats.categoria
+    left join pago on pago.categoria = cats.categoria
+$$;
+
+revoke all on function public.custos_da_minha_area(integer) from public, anon;
+grant execute on function public.custos_da_minha_area(integer) to authenticated;

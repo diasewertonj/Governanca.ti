@@ -28,6 +28,7 @@ import {
 import { NewAssetModal } from './NewAssetModal.tsx';
 import { AnexosAtivo } from './AnexosAtivo.tsx';
 import { DepreciacaoAtivo } from './DepreciacaoAtivo.tsx';
+import { BotaoContaDoAtivo } from '../financeiro/FaturasSecao.tsx';
 import { LembreteGarantia } from './LembreteGarantia.tsx';
 import { ManutencoesAtivo } from './ManutencoesAtivo.tsx';
 import { FormManutencao } from './FormManutencao.tsx';
@@ -788,6 +789,12 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
 
           {/* Fase 11: valor atual e depreciação (só TI recebe os dados fiscais) */}
           {isTI && <DepreciacaoAtivo asset={asset} podeEditar={!descartado} />}
+          {/* Seção 17 (decisão 11): comprado sem pedido e sem conta → lançar conta a pagar */}
+          {isTI && !descartado && (
+            <div className="flex justify-end">
+              <BotaoContaDoAtivo ativo={asset} compacto />
+            </div>
+          )}
 
           {/* Fase 8: arquivos (só TI) */}
           {isTI && <AnexosAtivo asset={asset} podeEditar={!descartado} />}

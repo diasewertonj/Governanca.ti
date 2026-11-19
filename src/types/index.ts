@@ -475,6 +475,8 @@ export interface PremissasFinanceiras {
   cambio?: Partial<Record<Moeda, number>>;
   reposicao?: Record<string, number>;
   contaContabil?: Partial<Record<CategoriaDespesa, string>>;
+  /** Decisão 7: centro de custo antigo (texto, minúsculo) → departamento */
+  mapaAreas?: Record<string, string>;
 }
 
 export type TicketType = 'suporte' | 'onboarding' | 'offboarding';
@@ -833,6 +835,8 @@ export interface CompanySettings {
   termoExige?: { computador: boolean; celular: boolean; monitor: boolean };
   /** Fase 11: vida útil (anos) por grupo e valor residual (% do valor de compra) */
   vidaUtil?: VidaUtil;
+  /** Seção 17: limite de capitalização, reajuste padrão, reposição e conta contábil */
+  premissasFinanceiras?: PremissasFinanceiras;
 }
 
 // -----------------------------------------------------------------------------
@@ -851,6 +855,10 @@ export interface Orcamento {
   /** 12 valores (jan a dez); o anual é a soma */
   meses: number[];
   observacoes?: string;
+  /** Seção 17: CAPEX/OPEX e área = departamento (decisão 7) */
+  natureza?: NaturezaGasto;
+  departamentoId?: string;
+  origem?: 'manual' | 'copia' | 'projecao';
 }
 
 export type StatusPedido = 'rascunho' | 'em_cotacao' | 'aguardando' | 'aprovado' | 'recusado' | 'comprado' | 'recebido' | 'cancelado';

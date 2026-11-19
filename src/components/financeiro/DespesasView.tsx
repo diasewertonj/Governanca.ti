@@ -29,10 +29,9 @@ import {
   somarPor,
   valorEfetivo,
 } from '../../utils/financeiro.ts';
-import { ContasPagarView, ContratoPorId } from './FinanceiroViews.tsx';
-import { CartaoPatrimonio, ComprasView } from './ComprasView.tsx';
+import { ContratoPorId } from './FinanceiroViews.tsx';
+import { ComprasView } from './ComprasView.tsx';
 import { Abas } from '../ui/Abas.tsx';
-import { OrcamentoView } from '../compras/OrcamentoView.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
 type Atalho = 'este_mes' | 'mes_anterior' | 'ult3' | 'ult6' | 'ult12' | 'este_ano' | 'ano_anterior' | 'personalizado';
@@ -97,11 +96,12 @@ interface Origem {
   area?: string;
 }
 
+/**
+ * Seção 17: "Custos recorrentes" (lado técnico): o que a T.I. custa e as compras de
+ * equipamento. Contas a pagar e Orçamento saíram daqui (Financeiro e Gestão de T.I.).
+ */
 export const FinanceiroView: React.FC = () => {
-  const { currentRole } = useApp();
-  // Compras vê só Contas a pagar e Orçamento (Pedidos de compra tem item próprio no menu)
-  const ehCompras = currentRole === 'compras';
-  const [aba, setAba] = useState<'contas' | 'despesas' | 'compras' | 'orcamento'>('contas');
+  const [aba, setAba] = useState<'despesas' | 'compras'>('despesas');
   // Período em comum entre Despesas e Compras
   const [atalho, setAtalho] = useState<Atalho>('ult6');
   const [deManual, setDeManual] = useState('');
@@ -113,15 +113,13 @@ export const FinanceiroView: React.FC = () => {
 
   const abas = (
     <Abas
-      rotulo="Financeiro"
+      rotulo="Custos recorrentes"
       ativa={aba}
       onMudar={setAba}
       itens={[
-        { id: 'contas' as const, rotulo: 'Contas a pagar' },
-        { id: 'despesas' as const, rotulo: 'Despesas' },
-        { id: 'compras' as const, rotulo: 'Compras' },
-        { id: 'orcamento' as const, rotulo: 'Orçamento' },
-      ].filter((a) => !ehCompras || a.id === 'contas' || a.id === 'orcamento')}
+        { id: 'despesas' as const, rotulo: 'Custos do período' },
+        { id: 'compras' as const, rotulo: 'Compras de equipamento' },
+      ]}
     />
   );
   const filtroPeriodo = (
@@ -139,8 +137,6 @@ export const FinanceiroView: React.FC = () => {
       )}
     </>
   );
-  if (aba === 'contas') return <ContasPagarView abas={abas} />;
-  if (aba === 'orcamento') return <OrcamentoView abas={abas} />;
   if (aba === 'compras') return <ComprasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
   return <DespesasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
 };
@@ -270,7 +266,7 @@ export const DespesasView: React.FC<{
     <div className="space-y-4">
       {/* Período e filtros */}
       <CabecalhoTela
-        titulo="Financeiro"
+        titulo="Custos recorrentes"
         subtitulo={`${formatDate(periodo.de)} a ${formatDate(periodo.ate)} (${meses.length} ${meses.length === 1 ? 'mês' : 'meses'}) · comparado com ${formatDate(anterior.de)} a ${formatDate(anterior.ate)}`}
         acoes={
           <button type="button" onClick={exportar} className="btn btn-secundario">
@@ -310,7 +306,7 @@ export const DespesasView: React.FC<{
         }
       />
       {/* Números do período (o valor do patrimônio é de hoje: só leitura da ficha fiscal) */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="cartao p-3">
           <p className="text-xs text-slate-500">Realizado (pago)</p>
           <p className="text-lg font-semibold font-mono text-slate-900">{brl(dados.realizado)}</p>
@@ -335,7 +331,6 @@ export const DespesasView: React.FC<{
           <p className="text-lg font-semibold font-mono text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}</p>
           <p className="text-xs text-slate-500">{ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || 'nenhum'}</p>
         </div>
-        <CartaoPatrimonio className="col-span-2 xl:col-span-1" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">

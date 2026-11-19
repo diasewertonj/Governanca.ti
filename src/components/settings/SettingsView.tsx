@@ -6,6 +6,7 @@ import { AssetCategory, Employee, ModeloDocumento, UserRole, VidaUtil } from '..
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
+import { FinanceiroSettings } from './FinanceiroSettings.tsx';
 import { UnidadesLista } from '../fornecedores/UnidadesLista.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { NavLateral, type GrupoNav } from '../ui/Abas.tsx';
@@ -57,7 +58,7 @@ const ROTULO_CAMPO_EMPRESA = {
 } as const;
 
 // Fase 7: abas com nomes do glossário (a chave interna não muda)
-type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'vida_util' | 'banco';
+type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'vida_util' | 'financeiro' | 'banco';
 const GRUPOS: GrupoNav<Aba>[] = [
   {
     titulo: 'Empresa',
@@ -88,6 +89,8 @@ const GRUPOS: GrupoNav<Aba>[] = [
       { id: 'vida_util', rotulo: 'Vida útil (depreciação)' },
     ],
   },
+  // Seção 17: premissas da Gestão de T.I. e mapa de áreas
+  { titulo: 'Financeiro', itens: [{ id: 'financeiro', rotulo: 'Premissas e áreas' }] },
   { titulo: 'Sistema', itens: [{ id: 'banco', rotulo: 'Conexão' }] },
 ];
 
@@ -774,6 +777,7 @@ export const SettingsView: React.FC = () => {
 
           {activeTab === 'catalogo' && <CatalogoSettings />}
           {activeTab === 'prazos' && <PrazosSettings />}
+          {activeTab === 'financeiro' && <FinanceiroSettings />}
 
           {/* USUÁRIOS E PERMISSÕES: quem opera o sistema */}
           {activeTab === 'equipe' && (
