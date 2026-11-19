@@ -1,0 +1,264 @@
+/**
+ * Seção 17 · Gestão financeira de T.I. — regras únicas usadas por todas as telas:
+ * natureza CAPEX/OPEX e imobilizado por ano (saldo inicial, aquisições, baixas,
+ * depreciação do ano, saldo final). Projeção 12–36 meses entra neste mesmo módulo.
+ */
+import type { Asset, CategoriaDespesa, GrupoDepreciacao, VidaUtil } from '../types/index.ts';
+import { depreciacao, grupoDoAtivo } from './patrimonio.ts';
+
+export type Natureza = 'capex' | 'opex';
+
+/** Decisão 4: limite padrão de capitalização (editável nas premissas) */
+export const LIMITE_CAPITALIZACAO_PADRAO = 1200;
+
+const c = (v: number) => Math.round(v * 100) / 100;
+
+type AtivoNatureza = Pick<Asset, 'fiscal'> & Partial<Pick<Asset, 'categoria' | 'nome' | 'modelo' | 'grupoDepreciacao'>> & {
+  natureza?: Natureza | null;
+  naturezaManual?: boolean;
+};
+
+/** Equipamento: ajuste manual vence; senão CAPEX se deprecia e vale ≥ limite */
+export function naturezaDoAtivo(a: AtivoNatureza, limite = LIMITE_CAPITALIZACAO_PADRAO): Natureza {
+  if (a.naturezaManual && a.natureza) return a.natureza;
+  const valor = Number(a.fiscal?.valorCompra) || 0;
+  return grupoDoAtivo(a) !== 'nao_deprecia' && valor >= limite ? 'capex' : 'opex';
+}
+
+/**
+ * Lançamento (fatura ou item de pedido): ajuste manual vence; hardware com valor
+ * unitário ≥ limite e licença perpétua ≥ limite são CAPEX; o resto é OPEX.
+ */
+export function naturezaDoLancamento(
+  l: { categoria: CategoriaDespesa; valorUnitario: number; perpetua?: boolean; natureza?: Natureza | null; naturezaManual?: boolean },
+  limite = LIMITE_CAPITALIZACAO_PADRAO
+): Natureza {
+  if (l.naturezaManual && l.natureza) return l.natureza;
+  if (l.valorUnitario < limite) return 'opex';
+  if (l.categoria === 'hardware') return 'capex';
+  if (l.perpetua && (l.categoria === 'software' || l.categoria === 'ia')) return 'capex';
+  return 'opex';
+}
+
+// -----------------------------------------------------------------------------
+// Imobilizado por ano
+// -----------------------------------------------------------------------------
+type AtivoImobilizado = Pick<Asset, 'id' | 'tag' | 'nome' | 'fiscal' | 'status'> &
+  Partial<Pick<Asset, 'categoria' | 'modelo' | 'grupoDepreciacao' | 'setorId' | 'baixas'>>;
+
+export interface LinhaImobilizado {
+  ativoId: string;
+  tag: string;
+  nome: string;
+  grupo: GrupoDepreciacao;
+  setorId?: string;
+  dataAquisicao?: string;
+  custo: number;
+  /** Situação em 1º/jan */
+  noInicio: boolean;
+  custoInicial: number;
+  depAcumInicial: number;
+  aquisicao: number;
+  depreciacaoAno: number;
+  baixa?: { data: string; custo: number; depAcum: number; valorVenda: number; resultado: number };
+  /** Situação em 31/dez */
+  custoFinal: number;
+  depAcumFinal: number;
+}
+
+export interface TotaisImobilizado {
+  custoInicial: number;
+  depAcumInicial: number;
+  liquidoInicial: number;
+  aquisicoes: number;
+  baixasCusto: number;
+  baixasDepAcum: number;
+  vendas: number;
+  resultadoBaixas: number;
+  depreciacaoAno: number;
+  custoFinal: number;
+  depAcumFinal: number;
+  liquidoFinal: number;
+}
+
+/** Baixa vigente (não estornada) do ativo, se houver */
+function baixaVigente(a: AtivoImobilizado) {
+  return (a.baixas || []).find((b) => !(b as { estornadaEm?: string }).estornadaEm);
+}
+
+/**
+ * Movimento do imobilizado no ano: só entram equipamentos CAPEX com valor e data de
+ * compra. Depreciação linear do cadastro (mesma da ficha do ativo).
+ */
+export function imobilizadoDoAno(ativos: AtivoImobilizado[], ano: number, vida?: VidaUtil, limite = LIMITE_CAPITALIZACAO_PADRAO): LinhaImobilizado[] {
+  const inicio = `${ano}-01-01`;
+  const fimAnoAnterior = `${ano - 1}-12-31`;
+  const fim = `${ano}-12-31`;
+  const out: LinhaImobilizado[] = [];
+  ativos.forEach((a) => {
+    const aquisicao = a.fiscal?.dataAquisicao;
+    const custo = Number(a.fiscal?.valorCompra) || 0;
+    if (!aquisicao || !custo || aquisicao > fim) return;
+    if (naturezaDoAtivo(a, limite) !== 'capex') return;
+    const b = baixaVigente(a);
+    const dataBaixa = b?.dataBaixa?.slice(0, 10);
+    if (dataBaixa && dataBaixa < inicio) return; // saiu antes do ano
+    const noInicio = aquisicao < inicio;
+    const depAcumInicial = noInicio ? depreciacao(a, vida, fimAnoAnterior).acumulada : 0;
+    const baixouNoAno = !!dataBaixa && dataBaixa <= fim;
+    const depAteFim = depreciacao(a, vida, baixouNoAno ? dataBaixa! : fim).acumulada;
+    const linha: LinhaImobilizado = {
+      ativoId: a.id,
+      tag: a.tag,
+      nome: a.nome,
+      grupo: grupoDoAtivo(a),
+      setorId: a.setorId,
+      dataAquisicao: aquisicao,
+      custo,
+      noInicio,
+      custoInicial: noInicio ? custo : 0,
+      depAcumInicial,
+      aquisicao: noInicio ? 0 : custo,
+      depreciacaoAno: c(depAteFim - depAcumInicial),
+      custoFinal: baixouNoAno ? 0 : custo,
+      depAcumFinal: baixouNoAno ? 0 : depAteFim,
+    };
+    if (baixouNoAno) {
+      const venda = Number(b!.valorVenda) || 0;
+      linha.baixa = { data: dataBaixa!, custo, depAcum: depAteFim, valorVenda: venda, resultado: c(venda - (custo - depAteFim)) };
+    }
+    out.push(linha);
+  });
+  return out.sort((x, y) => x.grupo.localeCompare(y.grupo) || x.tag.localeCompare(y.tag));
+}
+
+export function totaisImobilizado(linhas: LinhaImobilizado[]): TotaisImobilizado {
+  const s = (f: (l: LinhaImobilizado) => number) => c(linhas.reduce((t, l) => t + f(l), 0));
+  const custoInicial = s((l) => l.custoInicial);
+  const depAcumInicial = s((l) => l.depAcumInicial);
+  const custoFinal = s((l) => l.custoFinal);
+  const depAcumFinal = s((l) => l.depAcumFinal);
+  return {
+    custoInicial,
+    depAcumInicial,
+    liquidoInicial: c(custoInicial - depAcumInicial),
+    aquisicoes: s((l) => l.aquisicao),
+    baixasCusto: s((l) => l.baixa?.custo || 0),
+    baixasDepAcum: s((l) => l.baixa?.depAcum || 0),
+    vendas: s((l) => l.baixa?.valorVenda || 0),
+    resultadoBaixas: s((l) => l.baixa?.resultado || 0),
+    depreciacaoAno: s((l) => l.depreciacaoAno),
+    custoFinal,
+    depAcumFinal,
+    liquidoFinal: c(custoFinal - depAcumFinal),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Projeção de gastos (decisão 9: 24 meses padrão; reajuste do contrato ou 5% a.a.)
+// -----------------------------------------------------------------------------
+export interface Premissas {
+  limiteCapitalizacao?: number;
+  reajustePadraoPct?: number;
+  /** Custo de reposição por categoria de equipamento (sem valor: o de compra) */
+  reposicao?: Record<string, number>;
+}
+
+export interface ItemRecorrente {
+  origem: 'licenca' | 'contrato' | 'linha';
+  id: string;
+  nome: string;
+  categoria: CategoriaDespesa;
+  mensal: number;
+  /** Fim da vigência (sem fim: indeterminado) */
+  fim?: string;
+  renova: boolean;
+  /** Reajuste anual em % (sem índice no contrato: premissa padrão) */
+  reajustePct?: number;
+  /** Mês do reajuste (1–12); sem mês, no aniversário do início da projeção */
+  reajusteMes?: number;
+}
+
+export interface MesProjecao {
+  mes: string; // AAAA-MM
+  opex: number;
+  capex: number;
+  total: number;
+}
+
+export interface Projecao {
+  meses: MesProjecao[];
+  /** Detalhe para o relatório: o que compõe cada valor */
+  itens: { mes: string; natureza: Natureza; origem: string; nome: string; categoria: CategoriaDespesa | string; valor: number }[];
+}
+
+const mesIso = (base: Date, soma: number) => {
+  const d = new Date(base.getFullYear(), base.getMonth() + soma, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/**
+ * Gasto previsto mês a mês, a partir do mês seguinte a `agora`:
+ * OPEX recorrente (com fim, renovação e reajuste), CAPEX de reposição pelo fim da
+ * vida útil e pedidos aprovados ainda não pagos.
+ */
+export function projecaoGastos(
+  dados: {
+    recorrentes: ItemRecorrente[];
+    ativos: AtivoImobilizado[];
+    pedidosAprovados: { codigo: string; titulo: string; valor: number; previstoPara?: string; categoria?: CategoriaDespesa; natureza?: Natureza }[];
+  },
+  meses = 24,
+  premissas: Premissas = {},
+  vida?: VidaUtil,
+  agora: Date = new Date()
+): Projecao {
+  const limite = premissas.limiteCapitalizacao ?? LIMITE_CAPITALIZACAO_PADRAO;
+  const padrao = premissas.reajustePadraoPct ?? 5;
+  const lista = Array.from({ length: meses }, (_, i) => mesIso(agora, i + 1));
+  const itens: Projecao['itens'] = [];
+
+  dados.recorrentes.forEach((r) => {
+    const pct = (r.reajustePct ?? padrao) / 100;
+    let valor = r.mensal;
+    lista.forEach((mes, i) => {
+      if (r.fim && mes > r.fim.slice(0, 7) && !r.renova) return;
+      const numMes = Number(mes.slice(5, 7));
+      const reajusta = r.reajusteMes ? numMes === r.reajusteMes && i > 0 : i > 0 && i % 12 === 0;
+      if (reajusta) valor = c(valor * (1 + pct));
+      if (valor > 0) itens.push({ mes, natureza: 'opex', origem: r.origem, nome: r.nome, categoria: r.categoria, valor });
+    });
+  });
+
+  dados.ativos.forEach((a) => {
+    if (a.status === 'descartado' || baixaVigente(a)) return;
+    if (naturezaDoAtivo(a, limite) !== 'capex') return;
+    const d = depreciacao(a, vida, agora);
+    const quando = d.zeraEm?.slice(0, 7);
+    if (!quando || !lista.includes(quando)) return;
+    const valor = premissas.reposicao?.[a.categoria || ''] ?? d.valorCompra;
+    if (valor > 0) itens.push({ mes: quando, natureza: 'capex', origem: 'reposicao', nome: `${a.tag} · ${a.nome}`, categoria: 'hardware', valor });
+  });
+
+  dados.pedidosAprovados.forEach((p) => {
+    const mes = p.previstoPara && lista.includes(p.previstoPara.slice(0, 7)) ? p.previstoPara.slice(0, 7) : lista[0];
+    const categoria = p.categoria || 'hardware';
+    const natureza = p.natureza || naturezaDoLancamento({ categoria, valorUnitario: p.valor }, limite);
+    if (p.valor > 0) itens.push({ mes, natureza, origem: 'pedido', nome: `${p.codigo} · ${p.titulo}`, categoria, valor: p.valor });
+  });
+
+  const porMes = lista.map((mes) => {
+    const doMes = itens.filter((x) => x.mes === mes);
+    const opex = c(doMes.filter((x) => x.natureza === 'opex').reduce((s, x) => s + x.valor, 0));
+    const capex = c(doMes.filter((x) => x.natureza === 'capex').reduce((s, x) => s + x.valor, 0));
+    return { mes, opex, capex, total: c(opex + capex) };
+  });
+  return { meses: porMes, itens };
+}
+
+/** Totais por chave (grupo, área ou local) para o relatório e a exportação */
+export function imobilizadoPor(linhas: LinhaImobilizado[], chave: (l: LinhaImobilizado) => string): { chave: string; totais: TotaisImobilizado }[] {
+  const m = new Map<string, LinhaImobilizado[]>();
+  linhas.forEach((l) => m.set(chave(l), [...(m.get(chave(l)) || []), l]));
+  return [...m.entries()].map(([k, ls]) => ({ chave: k, totais: totaisImobilizado(ls) }));
+}
