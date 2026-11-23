@@ -28,12 +28,12 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
 
       {termosParaAssinar.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
-          <p className="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-            <FileText className="w-4 h-4" /> Você tem {termosParaAssinar.length} termo(s) para ler e assinar
+          <p className="font-semibold text-amber-900 flex items-center gap-2">
+            <FileText className="ico" /> Você tem {termosParaAssinar.length} termo(s) para ler e assinar
           </p>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {termosParaAssinar.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2 text-xs">
+              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2">
                 <span>
                   {t.docTitulo || (t.tipo === 'entrega' ? 'Termo de entrega' : 'Recibo de devolução')} · {t.codigo} · {formatDate(t.dataEmissao)}
                 </span>
@@ -49,13 +49,13 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
       {/* Equipamentos físicos */}
       <section className="space-y-3">
         <h3 className="secao-titulo flex items-center gap-2">
-          <Laptop className="w-4 h-4" /> Equipamentos físicos ({myAssets.length})
+          <Laptop className="ico" /> Equipamentos físicos ({myAssets.length})
         </h3>
 
         {myAssets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {myAssets.map((asset) => (
-              <div key={asset.id} className="cartao p-5 flex flex-col justify-between space-y-4">
+              <div key={asset.id} className="cartao p-4 flex flex-col justify-between space-y-4">
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="selo selo-info font-mono">{asset.tag}</span>
@@ -70,18 +70,18 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                     </button>
                   </div>
 
-                  <h4 className="font-semibold text-sm text-slate-900 mt-2">{asset.nome}</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <h4 className="font-semibold text-slate-900 mt-2">{asset.nome}</h4>
+                  <p className="texto-aux mt-0.5">
                     {asset.marca} {asset.modelo}
                   </p>
-                  <p className="font-mono text-xs text-slate-600 mt-1">S/N: {asset.serialNumber}</p>
+                  <p className="font-mono texto-aux mt-1">S/N: {asset.serialNumber}</p>
 
-                  <div className="mt-3 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-0.5">
+                  <div className="mt-3 pt-2 border-t border-slate-100 texto-aux space-y-0.5">
                     <p>
-                      Em posse desde: <span className="font-medium text-slate-700">{formatDate(asset.dataEntregaAtual)}</span>
+                      Em posse desde: <span className="text-slate-700">{formatDate(asset.dataEntregaAtual)}</span>
                     </p>
                     <p>
-                      Localização: <span className="font-medium text-slate-700">{asset.localizacaoFisica}</span>
+                      Localização: <span className="text-slate-700">{asset.localizacaoFisica}</span>
                     </p>
                   </div>
                 </div>
@@ -105,13 +105,13 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
       {/* Licenças ativas */}
       <section className="space-y-3">
         <h3 className="secao-titulo flex items-center gap-2">
-          <Key className="w-4 h-4" /> Softwares e contas liberadas ({myLicenses.length})
+          <Key className="ico" /> Softwares e contas liberadas ({myLicenses.length})
         </h3>
 
         {myLicenses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {myLicenses.map((lic) => (
-              <div key={lic.id} className="cartao p-4 flex items-center justify-between text-xs">
+              <div key={lic.id} className="cartao p-4 flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-slate-900">{lic.nome}</p>
                   <p className="text-slate-500">{lic.fornecedor}</p>
@@ -128,11 +128,11 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
       {/* Meus termos de responsabilidade */}
       <section className="space-y-3">
         <h3 className="secao-titulo flex items-center gap-2">
-          <FileText className="w-4 h-4" /> Meus termos de responsabilidade ({myTerms.length})
+          <FileText className="ico" /> Meus termos de responsabilidade ({myTerms.length})
         </h3>
 
         {myTerms.length > 0 ? (
-          <div className="cartao overflow-hidden">
+          <div className="cartao-tabela">
             <table className="tabela tabela-cartoes">
               <thead>
                 <tr>
@@ -140,7 +140,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                   <th>Termo</th>
                   <th>Emissão</th>
                   <th>Situação</th>
-                  <th className="text-right">Ações</th>
+                  <th className="col-acoes">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -148,7 +148,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                   const s = situacaoTermo(term, true, terms.find((x) => x.id === term.substituidoPor)?.codigo);
                   return (
                     <tr key={term.id}>
-                      <td data-label="Código" className="font-mono font-bold text-blue-700">
+                      <td data-label="Código" className="font-mono font-semibold text-blue-700">
                         {term.codigo}
                       </td>
                       <td data-label="Termo">
@@ -159,7 +159,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
                       <td data-label="Situação">
                         <span className={`selo ${SELO_TOM[s.tom] || 'selo-neutro'}`}>{s.rotulo}</span>
                       </td>
-                      <td data-label="Ações" className="text-right">
+                      <td data-label="Ações" className="col-acoes">
                         <span className="acoes-linha">
                           <button type="button" onClick={() => setSelectedTermForPrint(term)} className="btn btn-sm btn-secundario">
                             Visualizar termo

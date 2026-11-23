@@ -29,14 +29,14 @@ export const CartaoPatrimonio: React.FC<{ className?: string }> = ({ className =
   const vp = useMemo(() => valorPatrimonio(assets, estoque, settings.vidaUtil), [assets, estoque, settings.vidaUtil]);
   return (
     <div className={`cartao min-w-0 p-3 ${className}`}>
-      <p className="text-xs text-slate-500">Valor do patrimônio hoje</p>
-      <p className="font-mono text-lg font-semibold text-slate-900">{brl(vp.totalAtual)}</p>
-      <p className="text-xs text-slate-500">
-        valor atual · compra <span className="font-mono">{brl(vp.total)}</span> · depreciado <span className="font-mono">{brl(vp.depreciacaoAcumulada)}</span> · acessórios em estoque{' '}
-        <span className="font-mono">{brl(vp.acessorios)}</span>
+      <p className="texto-aux">Valor do patrimônio hoje</p>
+      <p className="num text-lg font-semibold text-slate-900">{brl(vp.totalAtual)}</p>
+      <p className="texto-aux">
+        valor atual · compra <span className="num">{brl(vp.total)}</span> · depreciado <span className="font-mono">{brl(vp.depreciacaoAcumulada)}</span> · acessórios em estoque{' '}
+        <span className="num">{brl(vp.acessorios)}</span>
       </p>
       {vp.semValor > 0 && (
-        <p className="text-xs text-amber-800">
+        <p className="text-amber-800">
           {vp.semValor} {vp.semValor === 1 ? 'equipamento sem valor de compra' : 'equipamentos sem valor de compra'}
         </p>
       )}
@@ -49,11 +49,11 @@ const BlocoSoma: React.FC<{ titulo: string; grupos: { chave: string; total: numb
   <div className="cartao space-y-2 p-3">
     <h3 className="secao-titulo">{titulo}</h3>
     {grupos.length === 0 ? (
-      <p className="text-xs text-slate-500">Nenhuma compra no período com estes filtros.</p>
+      <p className="texto-aux">Nenhuma compra no período com estes filtros.</p>
     ) : (
       <ul className="space-y-2">
         {grupos.map((g) => (
-          <li key={g.chave} className="text-xs">
+          <li key={g.chave} className="">
             <div className="flex justify-between gap-2">
               <span className="text-slate-800">{g.chave}</span>
               <span className="font-mono font-semibold">
@@ -187,7 +187,7 @@ export const ComprasView: React.FC<{
                 </option>
               ))}
             </select>
-            <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+            <label className="inline-flex items-center gap-2 text-slate-700">
               <input type="checkbox" checked={incluirBaixados} onChange={(e) => setIncluirBaixados(e.target.checked)} /> Incluir baixados
             </label>
             <button type="button" onClick={limpar} className="btn btn-sm btn-secundario">
@@ -200,25 +200,25 @@ export const ComprasView: React.FC<{
       {/* Números do período */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <div className="cartao min-w-0 p-3">
-          <p className="text-xs text-slate-500">Comprado no período</p>
-          <p className="font-mono text-lg font-semibold text-slate-900">{brl(total)}</p>
-          <p className="text-xs text-slate-500">pela data de aquisição</p>
+          <p className="texto-aux">Comprado no período</p>
+          <p className="num text-lg font-semibold text-slate-900">{brl(total)}</p>
+          <p className="texto-aux">pela data de aquisição</p>
         </div>
         <div className="cartao min-w-0 p-3">
-          <p className="text-xs text-slate-500">Quantidade</p>
+          <p className="texto-aux">Quantidade</p>
           <p className="font-mono text-lg font-semibold text-slate-900">{lista.length}</p>
-          <p className={`text-xs ${semValor > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
+          <p className={` ${semValor > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
             {semValor > 0 ? `${semValor} sem valor de compra na ficha` : lista.length === 1 ? 'equipamento comprado' : 'equipamentos comprados'}
           </p>
         </div>
         <div className="cartao min-w-0 p-3">
-          <p className="text-xs text-slate-500">Sem conta a pagar</p>
+          <p className="texto-aux">Sem conta a pagar</p>
           <p className={`font-mono text-lg font-semibold ${semConta.length ? 'text-amber-800' : 'text-slate-900'}`}>{semConta.length}</p>
-          <p className="text-xs text-slate-500">comprados sem pedido e sem fatura: lance para entrar no orçamento</p>
+          <p className="texto-aux">comprados sem pedido e sem fatura: lance para entrar no orçamento</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <div className="grid items-start grid-cols-1 gap-3 xl:grid-cols-2">
         <BlocoSoma titulo="Por fornecedor" grupos={porFornecedor} total={total} />
         <BlocoSoma titulo="Por categoria" grupos={porCategoria} total={total} />
       </div>
@@ -228,14 +228,23 @@ export const ComprasView: React.FC<{
         <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 pt-3">
           <h3 className="secao-titulo">Compras do período ({lista.length})</h3>
           {semData > 0 && (
-            <p className="text-xs text-slate-500">
+            <p className="texto-aux">
               {semData} {semData === 1 ? 'equipamento sem data de aquisição fica' : 'equipamentos sem data de aquisição ficam'} fora do período
             </p>
           )}
         </div>
         {lista.length === 0 ? (
           <div className="p-3">
-            <Vazio>Nenhuma compra de equipamento no período com estes filtros.</Vazio>
+            <Vazio
+              titulo="Nenhuma compra no período"
+              acao={
+                <button type="button" onClick={() => { setFFornecedor(''); setFCategoria(''); setBusca(''); }} className="btn btn-sm btn-secundario">
+                  Limpar filtros
+                </button>
+              }
+            >
+              Nenhuma compra de equipamento no período com estes filtros.
+            </Vazio>
           </div>
         ) : (
           <table className="tabela tabela-cartoes mt-2">
@@ -246,7 +255,7 @@ export const ComprasView: React.FC<{
                 <th>Categoria</th>
                 <th>Fornecedor</th>
                 <th>NF</th>
-                <th className="text-right">Valor</th>
+                <th className="num">Valor</th>
               </tr>
             </thead>
             <tbody>
@@ -257,14 +266,14 @@ export const ComprasView: React.FC<{
                     <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: c.ativoId })} className="link text-left">
                       <span className="font-mono">{c.tag}</span> · {c.nome}
                     </button>
-                    {c.baixado && <span className="selo selo-neutro ml-1.5">Baixado</span>}
+                    {c.baixado && <span className="selo selo-neutro ml-2">Baixado</span>}
                   </td>
                   <td data-label="Categoria">{ROTULO_CATEGORIA_ATIVO[c.categoria] || c.categoria}</td>
                   <td data-label="Fornecedor">{nomeForn(c) || '—'}</td>
                   <td data-label="NF" className="font-mono">
                     {c.numeroNF || '—'}
                   </td>
-                  <td data-label="Valor" className="text-right font-mono">
+                  <td data-label="Valor" className="num">
                     {c.valor > 0 ? brl(c.valor) : <span className="font-sans text-slate-500">sem valor</span>}
                     {(() => {
                       const a = assets.find((x) => x.id === c.ativoId);

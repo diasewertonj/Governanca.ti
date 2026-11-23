@@ -58,21 +58,21 @@ export const SeletorItensContrato: React.FC<{ itens: ItemContrato[]; onChange: (
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-500">{resumoItens(itens)}</p>
+      <p className="texto-aux">{resumoItens(itens)}</p>
 
       {itens.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Itens cobertos pelo contrato">
+        <ul className="flex flex-wrap gap-2" aria-label="Itens cobertos pelo contrato">
           {itens.map((i) => {
             const texto = rotulo(i);
             return (
               <li
                 key={i.ativoId ? `a:${i.ativoId}` : `l:${i.licencaId}`}
-                className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-slate-50 py-0.5 pr-0.5 pl-2 text-xs text-slate-800"
+                className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-slate-50 py-0.5 pr-0.5 pl-2 text-slate-800"
               >
                 {i.ativoId ? (
-                  <Laptop className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+                  <Laptop className="ico-sm text-slate-500" aria-hidden="true" />
                 ) : (
-                  <Key className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+                  <Key className="ico-sm text-slate-500" aria-hidden="true" />
                 )}
                 <span className="min-w-0 break-words">{texto}</span>
                 <button type="button" onClick={() => remover(i)} title="Remover" aria-label={`Remover ${texto}`} className="btn-icone btn-icone-perigo !p-0.5">
@@ -88,7 +88,7 @@ export const SeletorItensContrato: React.FC<{ itens: ItemContrato[]; onChange: (
         <label htmlFor="contrato-itens-busca" className="sr-only">
           Buscar ativo ou licença para adicionar
         </label>
-        <Search className="pointer-events-none absolute top-2.5 left-2.5 h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+        <Search className="ico-sm pointer-events-none absolute top-2.5 left-2.5 text-slate-500" aria-hidden="true" />
         <input
           id="contrato-itens-busca"
           type="search"
@@ -104,18 +104,18 @@ export const SeletorItensContrato: React.FC<{ itens: ItemContrato[]; onChange: (
           {!termo && <p className="secao-titulo">Sugestões deste fornecedor</p>}
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
             {sugestoes.length === 0 ? (
-              <li className="px-3 py-2 text-xs text-slate-500">Nenhum equipamento ou software encontrado.</li>
+              <li className="px-3 py-2 texto-aux">Nenhum equipamento ou software encontrado.</li>
             ) : (
               sugestoes.map((s) => (
                 <li key={s.item.ativoId ? `a:${s.item.ativoId}` : `l:${s.item.licencaId}`}>
                   <button
                     type="button"
                     onClick={() => onChange([...itens, s.item])}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-blue-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-blue-50"
                   >
-                    <Plus className="h-3.5 w-3.5 shrink-0 text-blue-600" aria-hidden="true" />
+                    <Plus className="ico-sm text-blue-600" aria-hidden="true" />
                     <span className="min-w-0">
-                      <span className="block font-medium break-words text-slate-900">{s.texto}</span>
+                      <span className="block font-semibold break-words text-slate-900">{s.texto}</span>
                       {s.detalhe && <span className="block break-words text-slate-500">{s.detalhe}</span>}
                     </span>
                   </button>

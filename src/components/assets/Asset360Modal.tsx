@@ -60,10 +60,10 @@ const SITUACAO: Record<AssetStatus, { rotulo: string; selo: string }> = {
 };
 
 const ICONE_CATEGORIA: Record<AssetCategory, React.ReactNode> = {
-  hardware: <Laptop className="h-4 w-4" />,
-  periferico: <Mouse className="h-4 w-4" />,
-  telefonia: <Smartphone className="h-4 w-4" />,
-  software: <Package className="h-4 w-4" />,
+  hardware: <Laptop className="ico" />,
+  periferico: <Mouse className="ico" />,
+  telefonia: <Smartphone className="ico" />,
+  software: <Package className="ico" />,
 };
 
 /** Texto do botão some no celular (fica só o ícone, com o nome no title/aria-label) */
@@ -222,7 +222,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
         {nome}
       </button>
     ) : (
-      <span className="font-medium text-slate-900">{nome}</span>
+      <span className="font-semibold text-slate-900">{nome}</span>
     );
 
   // Seção 9.1: quem está com o equipamento tem admissão/desligamento em andamento? (o certo é pelo checklist)
@@ -325,7 +325,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
     <>
       <Janela
         tamanho="ficha"
-        icone={ICONE_CATEGORIA[asset.categoria] || <Package className="h-4 w-4" />}
+        icone={ICONE_CATEGORIA[asset.categoria] || <Package className="ico" />}
         rotuloCaminho={`${asset.tag} · ${asset.nome}`}
         titulo={
           <span className="flex min-w-0 items-center gap-2">
@@ -411,7 +411,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
         {/* ---------------- Resumo ---------------- */}
         <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
           {isTI && baixa && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800">
               <span>
                 Baixa patrimonial em {formatDate(baixa.dataBaixa)}: {ROTULO_MOTIVO_BAIXA[baixa.motivo]}.
               </span>
@@ -534,8 +534,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                           <span className="font-normal text-slate-500">Nenhuma chave de recuperação BitLocker registrada para este equipamento.</span>
                         )
                       ) : (
-                        <span className="flex items-center gap-1.5 font-normal text-slate-500">
-                          <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="flex items-center gap-2 font-normal text-slate-500">
+                          <Lock className="ico-sm" aria-hidden="true" />
                           Chave confidencial de criptografia de disco (acesso restrito à equipe de TI).
                         </span>
                       )}
@@ -558,7 +558,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
           {asset.observacoes && (
             <section className="cartao space-y-2 p-4">
               <h3 className="secao-titulo">Observações</h3>
-              <p className="text-xs break-words whitespace-pre-wrap text-slate-700">{asset.observacoes}</p>
+              <p className="break-words whitespace-pre-wrap text-slate-700">{asset.observacoes}</p>
             </section>
           )}
         </div>
@@ -583,7 +583,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                 <Dado rotulo="Em posse desde">{formatDate(asset.dataEntregaAtual)}</Dado>
               </dl>
             ) : (
-              <p className="text-xs text-slate-600">
+              <p className="texto-aux">
                 Nenhum colaborador alocado no momento. O item está no estoque e pronto para empréstimo.
               </p>
             )}
@@ -591,9 +591,9 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
             {/* Transferência / devolução de custódia 1:1 */}
             {showTransferModal && (
               <form onSubmit={handleExecuteTransfer} className="space-y-3 border-t border-slate-100 pt-3">
-                <h4 className="text-xs font-semibold text-slate-900">Transferência / devolução de custódia</h4>
+                <h4 className="font-semibold text-slate-900">Transferência / devolução de custódia</h4>
                 {textoProcesso && processoDoCustodiante && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
                     <span>{textoProcesso}</span>
                     <button type="button" onClick={() => setSelectedTicketIdForDetail(processoDoCustodiante.id)} className="btn btn-sm btn-secundario">
                       Abrir o processo
@@ -660,7 +660,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
             {asset.historicoCustodia.length === 0 ? (
               <Vazio>Nenhum histórico anterior registrado.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
@@ -668,7 +668,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                       <th>Entrega</th>
                       <th>Devolução</th>
                       <th>Motivo</th>
-                      <th className="text-right">Ações</th>
+                      <th className="col-acoes">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -682,7 +682,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
                         <td data-label="Motivo" className="break-words">
                           {entry.motivoDevolucao || '—'}
                         </td>
-                        <td data-label="Ações" className="text-right">
+                        <td data-label="Ações" className="col-acoes">
                           {entry.termoId && (
                             <span className="acoes-linha">
                               <button type="button" onClick={() => handleViewTerm(entry.termoId)} className="btn btn-sm btn-secundario">
@@ -729,8 +729,8 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
               contratosCobertura.map((c) => (
                 <div key={c.id} className="cartao space-y-3 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-slate-900">
-                      <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-emerald-700" aria-hidden="true" />
+                    <p className="font-semibold text-slate-900">
+                      <ShieldCheck className="ico-sm mr-1 inline text-emerald-700" aria-hidden="true" />
                       Coberto pelo contrato {nomeContrato(c)} até {formatDate(c.fim)}
                     </p>
                     {isTI && (
@@ -767,7 +767,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Dado rotulo="Nota fiscal (NF-e)">Nº {asset.fiscal?.numeroNF || 'S/N'}</Dado>
               <Dado rotulo="Valor de aquisição">
-                <span className="font-mono">{formatCurrency(asset.fiscal?.valorCompra || 0)}</span>
+                <span className="num">{formatCurrency(asset.fiscal?.valorCompra || 0)}</span>
               </Dado>
               <Dado rotulo="Fornecedor">{nomeFornecedor || '—'}</Dado>
               <Dado rotulo="Data de compra">{formatDate(asset.fiscal?.dataAquisicao)}</Dado>
@@ -818,7 +818,7 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
             ) : (
               <ol className="cartao divide-y divide-slate-100">
                 {eventos.map((ev) => (
-                  <li key={ev.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-2.5 text-xs">
+                  <li key={ev.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3">
                     <span className="w-20 shrink-0 font-mono text-slate-500">{formatDate(ev.data)}</span>
                     <span className={`selo ${ev.selo} shrink-0`}>{ev.rotulo}</span>
                     <span className="min-w-0 flex-1 break-words text-slate-800">

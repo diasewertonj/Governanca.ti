@@ -66,14 +66,14 @@ export const ConferenciaView: React.FC = () => {
       {inventarios.length === 0 ? (
         <Vazio acao={<button type="button" onClick={() => setNova(true)} className="btn btn-sm btn-primario"><Plus /> Nova conferência</button>}>Nenhuma conferência ainda.</Vazio>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
                 <th>Conferência</th>
                 <th>Situação</th>
                 <th>Progresso</th>
-                <th className="text-right">Ação</th>
+                <th className="num">Ação</th>
               </tr>
             </thead>
             <tbody>
@@ -82,7 +82,7 @@ export const ConferenciaView: React.FC = () => {
                 return (
                   <tr key={inv.id}>
                     <td data-label="Conferência">
-                      <span className="font-medium text-slate-900">{inv.titulo}</span>
+                      <span className="font-semibold text-slate-900">{inv.titulo}</span>
                       <span className="block text-slate-500">
                         {inv.local || 'Todos os locais'} · aberta em {formatDate(inv.criadoEm.slice(0, 10))} por {nome(inv.criadoPor)}
                       </span>
@@ -94,7 +94,7 @@ export const ConferenciaView: React.FC = () => {
                     <td data-label="Progresso">
                       {conferidos} de {inv.itens.length}
                     </td>
-                    <td data-label="Ação" className="text-right">
+                    <td data-label="Ação" className="col-acoes">
                       <span className="acoes-linha">
                         <button type="button" onClick={() => exportar(inv)} className="btn btn-sm btn-secundario">
                           CSV
@@ -267,7 +267,7 @@ const TelaConferencia: React.FC<{ inventarioId: string; onClose: () => void }> =
       <Janela
         titulo={inv.titulo}
         subtitulo={`${inv.local || 'Todos os locais'} · ${ROTULO_STATUS[inv.status]} · ${conferidos} de ${inv.itens.length} conferido(s)`}
-        icone={<ClipboardCheck className="h-4 w-4" />}
+        icone={<ClipboardCheck className="ico" />}
         tamanho="g"
         onFechar={onClose}
         acoes={
@@ -287,18 +287,18 @@ const TelaConferencia: React.FC<{ inventarioId: string; onClose: () => void }> =
       >
         <div className="space-y-4">
           {!aberto && inv.resumo && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">
               Fechada em {inv.fechadoEm ? formatDate(inv.fechadoEm.slice(0, 10)) : '—'}: {inv.resumo.encontrados} encontrado(s), {inv.resumo.nao_encontrados} não encontrado(s) e {inv.resumo.outro_local} em outro local
               {inv.resumo.via_qr ? ` (${inv.resumo.via_qr} pelo QR)` : ''}. {inv.resumo.nao_encontrados || inv.resumo.outro_local ? 'As pendências estão em Lembretes.' : ''}
               {inv.resumo.locais_atualizados ? ' Os locais foram atualizados nos cadastros.' : ''}
             </div>
           )}
-          {inv.status === 'cancelado' && <p className="text-xs text-slate-600">Cancelada{inv.observacoes ? `: ${inv.observacoes}` : ''}.</p>}
+          {inv.status === 'cancelado' && <p className="texto-aux">Cancelada{inv.observacoes ? `: ${inv.observacoes}` : ''}.</p>}
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {(['pendente', 'encontrado', 'nao_encontrado', 'outro_local'] as SituacaoConferencia[]).map((s) => (
-              <button key={s} type="button" onClick={() => setFiltro(filtro === s ? '' : s)} aria-pressed={filtro === s} className={`cartao p-2.5 text-left ${filtro === s ? 'ring-2 ring-blue-500' : ''}`}>
-                <span className="block text-xs text-slate-500">{ROTULO_SITUACAO[s]}</span>
+              <button key={s} type="button" onClick={() => setFiltro(filtro === s ? '' : s)} aria-pressed={filtro === s} className={`cartao p-3 text-left ${filtro === s ? 'ring-2 ring-blue-500' : ''}`}>
+                <span className="block texto-aux">{ROTULO_SITUACAO[s]}</span>
                 <span className="font-mono text-lg font-semibold text-slate-900">{contagem(s)}</span>
               </button>
             ))}
@@ -315,7 +315,7 @@ const TelaConferencia: React.FC<{ inventarioId: string; onClose: () => void }> =
               >
                 <div className="w-full min-w-0 sm:w-auto sm:flex-1">
                   <label htmlFor="conf-codigo" className="rotulo">
-                    <QrCode className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
+                    <QrCode className="ico-sm mr-1 inline" aria-hidden="true" />
                     Ler QR da etiqueta ou digitar o patrimônio
                   </label>
                   <input id="conf-codigo" autoComplete="off" value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Aponte o leitor ou digite #PAT-0001" className="campo" />
@@ -328,7 +328,7 @@ const TelaConferencia: React.FC<{ inventarioId: string; onClose: () => void }> =
                 </button>
               </form>
               {aviso && (
-                <p role="status" className={`text-xs ${aviso.ok ? 'text-emerald-800' : 'text-red-700'}`}>
+                <p role="status" className={` ${aviso.ok ? 'text-emerald-800' : 'text-red-700'}`}>
                   {aviso.texto}
                 </p>
               )}
@@ -347,14 +347,14 @@ const TelaConferencia: React.FC<{ inventarioId: string; onClose: () => void }> =
           {lista.length === 0 ? (
             <Vazio>Nada nesta lista.</Vazio>
           ) : (
-            <div className="cartao overflow-hidden">
+            <div className="cartao-tabela">
               <table className="tabela tabela-cartoes">
                 <thead>
                   <tr>
                     <th>Equipamento</th>
                     <th>Local cadastrado</th>
                     <th>Situação</th>
-                    {aberto && <th className="text-right">Conferir</th>}
+                    {aberto && <th className="num">Conferir</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -375,7 +375,7 @@ const TelaConferencia: React.FC<{ inventarioId: string; onClose: () => void }> =
                           {i.situacao === 'outro_local' && i.localEncontrado && <span className="block text-slate-600">em {i.localEncontrado}</span>}
                         </td>
                         {aberto && (
-                          <td data-label="Conferir" className="text-right">
+                          <td data-label="Conferir" className="col-acoes">
                             <span className="acoes-linha">
                               {i.situacao !== 'encontrado' && (
                                 <button type="button" disabled={ocupado} onClick={() => marcar(i, 'encontrado', { viaQr: false, localEncontrado: undefined })} className="btn btn-sm btn-secundario">
@@ -456,7 +456,7 @@ const FecharConferencia: React.FC<{
         </>
       }
     >
-      <div className="space-y-3 text-xs text-slate-700">
+      <div className="space-y-3 text-slate-700">
         <ul className="list-disc space-y-1 pl-4">
           {pendentes > 0 && <li>{pendentes} item(ns) ainda pendente(s) vira(m) "não encontrado".</li>}
           <li>{naoEnc} não encontrado(s): cada um gera um lembrete para investigar e, se for o caso, dar baixa.</li>

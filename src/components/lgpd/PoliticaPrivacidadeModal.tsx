@@ -12,8 +12,8 @@ interface Props {
 // ATENÇÃO: texto-base técnico. Deve ser revisado pelo jurídico / encarregado (DPO)
 // antes de ser considerado a política oficial da empresa.
 export const PoliticaPrivacidadeModal: React.FC<Props> = ({ settings, onClose }) => (
-  <Janela tamanho="m" icone={<ShieldCheck className="h-4 w-4" />} titulo="Aviso de privacidade · Nexus IT & HR" idTitulo="politica-titulo" onFechar={onClose}>
-      <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
+  <Janela tamanho="m" icone={<ShieldCheck className="ico" />} titulo="Aviso de privacidade · Nexus IT & HR" idTitulo="politica-titulo" onFechar={onClose}>
+      <div className="space-y-4 text-slate-700 leading-relaxed">
         <p>
           <strong>Controlador:</strong> {settings.razaoSocial} (CNPJ {settings.cnpj}). Contato para assuntos de dados pessoais:{' '}
           <strong>{settings.emailTI}</strong>.
@@ -30,7 +30,7 @@ export const PoliticaPrivacidadeModal: React.FC<Props> = ({ settings, onClose })
 
         <section>
           <h3 className="font-semibold text-slate-900 mb-1">Para que e com qual base legal (LGPD, art. 7º)</h3>
-          <ul className="list-disc pl-5 space-y-1">
+          <ul className="list-disc pl-4 space-y-1">
             <li>Gestão de equipamentos, acessos e suporte técnico: <em>execução de contrato</em> de trabalho (inc. V).</li>
             <li>Termos de responsabilidade e controle patrimonial: <em>cumprimento de obrigação legal</em> e <em>exercício regular de direitos</em> (inc. II e VI).</li>
             <li>Segurança da informação e trilha de auditoria: <em>legítimo interesse</em> (inc. IX).</li>
@@ -63,7 +63,7 @@ export const PoliticaPrivacidadeModal: React.FC<Props> = ({ settings, onClose })
           </p>
         </section>
 
-        <p className="text-xs text-slate-500 border-t border-slate-100 pt-3">
+        <p className="texto-aux border-t border-slate-100 pt-3">
           Texto-base preparado para revisão do jurídico / encarregado de dados da empresa.
         </p>
       </div>

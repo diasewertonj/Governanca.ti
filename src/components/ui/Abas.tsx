@@ -77,14 +77,14 @@ export function NavLateral<T extends string>({
       <nav aria-label={rotulo} className="hidden md:block cartao p-2 space-y-3 self-start">
         {grupos.map((g) => (
           <div key={g.titulo} className="space-y-0.5">
-            <p className="px-2.5 pt-1 pb-0.5 secao-titulo">{g.titulo}</p>
+            <p className="px-3 pt-1 pb-0.5 secao-titulo">{g.titulo}</p>
             {g.itens.map((i) => (
               <button
                 key={i.id}
                 type="button"
                 aria-current={ativa === i.id ? 'page' : undefined}
                 onClick={() => onMudar(i.id)}
-                className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
                   ativa === i.id ? 'bg-blue-50 font-semibold text-blue-800' : 'text-slate-700 hover:bg-slate-50'
                 }`}
               >

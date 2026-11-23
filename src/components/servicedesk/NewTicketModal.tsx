@@ -203,9 +203,9 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
     >
       <form id={idForm} onSubmit={handleSubmit} className="space-y-4">
         {/* Preenchimento automático do solicitante */}
-        <div className="cartao flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-800">
+        <div className="cartao flex flex-wrap items-center justify-between gap-2 p-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-800">
               {solicitante.nome.charAt(0)}
             </div>
             <div className="min-w-0">
@@ -277,11 +277,11 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({ onClose, ativoIn
             </label>
             {/* Fase 10: vindo do painel do equipamento, ele já está escolhido (dá para trocar) */}
             {!trocandoAtivo && ativoEscolhido ? (
-              <div className="flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
                 <span className="min-w-0 break-words">
                   <span className="font-semibold text-slate-900">{ativoEscolhido.tag}</span> · {ativoEscolhido.nome}
                 </span>
-                <button type="button" onClick={() => setTrocandoAtivo(true)} className="link shrink-0 text-xs">
+                <button type="button" onClick={() => setTrocandoAtivo(true)} className="link shrink-0">
                   Trocar
                 </button>
               </div>

@@ -2,104 +2,288 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* =============================================================================
+   Seção 19 — Padronização 2.0: todas as cores e tamanhos do padrão moram aqui,
+   em variáveis. O tema escuro (futuro) só precisa redefinir estas variáveis
+   dentro de `.dark { … }` — nenhuma tela muda.
+   ============================================================================= */
+:root {
+  /* Superfícies e bordas */
+  --cor-fundo: #f8fafc; /* slate-50 */
+  --cor-superficie: #ffffff;
+  --cor-superficie-suave: #f8fafc;
+  --cor-superficie-realce: #f1f5f9; /* slate-100 */
+  --cor-borda: #e2e8f0; /* slate-200 */
+  --cor-borda-suave: #f1f5f9;
+  --cor-borda-forte: #cbd5e1; /* slate-300 */
+
+  /* Texto (contraste AA sobre branco) */
+  --cor-texto-forte: #0f172a; /* slate-900: títulos e números */
+  --cor-texto: #334155; /* slate-700: corpo */
+  --cor-texto-aux: #475569; /* slate-600: auxiliar (≥ 7:1) */
+  --cor-texto-desligado: #64748b; /* slate-500: só placeholder e itens desabilitados */
+
+  /* Ação e foco */
+  --cor-primaria: #2563eb; /* blue-600 */
+  --cor-primaria-forte: #1d4ed8; /* blue-700 */
+  --cor-primaria-suave: #eff6ff; /* blue-50 */
+  --cor-primaria-texto: #1e40af; /* blue-800 */
+  --cor-foco: #2563eb;
+  --cor-perigo: #dc2626;
+  --cor-perigo-forte: #b91c1c;
+
+  /* Mapa único de situação (selos, semáforo, avisos) */
+  --ok-fundo: #ecfdf5;
+  --ok-borda: #a7f3d0;
+  --ok-texto: #065f46;
+  --ok-marca: #059669;
+  --atencao-fundo: #fffbeb;
+  --atencao-borda: #fde68a;
+  --atencao-texto: #78350f;
+  --atencao-marca: #d97706;
+  --problema-fundo: #fef2f2;
+  --problema-borda: #fecaca;
+  --problema-texto: #991b1b;
+  --problema-marca: #dc2626;
+  --info-fundo: #eff6ff;
+  --info-borda: #bfdbfe;
+  --info-texto: #1e40af;
+  --info-marca: #2563eb;
+  --neutro-fundo: #f1f5f9;
+  --neutro-borda: #e2e8f0;
+  --neutro-texto: #334155;
+  --neutro-marca: #94a3b8;
+
+  /* Escala de texto (aprovada em 19/11/2026) */
+  --fs-corpo: 13px;
+  --fs-aux: 12px;
+  --fs-titulo-tela: 18px;
+  --fs-titulo-janela: 16px;
+  --fs-secao: 12px;
+  --fs-kpi: 26px;
+  --lh-corpo: 1.45;
+
+  /* Tabela: densidade confortável (padrão) ou compacta (escolha do usuário) */
+  --tabela-py: 0.625rem;
+  --tabela-px: 0.75rem;
+
+  /* Altura do cabeçalho do sistema (o cabeçalho das tabelas gruda logo abaixo) */
+  --altura-topo: 4rem;
+}
+:root[data-densidade='compacta'] {
+  --tabela-py: 0.3125rem;
+}
+/* Galeria (Configurações › Galeria visual): quadro "Antes" com as medidas antigas */
+.estilo-antigo {
+  --fs-corpo: 12px;
+  --fs-titulo-tela: 16px;
+  --cor-texto-aux: #64748b;
+  --tabela-py: 0.5rem;
+  font-size: 12px;
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-size: var(--fs-corpo);
+    line-height: var(--lh-corpo);
+    color: var(--cor-texto-forte);
+    background-color: var(--cor-fundo);
   }
-  
+
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
 
-  /* Fase 7 (acessibilidade): foco visível para quem navega pelo teclado */
+  /* Foco visível (teclado): anel azul de 2px em tudo que é clicável */
   :focus-visible {
-    outline: 2px solid #2563eb;
+    outline: 2px solid var(--cor-foco);
     outline-offset: 2px;
   }
 }
 
 /* =============================================================================
-   Padrão visual único (NEXUS-DOCUMENTACAO.md, seção 8). Toda tela usa estas
-   classes: nada de botão, campo, aba, cartão ou selo montado à mão.
+   Padrão visual único (NEXUS-DOCUMENTACAO.md, seções 8.6 e 19). Toda tela usa
+   estas classes: nada de botão, campo, aba, cartão, selo, texto ou ícone
+   montado à mão.
    Cor: azul = ação principal; cinza = secundária; vermelho = destrutiva;
-   verde/âmbar/vermelho só em selos de situação.
-   Cantos: 8px (botão, campo, aba) e 12px (cartão, janela). Ícones: 16px em
-   botões, 14px em ações de linha e selos.
+   verde/âmbar/vermelho/azul só como situação (selos, semáforo, avisos).
+   Texto: corpo 13px · auxiliar 12px · título de tela 18px · título de seção
+   12px maiúsculo · números de painel 26px. Peso: normal ou `semibold`.
+   Espaço: 4 / 8 / 12 / 16 / 24 px (Tailwind 1 / 2 / 3 / 4 / 6).
+   Cantos: 8px (botão, campo, aba) e 12px (cartão, janela).
+   Ícones: `ico` 16px (botões, menu, títulos), `ico-sm` 14px (linhas, selos).
    ============================================================================= */
 @layer components {
-  /* Botões */
+  /* ---------- Texto ---------- */
+  .texto-corpo {
+    font-size: var(--fs-corpo);
+    line-height: var(--lh-corpo);
+  }
+  .texto-aux {
+    font-size: var(--fs-aux);
+    line-height: 1.4;
+    color: var(--cor-texto-aux);
+  }
+  .numero-kpi {
+    font-size: var(--fs-kpi);
+    line-height: 1.15;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--cor-texto-forte);
+  }
+  /* Valores, quantidades, datas e prazos: dígitos alinhados (e à direita nas tabelas) */
+  .num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ---------- Botões ---------- */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-2 font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    font-size: var(--fs-corpo);
+    line-height: 1.25rem;
   }
   .btn svg {
     @apply h-4 w-4 shrink-0;
   }
   .btn-sm {
-    @apply gap-1 px-2.5 py-1.5;
+    @apply gap-1 px-2.5 py-1;
+    font-size: var(--fs-aux);
   }
   .btn-sm svg {
     @apply h-3.5 w-3.5;
   }
   .btn-primario {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
+    background-color: var(--cor-primaria);
+    color: #fff;
+  }
+  .btn-primario:hover:not(:disabled) {
+    background-color: var(--cor-primaria-forte);
   }
   .btn-secundario {
-    @apply border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+    border-color: var(--cor-borda-forte);
+    background-color: var(--cor-superficie);
+    color: var(--cor-texto);
+  }
+  .btn-secundario:hover:not(:disabled) {
+    background-color: var(--cor-superficie-suave);
   }
   .btn-perigo {
-    @apply border-red-200 bg-white text-red-700 hover:bg-red-50;
+    border-color: var(--problema-borda);
+    background-color: var(--cor-superficie);
+    color: var(--cor-perigo-forte);
+  }
+  .btn-perigo:hover:not(:disabled) {
+    background-color: var(--problema-fundo);
   }
   .btn-perigo-cheio {
-    @apply bg-red-600 text-white hover:bg-red-700;
+    background-color: var(--cor-perigo);
+    color: #fff;
+  }
+  .btn-perigo-cheio:hover:not(:disabled) {
+    background-color: var(--cor-perigo-forte);
   }
   .btn-discreto {
-    @apply text-blue-700 hover:bg-blue-50;
+    color: var(--cor-primaria-forte);
+  }
+  .btn-discreto:hover:not(:disabled) {
+    background-color: var(--cor-primaria-suave);
   }
   .btn-icone {
-    @apply inline-flex items-center justify-center rounded-md p-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-md p-1.5 transition-colors disabled:opacity-50;
+    color: var(--cor-texto-aux);
+  }
+  .btn-icone:hover:not(:disabled) {
+    background-color: var(--cor-superficie-realce);
+    color: var(--cor-texto-forte);
   }
   .btn-icone svg {
     @apply h-3.5 w-3.5;
   }
   .btn-icone-perigo {
-    @apply text-red-700 hover:bg-red-50 hover:text-red-800;
+    color: var(--cor-perigo-forte);
+  }
+  .btn-icone-perigo:hover:not(:disabled) {
+    background-color: var(--problema-fundo);
+    color: var(--problema-texto);
   }
   .link {
-    @apply font-medium text-blue-700 hover:underline;
+    @apply font-semibold hover:underline;
+    color: var(--cor-primaria-forte);
   }
 
-  /* Campos */
+  /* ---------- Campos ---------- */
   .campo {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500;
+    @apply w-full rounded-lg border px-3 py-2 focus:outline-hidden disabled:cursor-not-allowed;
+    font-size: var(--fs-corpo);
+    line-height: 1.25rem;
+    border-color: var(--cor-borda-forte);
+    background-color: var(--cor-superficie);
+    color: var(--cor-texto-forte);
+  }
+  .campo::placeholder {
+    color: var(--cor-texto-desligado);
+  }
+  .campo:focus {
+    border-color: var(--cor-foco);
+    box-shadow: 0 0 0 1px var(--cor-foco);
+  }
+  .campo:disabled {
+    background-color: var(--cor-superficie-suave);
+    color: var(--cor-texto-desligado);
   }
   .campo-sm {
-    @apply px-2.5 py-1.5;
+    @apply px-2.5 py-1;
   }
   .rotulo {
-    @apply mb-1 block text-xs font-semibold text-slate-700;
+    @apply mb-1 block font-semibold;
+    font-size: var(--fs-aux);
+    color: var(--cor-texto);
   }
   .ajuda {
-    @apply mt-1 text-xs text-slate-500;
+    @apply mt-1;
+    font-size: var(--fs-aux);
+    color: var(--cor-texto-aux);
   }
   .erro {
-    @apply mt-1 text-xs font-medium text-red-700;
+    @apply mt-1 font-semibold;
+    font-size: var(--fs-aux);
+    color: var(--cor-perigo-forte);
   }
 
-  /* Cartões, seções e cabeçalho de tela */
+  /* ---------- Cartões, seções e cabeçalho de tela ---------- */
   .cartao {
-    @apply rounded-xl border border-slate-200 bg-white shadow-2xs;
+    @apply rounded-xl border shadow-2xs;
+    border-color: var(--cor-borda);
+    background-color: var(--cor-superficie);
+  }
+  /* Cartão que envolve uma tabela: corta os cantos sem quebrar o cabeçalho fixo */
+  .cartao-tabela {
+    @apply rounded-xl border shadow-2xs;
+    overflow: clip;
+    border-color: var(--cor-borda);
+    background-color: var(--cor-superficie);
   }
   .secao-titulo {
-    @apply text-xs font-bold tracking-wider text-slate-500 uppercase;
+    @apply font-semibold tracking-wider uppercase;
+    font-size: var(--fs-secao);
+    color: var(--cor-texto-aux);
   }
   .tela-cabecalho {
-    @apply flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs sm:flex-row sm:items-center;
+    @apply flex flex-col justify-between gap-3 rounded-xl border p-4 shadow-2xs sm:flex-row sm:items-center;
+    border-color: var(--cor-borda);
+    background-color: var(--cor-superficie);
   }
   .tela-titulo {
-    @apply text-base font-semibold text-slate-900;
+    @apply font-semibold tracking-tight;
+    font-size: var(--fs-titulo-tela);
+    line-height: 1.5rem;
+    color: var(--cor-texto-forte);
   }
   .tela-subtitulo {
-    @apply text-xs text-slate-500;
+    font-size: var(--fs-aux);
+    color: var(--cor-texto-aux);
   }
   .barra-filtros {
     @apply flex flex-wrap items-center gap-2;
@@ -107,73 +291,213 @@
   /* Nos filtros, seletores e datas têm a largura do conteúdo (a busca tem largura própria) */
   .barra-filtros select.campo,
   .barra-filtros input.campo:not([type='search']) {
-    @apply w-auto px-2.5 py-1.5;
+    @apply w-full px-2.5 py-1 sm:w-auto;
   }
 
-  /* Abas: sempre numa linha (rola na horizontal se faltar espaço, nunca quebra) */
+  /* ---------- Abas ---------- */
   .abas {
-    @apply inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1;
+    @apply inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-lg p-1;
+    background-color: var(--cor-superficie-realce);
   }
   .aba {
-    @apply inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap text-slate-600 transition-colors hover:text-slate-900;
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 whitespace-nowrap transition-colors;
+    font-size: var(--fs-corpo);
+    color: var(--cor-texto-aux);
   }
-  .aba[aria-selected='true'] {
-    @apply bg-white font-semibold text-slate-900 shadow-2xs;
+  .aba svg {
+    @apply h-4 w-4 shrink-0;
   }
-  .aba-contador {
-    @apply rounded-full bg-slate-200 px-1.5 text-xs font-semibold text-slate-700;
+  .aba:hover {
+    color: var(--cor-texto-forte);
+  }
+  .aba[aria-selected='true'],
+  .aba[aria-checked='true'] {
+    @apply font-semibold shadow-2xs;
+    background-color: var(--cor-superficie);
+    color: var(--cor-texto-forte);
+  }
+  .aba-contador,
+  .contador {
+    @apply inline-flex min-w-5 items-center justify-center rounded-full px-1.5 font-semibold;
+    font-size: var(--fs-aux);
+    line-height: 1.125rem;
+    font-variant-numeric: tabular-nums;
+    background-color: var(--neutro-borda);
+    color: var(--neutro-texto);
+  }
+  .contador-alerta {
+    background-color: var(--problema-marca);
+    color: #fff;
+  }
+  .contador-atencao {
+    background-color: var(--atencao-borda);
+    color: var(--atencao-texto);
   }
 
-  /* Selos de situação: ok / atenção / problema / informação / neutro */
+  /* ---------- Navegação (menu lateral, menu da conta, navegação de seções) ---------- */
+  .nav-item {
+    @apply flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors;
+    font-size: var(--fs-corpo);
+    color: var(--cor-texto);
+  }
+  .nav-item svg {
+    @apply h-4 w-4 shrink-0;
+    color: var(--cor-texto-aux);
+  }
+  .nav-item:hover {
+    background-color: var(--cor-superficie-realce);
+    color: var(--cor-texto-forte);
+  }
+  .nav-item[aria-current='page'] {
+    @apply font-semibold;
+    background-color: var(--cor-primaria-suave);
+    color: var(--cor-primaria-texto);
+    box-shadow: inset 3px 0 0 var(--cor-primaria);
+  }
+  .nav-item[aria-current='page'] svg {
+    color: var(--cor-primaria);
+  }
+  .nav-item-perigo,
+  .nav-item-perigo svg {
+    color: var(--cor-perigo-forte);
+  }
+  .nav-item-perigo:hover {
+    background-color: var(--problema-fundo);
+    color: var(--problema-texto);
+  }
+
+  /* Avatar (foto ou inicial) */
+  .avatar {
+    @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full object-cover font-semibold;
+    font-size: var(--fs-aux);
+    background-color: var(--cor-primaria-suave);
+    color: var(--cor-primaria-texto);
+  }
+  .avatar-lg {
+    @apply h-10 w-10;
+    font-size: var(--fs-corpo);
+  }
+
+  /* ---------- Selos e avisos de situação: ok / atenção / problema / informação / neutro ---------- */
   .selo {
-    @apply inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+    @apply inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold whitespace-nowrap;
+    font-size: var(--fs-aux);
+    line-height: 1.125rem;
   }
   .selo svg {
-    @apply h-3.5 w-3.5;
+    @apply h-3.5 w-3.5 shrink-0;
+  }
+  .aviso {
+    @apply flex items-start gap-2 rounded-lg border px-3 py-2;
+    font-size: var(--fs-corpo);
+  }
+  .aviso svg {
+    @apply mt-0.5 h-4 w-4 shrink-0;
   }
   .selo-ok {
-    @apply border-emerald-200 bg-emerald-50 text-emerald-800;
+    border-color: var(--ok-borda);
+    background-color: var(--ok-fundo);
+    color: var(--ok-texto);
   }
   .selo-atencao {
-    @apply border-amber-200 bg-amber-50 text-amber-900;
+    border-color: var(--atencao-borda);
+    background-color: var(--atencao-fundo);
+    color: var(--atencao-texto);
   }
   .selo-problema {
-    @apply border-red-200 bg-red-50 text-red-800;
+    border-color: var(--problema-borda);
+    background-color: var(--problema-fundo);
+    color: var(--problema-texto);
   }
   .selo-info {
-    @apply border-blue-200 bg-blue-50 text-blue-800;
+    border-color: var(--info-borda);
+    background-color: var(--info-fundo);
+    color: var(--info-texto);
   }
   .selo-neutro {
-    @apply border-slate-200 bg-slate-100 text-slate-700;
+    border-color: var(--neutro-borda);
+    background-color: var(--neutro-fundo);
+    color: var(--neutro-texto);
+  }
+  /* Semáforo: bolinha de situação ao lado de um texto */
+  .semaforo {
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
+    background-color: var(--neutro-marca);
+  }
+  .semaforo-ok {
+    background-color: var(--ok-marca);
+  }
+  .semaforo-atencao {
+    background-color: var(--atencao-marca);
+  }
+  .semaforo-problema {
+    background-color: var(--problema-marca);
+  }
+  .semaforo-info {
+    background-color: var(--info-marca);
   }
 
-  /* Tabela padrão (no celular vira cartões com .tabela-cartoes) */
+  /* ---------- Tabela padrão (no celular vira cartões com .tabela-cartoes) ---------- */
   .tabela {
-    @apply w-full border-collapse text-left text-xs;
-  }
-  .tabela thead tr {
-    @apply border-b border-slate-200 bg-slate-50;
+    @apply w-full border-collapse text-left;
+    font-size: var(--fs-corpo);
   }
   .tabela th {
-    @apply px-3 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase;
+    @apply font-semibold tracking-wider whitespace-nowrap uppercase;
+    padding: 0.5rem var(--tabela-px);
+    font-size: var(--fs-secao);
+    color: var(--cor-texto-aux);
+    background-color: var(--cor-superficie-suave);
+    box-shadow: inset 0 -1px 0 var(--cor-borda);
+  }
+  /* Cabeçalho fixo ao rolar: só quando a tabela está num .cartao-tabela (que não
+     corta o sticky); gruda logo abaixo da barra superior, ou no topo do corpo da janela */
+  .cartao-tabela .tabela th {
+    position: sticky;
+    top: var(--altura-topo);
+    z-index: 1;
+  }
+  .janela .cartao-tabela .tabela th {
+    top: 0;
   }
   .tabela td {
-    @apply px-3 py-2 align-middle text-slate-700;
+    @apply align-middle;
+    padding: var(--tabela-py) var(--tabela-px);
+    color: var(--cor-texto);
   }
   .tabela tbody tr {
-    @apply border-b border-slate-100 last:border-b-0;
+    border-bottom: 1px solid var(--cor-borda-suave);
+  }
+  .tabela tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .tabela tbody tr:hover {
+    background-color: var(--cor-superficie-suave);
+  }
+  /* Valores, quantidades e prazos: à direita, dígitos alinhados */
+  .tabela .num,
+  .tabela th.num {
+    text-align: right;
+  }
+  /* Coluna de ações: sempre a última, à direita */
+  .tabela .col-acoes {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
   }
   .acoes-linha {
-    @apply inline-flex flex-nowrap items-center justify-end gap-0.5;
+    @apply inline-flex flex-nowrap items-center justify-end gap-1;
   }
 
-  /* Janelas: fundo, 4 larguras, cabeçalho, corpo e rodapé iguais em todas */
+  /* ---------- Janelas: fundo, 4 larguras, cabeçalho, corpo e rodapé iguais em todas ---------- */
   .janela-fundo {
     @apply fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-900/50 p-0 backdrop-blur-xs sm:items-center sm:p-4;
   }
   .janela {
     /* Cabe na altura da tela (ex.: notebook 1080p a 125%): o corpo rola, cabeçalho e rodapé ficam */
-    @apply relative my-0 min-h-[100dvh] w-full border border-slate-200 bg-white shadow-2xl sm:my-4 sm:flex sm:max-h-[calc(100dvh-2rem)] sm:min-h-0 sm:flex-col sm:overflow-hidden sm:rounded-xl;
+    @apply relative my-0 min-h-[100dvh] w-full border shadow-2xl sm:my-4 sm:flex sm:max-h-[calc(100dvh-2rem)] sm:min-h-0 sm:flex-col sm:overflow-hidden sm:rounded-xl;
+    border-color: var(--cor-borda);
+    background-color: var(--cor-superficie);
   }
   .janela-p {
     @apply sm:max-w-lg;
@@ -188,25 +512,106 @@
     @apply sm:max-w-6xl;
   }
   .janela-cabecalho {
-    @apply flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-5;
+    @apply flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b px-4 py-3 sm:px-6;
+    border-color: var(--cor-borda);
+    background-color: var(--cor-superficie-suave);
+  }
+  .janela-cabecalho:has(+ .janela-faixa) {
+    @apply border-b-0 pb-2;
+  }
+  .janela-faixa {
+    @apply border-b px-4 sm:px-6;
+    border-color: var(--cor-borda);
+    background-color: var(--cor-superficie-suave);
+  }
+  .janela-faixa .abas {
+    @apply gap-4 rounded-none bg-transparent p-0;
+  }
+  .janela-faixa .aba {
+    @apply -mb-px rounded-none border-b-2 border-transparent px-1 py-2;
+  }
+  .janela-faixa .aba[aria-selected='true'] {
+    @apply bg-transparent shadow-none;
+    border-bottom-color: var(--cor-primaria);
+    color: var(--cor-texto-forte);
+  }
+  .janela-titulo {
+    @apply font-semibold;
+    font-size: var(--fs-titulo-janela);
+    line-height: 1.375rem;
+    color: var(--cor-texto-forte);
   }
   .janela-corpo {
-    @apply space-y-4 p-4 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:p-5;
+    @apply space-y-4 p-4 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:p-6;
   }
-  /* Fichas e formulários em etapas: altura estável ao trocar de aba (a janela não pula) */
-  .janela-ficha {
-    @apply sm:h-[min(52rem,calc(100dvh-2rem))];
-  }
-  .janela-g {
-    @apply sm:h-[min(44rem,calc(100dvh-2rem))];
-  }
+  /* Seção 19 (pedido do dono): só a LARGURA é padronizada; a altura acompanha o
+     conteúdo, até o limite da tela (aí só o corpo rola) */
   .janela-rodape {
-    @apply flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3;
+    @apply flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 sm:px-6;
+    border-color: var(--cor-borda);
+    background-color: var(--cor-superficie);
   }
 
-  /* Estado vazio */
+  /* ---------- Estados: vazio e carregando ---------- */
   .vazio {
-    @apply rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500;
+    @apply flex flex-col items-center gap-2 rounded-xl border border-dashed p-6 text-center;
+    border-color: var(--cor-borda-forte);
+    background-color: var(--cor-superficie);
+    color: var(--cor-texto-aux);
+  }
+  /* Bloco de resumo sem nenhum dado preenchido não aparece */
+  .resumo-bloco:not(:has(dd)) {
+    display: none;
+  }
+  /* Vazio dentro de ficha (janela): uma linha só, baixa — sem faixa alta para uma frase */
+  .janela .vazio {
+    @apply flex-row flex-wrap justify-center gap-x-2 gap-y-1 px-4 py-3;
+  }
+  .janela .vazio > p {
+    max-width: none;
+  }
+  /* Vazio dentro de cartão ou tabela: sem segunda borda (nada de caixa dentro de caixa) */
+  .cartao .vazio,
+  .cartao-tabela .vazio,
+  .tabela .vazio {
+    border: 0;
+    background: transparent;
+  }
+  .vazio-titulo {
+    @apply font-semibold;
+    color: var(--cor-texto-forte);
+  }
+  .esqueleto {
+    @apply animate-pulse rounded-md;
+    background-color: var(--cor-superficie-realce);
+  }
+
+  /* Ícone no cabeçalho da janela e nos cartões de painel */
+  .janela-icone {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-lg;
+    background-color: var(--cor-primaria-suave);
+    color: var(--cor-primaria-forte);
+  }
+
+  /* ---------- Ícones (por último: vencem o tamanho padrão de botões e selos) ---------- */
+  .ico,
+  svg.ico {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+  }
+  .ico-sm,
+  svg.ico-sm {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+  }
+  /* Só em destaque: cabeçalho do sistema, fechar janela, estado vazio */
+  .ico-lg,
+  svg.ico-lg {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
   }
 }
 
@@ -245,10 +650,13 @@ body:has(.modal-tela) {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.25rem 0.75rem;
     margin: 0.5rem;
-    padding: 0.625rem 0.75rem;
-    border: 1px solid #e2e8f0;
+    padding: 0.75rem;
+    border: 1px solid var(--cor-borda);
     border-radius: 0.75rem;
-    background: #fff;
+    background: var(--cor-superficie);
+  }
+  .tabela-cartoes tbody tr:last-child {
+    border-bottom: 1px solid var(--cor-borda);
   }
   .tabela-cartoes td {
     grid-column: 1 / -1;
@@ -262,6 +670,40 @@ body:has(.modal-tela) {
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .tabela-cartoes td.num {
+    text-align: left;
+  }
+  /* Sem "cartão dentro de cartão": no celular a caixa em volta da tabela some e
+     os cartões das linhas ocupam a largura toda, sem margem e borda duplicadas */
+  .cartao:has(> .tabela-cartoes),
+  .cartao:has(> div > .tabela-cartoes),
+  .cartao-tabela:has(> .tabela-cartoes),
+  .cartao-tabela:has(> div > .tabela-cartoes) {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .tabela-cartoes tr {
+    margin: 0 0 0.5rem;
+  }
+  .tabela-cartoes tbody tr:hover {
+    background: var(--cor-superficie);
+  }
+  /* 1ª célula vazia (ex.: fatura sem origem): ela some e as ações vão para o
+     fim do cartão — nada de linha em branco ao lado dos botões */
+  .tabela-cartoes td:first-child:empty {
+    display: none;
+  }
+  .tabela-cartoes tr:has(> td:first-child:empty) > td:last-child:not(:first-child):not([colspan]) {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+  }
+  .tabela-cartoes td.col-acoes {
+    width: auto;
+  }
   .tabela-cartoes td > .block {
     display: inline;
   }
@@ -269,11 +711,11 @@ body:has(.modal-tela) {
     content: attr(data-label);
     flex: 0 0 6.5rem;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: var(--fs-aux);
+    font-weight: 400;
     letter-spacing: 0;
     text-transform: none;
-    color: #64748b;
+    color: var(--cor-texto-aux);
   }
   /* 1ª célula = título do cartão; última = ações, no canto direito da 1ª linha */
   .tabela-cartoes td:first-child {

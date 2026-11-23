@@ -3,17 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DialogoHost } from './components/ui/dialogo.tsx';
 import { NavegacaoProvider } from './components/ui/navegacao.tsx';
 import { AppProvider, useApp } from './context/AppContext.tsx';
 import { RecursosProvider } from './context/RecursosContext.tsx';
 import { ComprasProvider, useCompras } from './context/ComprasContext.tsx';
 import { vistaPermitida } from './utils/permissoes.ts';
+import { avisarAlteracaoProcesso, ouvirAlteracoesProcesso, processoDestaJanela } from './utils/janelaProcesso.ts';
+
+// Seção 19: esta aba é a janela própria de um processo (aberta pelo sistema)
+const JANELA_DO_PROCESSO = processoDestaJanela();
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
 import { LoginView } from './components/auth/LoginView.tsx';
 import { DefinirSenhaView } from './components/auth/DefinirSenhaView.tsx';
+import { Carregando as CarregandoLista } from './components/ui/Tela.tsx';
 
 // Fase 4: telas e modais carregam sob demanda (bundle inicial menor)
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.tsx').then((m) => ({ default: m.DashboardView })));
@@ -50,9 +55,14 @@ const PedidosCompraView = lazy(() => import('./components/compras/PedidosCompraV
 const ConferenciaView = lazy(() => import('./components/compras/ConferenciaView.tsx').then((m) => ({ default: m.ConferenciaView })));
 const TelaProcesso = lazy(() => import('./components/processos/TelaProcesso.tsx').then((m) => ({ default: m.TelaProcesso })));
 
+// Seção 19: enquanto a tela carrega, esqueleto no lugar do conteúdo
 const Carregando = () => (
-  <div className="py-16 flex justify-center" role="status" aria-label="Carregando">
-    <div className="w-6 h-6 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+  <div className="space-y-4">
+    <div className="cartao space-y-2 p-4" role="status" aria-label="Carregando">
+      <div className="esqueleto h-5 w-48" />
+      <div className="esqueleto h-3 w-72 max-w-full" />
+    </div>
+    <CarregandoLista />
   </div>
 );
 
@@ -77,6 +87,9 @@ function MainApp() {
     podeDescartarPendencias,
     processoAberto,
     fecharProcesso,
+    processoItens,
+    tickets,
+    refreshSupabaseData,
   } = useApp();
   const { podePedirCompra, ehGestor } = useCompras();
 
@@ -107,6 +120,21 @@ function MainApp() {
     return () => window.removeEventListener('keydown', tecla);
   }, []);
 
+  // Seção 19: a janela do processo avisa a principal a cada mudança; a principal recarrega
+  const primeiraCarga = useRef(true);
+  useEffect(() => {
+    if (!JANELA_DO_PROCESSO) return;
+    if (primeiraCarga.current) {
+      primeiraCarga.current = false;
+      return;
+    }
+    avisarAlteracaoProcesso();
+  }, [processoItens, tickets]);
+  useEffect(() => {
+    if (JANELA_DO_PROCESSO) return;
+    return ouvirAlteracoesProcesso(() => void refreshSupabaseData());
+  }, [refreshSupabaseData]);
+
   // RBAC de interface: a tela exibida é calculada a partir do papel (sem efeito
   // e sem renderização extra). A proteção real está no banco (RLS das Fases 0-1).
   const currentView = vistaPermitida(currentRole, viewSolicitada, { pedeCompra: podePedirCompra, gestor: ehGestor });
@@ -128,10 +156,10 @@ function MainApp() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg animate-pulse">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-semibold text-lg animate-pulse">
             N
           </div>
-          <span className="text-xs text-slate-500 font-medium">Carregando governança corporativa...</span>
+          <span className="texto-aux">Carregando governança corporativa...</span>
         </div>
       </div>
     );
@@ -150,15 +178,17 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Barra Superior Corporativa (Zone Contract) */}
-      <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} onNavigate={navegar} />
+      {!JANELA_DO_PROCESSO && (
+        <Header currentView={currentView} onAbrirMenu={() => setMenuAberto(true)} menuAberto={menuAberto} onNavigate={navegar} />
+      )}
 
       {/* Fase 2 (CRIT-04): falha de gravação no banco nunca mais passa em silêncio */}
       {dbErro && (
         <div
           role="alert"
-          className="selo-problema fixed bottom-4 right-4 z-[60] max-w-md flex items-start gap-3 p-3.5 rounded-xl border shadow-lg"
+          className="selo-problema fixed bottom-4 right-4 z-[60] max-w-md flex items-start gap-3 p-3 rounded-xl border shadow-lg"
         >
-          <span className="text-xs leading-relaxed flex-1">{dbErro}</span>
+          <span className="leading-relaxed flex-1">{dbErro}</span>
           <button
             type="button"
             onClick={limparDbErro}
@@ -170,24 +200,26 @@ function MainApp() {
         </div>
       )}
 
-      <div className="flex-1 flex min-h-[calc(100vh-57px)]">
-        {/* Menu por perfil (Fase 7: gaveta abaixo de 1024px) */}
-        <Sidebar
-          currentView={currentView}
-          onNavigate={navegar}
-          onOpenNewTicketModal={() => setShowNewTicketModal(true)}
-          aberto={menuAberto}
-          onFechar={fecharMenu}
-        />
+      <div className="flex-1 flex">
+        {/* Menu por perfil (Fase 7: gaveta abaixo de 1024px); a janela do processo não tem menu */}
+        {!JANELA_DO_PROCESSO && (
+          <Sidebar
+            currentView={currentView}
+            onNavigate={navegar}
+            onOpenNewTicketModal={() => setShowNewTicketModal(true)}
+            aberto={menuAberto}
+            onFechar={fecharMenu}
+          />
+        )}
 
-        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-clip">
           <Suspense fallback={<Carregando />}>
           {mostrarProcesso ? (
-            <TelaProcesso key={processoAberto} chamadoId={processoAberto} onVoltar={fecharProcesso} />
+            <TelaProcesso key={processoAberto} chamadoId={processoAberto} onVoltar={fecharProcesso} emJanela={Boolean(JANELA_DO_PROCESSO)} />
           ) : (
           <>
           {currentView === 'dashboard' &&
-            (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} />)}
+            (currentRole === 'rh' ? <RhInicioView onNavigate={navegar} /> : <DashboardView onNavigate={navegar} onAbrirChamado={() => setShowNewTicketModal(true)} />)}
           {currentView === 'assets' && <AssetsView key="hardware" modo="hardware" />}
           {currentView === 'softwares' && <AssetsView key="softwares" modo="softwares" />}
           {currentView === 'linhas' && <LinhasView />}

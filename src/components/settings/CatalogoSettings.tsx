@@ -82,16 +82,16 @@ export const CatalogoSettings: React.FC = () => {
         {TIPOS.map((tipo) => {
           const doTipo = lista.filter((c) => c.tipo === tipo).sort((a, b) => a.ordem - b.ordem);
           return (
-            <div key={tipo} className="space-y-1.5">
+            <div key={tipo} className="space-y-2">
               <h4 className="rotulo">{ROTULO_TIPO[tipo]}</h4>
               {doTipo.length === 0 ? (
-                <p className="text-xs text-slate-500">Nenhum item.</p>
+                <p className="texto-aux">Nenhum item.</p>
               ) : (
                 <div className="space-y-1">
                   {doTipo.map((c) => (
                     <div
                       key={c.id}
-                      className={`grid grid-cols-12 gap-2 items-center text-xs p-1.5 rounded ${
+                      className={`grid grid-cols-12 gap-2 items-center p-2 rounded ${
                         edicoes[c.id] ? 'bg-amber-50' : ''
                       } ${c.ativo ? '' : 'opacity-60'}`}
                     >
@@ -108,7 +108,7 @@ export const CatalogoSettings: React.FC = () => {
                         onChange={(e) => editar(c, { descricao: e.target.value || undefined })}
                         aria-label="Descrição"
                       />
-                      <label className="col-span-6 sm:col-span-2 flex items-center gap-1.5 text-xs text-slate-600">
+                      <label className="col-span-6 sm:col-span-2 flex items-center gap-2 texto-aux">
                         <input
                           type="checkbox"
                           checked={c.sugeridoOnboarding}
@@ -116,7 +116,7 @@ export const CatalogoSettings: React.FC = () => {
                         />
                         Sugerido
                       </label>
-                      <label className="col-span-6 sm:col-span-1 flex items-center gap-1.5 text-xs text-slate-600">
+                      <label className="col-span-6 sm:col-span-1 flex items-center gap-2 texto-aux">
                         <input type="checkbox" checked={c.ativo} onChange={(e) => editar(c, { ativo: e.target.checked })} />
                         Ativo
                       </label>

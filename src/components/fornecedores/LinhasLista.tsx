@@ -59,7 +59,7 @@ export const LinhasLista: React.FC<{
     <div className="space-y-3">
       {!controlada && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+          <label className="inline-flex items-center gap-2 text-slate-700">
             <input type="checkbox" checked={mostrarCanceladas} onChange={(e) => setCanceladasInterno(e.target.checked)} /> Mostrar canceladas
           </label>
           <button type="button" onClick={() => setEditando('nova')} className="btn btn-secundario">
@@ -84,9 +84,16 @@ export const LinhasLista: React.FC<{
       {erro && <p className="erro" role="alert">{erro}</p>}
 
       {lista.length === 0 ? (
-        <Vazio>Nenhuma linha cadastrada.</Vazio>
+        <Vazio
+          titulo="Nenhuma linha cadastrada"
+          acao={
+            <button type="button" onClick={() => setEditando('nova')} className="btn btn-sm btn-primario">
+              Nova linha
+            </button>
+          }
+        />
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
@@ -95,7 +102,7 @@ export const LinhasLista: React.FC<{
                 <th className="hidden xl:table-cell">Aparelho</th>
                 {!contratoId && <th>Contrato</th>}
                 <th>Situação</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -137,7 +144,7 @@ export const LinhasLista: React.FC<{
                       <td data-label="Situação">
                         <span className={`selo ${SELO_STATUS[l.status]}`}>{ROTULO_STATUS[l.status]}</span>
                       </td>
-                      <td data-label="Ações" className="text-right">
+                      <td data-label="Ações" className="col-acoes">
                         <span className="acoes-linha">
                           <button type="button" onClick={() => setEditando(l)} aria-label={`Editar ${l.numero}`} className="btn btn-sm btn-secundario">
                             <Pencil /> Editar
@@ -321,7 +328,7 @@ const FormLinha: React.FC<{
       tamanho="p"
       titulo={linha ? `Editar linha ${linha.numero}` : 'Nova linha'}
       subtitulo="Número, plano, aparelho e pessoa"
-      icone={<Phone className="h-4 w-4" />}
+      icone={<Phone className="ico" />}
       onFechar={onCancelar}
       idTitulo="janela-linha"
       rodape={

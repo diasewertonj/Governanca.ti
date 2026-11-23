@@ -135,9 +135,9 @@ export const RecebimentosView: React.FC = () => {
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
-            <span className="ml-auto text-xs text-slate-600">
-              A receber: <span className="font-mono font-semibold text-slate-900">{brl(previsto)}</span> · Recebido em {ano}:{' '}
-              <span className="font-mono font-semibold text-slate-900">{brl(recebidoAno)}</span>
+            <span className="ml-auto texto-aux">
+              A receber: <span className="num font-semibold text-slate-900">{brl(previsto)}</span> · Recebido em {ano}:{' '}
+              <span className="num font-semibold text-slate-900">{brl(recebidoAno)}</span>
             </span>
           </>
         }
@@ -148,29 +148,38 @@ export const RecebimentosView: React.FC = () => {
         </p>
       )}
       {filtrada.length === 0 ? (
-        <Vazio>Nenhum recebimento com estes filtros.</Vazio>
+        <Vazio
+          titulo="Nenhum recebimento"
+          acao={
+            <button type="button" onClick={() => { setStatus(''); setTipo(''); }} className="btn btn-sm btn-secundario">
+              Limpar filtros
+            </button>
+          }
+        >
+          Nenhum recebimento com estes filtros.
+        </Vazio>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
                 <th>O quê</th>
                 <th>Ligado a</th>
-                <th className="text-right">Valor</th>
+                <th className="num">Valor</th>
                 <th>Previsto para</th>
                 <th>Situação</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtrada.map((r) => (
                 <tr key={r.id} className={r.status === 'cancelado' ? 'opacity-60' : ''}>
                   <td data-label="O quê">
-                    <span className="font-medium text-slate-900">{r.descricao}</span>
+                    <span className="font-semibold text-slate-900">{r.descricao}</span>
                     <span className="block text-slate-500">{ROTULO_TIPO_RECEBIMENTO[r.tipo]}</span>
                   </td>
                   <td data-label="Ligado a">{ligadoA(r) || '—'}</td>
-                  <td data-label="Valor" className="text-right font-mono">
+                  <td data-label="Valor" className="num">
                     {brl(r.valor)}
                     {r.valorRecebido != null && r.valorRecebido !== r.valor && <span className="block text-slate-500">recebido {brl(r.valorRecebido)}</span>}
                   </td>
@@ -179,7 +188,7 @@ export const RecebimentosView: React.FC = () => {
                     <span className={`selo ${SELO[r.status]}`}>{ROTULO_STATUS[r.status]}</span>
                     {r.recebidoEm && <span className="block text-slate-500">em {formatDate(r.recebidoEm)}</span>}
                   </td>
-                  <td data-label="Ações" className="text-right">
+                  <td data-label="Ações" className="col-acoes">
                     {r.status === 'previsto' && (
                       <span className="acoes-linha">
                         <button type="button" onClick={() => setRecebendo(r)} className="btn btn-sm btn-secundario mr-1">
@@ -245,7 +254,7 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
     <Janela
       tamanho="p"
       titulo="Novo recebimento"
-      icone={<HandCoins className="h-4 w-4" />}
+      icone={<HandCoins className="ico" />}
       onFechar={onFechar}
       rodape={
         <div className="ml-auto flex gap-2">
@@ -348,7 +357,7 @@ const JanelaRecebido: React.FC<{ recebimento: Recebimento; onFechar: () => void;
       tamanho="p"
       titulo="Confirmar recebimento"
       subtitulo={`${recebimento.descricao} · previsto ${brl(recebimento.valor)}`}
-      icone={<CheckCircle2 className="h-4 w-4" />}
+      icone={<CheckCircle2 className="ico" />}
       onFechar={onFechar}
       rodape={
         <div className="ml-auto flex gap-2">

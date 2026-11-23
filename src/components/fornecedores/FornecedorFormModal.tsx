@@ -133,7 +133,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
       tamanho="m"
       titulo={fornecedor ? `Editar fornecedor ${fornecedor.nome}` : 'Novo fornecedor'}
       subtitulo={vinculos ? `Vínculos: ${resumoVinculos(vinculos)}` : 'Cadastro usado em contratos, equipamentos e softwares'}
-      icone={<Building2 className="h-4 w-4" />}
+      icone={<Building2 className="ico" />}
       idTitulo="fornecedor-form-titulo"
       onFechar={fechar}
       rodape={
@@ -243,7 +243,7 @@ export const FornecedorFormModal: React.FC<FornecedorFormModalProps> = ({ fornec
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+            <label className="inline-flex items-center gap-2 font-semibold text-slate-700">
               <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
               Fornecedor ativo
             </label>

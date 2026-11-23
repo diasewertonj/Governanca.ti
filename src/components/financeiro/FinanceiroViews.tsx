@@ -93,14 +93,14 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
       {lista.length === 0 ? (
         <Vazio>Nada vencendo neste período.</Vazio>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
                 <th>Quando</th>
                 <th>Tipo</th>
                 <th>O quê</th>
-                <th className="text-right">Ação</th>
+                <th className="num">Ação</th>
               </tr>
             </thead>
             <tbody>
@@ -120,10 +120,10 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
                   </td>
                   <td data-label="Tipo">{ROTULO_VENCIMENTO[v.tipo]}</td>
                   <td data-label="O quê">
-                    <span className="font-medium text-slate-900">{v.titulo}</span>
+                    <span className="font-semibold text-slate-900">{v.titulo}</span>
                     {v.detalhe && <span className="block text-slate-500">{v.detalhe}</span>}
                   </td>
-                  <td data-label="Ação" className="text-right">
+                  <td data-label="Ação" className="col-acoes">
                     {v.alvo.tipo !== 'estoque' && v.alvo.tipo !== 'linha' && v.alvo.tipo !== 'orcamento' && (
                       <span className="acoes-linha">
                         <button type="button" onClick={() => abrir(v)} className="btn btn-sm btn-secundario">
@@ -274,8 +274,8 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
               ))}
             </select>
             <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} aria-label="Competência" title="Competência" className="campo campo-sm" />
-            <span className="ml-auto text-xs text-slate-600">
-              Total na lista: <span className="font-mono font-semibold text-slate-900">{brl(total)}</span>
+            <span className="ml-auto texto-aux">
+              Total na lista: <span className="num font-semibold text-slate-900">{brl(total)}</span>
             </span>
           </>
         }

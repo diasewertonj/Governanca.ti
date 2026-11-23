@@ -145,6 +145,7 @@ import {
   estornarBaixaDb,
 } from '../services/supabaseDb.ts';
 import { CATALOGO_PADRAO } from '../utils/processos.ts';
+import { abrirProcessoEmJanela, processoDestaJanela } from '../utils/janelaProcesso.ts';
 import { erroCancelarTermo } from '../utils/termos.ts';
 import {
   empilharFicha,
@@ -790,8 +791,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setSelectedEmployeeIdFor360 = abrirOuFechar('colaborador');
   // Seção 9.2: admissão/desligamento abre a tela própria do processo (largura total);
   // as fichas por cima fecham (perguntando se houver alteração não salva)
-  const [processoAberto, setProcessoAberto] = useState<string | null>(null);
+  // Seção 19: na tela larga o processo abre numa janela própria do navegador
+  const [processoAberto, setProcessoAberto] = useState<string | null>(processoDestaJanela);
   const abrirProcesso = (chamadoId: string) => {
+    if (abrirProcessoEmJanela(chamadoId)) return;
     if (pilhaFichas.length === 0) return setProcessoAberto(chamadoId);
     void podeDescartarPendencias().then((ok) => {
       if (!ok) return;

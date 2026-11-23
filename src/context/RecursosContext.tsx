@@ -37,6 +37,7 @@ import type {
   TipoMovimentoEstoque,
   Unidade,
 } from '../types/index.ts';
+import { DEMO_ESTOQUE_EXTRA, DEMO_LINHAS, DEMO_MOVIMENTOS } from '../data/demoExtra.ts';
 
 type Resultado<T> = { item?: T; erro?: string };
 
@@ -70,16 +71,13 @@ const RecursosContext = createContext<RecursosContextType | undefined>(undefined
 const novoId = (prefixo: string) => `${prefixo}-${crypto.randomUUID()}`;
 const agoraIso = () => new Date().toISOString();
 
-// Demonstração: um contrato de telefonia não existe nos dados antigos; as linhas ficam sem contrato
+// Demonstração: linhas (ligadas ao contrato Vivo ctr-2), mais acessórios e movimentos em src/data/demoExtra.ts
 const DEMO_ESTOQUE: ItemEstoque[] = [
   { id: 'est-1', nome: 'Monitor 24" Dell P2422H', tipo: 'monitor', marca: 'Dell', quantidade: 6, minimo: 2, localizacao: 'Almoxarifado T.I.', ativo: true },
   { id: 'est-2', nome: 'Mouse USB Logitech M90', tipo: 'mouse', marca: 'Logitech', quantidade: 3, minimo: 5, localizacao: 'Almoxarifado T.I.', ativo: true },
   { id: 'est-3', nome: 'Teclado ABNT2 USB', tipo: 'teclado', quantidade: 8, minimo: 3, localizacao: 'Almoxarifado T.I.', ativo: true },
   { id: 'est-4', nome: 'Cabo HDMI 1,8 m', tipo: 'cabo', quantidade: 12, minimo: 4, ativo: true },
-];
-const DEMO_LINHAS: LinhaTelefonica[] = [
-  { id: 'lin-1', numero: '(11) 99000-0001', tipo: 'movel', plano: '20 GB', status: 'ativa', valorMensal: 62, criadoEm: '2026-01-10T12:00:00Z' },
-  { id: 'lin-2', numero: '(11) 99000-0002', tipo: 'movel', plano: '20 GB', status: 'ativa', valorMensal: 62, criadoEm: '2026-01-10T12:00:00Z' },
+  ...DEMO_ESTOQUE_EXTRA,
 ];
 const DEMO_UNIDADES: Unidade[] = [{ id: 'uni-1', nome: 'Matriz', cidade: 'São Paulo', uf: 'SP', ativo: true }];
 
@@ -93,7 +91,7 @@ export const RecursosProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [linhas, setLinhas] = useState<LinhaTelefonica[]>(demo ? DEMO_LINHAS : []);
   const [atribuicoesLinha, setAtribuicoesLinha] = useState<AtribuicaoLinha[]>([]);
   const [estoque, setEstoque] = useState<ItemEstoque[]>(demo ? DEMO_ESTOQUE : []);
-  const [movimentos, setMovimentos] = useState<MovimentoEstoque[]>([]);
+  const [movimentos, setMovimentos] = useState<MovimentoEstoque[]>(demo ? DEMO_MOVIMENTOS : []);
 
   // Busca no banco (sem mexer no estado) e aplica depois: o efeito só grava ao chegar a resposta
   const buscar = useCallback(async () => {

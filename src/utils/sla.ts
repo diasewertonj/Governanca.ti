@@ -168,11 +168,12 @@ export function seloSla(s: SituacaoSla): string {
   return ROTULO_ESTADO_SLA[estado];
 }
 
+/** Seção 19: mapa único de situação — só os selos do padrão (sem índigo/roxo/rosa) */
 export const COR_ESTADO_SLA: Record<EstadoSla, string> = {
-  no_prazo: 'text-slate-700 bg-slate-50 border-slate-200',
-  vence_logo: 'text-amber-800 bg-amber-50 border-amber-200',
-  atrasado: 'text-rose-700 bg-rose-50 border-rose-200',
-  pausado: 'text-purple-700 bg-purple-50 border-purple-200',
-  cumprido: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-  fora_do_prazo: 'text-rose-700 bg-rose-50 border-rose-200',
+  no_prazo: 'selo-neutro',
+  vence_logo: 'selo-atencao',
+  atrasado: 'selo-problema',
+  pausado: 'selo-info',
+  cumprido: 'selo-ok',
+  fora_do_prazo: 'selo-problema',
 };

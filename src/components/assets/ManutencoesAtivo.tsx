@@ -56,10 +56,10 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
         <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Dado rotulo="Manutenções">{lista.length}</Dado>
           <Dado rotulo="Total gasto">
-            <span className="font-mono">{formatCurrency(totalGastoManutencoes(lista))}</span>
+            <span className="num">{formatCurrency(totalGastoManutencoes(lista))}</span>
           </Dado>
           <Dado rotulo="Custo acumulado (compra + manutenções)">
-            <span className="font-mono">{formatCurrency(custoAcumulado(asset))}</span>
+            <span className="num">{formatCurrency(custoAcumulado(asset))}</span>
           </Dado>
         </dl>
       </section>
@@ -76,10 +76,10 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
             const comQuem = comQuemEstava(asset, m.abertaEm);
             const abriu = m.criadoPor ? employees.find((e) => e.id === m.criadoPor) : undefined;
             return (
-              <li key={m.id} className="cartao space-y-2 p-4 text-xs">
+              <li key={m.id} className="cartao space-y-2 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1 space-y-1">
-                    <p className="flex flex-wrap items-center gap-1.5">
+                    <p className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-slate-700">{ROTULO_TIPO_MANUTENCAO[m.tipo]}</span>
                       <span className={`selo ${SELO_STATUS[m.status]}`}>{ROTULO_STATUS_MANUTENCAO[m.status]}</span>
                       {m.cobertoGarantia && (
@@ -118,7 +118,7 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
                         Chamado:{' '}
                         <button type="button" onClick={() => setSelectedTicketIdForDetail(tk.id)} className={LINK}>
                           <span className="font-mono">{tk.codigo}</span>
-                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          <ExternalLink className="ico-sm" aria-hidden="true" />
                         </button>
                       </>
                     )}
@@ -131,7 +131,7 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
                         {comQuem.devolvidoEm ? 'Último a usar' : 'Com'}:{' '}
                         <button type="button" onClick={() => setSelectedEmployeeIdFor360(comQuem.colaboradorId)} className={LINK}>
                           {comQuem.colaboradorNome}
-                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          <ExternalLink className="ico-sm" aria-hidden="true" />
                         </button>
                         {comQuem.devolvidoEm && ` (devolvido em ${formatDate(comQuem.devolvidoEm)})`}
                       </>
@@ -142,7 +142,7 @@ export const ManutencoesAtivo: React.FC<{ asset: Asset; podeEditar: boolean }> =
                         Aberta por:{' '}
                         <button type="button" onClick={() => setSelectedEmployeeIdFor360(abriu.id)} className={LINK}>
                           {abriu.nome}
-                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          <ExternalLink className="ico-sm" aria-hidden="true" />
                         </button>
                       </>
                     )}

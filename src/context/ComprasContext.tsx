@@ -49,6 +49,7 @@ import {
   type AlertaOrcamento,
   type LinhaOrcamento,
 } from '../utils/compras.ts';
+import { DEMO_PEDIDOS_EXTRA } from '../data/demoExtra.ts';
 
 export type AcaoPedido = 'enviar' | 'devolver' | 'aprovar' | 'recusar' | 'cancelar';
 
@@ -261,7 +262,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const eu = currentUser?.id;
 
   const [orcamentos, setOrcamentos] = useState<Orcamento[]>(demo ? DEMO_ORCAMENTOS : []);
-  const [pedidosTodos, setPedidos] = useState<PedidoCompra[]>(demo ? DEMO_PEDIDOS : []);
+  const [pedidosTodos, setPedidos] = useState<PedidoCompra[]>(demo ? [...DEMO_PEDIDOS, ...DEMO_PEDIDOS_EXTRA] : []);
   const [inventarios, setInventarios] = useState<InventarioFisico[]>(demo ? DEMO_INVENTARIOS : []);
   const [mensagens, setMensagens] = useState<Record<string, MensagemPedido[]>>(demo ? DEMO_MENSAGENS : {});
   const podePedirCompra = !!currentUser;

@@ -102,7 +102,7 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
     <Janela
       tamanho="m"
       idTitulo={id('titulo')}
-      icone={<Archive className="h-4 w-4" aria-hidden="true" />}
+      icone={<Archive className="ico" aria-hidden="true" />}
       titulo="Dar baixa"
       subtitulo={`${asset.tag} · ${asset.nome}`}
       onFechar={fechar}
@@ -119,18 +119,18 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
     >
         <form id={id('form')} onSubmit={registrar} className="space-y-4">
           {!contabil.semDados && (
-            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
               Valor contábil em {dataBaixa ? dataBaixa.split('-').reverse().join('/') : 'hoje'}:{' '}
-              <span className="font-mono font-semibold text-slate-900">{brl(contabil.valorAtual)}</span> (compra {brl(contabil.valorCompra)} − depreciação{' '}
+              <span className="num font-semibold text-slate-900">{brl(contabil.valorAtual)}</span> (compra {brl(contabil.valorCompra)} − depreciação{' '}
               {brl(contabil.acumulada)}). É o valor que sai do patrimônio com a baixa.
             </p>
           )}
           {bloqueios.length > 0 && (
-            <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1" role="status">
-              <p className="flex items-center gap-1.5 font-semibold">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> A baixa ainda não pode ser feita
+            <div className="text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1" role="status">
+              <p className="flex items-center gap-2 font-semibold">
+                <AlertTriangle className="ico-sm" aria-hidden="true" /> A baixa ainda não pode ser feita
               </p>
-              <ul className="list-disc pl-5 space-y-0.5">
+              <ul className="list-disc pl-4 space-y-0.5">
                 {bloqueios.map((b) => (
                   <li key={b}>{b}</li>
                 ))}
@@ -138,8 +138,8 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
             </div>
           )}
           {encerraCustodia && (
-            <p className="flex items-start gap-1.5 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-              <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+            <p className="flex items-start gap-2 text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              <Info className="ico-sm mt-0.5" aria-hidden="true" />
               <span>
                 O ativo está com {custodiante?.nome || 'um colaborador'}. A custódia será encerrada com o motivo "
                 {motivo && motivoDevolucaoNaBaixa(motivo)}".
@@ -256,13 +256,13 @@ export const FormBaixa: React.FC<{ asset: Asset; onClose: () => void }> = ({ ass
             </div>
           </div>
 
-          <p className="flex items-start gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
-            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" aria-hidden="true" />
+          <p className="flex items-start gap-2 text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+            <AlertTriangle className="ico-sm mt-0.5 text-amber-600" aria-hidden="true" />
             O ativo sai da lista principal. O histórico continua na ficha.
           </p>
 
           {erro && (
-            <p className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+            <p className="text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
               {erro}
             </p>
           )}

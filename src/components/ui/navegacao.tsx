@@ -112,16 +112,16 @@ export const Caminho: React.FC<{ niveis: { id: number; rotulo: string }[]; indic
   // Caminhos longos: o primeiro, "…" e os dois últimos
   const mostrar = ate.length > 4 ? [ate[0], null, ...ate.slice(-3)] : ate;
   return (
-    <nav aria-label="Caminho" className="hidden sm:flex min-w-0 items-center gap-1 text-xs text-slate-500">
+    <nav aria-label="Caminho" className="hidden sm:flex min-w-0 items-center gap-1 texto-aux">
       {mostrar.map((n, i) =>
         n === null ? (
           <span key={`r${i}`} className="flex items-center gap-1">
-            … <ChevronRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+            … <ChevronRight className="ico-sm" aria-hidden="true" />
           </span>
         ) : (
           <span key={n.id} className="flex min-w-0 items-center gap-1">
             {n.id === ate[ate.length - 1].id ? (
-              <span className="truncate max-w-[14rem] font-medium text-slate-700" aria-current="page">
+              <span className="truncate max-w-[14rem] text-slate-700" aria-current="page">
                 {n.rotulo}
               </span>
             ) : (
@@ -129,7 +129,7 @@ export const Caminho: React.FC<{ niveis: { id: number; rotulo: string }[]; indic
                 <button type="button" onClick={() => voltarAte?.(niveis.findIndex((x) => x.id === n.id))} className="link truncate max-w-[12rem]">
                   {n.rotulo}
                 </button>
-                <ChevronRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <ChevronRight className="ico-sm" aria-hidden="true" />
               </>
             )}
           </span>

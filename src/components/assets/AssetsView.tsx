@@ -136,7 +136,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
           ) : acessorios ? (
             <>
               <Busca id="inventario-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar acessório, marca ou local..." />
-              <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+              <label className="inline-flex items-center gap-2 text-slate-700">
                 <input type="checkbox" checked={mostrarDesativados} onChange={(e) => setMostrarDesativados(e.target.checked)} />
                 Mostrar desativados
               </label>
@@ -166,7 +166,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
         <EstoqueAcessorios busca={searchTerm} mostrarInativos={mostrarDesativados} novoAberto={novoAcessorio} onFecharNovo={() => setNovoAcessorio(false)} />
       ) : softwares ? (
         licencasFiltradas.length === 0 ? (
-          <Vazio>Nenhuma licença encontrada.</Vazio>
+          <Vazio titulo="Nenhuma licença encontrada">Confira a busca ou cadastre um software novo.</Vazio>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Lote 1 (L3): inativas no fim, apagadas e marcadas */}
@@ -176,18 +176,18 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                 const perc = Math.round((lic.assentosAlocados / lic.assentosTotais) * 100);
                 const freeCount = Math.max(0, lic.assentosTotais - lic.assentosAlocados);
                 return (
-                  <div key={lic.id} className={`cartao p-5 space-y-4 ${licencaAtiva(lic) ? '' : 'opacity-60'}`}>
+                  <div key={lic.id} className={`cartao p-4 space-y-4 ${licencaAtiva(lic) ? '' : 'opacity-60'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <button type="button" onClick={() => setSelectedSoftwareIdFor360(lic.id)} className="flex items-center gap-2 group text-left min-w-0">
                         <div className="w-8 h-8 shrink-0 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-                          <Key className="w-4 h-4" />
+                          <Key className="ico" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 flex items-center gap-1.5">
+                          <h3 className="font-semibold text-slate-900 group-hover:text-blue-700 flex items-center gap-2">
                             <span>{lic.nome}</span>
                             {!licencaAtiva(lic) && <span className="selo selo-neutro">Inativa</span>}
                           </h3>
-                          <p className="text-xs text-slate-500 mt-0.5">
+                          <p className="texto-aux mt-0.5">
                             {fornecedores.find((f) => f.id === lic.fornecedorId)?.nome || lic.fornecedor}
                             {lic.chaveContrato && (
                               <>
@@ -200,7 +200,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                       </button>
 
                       <div className="text-right shrink-0">
-                        <span className="font-mono text-xs font-semibold text-slate-700 block">
+                        <span className="font-mono font-semibold text-slate-700 block">
                           {(() => {
                             const fonte = fonteCustoLicenca(lic, contratos);
                             if (fonte.forma === 'sem_custo') return 'Sem custo';
@@ -208,7 +208,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                             return `${formatCurrency(fonte.mensalDaLicenca)}/mês`;
                           })()}
                         </span>
-                        <span className="text-xs text-slate-500 block mt-0.5">{origemCurta(lic, contratos)}</span>
+                        <span className="texto-aux block mt-0.5">{origemCurta(lic, contratos)}</span>
                         <span className="mt-1 block">
                           {freeCount > 0 ? (
                             <span className="selo selo-ok">{freeCount} assento(s) livre(s)</span>
@@ -220,9 +220,9 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                     </div>
 
                     {/* Barra de progresso de assentos (ex.: 24/30) */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-600 font-medium">Ocupação de assentos</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Ocupação de assentos</span>
                         <span className="font-mono font-semibold text-slate-900">
                           {lic.assentosAlocados} / {lic.assentosTotais} ({perc}%)
                         </span>
@@ -239,7 +239,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                     <div className="pt-2 border-t border-slate-100">
                       <p className="secao-titulo mb-2">Colaboradores alocados ({lic.colaboradoresIds.length})</p>
                       {lic.colaboradoresIds.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {lic.colaboradoresIds.slice(0, 6).map((empId) => {
                             const emp = employees.find((e) => e.id === empId);
                             if (!emp) return null;
@@ -253,7 +253,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                           {lic.colaboradoresIds.length > 6 && <span className="selo selo-neutro">+{lic.colaboradoresIds.length - 6} outros</span>}
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-500 italic">Nenhum colaborador com assento alocado nesta licença.</p>
+                        <p className="texto-aux italic">Nenhum colaborador com assento alocado nesta licença.</p>
                       )}
                     </div>
 
@@ -282,7 +282,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
         )
       ) : (
         /* Tabela de ativos físicos (hardware, periféricos, telefonia) */
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
@@ -292,7 +292,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                 <th>Custodiante atual</th>
                 <th>Situação</th>
                 <th className="hidden xl:table-cell">Garantia</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -303,14 +303,14 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
 
                   return (
                     <tr key={asset.id} className="hover:bg-slate-50/70">
-                      <td data-label="Patrimônio" className="font-mono font-bold text-blue-700">
+                      <td data-label="Patrimônio" className="font-mono font-semibold text-blue-700">
                         {asset.tag}
                       </td>
                       <td data-label="Equipamento / modelo">
                         <button type="button" onClick={() => setSelectedAssetIdFor360(asset.id)} className="font-semibold text-slate-900 hover:text-blue-700 text-left block">
                           {asset.nome}
                         </button>
-                        <span className="text-xs text-slate-500">
+                        <span className="texto-aux">
                           {asset.marca} {asset.modelo}
                         </span>
                       </td>
@@ -323,7 +323,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                       <td data-label="Custodiante atual">
                         {custodian ? (
                           <button type="button" onClick={() => setSelectedEmployeeIdFor360(custodian.id)} className="link flex items-center gap-1">
-                            <User className="w-3.5 h-3.5" />
+                            <User className="ico-sm" />
                             <span>{custodian.nome}</span>
                           </button>
                         ) : (
@@ -357,7 +357,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                       </td>
 
                       {/* Ações */}
-                      <td data-label="Ações" className="text-right">
+                      <td data-label="Ações" className="col-acoes">
                         <span className="acoes-linha">
                           <button type="button" onClick={() => setSelectedAssetIdFor360(asset.id)} className="btn btn-sm btn-secundario">
                             Ficha
@@ -390,7 +390,16 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
               ) : (
                 <tr>
                   <td colSpan={7}>
-                    <Vazio>Nenhum equipamento encontrado com os filtros aplicados.</Vazio>
+                    <Vazio
+                      titulo="Nenhum equipamento encontrado"
+                      acao={
+                        <button type="button" onClick={() => { setCategoryFilter('todos'); setStatusFilter('ativos'); setGarantiaFilter('todas'); setSearchTerm(''); }} className="btn btn-sm btn-secundario">
+                          Limpar filtros
+                        </button>
+                      }
+                    >
+                      Nenhum equipamento com os filtros aplicados.
+                    </Vazio>
                   </td>
                 </tr>
               )}

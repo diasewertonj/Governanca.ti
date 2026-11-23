@@ -384,7 +384,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
             <p className="ajuda">Só pessoas ativas.</p>
           </div>
           {emailDiferente(pessoaEscolhida) && (
-            <label className="flex cursor-pointer items-start gap-2 text-xs font-medium text-amber-900">
+            <label className="flex cursor-pointer items-start gap-2 text-amber-900">
               <input
                 type="checkbox"
                 checked={confirmouOutraPessoa}
@@ -448,7 +448,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
 
       {/* Ajustes da admissão: a conta de um software com licença cadastrada já ocupa o assento */}
       {item.tipo === 'conta' && licencaConta && (
-        <div className="text-xs">
+        <div className="">
           {jaTemLicenca ? (
             <p className="text-slate-700">{colab?.nome} já tem a licença {licencaConta.nome}.</p>
           ) : !colabId ? (
@@ -572,7 +572,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
 
       {/* Ajustes do desligamento: desvincular de verdade (painel do fornecedor) e no sistema */}
       {desvincula && (
-        <div className="space-y-1.5 text-xs">
+        <div className="space-y-2">
           <label className="flex items-start gap-2 cursor-pointer text-slate-700">
             <input type="checkbox" checked={confirmouExterno} onChange={(e) => setConfirmouExterno(e.target.checked)} className="mt-0.5" />
             <span>
@@ -630,9 +630,9 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
       {item.tipo === 'devolver_equipamento' && (
         <div>
           <span className={rotulo}>Condição na devolução</span>
-          <div className="flex gap-4 text-xs">
+          <div className="flex gap-4">
             {(['bom', 'avaria'] as CondicaoItem[]).map((c) => (
-              <label key={c} className="flex items-center gap-1.5">
+              <label key={c} className="flex items-center gap-2">
                 <input type="radio" name={`cond-${item.id}`} checked={condicao === c} onChange={() => setCondicao(c)} />
                 {c === 'bom' ? 'Bom' : 'Com avaria (vai para manutenção)'}
               </label>
@@ -644,13 +644,13 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
       {item.tipo === 'acesso_nexus' && (
         <div className="space-y-2">
           {senha ? (
-            <div className="space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-              <p className="text-xs font-semibold text-emerald-900">Acesso pronto. A senha aparece só agora:</p>
-              <p className="text-xs text-slate-700">
+            <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <p className="font-semibold text-emerald-900">Acesso pronto. A senha aparece só agora:</p>
+              <p className="text-slate-700">
                 Login: <span className="font-mono">{senha.email}</span>
               </p>
               <div className="flex items-center gap-2">
-                <code className="px-2 py-1 bg-white border border-emerald-300 rounded text-sm font-mono tracking-wider select-all">
+                <code className="px-2 py-1 bg-white border border-emerald-300 rounded font-mono tracking-wider select-all">
                   {senha.senha}
                 </code>
                 <button
@@ -661,13 +661,13 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
                   <Copy aria-hidden="true" /> Copiar
                 </button>
               </div>
-              <p className="text-xs text-emerald-800">
+              <p className="text-emerald-800">
                 Entregue por um canal seguro (pessoalmente ou mensagem direta). No primeiro login o sistema pede uma senha nova.
               </p>
             </div>
           ) : (
             <>
-              <p className="text-xs text-slate-600">
+              <p className="texto-aux">
                 Cria o login de {colab?.nome || 'colaborador'} ({colab?.email || 'e-mail do cadastro'}) com senha provisória.
                 Não depende de e-mail.
               </p>
@@ -697,7 +697,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
       )}
 
       {item.tipo === 'termo' && (
-        <div className="space-y-1.5 text-xs">
+        <div className="space-y-2">
           {termo ? (
             <div className="flex flex-wrap items-center gap-2">
               <span>
@@ -795,7 +795,7 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
         </div>
       </div>
 
-      {aviso && <p className="text-xs text-emerald-700">{aviso}</p>}
+      {aviso && <p className="text-emerald-700">{aviso}</p>}
       {erro && <p role="alert" className="erro">{erro}</p>}
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">

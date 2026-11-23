@@ -13,7 +13,7 @@ import { pendenciaTermo, resumoPendenciaTermo, termoVigente } from '../../utils/
 import { historicoAssentos } from '../../utils/licencas.ts';
 import { FileText, FilePlus, Pencil, KeyRound, CheckCircle2, AlertCircle, Copy, ShieldOff } from 'lucide-react';
 import { avisar, confirmar } from '../ui/dialogo.tsx';
-import { Janela, Dado } from '../ui/Janela.tsx';
+import { Janela, DadoLinha } from '../ui/Janela.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
 import { Vazio } from '../ui/Tela.tsx';
 
@@ -124,7 +124,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     return (
       <Janela
         tamanho="p"
-        icone={<AlertCircle className="h-4 w-4" />}
+        icone={<AlertCircle className="ico" />}
         titulo="Acesso restrito ao perfil"
         onFechar={onClose}
         idTitulo="ficha-pessoa-restrita"
@@ -134,7 +134,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </button>
         }
       >
-        <p className="text-xs text-slate-600">
+        <p className="texto-aux">
           Por políticas de governança e privacidade de dados da empresa, colaboradores comuns têm acesso apenas à sua própria ficha e
           inventário pessoal.
         </p>
@@ -292,7 +292,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
 
   // Seção 9.5: aviso que não bloqueia nada; o termo anterior fica no histórico
   const avisoTermo = pendencia && podeGerarTermo && (
-    <div role="status" className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+    <div role="status" className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
       <div className="min-w-0 space-y-0.5">
         <p className="font-semibold">Termo desatualizado</p>
         <p>
@@ -322,17 +322,22 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     <>
       <Janela
         tamanho="ficha"
-        icone={<span className="text-sm font-semibold">{employee.nome.charAt(0)}</span>}
+        avatar={employee.nome}
         rotuloCaminho={employee.nome}
         titulo={
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate">{employee.nome}</span>
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="min-w-0 break-words">{employee.nome}</span>
             <span className={`selo ${situacao.selo} shrink-0`}>{situacao.rotulo}</span>
           </span>
         }
         subtitulo={
           <>
-            {employee.cargo} · {department?.nome || 'Departamento'} · Matrícula <span className="font-mono">{employee.matricula}</span>
+            {[employee.cargo, department?.nome].filter(Boolean).join(' · ')}
+            {employee.matricula && (
+              <>
+                {' · '}Matrícula <span className="font-mono">{employee.matricula}</span>
+              </>
+            )}
           </>
         }
         onFechar={onClose}
@@ -375,8 +380,8 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         faixa={<Abas<AbaPessoa> rotulo="Seções da ficha da pessoa" itens={abas} ativa={aba} onMudar={setAba} />}
       >
         {termSuccess && (
-          <p role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <p role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">
+            <CheckCircle2 className="ico" />
             {termSuccess}
           </p>
         )}
@@ -384,18 +389,16 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         {/* ---------------- Resumo ---------------- */}
         <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
           {avisoTermo}
+          {/* Seção 19: blocos curtos lado a lado (dados da pessoa e acesso / o que ainda está com ela) */}
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+          {/* Seção 19: cargo, setor, matrícula e situação já estão no cabeçalho; aqui só o resto, compacto */}
           <section className="cartao space-y-3 p-4">
             <h3 className="secao-titulo">Dados da pessoa</h3>
-            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Dado rotulo="E-mail corporativo">
+            <dl className="grid gap-y-1">
+              <DadoLinha rotulo="E-mail">
                 <span className="break-all">{employee.email}</span>
-              </Dado>
-              <Dado rotulo="Matrícula">
-                <span className="font-mono">{employee.matricula || '—'}</span>
-              </Dado>
-              <Dado rotulo="Cargo">{employee.cargo || '—'}</Dado>
-              <Dado rotulo="Setor">{department?.nome || '—'}</Dado>
-              <Dado rotulo="Gestor imediato">
+              </DadoLinha>
+              <DadoLinha rotulo="Gestor imediato">
                 {manager ? (
                   podeAbrirGestor ? (
                     <button type="button" onClick={() => setSelectedEmployeeIdFor360(manager.id)} className="link text-left">
@@ -405,14 +408,11 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                     manager.nome
                   )
                 ) : (
-                  <span className="font-normal text-slate-500">Diretoria / sem gestor</span>
+                  <span className="text-slate-600">Diretoria / sem gestor</span>
                 )}
-              </Dado>
-              <Dado rotulo="Data de admissão">{formatDate(employee.dataAdmissao)}</Dado>
-              <Dado rotulo="Telefone / ramal">{employee.telefone || '—'}</Dado>
-              <Dado rotulo="Situação">
-                <span className={`selo ${situacao.selo}`}>{situacao.rotulo}</span>
-              </Dado>
+              </DadoLinha>
+              <DadoLinha rotulo="Admissão">{employee.dataAdmissao ? <span className="num">{formatDate(employee.dataAdmissao)}</span> : null}</DadoLinha>
+              <DadoLinha rotulo="Telefone / ramal">{employee.telefone || null}</DadoLinha>
             </dl>
           </section>
 
@@ -429,9 +429,9 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               <section className="cartao space-y-2 p-4">
                 <h3 className="secao-titulo">Ainda com a pessoa</h3>
                 {currentAssets.length === 0 && assignedLicenses.length === 0 ? (
-                  <p className="text-xs text-slate-600">Nenhum equipamento nem software em nome dela.</p>
+                  <p className="texto-aux">Nenhum equipamento nem software em nome dela.</p>
                 ) : (
-                  <ul className="space-y-1 text-xs text-slate-700">
+                  <ul className="space-y-1 text-slate-700">
                     {currentAssets.map((a) => (
                       <li key={a.id}>
                         <span className="font-mono">{a.tag}</span> · {a.nome}
@@ -450,7 +450,14 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           {isTIFicha && (
             <section className="cartao space-y-3 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="secao-titulo">Acesso ao Nexus</h3>
+                <h3 className="secao-titulo flex items-center gap-2">
+                  Acesso ao Nexus
+                  {employee.temLogin !== undefined && (
+                    <span className={`selo normal-case tracking-normal ${employee.temLogin ? 'selo-ok' : 'selo-neutro'}`}>
+                      {employee.temLogin ? 'Tem login' : 'Ainda sem login'}
+                    </span>
+                  )}
+                </h3>
                 {employee.status !== 'desligado' && (
                   <button type="button" onClick={handleSenhaProvisoria} disabled={gerandoSenha} className="btn btn-sm btn-secundario">
                     <KeyRound />
@@ -458,25 +465,14 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                   </button>
                 )}
               </div>
-              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Dado rotulo="Login">
-                  <span className="break-all">{employee.email}</span>
-                </Dado>
-                <Dado rotulo="Situação do acesso">
-                  {employee.temLogin === undefined ? (
-                    '—'
-                  ) : (
-                    <span className={`selo ${employee.temLogin ? 'selo-ok' : 'selo-neutro'}`}>
-                      {employee.temLogin ? 'Tem login' : 'Ainda sem login'}
-                    </span>
-                  )}
-                </Dado>
-              </dl>
+              <p className="texto-aux">
+                Login: <span className="break-all text-slate-900">{employee.email}</span>
+              </p>
 
               {(senhaGerada || erroSenha) && (
                 <div
                   role="status"
-                  className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                  className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
                     senhaGerada ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-red-200 bg-red-50 text-red-800'
                   }`}
                 >
@@ -511,6 +507,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               )}
             </section>
           )}
+          </div>
         </div>
 
         {/* ---------------- Equipamentos e acessórios ---------------- */}
@@ -520,7 +517,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             {currentAssets.length === 0 ? (
               <Vazio>Nenhum equipamento físico alocado no momento para este colaborador.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
@@ -528,7 +525,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                       <th>Marca e modelo</th>
                       <th>Número de série</th>
                       <th>Em posse desde</th>
-                      <th className="text-right">Ações</th>
+                      <th className="col-acoes">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -536,14 +533,14 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                       <tr key={asset.id}>
                         <td data-label="Equipamento">
                           <span className="block font-mono font-semibold text-blue-700">{asset.tag}</span>
-                          <span className="font-medium text-slate-900">{asset.nome}</span>
+                          <span className="font-semibold text-slate-900">{asset.nome}</span>
                         </td>
                         <td data-label="Marca e modelo">{[asset.marca, asset.modelo].filter(Boolean).join(' ') || '—'}</td>
                         <td data-label="Número de série" className="font-mono break-all">
                           {asset.serialNumber || '—'}
                         </td>
                         <td data-label="Em posse desde">{formatDate(asset.dataEntregaAtual)}</td>
-                        <td data-label="Ações" className="text-right">
+                        <td data-label="Ações" className="col-acoes">
                           <span className="acoes-linha">
                             <button type="button" onClick={() => handleOpenAsset(asset.id)} className="btn btn-sm btn-secundario">
                               Abrir ficha
@@ -561,14 +558,14 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           {returnedHistory.length > 0 && (
             <section className="space-y-2">
               <h3 className="secao-titulo">Equipamentos já devolvidos ({returnedHistory.length})</h3>
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
                       <th>Equipamento</th>
                       <th>Período</th>
                       <th>Motivo</th>
-                      <th className="text-right">Situação</th>
+                      <th className="num">Situação</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -576,7 +573,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                       <tr key={entry.id}>
                         <td data-label="Equipamento">
                           <span className="block font-mono font-semibold text-slate-700">{asset.tag}</span>
-                          <span className="font-medium text-slate-900">{asset.nome}</span>
+                          <span className="font-semibold text-slate-900">{asset.nome}</span>
                         </td>
                         <td data-label="Período">
                           {formatDate(entry.dataEntrega)} até {formatDate(entry.dataDevolucao)}
@@ -584,7 +581,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                         <td data-label="Motivo" className="break-words">
                           {entry.motivoDevolucao || '—'}
                         </td>
-                        <td data-label="Situação" className="text-right">
+                        <td data-label="Situação" className="num">
                           <span className="selo selo-neutro">Devolvido</span>
                         </td>
                       </tr>
@@ -602,27 +599,27 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               {acessoriosRecebidos.length === 0 ? (
                 <Vazio>Nenhum acessório entregue a esta pessoa.</Vazio>
               ) : (
-                <div className="cartao overflow-hidden">
+                <div className="cartao-tabela">
                   <table className="tabela tabela-cartoes">
                     <thead>
                       <tr>
                         <th>Acessório</th>
                         <th>Data</th>
-                        <th className="text-right">Quantidade</th>
-                        <th className="text-right">Movimento</th>
+                        <th className="num">Quantidade</th>
+                        <th className="num">Movimento</th>
                       </tr>
                     </thead>
                     <tbody>
                       {acessoriosRecebidos.map((m) => (
                         <tr key={m.id}>
-                          <td data-label="Acessório" className="font-medium text-slate-900">
+                          <td data-label="Acessório" className="font-semibold text-slate-900">
                             {estoque.find((i) => i.id === m.itemId)?.nome || 'acessório'}
                           </td>
                           <td data-label="Data">{formatDate(m.criadoEm.slice(0, 10))}</td>
-                          <td data-label="Quantidade" className="text-right font-mono">
+                          <td data-label="Quantidade" className="num">
                             {m.quantidade}
                           </td>
-                          <td data-label="Movimento" className="text-right">
+                          <td data-label="Movimento" className="num">
                             <span className={`selo ${m.tipo === 'saida' ? 'selo-info' : 'selo-neutro'}`}>
                               {m.tipo === 'saida' ? 'Recebeu' : 'Devolveu'}
                             </span>
@@ -644,14 +641,14 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             {assignedLicenses.length === 0 ? (
               <Vazio>Nenhuma licença vinculada.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
                       <th>Software</th>
                       <th>Fornecedor</th>
                       {isTIFicha && <th>Chave / ID</th>}
-                      <th className="text-right">Situação</th>
+                      <th className="num">Situação</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -663,7 +660,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                               {lic.nome}
                             </button>
                           ) : (
-                            <span className="font-medium text-slate-900">{lic.nome}</span>
+                            <span className="font-semibold text-slate-900">{lic.nome}</span>
                           )}
                         </td>
                         <td data-label="Fornecedor">
@@ -674,7 +671,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                             {lic.chaveContrato || '—'}
                           </td>
                         )}
-                        <td data-label="Situação" className="text-right">
+                        <td data-label="Situação" className="num">
                           <span className="selo selo-ok">Assento ativo</span>
                         </td>
                       </tr>
@@ -690,8 +687,8 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               <h3 className="secao-titulo">Licenças que já teve</h3>
               <ul className="cartao divide-y divide-slate-100">
                 {historicoLicencas.map((a) => (
-                  <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                    <span className="font-medium text-slate-900">{nomeLicenca(a.licencaId)}</span>
+                  <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                    <span className="font-semibold text-slate-900">{nomeLicenca(a.licencaId)}</span>
                     <span className="text-slate-600">
                       {a.inicio ? formatDate(a.inicio) : 'antes do histórico'} até {formatDate(a.fim || '')}
                     </span>
@@ -708,13 +705,13 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               {minhasLinhas.length === 0 ? (
                 <Vazio>Nenhuma linha em uso por esta pessoa.</Vazio>
               ) : (
-                <div className="cartao overflow-hidden">
+                <div className="cartao-tabela">
                   <table className="tabela tabela-cartoes">
                     <thead>
                       <tr>
                         <th>Número</th>
                         <th>Plano</th>
-                        <th className="text-right">Situação</th>
+                        <th className="num">Situação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -724,7 +721,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                             {l.numero}
                           </td>
                           <td data-label="Plano">{l.plano || '—'}</td>
-                          <td data-label="Situação" className="text-right">
+                          <td data-label="Situação" className="num">
                             <span className={`selo ${l.status === 'ativa' ? 'selo-ok' : 'selo-atencao'}`}>
                               {l.status === 'ativa' ? 'Em uso' : l.status}
                             </span>
@@ -738,7 +735,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               {historicoLinhas.length > 0 && (
                 <ul className="cartao divide-y divide-slate-100">
                   {historicoLinhas.map((a) => (
-                    <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                    <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                       <span className="text-slate-900">
                         Teve a linha <span className="font-mono font-semibold">{linhas.find((l) => l.id === a.linhaId)?.numero || '—'}</span>
                       </span>
@@ -787,7 +784,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             {employeeTerms.length === 0 ? (
               <Vazio>Nenhum termo emitido para este colaborador ainda.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
@@ -795,7 +792,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                       <th>Tipo</th>
                       <th>Situação</th>
                       <th>Emissão</th>
-                      <th className="text-right">Ações</th>
+                      <th className="col-acoes">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -814,7 +811,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                             {formatDate(term.dataEmissao)}
                             <span className="block text-slate-500">por {term.responsavelTINome}</span>
                           </td>
-                          <td data-label="Ações" className="text-right">
+                          <td data-label="Ações" className="col-acoes">
                             <span className="acoes-linha">
                               <button type="button" onClick={() => setSelectedTermForPrint(term)} className="btn btn-sm btn-secundario">
                                 <FileText />
@@ -840,7 +837,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             <section className="space-y-2">
               <h3 className="secao-titulo">Anotações dos processos</h3>
               {anotacoesProcessos.map((t) => (
-                <div key={t.id} className="cartao space-y-1 p-3 text-xs">
+                <div key={t.id} className="cartao space-y-1 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-semibold text-slate-900">
                       {ROTULO_PROCESSO[t.tipo]} · <span className="font-mono">{t.codigo}</span>

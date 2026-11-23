@@ -59,19 +59,19 @@ export const LoginView: React.FC = () => {
       <div className="w-full max-w-5xl grid gap-10 lg:grid-cols-2 lg:items-center">
         {/* Apresentação: nome da empresa e o que o sistema faz (sem dados internos) */}
         <div className="text-center lg:text-left">
-          <div className="inline-flex w-12 h-12 rounded-xl bg-blue-600 text-white items-center justify-center font-bold text-xl shadow-md mb-4">
+          <div className="inline-flex w-12 h-12 rounded-xl bg-blue-600 text-white items-center justify-center font-semibold text-xl shadow-md mb-4">
             N
           </div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+          <p className="secao-titulo text-blue-700">
             {settings.nomeFantasia || settings.razaoSocial}
           </p>
-          <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">
             Governança de T.I. e RH em um só lugar
           </h1>
-          <p className="mt-3 text-sm text-slate-600 max-w-md mx-auto lg:mx-0">
+          <p className="mt-3 text-slate-600 max-w-md mx-auto lg:mx-0">
             Equipamentos, acessos, chamados e admissões organizados, com histórico de cada decisão.
           </p>
-          <ul className="mt-5 hidden sm:block space-y-2 text-sm text-slate-700 max-w-md mx-auto lg:mx-0">
+          <ul className="mt-4 hidden sm:block space-y-2 text-slate-700 max-w-md mx-auto lg:mx-0">
             <li>✓ Saber com quem está cada equipamento e licença</li>
             <li>✓ Abrir e acompanhar chamados de suporte</li>
             <li>✓ Acompanhar admissões e desligamentos</li>
@@ -116,7 +116,7 @@ export const LoginView: React.FC = () => {
 
           <div className="relative flex items-center justify-center">
             <div className="border-t border-slate-200 w-full" />
-            <span className="bg-white px-3 text-xs uppercase font-bold text-slate-500 tracking-wider absolute">
+            <span className="bg-white px-3 secao-titulo absolute">
               ou credenciais corporativas
             </span>
           </div>
@@ -133,7 +133,7 @@ export const LoginView: React.FC = () => {
                   placeholder="nome@empresa.com.br"
                   className="campo"
                 />
-                <Mail className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
+                <Mail className="ico text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
@@ -148,12 +148,12 @@ export const LoginView: React.FC = () => {
                   placeholder="••••••••"
                   className="campo"
                 />
-                <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
+                <Lock className="ico text-slate-500 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
             {(errorMessage || authError || erroLinkAuth) && (
-              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700">
                 {errorMessage ||
                   authError ||
                   `O link do e-mail não é mais válido (${erroLinkAuth}). Peça um novo em "Esqueci minha senha".`}
@@ -186,17 +186,17 @@ export const LoginView: React.FC = () => {
                     setModoRecuperar(true);
                     setMsgRecuperacao(null);
                   }}
-                  className="link text-xs"
+                  className="link"
                 >
                   Esqueci minha senha
                 </button>
               ) : (
                 <form onSubmit={handleRecuperar} className="space-y-2">
-                  <p className="text-xs text-slate-600">
+                  <p className="texto-aux">
                     Informe seu e-mail corporativo no campo acima e enviaremos um link para definir uma nova senha.
                   </p>
                   {msgRecuperacao && (
-                    <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">{msgRecuperacao}</div>
+                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">{msgRecuperacao}</div>
                   )}
                   <div className="flex items-center gap-3">
                     <button
@@ -216,7 +216,7 @@ export const LoginView: React.FC = () => {
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-slate-500">
+        <p className="mt-4 text-center texto-aux">
           <button type="button" onClick={() => setMostrarPolitica(true)} className="link">
             Aviso de privacidade
           </button>

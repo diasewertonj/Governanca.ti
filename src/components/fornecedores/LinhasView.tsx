@@ -26,7 +26,7 @@ export const LinhasView: React.FC = () => {
         filtros={
           <>
             <Busca id="linhas-busca" valor={busca} onMudar={setBusca} placeholder="Buscar número, plano, pessoa ou contrato..." />
-            <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+            <label className="inline-flex items-center gap-2 text-slate-700">
               <input type="checkbox" checked={mostrarCanceladas} onChange={(e) => setMostrarCanceladas(e.target.checked)} /> Mostrar canceladas
             </label>
           </>

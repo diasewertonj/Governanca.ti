@@ -269,7 +269,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
     <>
       <Janela
         tamanho="g"
-        icone={<Key className="h-4 w-4" />}
+        icone={<Key className="ico" />}
         titulo={isEditing ? `Editar ${softwareToEdit?.nome}` : 'Novo software / assinatura'}
         subtitulo="Identificação, quem cobra, como é pago e assentos"
         onFechar={onClose}
@@ -298,8 +298,8 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
       >
         <form id="form-software" noValidate onSubmit={handleSubmit} className="space-y-4">
           {errorMsg && (
-            <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+            <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
+              <AlertCircle className="ico text-red-600" />
               <span>{errorMsg}</span>
             </div>
           )}
@@ -308,12 +308,12 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           <div className={painel('ident')}>
             <div className="cartao space-y-2 p-4">
               <h3 className={TITULO}>Identificação</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="md:col-span-2 xl:col-span-2">
                   <label htmlFor="licenca-nome" className={ROTULO}>Nome do software *</label>
                   <input id="licenca-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Microsoft 365 Business Standard, Figma, ChatGPT Team" className={CAMPO} />
                   {parecidos.length > 0 && (
-                    <div className="mt-1 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <div className="mt-1 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
                       <p>Já existe parecido:</p>
                       {parecidos.map((l) => (
                         <p key={l.id} className="flex flex-wrap items-center gap-2">
@@ -359,7 +359,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           <div className={painel('pagto')}>
             <div className="cartao space-y-2 p-4">
               <h3 className={TITULO}>Quem cobra (fornecedor)</h3>
-              <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+              <label className="inline-flex items-center gap-2 text-slate-700">
                 <input type="checkbox" checked={compradoDireto} onChange={(e) => marcarDireto(e.target.checked)} disabled={!fabricante.trim()} />
                 Comprado direto do fabricante {fabricante.trim() ? `(${fabricante.trim()})` : '(preencha o fabricante)'}
               </label>
@@ -381,7 +381,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                 </div>
                 <p className="ajuda">Quem emite a cobrança: a revenda ou o próprio fabricante.</p>
                 {fornecedorLegado && !fornecedorId && (
-                  <p className="mt-1 text-xs text-amber-800">Registro antigo: "{fornecedorLegado}" (texto). Escolha o fornecedor do cadastro.</p>
+                  <p className="mt-1 text-amber-800">Registro antigo: "{fornecedorLegado}" (texto). Escolha o fornecedor do cadastro.</p>
                 )}
               </div>
             </div>
@@ -390,7 +390,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               <h3 className={TITULO}>Como é pago? *</h3>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(['sem_custo', 'propria', 'contrato', 'novo_contrato'] as Escolha[]).map((op) => (
-                  <label key={op} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-xs ${escolha === op ? 'border-blue-400 bg-blue-50' : 'border-slate-200'}`}>
+                  <label key={op} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 ${escolha === op ? 'border-blue-400 bg-blue-50' : 'border-slate-200'}`}>
                     <input type="radio" name="como-pago" checked={escolha === op} onChange={() => setEscolha(op)} className="mt-0.5" />
                     <span>
                       <span className="block font-semibold text-slate-900">
@@ -426,7 +426,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               )}
 
               {(propria || escolha === 'novo_contrato') && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div>
                     <label htmlFor="licenca-valor" className={ROTULO}>Valor (R$) *</label>
                     <CampoMoeda id="licenca-valor" required valor={valorMensal} onMudar={setValorMensal} className={CAMPO} />
@@ -446,7 +446,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               )}
 
               {propria && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div>
                     <label htmlFor="licenca-moeda" className={ROTULO}>Moeda da cobrança</label>
                     <select id="licenca-moeda" value={moeda} onChange={(e) => setMoeda(e.target.value as Moeda)} className={CAMPO}>
@@ -487,7 +487,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                     <label htmlFor="licenca-aviso" className={ROTULO}>Avisar para cancelar com (dias)</label>
                     <input id="licenca-aviso" type="number" min={0} value={avisoDias} onChange={(e) => setAvisoDias(e.target.value)} placeholder="Ex.: 30" className={CAMPO} />
                   </div>
-                  <label className="inline-flex items-center gap-2 text-xs text-slate-700 md:col-span-3 xl:col-span-4">
+                  <label className="inline-flex items-center gap-2 text-slate-700 md:col-span-3 xl:col-span-4">
                     <input type="checkbox" checked={renovacaoAutomatica} onChange={(e) => setRenovacaoAutomatica(e.target.checked)} /> Renova sozinho (cobrança automática)
                   </label>
                 </div>
@@ -499,10 +499,10 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           <div className={painel('assentos')}>
             <div className="cartao space-y-3 p-4">
               <h3 className={TITULO}>Assentos e responsável</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <label htmlFor="licenca-assentos" className={ROTULO}>Total de assentos *</label>
-                  <input id="licenca-assentos" type="number" min={Math.max(1, emUso)} required value={assentosTotais} onChange={(e) => setAssentosTotais(Number(e.target.value))} className={`${CAMPO} font-mono font-bold`} />
+                  <input id="licenca-assentos" type="number" min={Math.max(1, emUso)} required value={assentosTotais} onChange={(e) => setAssentosTotais(Number(e.target.value))} className={`${CAMPO} font-mono font-semibold`} />
                   <p className="ajuda">{isEditing ? `${emUso} em uso` : 'Quantas pessoas podem usar'}</p>
                 </div>
                 <div>

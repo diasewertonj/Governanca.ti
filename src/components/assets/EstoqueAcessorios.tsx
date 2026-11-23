@@ -72,7 +72,7 @@ export const EstoqueAcessorios: React.FC<{
     <div className="space-y-4">
       {!controlado && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+          <label className="inline-flex items-center gap-2 text-slate-700">
             <input type="checkbox" checked={mostrarInativos} onChange={(e) => setInativosInterno(e.target.checked)} />
             Mostrar desativados
           </label>
@@ -119,9 +119,16 @@ export const EstoqueAcessorios: React.FC<{
       )}
 
       {lista.length === 0 ? (
-        <Vazio>Nenhum acessório cadastrado.</Vazio>
+        <Vazio
+          titulo="Nenhum acessório cadastrado"
+          acao={
+            <button type="button" onClick={() => setEditando('novo')} className="btn btn-sm btn-primario">
+              Novo acessório
+            </button>
+          }
+        />
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
@@ -129,7 +136,7 @@ export const EstoqueAcessorios: React.FC<{
                 <th>Tipo</th>
                 <th>Em estoque</th>
                 <th className="hidden xl:table-cell">Local</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -148,12 +155,12 @@ export const EstoqueAcessorios: React.FC<{
                       <td data-label="Em estoque">
                         <span className={`font-mono font-semibold ${baixo ? 'text-red-700' : 'text-slate-900'}`}>{i.quantidade}</span>
                         {i.minimo > 0 && <span className="text-slate-500"> (mín. {i.minimo})</span>}
-                        {baixo && <span className="selo selo-problema ml-1.5">Estoque baixo</span>}
+                        {baixo && <span className="selo selo-problema ml-2">Estoque baixo</span>}
                       </td>
                       <td data-label="Local" className="hidden xl:table-cell">
                         {i.localizacao || '-'}
                       </td>
-                      <td data-label="Ações" className="text-right">
+                      <td data-label="Ações" className="col-acoes">
                         <span className="acoes-linha">
                           <button type="button" onClick={() => setMovendo({ item: i, tipo: 'saida' })} className="btn btn-sm btn-secundario">
                             <ArrowUpFromLine /> Entregar
@@ -273,7 +280,7 @@ const FormItem: React.FC<{
       tamanho="p"
       titulo={item ? `Editar ${item.nome}` : 'Novo acessório'}
       subtitulo="Item de estoque controlado por quantidade"
-      icone={<Package className="h-4 w-4" />}
+      icone={<Package className="ico" />}
       onFechar={onCancelar}
       idTitulo="janela-acessorio"
       rodape={
@@ -339,7 +346,7 @@ const FormItem: React.FC<{
           <textarea id="est-obs" rows={2} value={d.observacoes} onChange={(e) => set('observacoes', e.target.value)} className={CLASSE_CAMPO} />
         </div>
         {item && (
-          <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+          <label className="inline-flex items-center gap-2 text-slate-700">
             <input type="checkbox" checked={d.ativo} onChange={(e) => set('ativo', e.target.checked)} /> Ativo (aparece nas listas de entrega)
           </label>
         )}
@@ -432,7 +439,7 @@ const FormMovimento: React.FC<{
       tamanho="p"
       titulo={`${ROTULO_MOV[tipo]} · ${item.nome}`}
       subtitulo={`Em estoque: ${item.quantidade}`}
-      icone={<ArrowLeftRight className="h-4 w-4" />}
+      icone={<ArrowLeftRight className="ico" />}
       onFechar={onCancelar}
       idTitulo="janela-movimento"
       rodape={

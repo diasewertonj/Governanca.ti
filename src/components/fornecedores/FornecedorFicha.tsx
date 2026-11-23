@@ -143,18 +143,18 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
         titulo={fornecedor.nome}
         subtitulo={
           <>
-            <span className={`selo ${fornecedor.ativo ? 'selo-ok' : 'selo-neutro'} mr-1.5`}>{fornecedor.ativo ? 'Ativo' : 'Inativo'}</span>
+            <span className={`selo ${fornecedor.ativo ? 'selo-ok' : 'selo-neutro'} mr-2`}>{fornecedor.ativo ? 'Ativo' : 'Inativo'}</span>
             {resumoVinculos(vinculos)}
           </>
         }
-        icone={<Building2 className="h-4 w-4" />}
+        icone={<Building2 className="ico" />}
         idTitulo="ficha-fornecedor-titulo"
         acoes={acoes}
         onFechar={fechar}
         faixa={<Abas itens={abas} ativa={aba} onMudar={setAba} rotulo="Seções do fornecedor" />}
       >
         {erro && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800" role="alert">
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800" role="alert">
             {erro}
           </p>
         )}
@@ -186,8 +186,8 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
               </dl>
               {fornecedor.observacoes && (
                 <div className="border-t border-slate-100 pt-3">
-                  <p className="text-xs text-slate-500">Observações</p>
-                  <p className="text-xs whitespace-pre-line text-slate-900">{fornecedor.observacoes}</p>
+                  <p className="texto-aux">Observações</p>
+                  <p className="whitespace-pre-line text-slate-900">{fornecedor.observacoes}</p>
                 </div>
               )}
             </section>
@@ -195,19 +195,19 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
             <section className="cartao space-y-3 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="secao-titulo">Custo mensal hoje</h3>
-                <span className="font-mono text-sm font-semibold text-slate-900">{formatCurrency(totalMensal)}</span>
+                <span className="num font-semibold text-slate-900">{formatCurrency(totalMensal)}</span>
               </div>
               {custoMensal.length === 0 ? (
-                <p className="text-xs text-slate-500">Nenhum contrato vigente nem software com cobrança própria deste fornecedor.</p>
+                <p className="texto-aux">Nenhum contrato vigente nem software com cobrança própria deste fornecedor.</p>
               ) : (
-                <ul className="divide-y divide-slate-100 text-xs">
+                <ul className="divide-y divide-slate-100">
                   {custoMensal.map((d) => (
-                    <li key={`${d.origem}:${d.id}`} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                    <li key={`${d.origem}:${d.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
                       <span className="min-w-0 text-slate-700">
                         <span className="text-slate-500">{ROTULO_ORIGEM[d.origem]} · </span>
                         {d.nome}
                       </span>
-                      <span className="font-mono text-slate-900">{formatCurrency(d.mensal)}</span>
+                      <span className="num text-slate-900">{formatCurrency(d.mensal)}</span>
                     </li>
                   ))}
                 </ul>
@@ -220,7 +220,7 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
         {aba === 'contratos' && (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-slate-600">Clique no contrato para abrir a ficha.</p>
+              <p className="texto-aux">Clique no contrato para abrir a ficha.</p>
               <button type="button" onClick={() => setNovoContrato(true)} className="btn btn-sm btn-secundario">
                 <Plus aria-hidden="true" /> Novo contrato
               </button>
@@ -228,20 +228,20 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
             {seusContratos.length === 0 ? (
               <Vazio>Nenhum contrato deste fornecedor.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
                       <th>Contrato</th>
                       <th>Tipo</th>
                       <th>Vigência</th>
-                      <th className="text-right">Valor</th>
+                      <th className="num">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
                     {seusContratos.map((c) => (
                       <tr key={c.id} onClick={() => setContratoAberto(c.id)} className={LINHA_CLICAVEL}>
-                        <td data-label="Contrato" className="font-medium text-slate-900">
+                        <td data-label="Contrato" className="font-semibold text-slate-900">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -250,18 +250,18 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                             }}
                             className="link text-left"
                           >
-                            {c.numero && <span className="mr-1.5 font-mono">{c.numero}</span>}
+                            {c.numero && <span className="mr-2 font-mono">{c.numero}</span>}
                             {c.descricao}
                           </button>
                         </td>
                         <td data-label="Tipo">{ROTULO_TIPO_CONTRATO[c.tipo]}</td>
                         <td data-label="Vigência">
-                          <span className="inline-flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex flex-wrap items-center gap-2">
                             {c.fim ? `até ${formatDate(c.fim)}` : 'Sem data de fim'}
                             <SeloContrato contrato={c} />
                           </span>
                         </td>
-                        <td data-label="Valor" className="text-right font-mono text-slate-800">
+                        <td data-label="Valor" className="num text-slate-800">
                           {formatCurrency(c.valor)}
                           <span className="font-sans text-slate-500">{SUFIXO_PERIODICIDADE[c.periodicidade]}</span>
                         </td>
@@ -278,13 +278,13 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
           (seusSoftwares.length === 0 ? (
             <Vazio>Nenhum software com este fornecedor.</Vazio>
           ) : (
-            <div className="cartao overflow-hidden">
+            <div className="cartao-tabela">
               <table className="tabela tabela-cartoes">
                 <thead>
                   <tr>
                     <th>Software</th>
                     <th>Como é pago</th>
-                    <th className="text-right">Assentos em uso</th>
+                    <th className="num">Assentos em uso</th>
                     <th>Situação</th>
                   </tr>
                 </thead>
@@ -293,13 +293,13 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                     const ativa = (l.status || 'ativa') === 'ativa';
                     return (
                       <tr key={l.id} className={ativa ? '' : 'opacity-60'}>
-                        <td data-label="Software" className="font-medium text-slate-900">
+                        <td data-label="Software" className="font-semibold text-slate-900">
                           <button type="button" onClick={() => abrirFicha({ tipo: 'software', id: l.id })} className="link text-left">
                             {l.nome}
                           </button>
                         </td>
                         <td data-label="Como é pago">{ROTULO_FORMA_COBRANCA[formaCobrancaDe(l, contratos)]}</td>
-                        <td data-label="Assentos em uso" className="text-right font-mono">
+                        <td data-label="Assentos em uso" className="num">
                           {l.colaboradoresIds.length}/{l.assentosTotais}
                         </td>
                         <td data-label="Situação">
@@ -317,7 +317,7 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
           (seusEquipamentos.length === 0 ? (
             <Vazio>Nenhum equipamento com este fornecedor.</Vazio>
           ) : (
-            <div className="cartao overflow-hidden">
+            <div className="cartao-tabela">
               <table className="tabela tabela-cartoes">
                 <thead>
                   <tr>
@@ -350,21 +350,21 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
         {aba === 'faturas' && (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-slate-600">Faturas dos contratos e softwares deste fornecedor. Para lançar ou pagar, abra o contrato ou o software.</p>
-              <span className="text-xs text-slate-600">
-                Pago em {ano}: <span className="font-mono font-semibold text-slate-900">{formatCurrency(totalPagoNoAno(suasFaturas, ano))}</span>
+              <p className="texto-aux">Faturas dos contratos e softwares deste fornecedor. Para lançar ou pagar, abra o contrato ou o software.</p>
+              <span className="texto-aux">
+                Pago em {ano}: <span className="num font-semibold text-slate-900">{formatCurrency(totalPagoNoAno(suasFaturas, ano))}</span>
               </span>
             </div>
             {suasFaturas.length === 0 ? (
               <Vazio>Nenhuma fatura lançada.</Vazio>
             ) : (
-              <div className="cartao overflow-hidden">
+              <div className="cartao-tabela">
                 <table className="tabela tabela-cartoes">
                   <thead>
                     <tr>
                       <th>Origem</th>
                       <th>Competência</th>
-                      <th className="text-right">Valor</th>
+                      <th className="num">Valor</th>
                       <th>Vencimento</th>
                       <th>Situação</th>
                     </tr>
@@ -374,7 +374,7 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                       const status = statusExibido(f, agora);
                       return (
                         <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
-                          <td data-label="Origem" className="font-medium text-slate-900">
+                          <td data-label="Origem" className="font-semibold text-slate-900">
                             {f.contratoId ? (
                               <button type="button" onClick={() => setContratoAberto(f.contratoId as string)} className="link text-left">
                                 {origemFatura(f)}
@@ -386,7 +386,7 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                             )}
                           </td>
                           <td data-label="Competência">{rotuloCompetencia(f.competencia)}</td>
-                          <td data-label="Valor" className="text-right font-mono text-slate-800">
+                          <td data-label="Valor" className="num text-slate-800">
                             {valorDaFatura(f)}
                           </td>
                           <td data-label="Vencimento">{formatDate(f.vencimento)}</td>

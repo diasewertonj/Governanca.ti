@@ -149,7 +149,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
     <Janela
       tamanho="m"
       idTitulo={id('titulo')}
-      icone={<BotaoIcone className="h-4 w-4" aria-hidden="true" />}
+      icone={<BotaoIcone className="ico" aria-hidden="true" />}
       titulo={TITULO[modo]}
       subtitulo={`${asset.tag} · ${asset.nome}`}
       onFechar={fechar}
@@ -165,7 +165,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
       }
     >
       <form id={id('form')} onSubmit={salvar} className="space-y-4">
-        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
           {modo === 'abrir' && `O ativo fica "Em manutenção" até a conclusão. A custódia não muda.`}
           {modo === 'feita' && 'Lança no histórico um serviço já concluído (ex.: troca de SSD em março), sem mudar o status do ativo.'}
           {encerrando && `Ao ${modo === 'concluir' ? 'concluir' : 'cancelar'}, o ativo volta para "${retorno}".`}
@@ -173,7 +173,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
         </p>
 
         {encerrando && manutencao && (
-          <div className="space-y-0.5 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700">
+          <div className="space-y-0.5 rounded-lg border border-slate-200 px-3 py-2 text-slate-700">
             <p className="font-semibold break-words text-slate-900">
               {ROTULO_TIPO_MANUTENCAO[manutencao.tipo]} · {manutencao.descricao}
             </p>
@@ -329,8 +329,8 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
                 </label>
                 <CampoMoeda id={id('custo')} valor={custo} onMudar={setCusto} />
               </div>
-              <div className="flex items-center md:pt-5">
-                <label htmlFor={id('garantia')} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <div className="flex items-center md:pt-6">
+                <label htmlFor={id('garantia')} className="inline-flex items-center gap-2 font-semibold text-slate-700">
                   <input id={id('garantia')} type="checkbox" checked={cobertoGarantia} onChange={(e) => setCobertoGarantia(e.target.checked)} />
                   Coberto pela garantia
                 </label>
@@ -389,7 +389,7 @@ export const FormManutencao: React.FC<FormManutencaoProps> = ({ asset, modo, man
         )}
 
         {erro && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700" role="alert">
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700" role="alert">
             {erro}
           </p>
         )}

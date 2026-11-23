@@ -56,15 +56,15 @@ export const ConferenciaTermo: React.FC<Props> = ({
   const travada = (i: number) => tipo === 'devolucao' && !!linhasIniciais[i]?.condicao;
 
   return (
-    <div className="cartao p-3 space-y-2 text-xs">
+    <div className="cartao p-3 space-y-2">
       <p className="font-semibold text-slate-800">
         Confira cada item{nomePessoa ? ` com ${nomePessoa}` : ''} antes de gerar
       </p>
       <ul className="divide-y divide-slate-100">
         {linhas.map((l, i) => (
-          <li key={`${l.descricao}-${i}`} className="py-1.5 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center">
+          <li key={`${l.descricao}-${i}`} className="py-2 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center">
             <span>
-              <span className="font-medium text-slate-900">{l.descricao}</span>{' '}
+              <span className="font-semibold text-slate-900">{l.descricao}</span>{' '}
               <span className="text-slate-500">{l.patrimonio}</span>
             </span>
             <select

@@ -103,14 +103,14 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
 
   return (
     // embutido: faixa fina no topo do chamado (sem cartão; itens lado a lado)
-    <section aria-label="Vínculos" className={embutido ? 'space-y-1.5 text-xs' : 'cartao p-4 space-y-3 text-xs'}>
+    <section aria-label="Vínculos" className={embutido ? 'space-y-2' : 'cartao p-4 space-y-3'}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="secao-titulo">Vínculos</h3>
         {podeAlterar && (
           <button
             type="button"
             onClick={() => setEditando((v) => !v)}
-            className="link text-xs"
+            className="link"
             aria-expanded={editando || mexeu}
           >
             {editando || mexeu ? 'Ocultar campos' : 'Alterar'}
@@ -226,7 +226,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
 
       <div className={embutido ? 'flex flex-wrap items-start gap-x-8 gap-y-2' : 'space-y-3'}>
       {vazio && (
-        <p className="text-xs text-slate-500">
+        <p className="texto-aux">
           {processo
             ? 'O equipamento e as licenças aparecem aqui quando o checklist os entregar.'
             : 'Nenhum equipamento, software ou colaborador ligado.'}
@@ -234,31 +234,31 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
       )}
 
       {(ativosEntregues.length > 0 || licencasEntregues.length > 0) && (
-        <div className="space-y-1.5">
-          <span className="text-xs text-slate-500 block">Entregue pelo checklist</span>
+        <div className="space-y-2">
+          <span className="texto-aux block">Entregue pelo checklist</span>
           {ativosEntregues.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 text-xs">
-              <Laptop className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+            <div key={a.id} className="flex items-center gap-2">
+              <Laptop className="ico text-slate-500" aria-hidden="true" />
               {pode('ativo', { custodianteId: a.custodianteId }) ? (
                 <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: a.id })} className={LINK}>
                   <span className="font-mono">{a.tag}</span> · {a.nome}
-                  <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <ExternalLink className="ico-sm" aria-hidden="true" />
                 </button>
               ) : (
-                <span className="font-medium text-slate-900">{a.tag} · {a.nome}</span>
+                <span className="font-semibold text-slate-900">{a.tag} · {a.nome}</span>
               )}
             </div>
           ))}
           {licencasEntregues.map((l) => (
-            <div key={l.id} className="flex items-center gap-2 text-xs">
-              <Key className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+            <div key={l.id} className="flex items-center gap-2">
+              <Key className="ico text-slate-500" aria-hidden="true" />
               {pode('software') ? (
                 <button type="button" onClick={() => abrirFicha({ tipo: 'software', id: l.id })} className={LINK}>
                   {l.nome}
-                  <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <ExternalLink className="ico-sm" aria-hidden="true" />
                 </button>
               ) : (
-                <span className="font-medium text-slate-900">{l.nome}</span>
+                <span className="font-semibold text-slate-900">{l.nome}</span>
               )}
             </div>
           ))}
@@ -267,40 +267,40 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
 
       {colaborador && (
         <div className="flex items-start gap-2">
-          <User className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" aria-hidden="true" />
+          <User className="ico text-slate-500 mt-0.5" aria-hidden="true" />
           <div className="min-w-0">
-            <span className="text-xs text-slate-500 block">
+            <span className="texto-aux block">
               {processo ? (ticket.tipo === 'onboarding' ? 'Pessoa admitida' : 'Pessoa desligada') : 'Colaborador relacionado'}
             </span>
             {pode('colaborador', { colaboradorId: colaborador.id }) ? (
               <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: colaborador.id })} className={LINK}>
                 {colaborador.nome}
-                <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                <ExternalLink className="ico-sm" aria-hidden="true" />
               </button>
             ) : (
-              <span className="font-medium text-slate-900">{colaborador.nome}</span>
+              <span className="font-semibold text-slate-900">{colaborador.nome}</span>
             )}
-            <p className="text-xs text-slate-500">{colaborador.cargo}</p>
+            <p className="texto-aux">{colaborador.cargo}</p>
           </div>
         </div>
       )}
 
       {ativo && (
         <div className="flex items-start gap-2">
-          <Laptop className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" aria-hidden="true" />
+          <Laptop className="ico text-slate-500 mt-0.5" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <span className="text-xs text-slate-500 block">Equipamento</span>
+            <span className="texto-aux block">Equipamento</span>
             {pode('ativo', { custodianteId: ativo.custodianteId }) ? (
               <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: ativo.id })} className={LINK}>
                 <span className="font-mono">{ativo.tag}</span> · {ativo.nome}
-                <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                <ExternalLink className="ico-sm" aria-hidden="true" />
               </button>
             ) : (
-              <span className="font-medium text-slate-900">
+              <span className="font-semibold text-slate-900">
                 <span className="font-mono">{ativo.tag}</span> · {ativo.nome}
               </span>
             )}
-            <p className="text-xs text-slate-500 break-words">
+            <p className="texto-aux break-words">
               {ativo.marca} {ativo.modelo} · S/N: <span className="font-mono">{ativo.serialNumber}</span>
             </p>
             {ativo.status === 'manutencao' && (
@@ -314,7 +314,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
                 onClick={() => abrirFicha({ tipo: 'ativo', id: ativo.id, manutencaoDoChamado: ticket.id })}
                 className="btn btn-sm btn-secundario mt-2"
               >
-                <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
+                <Wrench className="ico-sm" aria-hidden="true" />
                 {ativo.status === 'manutencao' ? 'Registrar manutenção' : 'Enviar para manutenção'}
               </button>
             )}
@@ -324,20 +324,20 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
 
       {nomeSoftware && (
         <div className="flex items-start gap-2">
-          <Key className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" aria-hidden="true" />
+          <Key className="ico text-slate-500 mt-0.5" aria-hidden="true" />
           <div className="min-w-0">
-            <span className="text-xs text-slate-500 block">Software / licença</span>
+            <span className="texto-aux block">Software / licença</span>
             {licenca && pode('software') ? (
               <button type="button" onClick={() => abrirFicha({ tipo: 'software', id: licenca.id })} className={LINK}>
                 {licenca.nome}
-                <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                <ExternalLink className="ico-sm" aria-hidden="true" />
               </button>
             ) : (
-              <span className="font-medium text-slate-900">{nomeSoftware}</span>
+              <span className="font-semibold text-slate-900">{nomeSoftware}</span>
             )}
-            {isTI && fornecedorSoftware && <p className="text-xs text-slate-600">Fornecedor: {fornecedorSoftware}</p>}
+            {isTI && fornecedorSoftware && <p className="texto-aux">Fornecedor: {fornecedorSoftware}</p>}
             {isTI && licenca && (
-              <p className="text-xs text-slate-600 break-words">
+              <p className="texto-aux break-words">
                 {contrato ? (
                   <>
                     Contrato vigente: {nomeContrato(contrato)}
@@ -355,12 +355,12 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
 
       {linhaId && (
         <div className="flex items-start gap-2">
-          <Phone className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" aria-hidden="true" />
+          <Phone className="ico text-slate-500 mt-0.5" aria-hidden="true" />
           <div className="min-w-0">
-            <span className="text-xs text-slate-500 block">Linha telefônica</span>
-            <span className="font-medium text-slate-900">{linha?.numero || 'Linha vinculada'}</span>
+            <span className="texto-aux block">Linha telefônica</span>
+            <span className="font-semibold text-slate-900">{linha?.numero || 'Linha vinculada'}</span>
             {isTI && linha && (
-              <p className="text-xs text-slate-600">
+              <p className="texto-aux">
                 {[linha.plano, linha.tipo === 'fixa' ? 'fixa' : 'móvel', linha.status !== 'ativa' ? linha.status : '']
                   .filter(Boolean)
                   .join(' · ')}
@@ -371,16 +371,16 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
       )}
 
       {manutencoes.length > 0 && (
-        <div className="pt-2 border-t border-slate-100 space-y-1.5">
-          <span className="text-xs text-slate-500 block">Manutenções abertas por este chamado</span>
+        <div className="pt-2 border-t border-slate-100 space-y-2">
+          <span className="texto-aux block">Manutenções abertas por este chamado</span>
           {manutencoes.map(({ m, a }) => (
             <button
               key={m.id}
               type="button"
               onClick={() => abrirFicha({ tipo: 'ativo', id: a.id })}
-              className="link flex w-full flex-wrap items-center gap-x-1.5 text-left"
+              className="link flex w-full flex-wrap items-center gap-x-2 text-left"
             >
-              <Wrench className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+              <Wrench className="ico-sm text-slate-500" aria-hidden="true" />
               <span className="font-mono font-semibold">{a.tag}</span>
               <span>· {ROTULO_TIPO_MANUTENCAO[m.tipo]}</span>
               <span>· {ROTULO_STATUS_MANUTENCAO[m.status]}</span>

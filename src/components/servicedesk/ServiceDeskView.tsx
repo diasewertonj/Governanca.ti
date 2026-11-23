@@ -98,7 +98,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
     baixa: { label: 'Baixa', cls: 'text-slate-500' },
     media: { label: 'Média', cls: 'text-blue-700' },
     alta: { label: 'Alta', cls: 'text-amber-700 font-semibold' },
-    critica: { label: 'Urgente', cls: 'text-red-700 font-bold' },
+    critica: { label: 'Urgente', cls: 'text-red-700 font-semibold' },
   };
 
   return (
@@ -168,7 +168,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
       />
 
       {/* Fila de chamados: tabela que vira cartões no celular */}
-      <div className="cartao overflow-hidden">
+      <div className="cartao-tabela">
         <table className="tabela tabela-cartoes">
           <thead>
             <tr>
@@ -179,7 +179,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
               <th>Prioridade</th>
               <th className="hidden 2xl:table-cell">Técnico T.I.</th>
               <th>Abertura</th>
-              <th className="text-right">Ações</th>
+              <th className="col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -191,20 +191,20 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
 
                 return (
                   <tr key={tkt.id} onClick={() => setSelectedTicketIdForDetail(tkt.id)} className="hover:bg-slate-50/70 cursor-pointer">
-                    <td data-label="Código" className="font-mono font-bold text-slate-800">
+                    <td data-label="Código" className="font-mono font-semibold text-slate-800">
                       {tkt.codigo}
                     </td>
 
                     <td data-label="Título do chamado">
                       <div className="max-w-xs md:max-w-sm">
                         <span className="font-semibold text-slate-900 block truncate">{tkt.titulo}</span>
-                        <span className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                        <span className="texto-aux flex items-center gap-2 mt-0.5">
                           <span className="capitalize">{tkt.categoria}</span>
                           {tkt.mensagens.length > 1 && (
                             <>
                               <span>·</span>
                               <span className="flex items-center gap-0.5">
-                                <MessageSquare className="w-3 h-3" />
+                                <MessageSquare className="ico-sm" />
                                 {tkt.mensagens.length}
                               </span>
                             </>
@@ -222,10 +222,10 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                         }}
                         className="link flex items-center gap-1"
                       >
-                        <User className="w-3 h-3" />
+                        <User className="ico-sm" />
                         <span>{tkt.solicitanteNome}</span>
                       </button>
-                      <span className="text-xs text-slate-500 block">{tkt.solicitanteSetorNome}</span>
+                      <span className="texto-aux block">{tkt.solicitanteSetorNome}</span>
                       {origem && <span className={`selo ${origem.cls} mt-0.5`}>{origem.r}</span>}
                       {tkt.tipo === 'suporte' && tkt.colaboradorId && tkt.colaboradorId !== tkt.solicitanteId && (
                         <button
@@ -234,7 +234,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                             e.stopPropagation();
                             setSelectedEmployeeIdFor360(tkt.colaboradorId!);
                           }}
-                          className="block text-xs text-slate-600 hover:text-blue-700"
+                          className="block texto-aux hover:text-blue-700"
                         >
                           Relacionado: {employees.find((e) => e.id === tkt.colaboradorId)?.nome || 'colaborador'}
                         </button>
@@ -260,7 +260,7 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
                       {formatDate(tkt.dataCriacao)}
                     </td>
 
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       <span className="acoes-linha">
                         <button
                           type="button"
@@ -281,7 +281,21 @@ export const ServiceDeskView: React.FC<ServiceDeskViewProps> = ({ onOpenNewTicke
             ) : (
               <tr>
                 <td colSpan={8}>
-                  <Vazio>Nenhum chamado encontrado com os filtros selecionados.</Vazio>
+                  <Vazio
+                    titulo="Nenhum chamado encontrado"
+                    acao={
+                      <>
+                        <button type="button" onClick={() => { setSearchTerm(''); setStatusFilter('todos'); setPriorityFilter('todos'); setOrigemFiltro('todos'); }} className="btn btn-sm btn-secundario">
+                          Limpar filtros
+                        </button>
+                        <button type="button" onClick={onOpenNewTicketModal} className="btn btn-sm btn-primario">
+                          Novo chamado
+                        </button>
+                      </>
+                    }
+                  >
+                    Nenhum chamado com os filtros selecionados.
+                  </Vazio>
                 </td>
               </tr>
             )}

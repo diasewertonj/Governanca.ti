@@ -308,44 +308,47 @@ export const DespesasView: React.FC<{
       {/* Números do período (o valor do patrimônio é de hoje: só leitura da ficha fiscal) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="cartao p-3">
-          <p className="text-xs text-slate-500">Realizado (pago)</p>
-          <p className="text-lg font-semibold font-mono text-slate-900">{brl(dados.realizado)}</p>
+          <p className="texto-aux">Realizado (pago)</p>
+          <p className="text-lg font-semibold num text-slate-900">{brl(dados.realizado)}</p>
           {variacao !== undefined && (
-            <p className={`text-xs ${variacao > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+            <p className={` ${variacao > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
               {variacao > 0 ? '+' : ''}
               {variacao.toFixed(0)}% vs período anterior ({brl(dados.realizadoAnterior)})
             </p>
           )}
         </div>
         <div className="cartao p-3">
-          <p className="text-xs text-slate-500">Previsto (recorrente)</p>
-          <p className="text-lg font-semibold font-mono text-slate-900">{brl(dados.previsto)}</p>
-          <p className="text-xs text-slate-500">diferença: {brl(dados.realizado - dados.previsto)}</p>
+          <p className="texto-aux">Previsto (recorrente)</p>
+          <p className="text-lg font-semibold num text-slate-900">{brl(dados.previsto)}</p>
+          <p className="texto-aux">diferença: {brl(dados.realizado - dados.previsto)}</p>
         </div>
         <div className="cartao p-3">
-          <p className="text-xs text-slate-500">A pagar no período</p>
-          <p className="text-lg font-semibold font-mono text-amber-800">{brl(dados.aPagar)}</p>
+          <p className="texto-aux">A pagar no período</p>
+          <p className="text-lg font-semibold num text-amber-800">{brl(dados.aPagar)}</p>
         </div>
         <div className="cartao p-3">
-          <p className="text-xs text-slate-500">Assentos sem uso (por mês)</p>
-          <p className="text-lg font-semibold font-mono text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}</p>
-          <p className="text-xs text-slate-500">{ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || 'nenhum'}</p>
+          <p className="texto-aux">Assentos sem uso (por mês)</p>
+          <p className="text-lg font-semibold num text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}</p>
+          {/* Seção 19: lista em até 2 linhas (o resto no texto de ajuda) para o cartão não esticar a linha dos indicadores */}
+          <p className="texto-aux line-clamp-2" title={ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ')}>
+            {ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || 'nenhum'}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+      <div className="grid items-start grid-cols-1 xl:grid-cols-2 gap-3">
         {/* Mês a mês */}
         <div className="cartao p-3 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="secao-titulo">Mês a mês</h3>
-            <span className="text-xs text-slate-500">
+            <span className="texto-aux">
               <span className="inline-block w-2.5 h-2.5 bg-emerald-600 rounded-sm align-middle" /> realizado{' '}
               <span className="inline-block w-2.5 h-2.5 bg-slate-300 rounded-sm align-middle ml-2" /> previsto
             </span>
           </div>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {dados.porMes.map((m) => (
-              <li key={m.comp} className="grid grid-cols-[5.5rem_1fr_7rem] items-center gap-2 text-xs">
+              <li key={m.comp} className="grid grid-cols-[5.5rem_1fr_7rem] items-center gap-2">
                 <span className="text-slate-600">{rotuloCompetencia(m.comp)}</span>
                 <span className="space-y-0.5">
                   <span className="block h-2 bg-emerald-600 rounded-full" style={{ width: `${(m.realizado / maior) * 100}%` }} />
@@ -372,11 +375,11 @@ export const DespesasView: React.FC<{
             </select>
           </div>
           {dados.grupos.length === 0 ? (
-            <p className="text-xs text-slate-500">Nada pago neste período com estes filtros.</p>
+            <p className="texto-aux">Nada pago neste período com estes filtros.</p>
           ) : (
             <ul className="space-y-2">
               {dados.grupos.map((g) => (
-                <li key={g.chave} className="text-xs">
+                <li key={g.chave} className="">
                   <div className="flex justify-between gap-2">
                     <span className="text-slate-800">{g.chave}</span>
                     <span className="font-mono font-semibold">
@@ -394,11 +397,20 @@ export const DespesasView: React.FC<{
       </div>
 
       {/* Detalhe */}
-      <div className="cartao overflow-hidden">
+      <div className="cartao-tabela">
         <h3 className="secao-titulo px-3 pt-3">Faturas do período ({dados.doPeriodo.length})</h3>
         {dados.doPeriodo.length === 0 ? (
           <div className="p-3">
-            <Vazio>Nenhuma fatura no período com estes filtros.</Vazio>
+            <Vazio
+              titulo="Nenhuma fatura no período"
+              acao={
+                <button type="button" onClick={() => { setFFornecedor(''); setFCategoria(''); setFArea(''); setFOrigem(''); }} className="btn btn-sm btn-secundario">
+                  Limpar filtros
+                </button>
+              }
+            >
+              Nenhuma fatura no período com estes filtros.
+            </Vazio>
           </div>
         ) : (
           <table className="tabela tabela-cartoes mt-2">
@@ -432,7 +444,7 @@ export const DespesasView: React.FC<{
                       <td data-label="Fornecedor">{nomeForn(o?.fornecedorId)}</td>
                       <td data-label="Categoria" className="hidden xl:table-cell">{o ? ROTULO_CATEGORIA[o.categoria] : '—'}</td>
                       <td data-label="Área" className="hidden xl:table-cell">{o?.area || '—'}</td>
-                      <td data-label="Valor" className="font-mono">{brl(valorEfetivo(f))}</td>
+                      <td data-label="Valor" className="num">{brl(valorEfetivo(f))}</td>
                       <td data-label="Situação">
                         <span className={`selo ${SELO_FATURA[st]}`}>{ROTULO_STATUS_FATURA[st]}</span>
                         {f.pagoEm && <span className="block text-slate-500">em {formatDate(f.pagoEm)}</span>}

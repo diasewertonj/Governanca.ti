@@ -53,9 +53,9 @@ export const RhInicioView: React.FC<{ onNavigate: (view: string) => void }> = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {cartoes.map(({ rotulo, valor, Icone }) => (
           <div key={rotulo} className="cartao p-4 flex items-center gap-3">
-            <Icone className="w-5 h-5 text-slate-500" aria-hidden="true" />
+            <Icone className="ico-lg text-slate-500" aria-hidden="true" />
             <div>
-              <p className="text-xs text-slate-600">{rotulo}</p>
+              <p className="texto-aux">{rotulo}</p>
               <p className="text-2xl font-semibold text-slate-900">{valor}</p>
             </div>
           </div>
@@ -82,18 +82,18 @@ export const RhInicioView: React.FC<{ onNavigate: (view: string) => void }> = ({
                       {t.tipo === 'onboarding' ? 'Admissão' : 'Desligamento'}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-semibold text-slate-900 truncate">{pessoa(t)}</span>
-                      <span className="block text-xs text-slate-600">
+                      <span className="block font-semibold text-slate-900 truncate">{pessoa(t)}</span>
+                      <span className="block texto-aux">
                         {t.codigo}
                         {dataPrevista(t) && ` · ${dataPrevista(t)}`}
                       </span>
                     </span>
                     <span className="sm:w-48">
                       {itens.length === 0 ? (
-                        <span className="text-xs text-slate-600">A T.I. ainda não montou o checklist</span>
+                        <span className="texto-aux">A T.I. ainda não montou o checklist</span>
                       ) : (
                         <>
-                          <span className="block text-xs text-slate-700 mb-1">
+                          <span className="block text-slate-700 mb-1">
                             T.I.: {p.feitos + p.naoSeAplica} de {p.total} passos
                           </span>
                           <span className="block h-1.5 bg-slate-100 rounded-full overflow-hidden" aria-hidden="true">
@@ -124,8 +124,8 @@ export const RhInicioView: React.FC<{ onNavigate: (view: string) => void }> = ({
                   className="cartao w-full text-left p-4 hover:border-blue-300 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4"
                 >
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-semibold text-slate-900 truncate">{t.colaboradorNome}</span>
-                    <span className="block text-xs text-slate-600">
+                    <span className="block font-semibold text-slate-900 truncate">{t.colaboradorNome}</span>
+                    <span className="block texto-aux">
                       {t.docCodigo || t.codigo} · {t.tipo === 'entrega' ? 'Entrega' : 'Devolução'} · {formatDate(t.dataEmissao)}
                     </span>
                   </span>

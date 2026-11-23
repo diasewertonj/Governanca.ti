@@ -34,21 +34,21 @@ export const BlocoResolucao: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   return (
     <section aria-label="Resolução" className="cartao p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="secao-titulo flex items-center gap-1.5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+        <h3 className="secao-titulo flex items-center gap-2">
+          <CheckCircle2 className="ico text-emerald-600" aria-hidden="true" />
           Resolução
         </h3>
-        <p className="text-xs text-slate-600">
+        <p className="texto-aux">
           {ROTULO_CAUSA[r.causa]} · {ROTULO_TIPO_SOLUCAO[r.tipo]}
           {r.tempoMin !== undefined && ` · ${formatarTempo(r.tempoMin)}`}
           {quem && ` · ${quem}`}
           {r.resolvidoEm && `, ${formatDateTime(r.resolvidoEm)}`}
         </p>
       </div>
-      <p className="text-sm leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{r.solucao}</p>
+      <p className="leading-relaxed text-slate-900 whitespace-pre-wrap break-words">{r.solucao}</p>
       {r.proximoPasso && (
-        <p className="text-xs text-slate-700">
-          <span className="selo selo-atencao mr-1.5">Próximo passo</span>
+        <p className="text-slate-700">
+          <span className="selo selo-atencao mr-2">Próximo passo</span>
           {r.proximoPasso}
         </p>
       )}
@@ -84,13 +84,13 @@ const Avaliacao: React.FC<{
 
   if (ticket.avaliacao) {
     return (
-      <p className="flex items-center gap-1 text-xs text-slate-700">
+      <p className="flex items-center gap-1 text-slate-700">
         <Estrelas nota={ticket.avaliacao.nota} />
         <span className="ml-1">Avaliação de quem abriu{ticket.avaliacao.comentario && `: "${ticket.avaliacao.comentario}"`}</span>
       </p>
     );
   }
-  if (!pode) return <span className="text-xs text-slate-500">Sem avaliação</span>;
+  if (!pode) return <span className="texto-aux">Sem avaliação</span>;
 
   const enviar = async () => {
     setEnviando(true);
@@ -100,7 +100,7 @@ const Avaliacao: React.FC<{
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-slate-700">Como foi o atendimento?</span>
       <span className="flex" role="radiogroup" aria-label="Nota de 1 a 5">
         {[1, 2, 3, 4, 5].map((n) => (
@@ -113,7 +113,7 @@ const Avaliacao: React.FC<{
             onClick={() => setNota(n)}
             className="p-0.5"
           >
-            <Star className={`w-4 h-4 ${n <= nota ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} aria-hidden="true" />
+            <Star className={`ico ${n <= nota ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} aria-hidden="true" />
           </button>
         ))}
       </span>
@@ -144,7 +144,7 @@ const Avaliacao: React.FC<{
 const Estrelas: React.FC<{ nota: number }> = ({ nota }) => (
   <span className="flex" aria-label={`${nota} de 5`}>
     {[1, 2, 3, 4, 5].map((n) => (
-      <Star key={n} className={`w-3.5 h-3.5 ${n <= nota ? 'fill-amber-400 text-amber-500' : 'text-slate-300'}`} aria-hidden="true" />
+      <Star key={n} className={`ico-sm ${n <= nota ? 'fill-amber-400 text-amber-500' : 'text-slate-300'}`} aria-hidden="true" />
     ))}
   </span>
 );
@@ -156,12 +156,12 @@ export const BlocoCancelamento: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
   if (!c) return null;
   const quem = employees.find((e) => e.id === c.canceladoPor)?.nome;
   return (
-    <section aria-label="Cancelamento" className="cartao p-4 space-y-3 text-xs text-slate-700">
-      <h3 className="secao-titulo flex items-center gap-1.5">
-        <Ban className="h-4 w-4" aria-hidden="true" />
+    <section aria-label="Cancelamento" className="cartao p-4 space-y-3 text-slate-700">
+      <h3 className="secao-titulo flex items-center gap-2">
+        <Ban className="ico" aria-hidden="true" />
         Cancelamento
       </h3>
-      <p className="font-medium text-slate-900">
+      <p className="font-semibold text-slate-900">
         {ROTULO_MOTIVO_CANCELAMENTO[c.motivo]}
         {quem && <span className="font-normal text-slate-600"> · por {quem}</span>}
       </p>
@@ -187,12 +187,12 @@ export const HistoricoChamado: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticket.id, ticket.dataAtualizacao, ticket.status]);
 
-  if (!eventos) return <p className="text-xs text-slate-500">Carregando histórico…</p>;
-  if (eventos.length === 0) return <p className="text-xs text-slate-500">Sem registros.</p>;
+  if (!eventos) return <p className="texto-aux">Carregando histórico…</p>;
+  if (eventos.length === 0) return <p className="texto-aux">Sem registros.</p>;
   return (
     <ol className="relative border-l border-slate-200 ml-2 space-y-3">
       {eventos.map((e) => (
-        <li key={e.id} className="ml-4 text-xs">
+        <li key={e.id} className="ml-4">
           <span className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full bg-white border-2 border-slate-300" aria-hidden="true" />
           <p className="text-slate-900 break-words">{descreverEvento(e)}</p>
           <p className="text-slate-500">
@@ -274,7 +274,7 @@ export const FormResolucao: React.FC<{ ticket: Ticket; onClose: () => void }> = 
         </>
       }
     >
-      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4 text-xs">
+      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4">
         <p className="text-slate-600">
           A solução fica registrada no chamado e encerra o atendimento. Quem abriu pode reabrir se o problema voltar.
         </p>
@@ -303,7 +303,7 @@ export const FormResolucao: React.FC<{ ticket: Ticket; onClose: () => void }> = 
           <legend className={CLASSE_ROTULO}>Tipo de solução *</legend>
           <div className="flex flex-wrap gap-4 mt-1">
             {(['definitiva', 'paliativa'] as TipoSolucao[]).map((t) => (
-              <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+              <label key={t} className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name={`${id}-tipo`} checked={tipo === t} onChange={() => setTipo(t)} />
                 {ROTULO_TIPO_SOLUCAO[t]}
               </label>
@@ -375,12 +375,12 @@ export const FormCancelamento: React.FC<{ ticket: Ticket; onClose: () => void }>
         </>
       }
     >
-      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4 text-xs">
+      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4">
         {processo && <p className="ajuda">O processo fica registrado como cancelado, com o motivo, e não é reaberto.</p>}
         {aReverter.length > 0 && (
           <div className="space-y-2 text-slate-700">
             <p className="font-semibold text-slate-900">Estes passos já foram feitos e não se desfazem sozinhos:</p>
-            <ul className="list-disc pl-5">
+            <ul className="list-disc pl-4">
               {aReverter.map((i) => (
                 <li key={i.id}>{i.titulo}</li>
               ))}
@@ -447,7 +447,7 @@ const FormReabrir: React.FC<{ ticket: Ticket; onClose: () => void }> = ({ ticket
         </>
       }
     >
-      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4 text-xs">
+      <form id={`${id}-form`} onSubmit={enviar} className="space-y-4">
         <div>
           <label htmlFor={`${id}-motivo`} className={CLASSE_ROTULO}>O que continua acontecendo? *</label>
           <textarea id={`${id}-motivo`} rows={4} value={motivo} onChange={(e) => setMotivo(e.target.value)} className={CLASSE_CAMPO} required />

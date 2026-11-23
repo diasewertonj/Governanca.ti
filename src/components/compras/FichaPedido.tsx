@@ -25,7 +25,7 @@ import {
 } from '../../utils/compras.ts';
 import { proximasTags } from '../../utils/patrimonio.ts';
 import { formatDate } from '../../utils/formatters.ts';
-import { Dado, Janela } from '../ui/Janela.tsx';
+import { Dado, DadoLinha, Janela } from '../ui/Janela.tsx';
 import { CampoMoeda } from '../ui/Campos.tsx';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
@@ -126,7 +126,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
         titulo={`${p.codigo} · ${p.titulo}`}
         rotuloCaminho={p.codigo}
         subtitulo={`${ROTULO_STATUS_PEDIDO[p.status]}${proximoPasso(p) ? ` · próximo passo: ${proximoPasso(p)}` : ''}`}
-        icone={<ShoppingCart className="h-4 w-4" />}
+        icone={<ShoppingCart className="ico" />}
         tamanho="g"
         onFechar={onClose}
         acoes={
@@ -145,7 +145,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
         }
         rodape={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
-            {esperando && <span className="mr-auto text-xs text-slate-500">Aguardando: {esperando}.</span>}
+            {esperando && <span className="mr-auto texto-aux">Aguardando: {esperando}.</span>}
             {podeDevolver && (
               <button type="button" disabled={ocupado} onClick={devolver} className="btn btn-secundario">
                 <X /> Devolver
@@ -185,7 +185,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </p>
           )}
           {/* Linha do tempo do fluxo */}
-          <ol className="flex flex-wrap gap-1.5" aria-label="Etapas do pedido">
+          <ol className="flex flex-wrap gap-2" aria-label="Etapas do pedido">
             {fluxo.map((s, i) => (
               <li key={s} className={`selo ${p.status === s ? SELO_STATUS_PEDIDO[s] : passoAtual > i ? 'selo-ok' : 'selo-neutro'}`}>
                 {i + 1}. {ROTULO_STATUS_PEDIDO[s]}
@@ -194,51 +194,50 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             {(p.status === 'recusado' || p.status === 'cancelado') && <li className={`selo ${SELO_STATUS_PEDIDO[p.status]}`}>{ROTULO_STATUS_PEDIDO[p.status]}</li>}
           </ol>
           {p.motivo && (p.status === 'recusado' || p.status === 'cancelado') && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800">
               <span className="font-semibold">{p.status === 'recusado' ? 'Motivo da recusa' : 'Motivo do cancelamento'}:</span> {p.motivo}
             </p>
           )}
 
+          {/* Seção 19: resumo compacto — finalidade em destaque, dados em linhas "rótulo valor", vazios escondidos */}
           <section className="cartao space-y-3 p-4">
-            <h3 className="secao-titulo">Resumo</h3>
-            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Dado rotulo="Pedido por">{nome(p.solicitanteId, p.solicitanteNome)}</Dado>
-              <Dado rotulo="Tipo">{p.tipoPedido === 'outros' ? 'Outros (Compras cota)' : 'De T.I. (a T.I. cota)'}</Dado>
-              <Dado rotulo="Gestor">
-                {p.gestorId ? nome(p.gestorId, p.gestorNome) : '—'}
-              </Dado>
-              <Dado rotulo="Em">{formatDate(p.criadoEm.slice(0, 10))}</Dado>
-              <Dado rotulo="Categoria">{ROTULO_CATEGORIA[p.categoria]}</Dado>
-              <Dado rotulo="Área">{p.area || 'Geral'}</Dado>
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+              <div className="min-w-0 flex-1">
+                <h3 className="secao-titulo">Resumo</h3>
+                {p.justificativa && <p className="mt-1 break-words text-slate-900">{p.justificativa}</p>}
+              </div>
+              {valor !== undefined && valor > 0 && (
+                <div className="text-right">
+                  <p className="texto-aux">{p.valorFinal != null ? 'Valor final' : 'Valor'}</p>
+                  <p className="num text-base font-semibold text-slate-900">{brl(valor)}</p>
+                </div>
+              )}
+            </div>
+            <dl className="grid gap-x-6 gap-y-1 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-3">
+              <DadoLinha rotulo="Pedido por">
+                {nome(p.solicitanteId, p.solicitanteNome)} · <span className="num">{formatDate(p.criadoEm.slice(0, 10))}</span>
+              </DadoLinha>
+              <DadoLinha rotulo="Tipo">{p.tipoPedido === 'outros' ? 'Outros (Compras cota)' : 'De T.I. (a T.I. cota)'}</DadoLinha>
+              <DadoLinha rotulo="Categoria">{ROTULO_CATEGORIA[p.categoria]}</DadoLinha>
+              <DadoLinha rotulo="Área">{p.area || 'Geral'}</DadoLinha>
+              <DadoLinha rotulo="Gestor">{p.gestorId ? nome(p.gestorId, p.gestorNome) : null}</DadoLinha>
               {p.aprovadorId && (
-                <Dado rotulo="Aprovado por">
+                <DadoLinha rotulo="Aprovado por">
                   {nome(p.aprovadorId)}
                   {p.aprovacaoForma ? ` · ${ROTULO_FORMA_APROVACAO[p.aprovacaoForma]}` : ''}
                   {p.aprovadoEm ? ` · ${formatDate(p.aprovadoEm.slice(0, 10))}` : ''}
                   {p.aprovadoPor && p.aprovadoPor !== p.aprovadorId ? ` (registrado por ${nome(p.aprovadoPor)})` : ''}
-                </Dado>
+                </DadoLinha>
               )}
-              <Dado rotulo="Para quem">{p.colaboradorDestinoId ? nome(p.colaboradorDestinoId, p.destinoNome) : '—'}</Dado>
-              <Dado rotulo="Precisa até">{p.necessarioEm ? formatDate(p.necessarioEm) : '—'}</Dado>
-              <Dado rotulo="Admissão">
+              <DadoLinha rotulo="Para quem">{p.colaboradorDestinoId ? nome(p.colaboradorDestinoId, p.destinoNome) : null}</DadoLinha>
+              <DadoLinha rotulo="Precisa até">{p.necessarioEm ? <span className="num">{formatDate(p.necessarioEm)}</span> : null}</DadoLinha>
+              <DadoLinha rotulo="Admissão">
                 {admissao ? (
                   <button type="button" className="link text-left" onClick={() => setSelectedTicketIdForDetail(admissao.id)}>
                     {admissao.codigo} · {admissao.onboarding?.nomeColaborador || admissao.titulo}
                   </button>
-                ) : (
-                  '—'
-                )}
-              </Dado>
-              {valor !== undefined && (
-                <Dado rotulo={p.valorFinal != null ? 'Valor final' : 'Valor'}>
-                  <span className="font-mono">{brl(valor)}</span>
-                </Dado>
-              )}
-              {p.justificativa && (
-                <Dado rotulo="Para que é" className="col-span-2 lg:col-span-4">
-                  {p.justificativa}
-                </Dado>
-              )}
+                ) : null}
+              </DadoLinha>
             </dl>
           </section>
 
@@ -250,26 +249,26 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                 <tr>
                   <th>Item</th>
                   <th>Tipo</th>
-                  <th className="text-right">Qtd.</th>
-                  {!p.semValores && <th className="text-right">Unitário</th>}
-                  {!p.semValores && <th className="text-right">Total</th>}
+                  <th className="num">Qtd.</th>
+                  {!p.semValores && <th className="num">Unitário</th>}
+                  {!p.semValores && <th className="num">Total</th>}
                 </tr>
               </thead>
               <tbody>
                 {p.itens.map((i) => (
                   <tr key={i.id}>
                     <td data-label="Item">
-                      <span className="font-medium text-slate-900">{i.descricao}</span>
+                      <span className="font-semibold text-slate-900">{i.descricao}</span>
                       {i.link && /^https?:\/\//i.test(i.link) && (
-                        <a href={i.link} target="_blank" rel="noopener noreferrer" className="link ml-1.5 inline-flex items-center gap-0.5 text-xs">
-                          <ExternalLink className="h-3 w-3" aria-hidden="true" /> ver produto
+                        <a href={i.link} target="_blank" rel="noopener noreferrer" className="link ml-2 inline-flex items-center gap-0.5">
+                          <ExternalLink className="ico-sm" aria-hidden="true" /> ver produto
                         </a>
                       )}
                       {i.valorReferencia != null && <span className="block text-slate-500">quem pediu viu {brl(i.valorReferencia)}</span>}
                       {opcoesDoItem(p, i.id).length > 0 && (
                         <ul className="mt-1 space-y-0.5">
                           {opcoesDoItem(p, i.id).map((o) => (
-                            <li key={o.id} className={`text-xs ${o.vencedora ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
+                            <li key={o.id} className={` ${o.vencedora ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
                               {o.vencedora ? '✓ recomendada · ' : '· '}
                               {fornecedores.find((f) => f.id === o.fornecedorId)?.nome || o.loja || 'Opção'}
                               {[o.marca, o.modelo].filter(Boolean).length ? ` · ${[o.marca, o.modelo].filter(Boolean).join(' ')}` : ''}
@@ -286,9 +285,9 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                       {(i.marca || i.modelo || i.especificacao) && <span className="block text-slate-500">{[i.marca, i.modelo, i.especificacao].filter(Boolean).join(' · ')}</span>}
                     </td>
                     <td data-label="Tipo">{ROTULO_TIPO_ITEM[i.tipo]}</td>
-                    <td data-label="Qtd." className="text-right font-mono">{i.quantidade}</td>
-                    {!p.semValores && <td data-label="Unitário" className="text-right font-mono">{i.valorUnitario != null ? brl(i.valorUnitario) : '—'}</td>}
-                    {!p.semValores && <td data-label="Total" className="text-right font-mono">{i.valorUnitario != null ? brl(i.valorUnitario * i.quantidade) : '—'}</td>}
+                    <td data-label="Qtd." className="num">{i.quantidade}</td>
+                    {!p.semValores && <td data-label="Unitário" className="num">{i.valorUnitario != null ? brl(i.valorUnitario) : '—'}</td>}
+                    {!p.semValores && <td data-label="Total" className="num">{i.valorUnitario != null ? brl(i.valorUnitario * i.quantidade) : '—'}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -299,13 +298,13 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             <section className="cartao space-y-2 p-4">
               <h3 className="secao-titulo">Cotações do pedido inteiro ({p.cotacoes.filter((c) => !c.itemId).length})</h3>
               {p.cotacoes.length === 0 ? (
-                <p className="text-xs text-slate-500">Sem cotações{aberto && isTI ? ': use Editar para incluir até 3.' : '.'}</p>
+                <p className="texto-aux">Sem cotações{aberto && isTI ? ': use Editar para incluir até 3.' : '.'}</p>
               ) : (
                 <ul className="space-y-2">
                   {p.cotacoes.filter((c) => !c.itemId).map((c) => (
-                    <li key={c.id} className={`flex flex-wrap items-center gap-2 rounded-lg border p-2.5 text-xs ${c.vencedora ? 'border-emerald-300 bg-emerald-50/60' : 'border-slate-200'}`}>
+                    <li key={c.id} className={`flex flex-wrap items-center gap-2 rounded-lg border p-3 ${c.vencedora ? 'border-emerald-300 bg-emerald-50/60' : 'border-slate-200'}`}>
                       <span className="font-semibold text-slate-900">{fornecedor(c.fornecedorId)}</span>
-                      <span className="font-mono">{brl(c.valor)}</span>
+                      <span className="num">{brl(c.valor)}</span>
                       {c.prazoDias != null && <span className="text-slate-600">prazo {c.prazoDias} dia(s)</span>}
                       {c.validade && <span className="text-slate-600">válida até {formatDate(c.validade)}</span>}
                       {c.vencedora && <span className="selo selo-ok">Vencedora</span>}
@@ -325,13 +324,13 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                 {p.area ? ` · ${p.area}` : ''}
               </h3>
               {impacto.semOrcamento ? (
-                <p className="text-xs text-amber-800">Não há orçamento para esta categoria e área em {ano}. O gasto vai aparecer como "sem orçamento".</p>
+                <p className="text-amber-800">Não há orçamento para esta categoria e área em {ano}. O gasto vai aparecer como "sem orçamento".</p>
               ) : (
                 <dl className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                  <Dado rotulo="Previsto no ano"><span className="font-mono">{brl(impacto.previsto)}</span></Dado>
-                  <Dado rotulo="Já realizado"><span className="font-mono">{brl(impacto.realizado)}</span></Dado>
-                  <Dado rotulo="Outros pedidos aprovados"><span className="font-mono">{brl(impacto.comprometido)}</span></Dado>
-                  <Dado rotulo="Este pedido"><span className="font-mono">{brl(impacto.pedido)}</span></Dado>
+                  <Dado rotulo="Previsto no ano"><span className="num">{brl(impacto.previsto)}</span></Dado>
+                  <Dado rotulo="Já realizado"><span className="num">{brl(impacto.realizado)}</span></Dado>
+                  <Dado rotulo="Outros pedidos aprovados"><span className="num">{brl(impacto.comprometido)}</span></Dado>
+                  <Dado rotulo="Este pedido"><span className="num">{brl(impacto.pedido)}</span></Dado>
                   <Dado rotulo="Saldo depois">
                     <span className={`font-mono ${impacto.saldoDepois < 0 ? 'text-red-700' : ''}`}>
                       {brl(impacto.saldoDepois)} ({Math.round((impacto.pctDepois || 0) * 100)}% usado)
@@ -345,21 +344,26 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
           {(p.status === 'comprado' || p.status === 'recebido') && !p.semValores && (
             <section className="cartao space-y-2 p-4">
               <h3 className="secao-titulo">Compra</h3>
-              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Dado rotulo="Fornecedor">{p.lojaCompra ? `${p.lojaCompra} (fora do cadastro)` : fornecedor(p.fornecedorId)}</Dado>
-                <Dado rotulo="Nota fiscal">{p.numeroNf || '—'}</Dado>
-                <Dado rotulo="Data da compra">{p.dataCompra ? formatDate(p.dataCompra) : '—'}</Dado>
-                <Dado rotulo="Pagamento">{p.formaPagamento ? ROTULO_FORMA_PAGAMENTO[p.formaPagamento] : '—'}</Dado>
-                <Dado rotulo="Chave da NF-e">{p.nfChave ? <span className="font-mono break-all">{p.nfChave}</span> : '—'}</Dado>
-                <Dado rotulo="Arquivo da NF">{p.nfArquivo ? <AbrirArquivo caminho={p.nfArquivo} rotulo="Abrir NF" /> : '—'}</Dado>
-                {p.fornecedorTrocaMotivo && (
-                  <Dado rotulo="Fornecedor diferente do sugerido pela T.I." className="col-span-2">
-                    {p.fornecedorTrocaMotivo}
-                  </Dado>
-                )}
-                <Dado rotulo="Fatura em Contas a pagar">
-                  {fatura ? `${brl(fatura.valor)} · vence ${formatDate(fatura.vencimento)} · ${fatura.status === 'paga' ? 'paga' : fatura.status === 'cancelada' ? 'cancelada' : 'a pagar'}` : '—'}
-                </Dado>
+              <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
+                <DadoLinha rotulo="Fornecedor">{p.lojaCompra ? `${p.lojaCompra} (fora do cadastro)` : fornecedor(p.fornecedorId)}</DadoLinha>
+                <DadoLinha rotulo="Nota fiscal">{p.numeroNf || null}</DadoLinha>
+                <DadoLinha rotulo="Data da compra">{p.dataCompra ? <span className="num">{formatDate(p.dataCompra)}</span> : null}</DadoLinha>
+                <DadoLinha rotulo="Pagamento">{p.formaPagamento ? ROTULO_FORMA_PAGAMENTO[p.formaPagamento] : null}</DadoLinha>
+                <DadoLinha rotulo="Arquivo da NF">{p.nfArquivo ? <AbrirArquivo caminho={p.nfArquivo} rotulo="Abrir NF" /> : null}</DadoLinha>
+                <DadoLinha rotulo="Fatura">
+                  {fatura ? (
+                    <>
+                      <span className="num">{brl(fatura.valor)}</span> · vence <span className="num">{formatDate(fatura.vencimento)}</span> ·{' '}
+                      {fatura.status === 'paga' ? 'paga' : fatura.status === 'cancelada' ? 'cancelada' : 'a pagar'}
+                    </>
+                  ) : null}
+                </DadoLinha>
+                <DadoLinha rotulo="Chave da NF-e" largo>
+                  {p.nfChave ? <span className="font-mono break-all">{p.nfChave}</span> : null}
+                </DadoLinha>
+                <DadoLinha rotulo="Troca de fornecedor" largo>
+                  {p.fornecedorTrocaMotivo || null}
+                </DadoLinha>
               </dl>
             </section>
           )}
@@ -380,7 +384,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-500">Sem equipamentos (entrada no estoque, assentos ou serviço).</p>
+                <p className="texto-aux">Sem equipamentos (entrada no estoque, assentos ou serviço).</p>
               )}
             </section>
           )}
@@ -390,12 +394,12 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
           <section className="cartao space-y-2 p-4">
             <h3 className="secao-titulo">Histórico</h3>
             {p.eventos.length === 0 ? (
-              <p className="text-xs text-slate-500">Sem registros.</p>
+              <p className="texto-aux">Sem registros.</p>
             ) : (
-              <ol className="space-y-1.5">
+              <ol className="space-y-2">
                 {p.eventos.map((e, n) => (
-                  <li key={n} className="text-xs text-slate-700">
-                    <span className="text-slate-500">{dataHora(e.em)}</span> · <span className="font-medium">{nome(e.por, e.porNome)}</span> ·{' '}
+                  <li key={n} className="text-slate-700">
+                    <span className="text-slate-500">{dataHora(e.em)}</span> · <span className="">{nome(e.por, e.porNome)}</span> ·{' '}
                     {e.campo || (e.de && e.de === e.para) ? '' : e.de ? `${ROTULO_STATUS_PEDIDO[e.de]} → ` : 'Criado como '}
                     <span className="font-semibold">
                       {e.campo === 'item' ? 'Item alterado' : e.de === 'aguardando' && e.para === 'aguardando' ? 'Aprovação do gestor' : ROTULO_STATUS_PEDIDO[e.para]}
@@ -583,14 +587,14 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
           <legend className="rotulo">Valor pago por unidade</legend>
           {p.itens.map((i) => (
             <div key={i.id} className="grid grid-cols-[minmax(0,1fr)_10rem] items-center gap-2">
-              <label htmlFor={`compra-val-${i.id}`} className="text-xs text-slate-700">
+              <label htmlFor={`compra-val-${i.id}`} className="text-slate-700">
                 {i.descricao} <span className="text-slate-500">× {i.quantidade}</span>
               </label>
               <CampoMoeda id={`compra-val-${i.id}`} className="campo campo-sm" valor={valores[i.id]} onMudar={(v) => setValores({ ...valores, [i.id]: v })} />
             </div>
           ))}
-          <p className="text-right text-xs text-slate-600">
-            Total da fatura: <span className="font-mono font-semibold text-slate-900">{brl(total)}</span>
+          <p className="text-right texto-aux">
+            Total da fatura: <span className="num font-semibold text-slate-900">{brl(total)}</span>
             {vencedora && Math.abs(vencedora.valor - total) > 0.009 && <span className="block text-amber-800">Diferente da cotação vencedora ({brl(vencedora.valor)}).</span>}
           </p>
         </fieldset>
@@ -683,21 +687,21 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
               <p className="ajuda">Patrimônio sugerido em sequência. O número de série pode ficar para depois (fica marcado "a preencher").</p>
               {linhas.map((l, n) => (
                 <div key={l.chave} className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_10rem] lg:items-end">
-                  <span className="text-xs text-slate-700">{l.descricao}</span>
+                  <span className="text-slate-700">{l.descricao}</span>
                   <div>
-                    <label htmlFor={`rec-tag-${n}`} className="text-xs text-slate-600">Patrimônio</label>
+                    <label htmlFor={`rec-tag-${n}`} className="texto-aux">Patrimônio</label>
                     <input id={`rec-tag-${n}`} value={l.tag} onChange={(e) => setLinhas(linhas.map((x) => (x.chave === l.chave ? { ...x, tag: e.target.value } : x)))} className="campo campo-sm font-mono" />
                   </div>
                   <div>
-                    <label htmlFor={`rec-marca-${n}`} className="text-xs text-slate-600">Marca</label>
+                    <label htmlFor={`rec-marca-${n}`} className="texto-aux">Marca</label>
                     <input id={`rec-marca-${n}`} value={l.marca} onChange={(e) => setLinhas(linhas.map((x) => (x.chave === l.chave ? { ...x, marca: e.target.value } : x)))} className="campo campo-sm" />
                   </div>
                   <div>
-                    <label htmlFor={`rec-modelo-${n}`} className="text-xs text-slate-600">Modelo</label>
+                    <label htmlFor={`rec-modelo-${n}`} className="texto-aux">Modelo</label>
                     <input id={`rec-modelo-${n}`} value={l.modelo} onChange={(e) => setLinhas(linhas.map((x) => (x.chave === l.chave ? { ...x, modelo: e.target.value } : x)))} className="campo campo-sm" />
                   </div>
                   <div>
-                    <label htmlFor={`rec-serie-${n}`} className="text-xs text-slate-600">Número de série (opcional)</label>
+                    <label htmlFor={`rec-serie-${n}`} className="texto-aux">Número de série (opcional)</label>
                     <input id={`rec-serie-${n}`} value={l.serial} onChange={(e) => setLinhas(linhas.map((x) => (x.chave === l.chave ? { ...x, serial: e.target.value } : x)))} className="campo campo-sm font-mono" />
                   </div>
                 </div>
@@ -711,14 +715,14 @@ const FormRecebimento: React.FC<{ pedido: PedidoCompra; onClose: () => void }> =
             {outros
               .filter((i) => i.tipo === 'acessorio' && !i.estoqueItemId)
               .map((i) => (
-                <label key={i.id} className="flex items-center gap-2 text-xs text-slate-700">
+                <label key={i.id} className="flex items-center gap-2 text-slate-700">
                   <input type="checkbox" checked={criarEstoque.includes(i.id)} onChange={(e) => setCriarEstoque(e.target.checked ? [...criarEstoque, i.id] : criarEstoque.filter((x) => x !== i.id))} />
                   Criar &quot;{i.descricao}&quot; no estoque ({[i.marca, i.modelo].filter(Boolean).join(' ') || 'sem marca'}, {i.quantidade} un.)
                 </label>
               ))}
           </fieldset>
         )}
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">
           <p className="font-semibold text-slate-900">O que acontece ao confirmar</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4">
             {efeitos.map((e) => (
@@ -799,7 +803,7 @@ const FormAprovacao: React.FC<{ pedido: PedidoCompra; impacto: ReturnType<typeof
           <input id="aprov-obs" value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: conversado na reunião de segunda" className="campo" />
         </div>
         {impacto && (
-          <p className={`text-xs ${impacto.saldoDepois < 0 ? 'text-red-700' : 'text-slate-600'}`}>
+          <p className={` ${impacto.saldoDepois < 0 ? 'text-red-700' : 'text-slate-600'}`}>
             {impacto.semOrcamento
               ? 'Não há orçamento para esta categoria e área no ano.'
               : `Orçamento depois deste pedido: sobram ${brl(impacto.saldoDepois)} (${Math.round((impacto.pctDepois || 0) * 100)}% usado).`}

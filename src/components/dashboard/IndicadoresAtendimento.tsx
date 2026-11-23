@@ -9,7 +9,8 @@ import { ROTULO_CAUSA } from '../../utils/atendimento.ts';
 export const IndicadoresAtendimento: React.FC = () => {
   const { tickets, assets, eventosSla, prazosSla, setSelectedAssetIdFor360 } = useApp();
   const i = indicadoresAtendimento(tickets, eventosSla, prazosSla);
-  const traco = '—';
+  // Seção 19: sem chamados encerrados no período não há média para mostrar
+  const traco = 'Sem dados';
 
   const cartoes: { rotulo: string; valor: string; destaque?: string }[] = [
     { rotulo: 'Em atendimento', valor: String(i.abertos) },
@@ -26,27 +27,27 @@ export const IndicadoresAtendimento: React.FC = () => {
   ];
 
   return (
-    <section aria-labelledby="indicadores-atendimento" className="cartao p-5 space-y-4">
+    <section aria-labelledby="indicadores-atendimento" className="cartao p-4 space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="indicadores-atendimento" className="secao-titulo flex items-center gap-1.5">
-          <Clock className="w-4 h-4" aria-hidden="true" />
+        <h3 id="indicadores-atendimento" className="secao-titulo flex items-center gap-2">
+          <Clock className="ico" aria-hidden="true" />
           Atendimento
         </h3>
-        <span className="text-xs text-slate-500">Chamados de suporte · médias e rankings dos últimos {JANELA_DIAS} dias · horas úteis</span>
+        <span className="texto-aux">Chamados de suporte · médias e rankings dos últimos {JANELA_DIAS} dias · horas úteis</span>
       </div>
 
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {cartoes.map((c) => (
           <div key={c.rotulo} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-            <dt className="text-xs text-slate-500">{c.rotulo}</dt>
+            <dt className="texto-aux">{c.rotulo}</dt>
             <dd className={`mt-0.5 text-lg font-semibold ${c.destaque || 'text-slate-900'}`}>{c.valor}</dd>
           </div>
         ))}
       </dl>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <h4 className="font-semibold text-slate-700 mb-1.5">Causas mais comuns</h4>
+          <h4 className="font-semibold text-slate-700 mb-2">Causas mais comuns</h4>
           {i.topCausas.length === 0 ? (
             <p className="text-slate-500">Sem chamados encerrados no período.</p>
           ) : (
@@ -61,7 +62,7 @@ export const IndicadoresAtendimento: React.FC = () => {
           )}
         </div>
         <div>
-          <h4 className="font-semibold text-slate-700 mb-1.5">Equipamentos com mais chamados</h4>
+          <h4 className="font-semibold text-slate-700 mb-2">Equipamentos com mais chamados</h4>
           {i.topEquipamentos.length === 0 ? (
             <p className="text-slate-500">Nenhum chamado ligado a equipamento no período.</p>
           ) : (

@@ -160,14 +160,14 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="secao-titulo inline-flex items-center gap-1.5">
-          <Receipt className="h-3.5 w-3.5" aria-hidden="true" />
+        <h3 className="secao-titulo inline-flex items-center gap-2">
+          <Receipt className="ico-sm" aria-hidden="true" />
           Faturas ({lista.length})
         </h3>
         <div className="flex flex-wrap items-center gap-3">
           {alvo && (
-            <span className="text-xs text-slate-600">
-              Pago em {ano}: <span className="font-mono font-semibold text-slate-900">{formatCurrency(totalPagoNoAno(lista, ano))}</span>
+            <span className="texto-aux">
+              Pago em {ano}: <span className="num font-semibold text-slate-900">{formatCurrency(totalPagoNoAno(lista, ano))}</span>
             </span>
           )}
           {!bloqueioLancamento && isTI && (
@@ -185,23 +185,23 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
         </div>
       </div>
 
-      {bloqueioLancamento && <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">{bloqueioLancamento}</p>}
+      {bloqueioLancamento && <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 texto-aux">{bloqueioLancamento}</p>}
 
       {lista.length === 0 ? (
         <Vazio>Nenhuma fatura lançada.</Vazio>
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
                 {!alvo && <th>Origem</th>}
                 <th>Competência</th>
-                <th className="text-right">Valor</th>
+                <th className="num">Valor</th>
                 <th>Vencimento</th>
                 <th>Situação</th>
                 <th className="hidden xl:table-cell">Nº do documento</th>
                 <th>Arquivo</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -210,14 +210,14 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                 return (
                   <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
                     {!alvo && (
-                      <td data-label="Origem" className="font-medium text-slate-900">
-                        {origem(f)}
+                      <td data-label="Origem" className="min-w-64 font-semibold text-slate-900">
+                        {origem(f) || 'Conta avulsa'}
                       </td>
                     )}
                     <td data-label="Competência" className="font-semibold text-slate-900">
                       {rotuloCompetencia(f.competencia)}
                     </td>
-                    <td data-label="Valor" className="text-right font-mono text-slate-800">
+                    <td data-label="Valor" className="num text-slate-800">
                       {valorDaFatura(f)}
                       {f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null && (
                         <span className="block text-slate-500">
@@ -242,7 +242,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                       {f.arquivoCaminho ? (
                         <AbrirArquivo caminho={f.arquivoCaminho} />
                       ) : anexando?.id === f.id ? (
-                        <span className="flex min-w-0 flex-col gap-1.5">
+                        <span className="flex min-w-0 flex-col gap-2">
                           <label htmlFor={`fatura-arq-${f.id}`} className="sr-only">
                             Arquivo da fatura de {rotuloCompetencia(f.competencia)}
                           </label>
@@ -253,7 +253,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                             onChange={(e) => escolherArquivo(e.target.files?.[0])}
                             className={CLASSE_ARQUIVO}
                           />
-                          <span className="inline-flex flex-wrap gap-1.5">
+                          <span className="inline-flex flex-wrap gap-2">
                             <button
                               type="button"
                               onClick={enviarArquivo}
@@ -284,13 +284,13 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                             setErro('');
                           }}
                           aria-label={`Anexar arquivo à fatura de ${rotuloCompetencia(f.competencia)}`}
-                          className="link inline-flex items-center gap-1 text-xs"
+                          className="link inline-flex items-center gap-1"
                         >
-                          <Paperclip className="h-3.5 w-3.5" aria-hidden="true" /> Anexar
+                          <Paperclip className="ico-sm" aria-hidden="true" /> Anexar
                         </button>
                       )}
                     </td>
-                    <td data-label="Ações" className="text-right">
+                    <td data-label="Ações" className="col-acoes">
                       {(
                         <span className="acoes-linha">
                           {f.status === 'a_pagar' && podePagar && (
@@ -478,7 +478,7 @@ const JanelaPagamento: React.FC<{
       tamanho="p"
       titulo="Registrar pagamento"
       subtitulo={`${origem} · ${rotuloCompetencia(fatura.competencia)} · vence ${formatDate(fatura.vencimento)}`}
-      icone={<CheckCircle2 className="h-4 w-4" />}
+      icone={<CheckCircle2 className="ico" />}
       onFechar={onFechar}
       rodape={
         <>
@@ -783,7 +783,7 @@ export const FormFatura: React.FC<{
       tamanho="p"
       titulo={editando ? `Editar fatura de ${rotuloCompetencia(editando.competencia)}` : 'Lançar fatura'}
       subtitulo={nomeAlvo}
-      icone={<Receipt className="h-4 w-4" />}
+      icone={<Receipt className="ico" />}
       idTitulo="janela-fatura-titulo"
       onFechar={cancelarDigitacao}
       rodape={

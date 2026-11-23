@@ -19,16 +19,23 @@ export const UnidadesLista: React.FC = () => {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-slate-600">Endereços usados nos contratos de internet e telefonia fixa. Uma unidade inativa sai das listas de escolha.</p>
+        <p className="texto-aux">Endereços usados nos contratos de internet e telefonia fixa. Uma unidade inativa sai das listas de escolha.</p>
         <button type="button" onClick={() => setEditando('nova')} className="btn btn-primario">
           <Plus aria-hidden="true" /> Nova unidade
         </button>
       </div>
 
       {unidades.length === 0 ? (
-        <Vazio>Nenhuma unidade cadastrada.</Vazio>
+        <Vazio
+          titulo="Nenhuma unidade cadastrada"
+          acao={
+            <button type="button" onClick={() => setEditando('nova')} className="btn btn-sm btn-primario">
+              Nova unidade
+            </button>
+          }
+        />
       ) : (
-        <div className="cartao overflow-hidden">
+        <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
@@ -36,7 +43,7 @@ export const UnidadesLista: React.FC = () => {
                 <th>Endereço</th>
                 <th>Cidade / UF</th>
                 <th>Situação</th>
-                <th className="text-right">Ações</th>
+                <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -53,7 +60,7 @@ export const UnidadesLista: React.FC = () => {
                   <td data-label="Situação">
                     <span className={`selo ${u.ativo ? 'selo-ok' : 'selo-neutro'}`}>{u.ativo ? 'Ativa' : 'Inativa'}</span>
                   </td>
-                  <td data-label="Ações" className="text-right">
+                  <td data-label="Ações" className="col-acoes">
                     <span className="acoes-linha">
                       <button type="button" onClick={() => setEditando(u)} title="Editar" aria-label={`Editar a unidade ${u.nome}`} className="btn-icone">
                         <Pencil aria-hidden="true" />
@@ -153,7 +160,7 @@ const FormUnidade: React.FC<{
     <Janela
       tamanho="p"
       titulo={unidade ? `Editar unidade ${unidade.nome}` : 'Nova unidade'}
-      icone={<MapPin className="h-4 w-4" />}
+      icone={<MapPin className="ico" />}
       idTitulo="janela-unidade-titulo"
       onFechar={fechar}
       rodape={
@@ -185,7 +192,7 @@ const FormUnidade: React.FC<{
           {campo('observacoes', 'Observações', {}, 'sm:col-span-2')}
           {unidade && (
             <div className="sm:col-span-2">
-              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <label className="inline-flex items-center gap-2 font-semibold text-slate-700">
                 <input type="checkbox" checked={d.ativo} onChange={(e) => setD({ ...d, ativo: e.target.checked })} className="h-4 w-4 rounded border-slate-300" /> Unidade ativa
               </label>
               <p className="ajuda">Inativa sai das listas de escolha; os contratos que apontam para ela continuam.</p>

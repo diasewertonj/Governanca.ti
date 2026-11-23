@@ -51,7 +51,7 @@ export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: 
   if (lista.length === 0) return <Vazio>Nenhum processo com estes filtros.</Vazio>;
 
   return (
-    <div className="cartao overflow-hidden">
+    <div className="cartao-tabela">
       <table className="tabela tabela-cartoes">
         <thead>
           <tr>
@@ -61,7 +61,7 @@ export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: 
             <th>Situação</th>
             <th>Checklist</th>
             <th className="hidden xl:table-cell">Aberto em</th>
-            <th className="text-right">Ações</th>
+            <th className="col-acoes">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -72,11 +72,11 @@ export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: 
             return (
               <tr key={t.id} onClick={() => setSelectedTicketIdForDetail(t.id)} className="cursor-pointer hover:bg-slate-50">
                 <td data-label="Processo">
-                  <span className="inline-flex items-center gap-1.5 font-medium text-slate-900">
+                  <span className="inline-flex items-center gap-2 font-semibold text-slate-900">
                     {t.tipo === 'onboarding' ? (
-                      <UserPlus className="w-3.5 h-3.5 text-blue-600" aria-hidden="true" />
+                      <UserPlus className="ico-sm text-blue-600" aria-hidden="true" />
                     ) : (
-                      <UserMinus className="w-3.5 h-3.5 text-red-700" aria-hidden="true" />
+                      <UserMinus className="ico-sm text-red-700" aria-hidden="true" />
                     )}
                     {t.tipo === 'onboarding' ? 'Admissão' : 'Desligamento'}
                   </span>
@@ -87,7 +87,7 @@ export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: 
                   {/* Seção 9.2: anotações fixas do processo, visíveis também depois de concluir */}
                   {t.anotacoesProcesso && (
                     <span className="block max-w-xs truncate font-normal text-slate-500" title={t.anotacoesProcesso}>
-                      <StickyNote className="mr-1 inline h-3 w-3" aria-label="Anotações" />
+                      <StickyNote className="ico-sm mr-1 inline" aria-label="Anotações" />
                       {t.anotacoesProcesso}
                     </span>
                   )}
@@ -114,7 +114,7 @@ export const HistoricoProcessos: React.FC<{ tipo: FiltroTipoProcesso; situacao: 
                 <td data-label="Aberto em" className="hidden xl:table-cell">
                   {formatDate(t.dataCriacao.slice(0, 10))}
                 </td>
-                <td data-label="Ações" className="text-right">
+                <td data-label="Ações" className="col-acoes">
                   <span className="acoes-linha">
                     <button
                       type="button"
