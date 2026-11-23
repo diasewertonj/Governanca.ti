@@ -239,9 +239,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
         ))}
       </nav>
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         {/* Precisa de atenção: a linha inteira leva à tela; cada item citado abre a ficha dele */}
-        <section className="cartao" aria-labelledby="inicio-atencao">
+        <section className="cartao min-w-0" aria-labelledby="inicio-atencao">
           <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
             <h2 id="inicio-atencao" className="secao-titulo">
               Precisa de atenção
@@ -261,7 +261,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
           ) : (
             <ul className="divide-y divide-slate-100">
               {atencao.map((a) => (
-                <li key={a.id} className="group relative flex items-start gap-3 px-4 py-3 transition-colors hover:bg-slate-50">
+                <li key={a.id} className="group relative flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors hover:bg-slate-50">
                   <span className={`semaforo semaforo-${a.tom} mt-2`} role="img" aria-label={ROTULO_TOM[a.tom]} />
                   <div className="min-w-0 flex-1">
                     {/* Botão que cobre a linha toda (os links dos itens ficam por cima) */}
@@ -292,7 +292,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
         </section>
 
         {/* Chamados recentes */}
-        <section className="cartao" aria-labelledby="inicio-recentes">
+        <section className="cartao min-w-0" aria-labelledby="inicio-recentes">
           <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
             <h2 id="inicio-recentes" className="secao-titulo">
               Chamados recentes
