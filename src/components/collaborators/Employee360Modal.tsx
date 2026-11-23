@@ -325,8 +325,8 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         avatar={employee.nome}
         rotuloCaminho={employee.nome}
         titulo={
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate">{employee.nome}</span>
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="min-w-0 break-words">{employee.nome}</span>
             <span className={`selo ${situacao.selo} shrink-0`}>{situacao.rotulo}</span>
           </span>
         }
