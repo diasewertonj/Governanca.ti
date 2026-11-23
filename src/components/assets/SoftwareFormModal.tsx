@@ -308,7 +308,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           <div className={painel('ident')}>
             <div className="cartao space-y-2 p-4">
               <h3 className={TITULO}>Identificação</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="md:col-span-2 xl:col-span-2">
                   <label htmlFor="licenca-nome" className={ROTULO}>Nome do software *</label>
                   <input id="licenca-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Microsoft 365 Business Standard, Figma, ChatGPT Team" className={CAMPO} />
@@ -426,7 +426,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               )}
 
               {(propria || escolha === 'novo_contrato') && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div>
                     <label htmlFor="licenca-valor" className={ROTULO}>Valor (R$) *</label>
                     <CampoMoeda id="licenca-valor" required valor={valorMensal} onMudar={setValorMensal} className={CAMPO} />
@@ -446,7 +446,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               )}
 
               {propria && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div>
                     <label htmlFor="licenca-moeda" className={ROTULO}>Moeda da cobrança</label>
                     <select id="licenca-moeda" value={moeda} onChange={(e) => setMoeda(e.target.value as Moeda)} className={CAMPO}>
@@ -499,7 +499,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           <div className={painel('assentos')}>
             <div className="cartao space-y-3 p-4">
               <h3 className={TITULO}>Assentos e responsável</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <label htmlFor="licenca-assentos" className={ROTULO}>Total de assentos *</label>
                   <input id="licenca-assentos" type="number" min={Math.max(1, emUso)} required value={assentosTotais} onChange={(e) => setAssentosTotais(Number(e.target.value))} className={`${CAMPO} font-mono font-semibold`} />

@@ -94,11 +94,11 @@ export const Janela: React.FC<{
  * Seção 19: resumo compacto — rótulo e valor na mesma linha, em colunas; o que
  * está vazio não aparece (nada de "—" ocupando espaço). Use dentro de `<dl className="resumo">`.
  */
-export const DadoLinha: React.FC<{ rotulo: string; children?: React.ReactNode; largo?: boolean }> = ({ rotulo, children, largo }) => {
-  if (children === null || children === undefined || children === '' || children === '—' || children === false) return null;
+export const DadoLinha: React.FC<{ rotulo: string; children?: React.ReactNode; largo?: boolean; naoMostrar?: boolean }> = ({ rotulo, children, largo, naoMostrar }) => {
+  if (naoMostrar || children === null || children === undefined || children === '' || children === '—' || children === false) return null;
   return (
     <div className={`flex min-w-0 items-baseline gap-2 ${largo ? 'sm:col-span-full' : ''}`}>
-      <dt className="texto-aux w-28 shrink-0">{rotulo}</dt>
+      <dt className="texto-aux w-32 shrink-0">{rotulo}</dt>
       <dd className="min-w-0 break-words text-slate-900">{children}</dd>
     </div>
   );

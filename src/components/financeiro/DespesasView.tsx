@@ -329,7 +329,10 @@ export const DespesasView: React.FC<{
         <div className="cartao p-3">
           <p className="texto-aux">Assentos sem uso (por mês)</p>
           <p className="text-lg font-semibold num text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}</p>
-          <p className="texto-aux">{ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || 'nenhum'}</p>
+          {/* Seção 19: lista em até 2 linhas (o resto no texto de ajuda) para o cartão não esticar a linha dos indicadores */}
+          <p className="texto-aux line-clamp-2" title={ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ')}>
+            {ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || 'nenhum'}
+          </p>
         </div>
       </div>
 

@@ -559,6 +559,10 @@
     background-color: var(--cor-superficie);
     color: var(--cor-texto-aux);
   }
+  /* Bloco de resumo sem nenhum dado preenchido não aparece */
+  .resumo-bloco:not(:has(dd)) {
+    display: none;
+  }
   /* Vazio dentro de ficha (janela): uma linha só, baixa — sem faixa alta para uma frase */
   .janela .vazio {
     @apply flex-row flex-wrap justify-center gap-x-2 gap-y-1 px-4 py-3;

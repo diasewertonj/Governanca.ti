@@ -147,8 +147,8 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
       <form id="form-colaborador" onSubmit={handleSubmit} className="space-y-4">
         <div className="cartao space-y-2 p-4">
           <h3 className="secao-titulo">Identificação e contato</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            <div className="md:col-span-2 xl:col-span-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="md:col-span-2">
               <label htmlFor="colab-nome" className="rotulo">Nome completo *</label>
               <input id="colab-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Amanda Silva Castro" className="campo" />
             </div>
@@ -156,7 +156,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
               <label htmlFor="colab-matricula" className="rotulo">Matrícula funcional *</label>
               <input id="colab-matricula" type="text" required value={matricula} disabled={editando} onChange={(e) => setMatricula(e.target.value)} className="campo font-mono" />
             </div>
-            <div className="md:col-span-2 xl:col-span-2">
+            <div className="md:col-span-2">
               <label htmlFor="colab-email" className="rotulo">E-mail corporativo *</label>
               <input id="colab-email" type="email" required value={email} disabled={!podeMudarEmail} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com.br" className="campo" />
               {editando && temLogin && (
@@ -177,8 +177,8 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
         {/* Entradas dinâmicas estritas (setor e gestor) */}
         <div className="cartao space-y-2 p-4">
           <h3 className="secao-titulo">Vínculo e situação</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            <div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="md:col-span-2">
               <label htmlFor="colab-cargo" className="rotulo">Cargo / função *</label>
               <input id="colab-cargo" type="text" required value={cargo} onChange={(e) => setCargo(e.target.value)} placeholder="Ex: Engenheiro(a) de Software" className="campo" />
             </div>

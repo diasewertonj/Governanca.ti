@@ -389,10 +389,12 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         {/* ---------------- Resumo ---------------- */}
         <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
           {avisoTermo}
+          {/* Seção 19: blocos curtos lado a lado (dados da pessoa e acesso / o que ainda está com ela) */}
+          <div className="grid items-start gap-4 lg:grid-cols-2">
           {/* Seção 19: cargo, setor, matrícula e situação já estão no cabeçalho; aqui só o resto, compacto */}
           <section className="cartao space-y-3 p-4">
             <h3 className="secao-titulo">Dados da pessoa</h3>
-            <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+            <dl className="grid gap-y-1">
               <DadoLinha rotulo="E-mail">
                 <span className="break-all">{employee.email}</span>
               </DadoLinha>
@@ -505,6 +507,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               )}
             </section>
           )}
+          </div>
         </div>
 
         {/* ---------------- Equipamentos e acessórios ---------------- */}
