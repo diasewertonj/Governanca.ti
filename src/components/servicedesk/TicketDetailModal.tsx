@@ -421,21 +421,26 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
                   )}
                 </>
               )}
-              <label className="flex items-center gap-2">
-                <span className="text-slate-600">Técnico</span>
-                <select
-                  value={tecnicoExibido}
-                  onChange={(e) => handleTechnicianChange(e.target.value)}
-                  className="campo campo-sm w-auto max-w-56"
-                >
-                  <option value="">Não atribuído...</option>
-                  {tecnicosTI.map((tech) => (
-                    <option key={tech.id} value={tech.id}>
-                      {tech.nome}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Encerrado: técnico só para leitura (mudar algo exige reabrir) */}
+              {encerrado ? (
+                <span className="text-slate-600">· Técnico: {ticket.tecnicoResponsavelNome || 'não atribuído'}</span>
+              ) : (
+                <label className="flex items-center gap-2">
+                  <span className="text-slate-600">Técnico</span>
+                  <select
+                    value={tecnicoExibido}
+                    onChange={(e) => handleTechnicianChange(e.target.value)}
+                    className="campo campo-sm w-auto max-w-56"
+                  >
+                    <option value="">Não atribuído...</option>
+                    {tecnicosTI.map((tech) => (
+                      <option key={tech.id} value={tech.id}>
+                        {tech.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {!encerrado && (
                 <span className="flex flex-wrap gap-2 sm:ml-auto">
                   {/* Padrão dos rodapés: destrutiva à esquerda, principal (azul) por último */}

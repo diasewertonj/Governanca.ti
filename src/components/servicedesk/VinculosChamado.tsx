@@ -48,6 +48,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
     .filter((l) => l.status !== 'cancelada' || l.id === linhaId)
     .sort((a, b) => Number(b.colaboradorId === (rascunho.colaboradorId ?? ticket.colaboradorId ?? ticket.solicitanteId)) - Number(a.colaboradorId === (rascunho.colaboradorId ?? ticket.colaboradorId ?? ticket.solicitanteId)));
   const processo = ticket.tipo !== 'suporte';
+  const encerrado = ticket.status === 'resolvido' || ticket.status === 'cancelado';
 
   const ativo = assets.find((a) => a.id === ativoId);
   const licenca = licenses.find((l) => l.id === softwareId);
@@ -80,7 +81,7 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
     ? assets.flatMap((a) => (a.historicoManutencao || []).filter((m) => m.chamadoId === ticket.id).map((m) => ({ m, a })))
     : [];
   const podeMandarParaManutencao =
-    isTI && !!ativo && ativo.id === ticket.ativoId && rascunho.ativoId === null && podeEnviarParaManutencao(ativo);
+    isTI && !encerrado && !!ativo && ativo.id === ticket.ativoId && rascunho.ativoId === null && podeEnviarParaManutencao(ativo);
 
   // Admissão/desligamento: equipamento e licenças vêm do checklist (só leitura aqui)
   const entregues = processo ? processoItens.filter((i) => i.chamadoId === ticket.id && i.status === 'feito') : [];
@@ -90,7 +91,8 @@ export const VinculosChamado: React.FC<VinculosChamadoProps & { embutido?: boole
   const licencasEntregues = [...new Set(entregues.flatMap((i) => (i.licencaId ? [i.licencaId] : [])))]
     .map((id) => licenses.find((l) => l.id === id))
     .filter((l): l is NonNullable<typeof l> => !!l);
-  const podeAlterar = isTI && !processo;
+  // Encerrado ou cancelado: vínculos só para leitura (para mudar, reabra o chamado)
+  const podeAlterar = isTI && !processo && !encerrado;
   const nomeCurto = (id?: string) => employees.find((e) => e.id === id)?.nome.split(' ')[0];
   const rotuloOpcaoAtivo = (a: (typeof assets)[number]) =>
     `${a.tag} · ${a.nome}${a.custodianteId && a.custodianteId !== pessoaRef ? ` (com ${nomeCurto(a.custodianteId) || 'outra pessoa'})` : ''}`;
