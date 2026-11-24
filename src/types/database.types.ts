@@ -1995,6 +1995,10 @@ export type Database = {
         Returns: string
       }
       baixar_ativo: { Args: { p_ativo: string; p_dados: Json }; Returns: string }
+      transferir_custodia: {
+        Args: { p_ativo: string; p_data?: string; p_motivo?: string; p_observacao?: string; p_para?: string }
+        Returns: undefined
+      }
       encerrar_manutencao: {
         Args: { p_dados?: Json; p_manutencao: string; p_status: string }
         Returns: undefined

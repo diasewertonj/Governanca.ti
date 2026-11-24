@@ -96,13 +96,14 @@ export async function listarRateios(): Promise<Rateio[] | null> {
 /** Troca o rateio inteiro de uma origem (apaga as áreas que saíram) */
 export async function salvarRateioDe(origemTipo: Rateio['origemTipo'], origemId: string, partes: { departamentoId: string; percentual: number }[]): Promise<void> {
   if (!supabase) return;
-  await checar(bd().from('rateios').delete().eq('origem_tipo', origemTipo).eq('origem_id', origemId));
-  if (partes.length)
-    await checar(
-      bd()
-        .from('rateios')
-        .insert(partes.map((p) => ({ origem_tipo: origemTipo, origem_id: origemId, departamento_id: p.departamentoId, percentual: p.percentual })))
-    );
+  // Uma função do banco troca tudo numa transação: se algo falhar, o rateio antigo continua
+  await checar(
+    bd().rpc('salvar_rateio', {
+      p_origem_tipo: origemTipo,
+      p_origem_id: origemId,
+      p_linhas: partes.map((p) => ({ departamento_id: p.departamentoId, percentual: p.percentual })),
+    })
+  );
 }
 
 // Imobilizado ------------------------------------------------------------------
@@ -158,6 +159,46 @@ export async function contratosResumo(): Promise<ContratoResumo[] | null> {
         inicio: txt(r.inicio),
         fim: txt(r.fim),
         status: txt(r.status),
+      }))
+    : null;
+}
+
+/** Custo recorrente de hoje (sem dados de pagamento), para Compras: a RLS esconde contratos e licenças dela */
+export interface RecorrenteResumo {
+  origem: 'licenca' | 'contrato' | 'linha';
+  id: string;
+  nome: string;
+  fornecedorId?: string;
+  tipo?: string;
+  categoriaDespesa?: string;
+  centroCusto?: string;
+  departamentoId?: string;
+  mensal: number;
+  fim?: string;
+  renova: boolean;
+  reajusteMes?: number;
+  /** Entra no custo mensal de hoje (vigente / cobrança própria); os demais servem só para classificar faturas */
+  recorrente: boolean;
+}
+
+export async function recorrenteResumo(): Promise<RecorrenteResumo[] | null> {
+  if (!supabase) return null;
+  const d = await ler(bd().rpc('recorrente_resumo'));
+  return d
+    ? (d as Linha[]).map((r) => ({
+        origem: r.origem as RecorrenteResumo['origem'],
+        id: String(r.id),
+        nome: String(r.nome || ''),
+        fornecedorId: txt(r.fornecedor_id),
+        tipo: txt(r.tipo),
+        categoriaDespesa: txt(r.categoria_despesa),
+        centroCusto: txt(r.centro_custo),
+        departamentoId: txt(r.departamento_id),
+        mensal: Number(r.mensal) || 0,
+        fim: txt(r.fim),
+        renova: r.renova !== false,
+        reajusteMes: num(r.reajuste_mes),
+        recorrente: r.recorrente !== false,
       }))
     : null;
 }

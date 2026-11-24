@@ -5,7 +5,7 @@ import { formatDate, formatDateTime } from '../../utils/formatters.ts';
 import { Printer, CheckCircle2, Upload, FileText, PenLine, Ban, MessageSquareWarning } from 'lucide-react';
 import { enviarTermoAssinadoDb, linkTemporarioDb, mensagemDeErro, TIPOS_ARQUIVO_ACEITOS } from '../../services/supabaseDb.ts';
 import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO, SEM_TOMBO } from '../../utils/processos.ts';
-import { erroCancelarTermo, situacaoTermo, termoCancelado } from '../../utils/termos.ts';
+import { erroCancelarTermo, situacaoTermo, termoCancelado, termoContestadoAberto } from '../../utils/termos.ts';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { Janela } from '../ui/Janela.tsx';
 
@@ -167,10 +167,12 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
     );
   };
 
-  const podeAceitarColab = !encerrado && souColaborador && !t.aceiteColaboradorEm && Boolean(t.formaAssinatura);
+  const contestacaoAberta = termoContestadoAberto(t);
+  const colaboradorPodeAgir = !encerrado && souColaborador && !t.aceiteColaboradorEm;
+  // Contestação aberta bloqueia as duas assinaturas até a T.I. responder (o banco também recusa)
+  const podeAceitarColab = colaboradorPodeAgir && !contestacaoAberta;
   // Entrega A: em vez de aceitar, o colaborador pode contestar (com motivo); a T.I. responde
-  const podeContestar = podeAceitarColab && (!t.contestacaoEm || !!t.contestacaoRespondidaEm);
-  const contestacaoAberta = !!t.contestacaoEm && !t.contestacaoRespondidaEm;
+  const podeContestar = colaboradorPodeAgir && !contestacaoAberta;
 
   const contestar = async () => {
     const motivo = await pedirTexto('Contestar o termo?\n\nExplique o que está errado (item que não recebeu, número de série diferente, dado pessoal incorreto...). A T.I. recebe o aviso e responde; você assina depois de corrigido.');
@@ -191,7 +193,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
     if (falha) return setErro(falha);
     setAviso('Resposta registrada.');
   };
-  const podeAceitarTI = !encerrado && isTI && !souColaborador && !t.aceiteTiEm && Boolean(t.formaAssinatura);
+  const podeAceitarTI = !encerrado && isTI && !souColaborador && !t.aceiteTiEm && !contestacaoAberta;
 
   const celula = 'border border-slate-400 px-2 py-1';
 
@@ -284,7 +286,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
                 <span className="font-semibold">Resposta da T.I.</span> em {formatDateTime(t.contestacaoRespondidaEm)}: {t.contestacaoResposta}
               </p>
             ) : (
-              <p className="mt-1 text-amber-800">Aguardando resposta da T.I.</p>
+              <p className="mt-1 text-amber-800">Aguardando resposta da T.I. à contestação. As assinaturas ficam bloqueadas até lá.</p>
             )}
           </div>
         )}

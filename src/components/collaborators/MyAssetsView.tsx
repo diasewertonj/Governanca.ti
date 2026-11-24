@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatDate } from '../../utils/formatters.ts';
-import { situacaoTermo, termoAberto } from '../../utils/termos.ts';
+import { situacaoTermo, termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
 import { Laptop, Key, FileText, LifeBuoy, QrCode } from 'lucide-react';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
@@ -20,7 +20,7 @@ export const MyAssetsView: React.FC<MyAssetsViewProps> = ({ onOpenNewTicketForAs
   const myLicenses = licenses.filter((l) => l.colaboradoresIds.includes(currentUser.id));
   const myTerms = terms.filter((t) => t.colaboradorId === currentUser.id);
   // Fase 6: termos aguardando o "Li e concordo" do colaborador
-  const termosParaAssinar = myTerms.filter((t) => termoAberto(t) && !t.aceiteColaboradorEm);
+  const termosParaAssinar = myTerms.filter((t) => termoAberto(t) && !t.aceiteColaboradorEm && !termoContestadoAberto(t));
 
   return (
     <div className="space-y-4">

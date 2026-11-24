@@ -68,7 +68,10 @@ export function usePassoProcesso(ticket: Ticket) {
 
     if (op.licencaContaId) {
       const lic = licenses.find((l) => l.id === op.licencaContaId);
-      if (lic && !lic.colaboradoresIds.includes(colab) && assentosLivres(lic) > 0) allocateLicense(lic.id, colab);
+      if (lic && !lic.colaboradoresIds.includes(colab) && assentosLivres(lic) > 0) {
+        const erroAssento = await allocateLicense(lic.id, colab);
+        if (erroAssento) return `Passo registrado, mas o assento da licença não foi alocado: ${erroAssento}`;
+      }
     }
     if (item.tipo === 'entregar_linha' && op.linha?.linhaId) {
       const l = linhas.find((x) => x.id === op.linha?.linhaId);

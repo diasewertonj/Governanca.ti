@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ClipboardList, Copy, History, KeyRound, Plus, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
@@ -89,12 +89,19 @@ export const ChecklistProcesso: React.FC<{ ticket: Ticket }> = ({ ticket }) => {
         : montarOffboarding(ticket, { recursos, ativos: assets, licencas: licenses, linhas }, nomeDe)
     );
 
+  // Trava síncrona: dois cliques seguidos antes de o estado atualizar não salvam duas vezes
+  const salvandoRef = useRef(false);
   const salvarRascunho = async () => {
-    if (!rascunho) return;
+    if (!rascunho || salvandoRef.current) return;
+    salvandoRef.current = true;
     setSalvando(true);
-    const ok = await salvarChecklist(ticket.id, rascunho);
-    setSalvando(false);
-    if (ok) setRascunho(null);
+    try {
+      const ok = await salvarChecklist(ticket.id, rascunho);
+      if (ok) setRascunho(null);
+    } finally {
+      salvandoRef.current = false;
+      setSalvando(false);
+    }
   };
 
   const concluir = async () => {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { HistoricoProcessos, type FiltroSituacaoProcesso, type FiltroTipoProcesso } from './HistoricoProcessos.tsx';
 import { Busca, CabecalhoTela } from '../ui/Tela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
-import { formatDate } from '../../utils/formatters.ts';
+import { formatDate, isoLocal } from '../../utils/formatters.ts';
 import { descricaoAdmissao } from '../../utils/admissao.ts';
 import { chamadoEncerrado } from '../../utils/atendimento.ts';
 import type { CatalogoItem } from '../../types/index.ts';
@@ -48,7 +48,7 @@ export const RhProcessesView: React.FC = () => {
   // Estados do Offboarding
   const [selectedColabId, setSelectedColabId] = useState('');
   const [dataDesligamento, setDataDesligamento] = useState(() =>
-    new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    isoLocal(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000))
   );
   const [redirecionarEmail, setRedirecionarEmail] = useState(true);
   const [destinatarioEmailId, setDestinatarioEmailId] = useState('');
@@ -67,7 +67,7 @@ export const RhProcessesView: React.FC = () => {
   const [onbGestorId, setOnbGestorId] = useState('');
   const [onbPapelAcesso, setOnbPapelAcesso] = useState<'colaborador' | 'rh' | 'ti_suporte' | 'ti_admin'>('colaborador');
   const [onbDataInicio, setOnbDataInicio] = useState(() =>
-    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    isoLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
   );
   // Observação livre sobre o equipamento (o RH não escolhe modelo)
   const [onbTipoComputador, setOnbTipoComputador] = useState('');

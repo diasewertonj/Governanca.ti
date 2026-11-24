@@ -88,6 +88,8 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
   const usados = g.lancamentos.filter((l) => l.situacao !== 'comprometido');
   const doMes = usados.filter((l) => l.mes === mes).reduce((s, l) => s + l.valor, 0);
   const comprometido = g.lancamentos.filter((l) => l.situacao === 'comprometido').reduce((s, l) => s + l.valor, 0);
+  // Mesma definição da tela Orçamento: usado = pago + a pagar + comprometido
+  const pctUsado = orcadoAno > 0 ? (ind.totalAno + comprometido) / orcadoAno : undefined;
   const patrimonio = useMemo(() => valorPatrimonio(assets, estoque, settings.vidaUtil), [assets, estoque, settings.vidaUtil]);
   const ociosos = assentosOciosos(licenses, contratos);
   const porMes = MESES.map((_, m) => ({
@@ -119,9 +121,9 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         <Numero rotulo={`Custo em ${MESES[mes]}`} valor={brl(doMes)} />
         <Numero
           rotulo="Orçamento usado"
-          valor={pct(ind.pctOrcamento)}
-          detalhe={orcadoAno ? `de ${brl(orcadoAno)} · comprometido ${brl(comprometido)}` : 'sem orçamento no ano'}
-          tom={ind.pctOrcamento !== undefined && ind.pctOrcamento >= 1 ? 'problema' : ind.pctOrcamento !== undefined && ind.pctOrcamento >= 0.9 ? 'atencao' : undefined}
+          valor={pct(pctUsado)}
+          detalhe={orcadoAno ? `de ${brl(orcadoAno)} · inclui ${brl(comprometido)} comprometido` : 'sem orçamento no ano'}
+          tom={pctUsado !== undefined && pctUsado >= 1 ? 'problema' : pctUsado !== undefined && pctUsado >= 0.9 ? 'atencao' : undefined}
         />
         <Numero rotulo="OPEX por colaborador (ano)" valor={ind.custoPorColaborador !== undefined ? brl(ind.custoPorColaborador) : '—'} detalhe={`${g.colaboradoresAtivos} colaboradores ativos`} />
         <Numero rotulo="Projeção 12 meses" valor={brl(ind.projecao12m)} detalhe={<button type="button" className="link" onClick={() => onNavigate('projecao')}>ver projeção</button>} />
@@ -689,18 +691,24 @@ export const RelatoriosView: React.FC = () => {
   const { lista: recebimentos } = useRecebimentos();
   const { lista: fechamentos } = useFechamentos();
   const [rateios, setRateios] = useState<Rateio[]>([]);
+  const [rateiosErro, setRateiosErro] = useState(false);
+  const [tentativaRateios, setTentativaRateios] = useState(0);
   const [rateando, setRateando] = useState<{ tipo: 'contrato' | 'licenca'; id: string; nome: string } | null>(null);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   useEffect(() => {
     if (!isTI) return;
     let vivo = true;
     listarRateios().then((r) => {
-      if (vivo && r) setRateios(r);
+      if (!vivo) return;
+      if (r) {
+        setRateios(r);
+        setRateiosErro(false);
+      } else setRateiosErro(true);
     });
     return () => {
       vivo = false;
     };
-  }, [isTI]);
+  }, [isTI, tentativaRateios]);
   const nomeDep = (id?: string) => departments.find((d) => d.id === id)?.nome || 'Sem área';
   const fechado = fechamentos.find((f) => f.ano === ano && !f.reabertoEm);
   const contas = settings.premissasFinanceiras?.contaContabil || {};
@@ -709,7 +717,7 @@ export const RelatoriosView: React.FC = () => {
   const baixar = (nome: string, aba: string, cab: string[], ls: (string | number | undefined)[][], excel: boolean) =>
     excel ? baixarExcel(`${nome}.xls`, paraExcel(aba, cab, ls)) : baixarCsv(`${nome}.csv`, paraCsv(cab, ls));
 
-  const relatorios: { titulo: string; descricao: string; gerar: (excel: boolean) => void; so?: 'ti' }[] = [
+  const relatorios: { titulo: string; descricao: string; gerar: (excel: boolean) => void; so?: 'ti'; bloqueado?: boolean }[] = [
     {
       titulo: `Imobilizado de ${ano}${fechado ? ' (fechado)' : ''}`,
       descricao: 'Saldo inicial, aquisições, baixas com valor de venda e ganho/perda, depreciação do ano e saldo final por equipamento.',
@@ -752,8 +760,11 @@ export const RelatoriosView: React.FC = () => {
         ),
     },
     {
-      titulo: `Custo por área de ${ano} (com rateio)`,
-      descricao: 'Realizado de cada área; contratos e licenças rateados entram pela porcentagem de cada área.',
+      titulo: `Custo por área de ${ano} (${isTI ? 'com rateio' : 'sem rateio'})`,
+      descricao: isTI
+        ? 'Realizado de cada área; contratos e licenças rateados entram pela porcentagem de cada área.'
+        : 'Realizado de cada área, sem o rateio de contratos e licenças (o rateio é da T.I.).',
+      bloqueado: isTI && rateiosErro,
       gerar: (excel) => baixar(`custo-por-area-${ano}`, `Custo por área ${ano}`, ['Área', 'Realizado'], porArea.map((a) => [a.area, a.valor]), excel),
     },
   ];
@@ -775,10 +786,12 @@ export const RelatoriosView: React.FC = () => {
               <div className="min-w-0">
                 <p className="font-semibold text-slate-900">{r.titulo}</p>
                 <p className="texto-aux">{r.descricao}</p>
+                {r.bloqueado && <p className="erro" role="alert">Não deu para carregar os rateios; sem eles o relatório sairia errado.</p>}
               </div>
               <span className="flex gap-2">
-                <button type="button" onClick={() => r.gerar(false)} className="btn btn-sm btn-secundario"><Download /> CSV</button>
-                <button type="button" onClick={() => r.gerar(true)} className="btn btn-sm btn-secundario"><FileSpreadsheet /> Excel</button>
+                {r.bloqueado && <button type="button" onClick={() => setTentativaRateios((n) => n + 1)} className="btn btn-sm btn-secundario">Tentar de novo</button>}
+                <button type="button" disabled={r.bloqueado} onClick={() => r.gerar(false)} className="btn btn-sm btn-secundario"><Download /> CSV</button>
+                <button type="button" disabled={r.bloqueado} onClick={() => r.gerar(true)} className="btn btn-sm btn-secundario"><FileSpreadsheet /> Excel</button>
               </span>
             </div>
           ))}
@@ -905,37 +918,60 @@ const JanelaRateio: React.FC<{
 // -----------------------------------------------------------------------------
 export const CustosMinhaAreaView: React.FC = () => {
   const [ano, setAno] = useState(ANO_ATUAL);
-  const [linhas, setLinhas] = useState<{ area: string; categoria: string; previsto: number; realizado: number }[] | null>(null);
+  const [linhas, setLinhas] = useState<{ area: string; categoria: string; previsto: number; realizado: number; aPagar: number }[] | null>(null);
+  const [erro, setErro] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
   useEffect(() => {
     let vivo = true;
     (async () => {
       if (!supabase) return setLinhas([]);
-      const { data, error } = await supabase.rpc('custos_da_minha_area' as never, { p_ano: ano } as never);
+      const { data, error } = await supabase.rpc('custos_area_gestor' as never, { p_ano: ano } as never);
       if (!vivo) return;
-      setLinhas(error ? [] : ((data || []) as { area: string; categoria: string; previsto: number; realizado: number }[]).map((l) => ({ ...l, previsto: Number(l.previsto) || 0, realizado: Number(l.realizado) || 0 })));
+      if (error) {
+        setErro(true);
+        return setLinhas([]);
+      }
+      setErro(false);
+      setLinhas(
+        ((data || []) as { area: string; categoria: string; previsto: number; realizado: number; a_pagar?: number }[]).map((l) => ({
+          area: l.area,
+          categoria: l.categoria,
+          previsto: Number(l.previsto) || 0,
+          realizado: Number(l.realizado) || 0,
+          aPagar: Number(l.a_pagar) || 0,
+        }))
+      );
     })();
     return () => {
       vivo = false;
     };
-  }, [ano]);
+  }, [ano, tentativa]);
   const area = linhas?.[0]?.area;
   const previsto = (linhas || []).reduce((s, l) => s + l.previsto, 0);
   const realizado = (linhas || []).reduce((s, l) => s + l.realizado, 0);
+  const aPagar = (linhas || []).reduce((s, l) => s + l.aPagar, 0);
+  const usado = realizado + aPagar;
   return (
     <div className="space-y-3">
       <CabecalhoTela
         titulo="Custos da minha área"
         subtitulo={`${area ? `${area} · ` : ''}orçamento de T.I. previsto × pago em ${ano}, por categoria (só totais)`}
-        filtros={<SeletorAno ano={ano} onMudar={setAno} anos={[ANO_ATUAL, ANO_ATUAL - 1, ANO_ATUAL - 2]} />}
+        filtros={<SeletorAno ano={ano} onMudar={(a) => { setLinhas(null); setAno(a); }} anos={[ANO_ATUAL, ANO_ATUAL - 1, ANO_ATUAL - 2]} />}
       />
-      {linhas === null ? null : linhas.length === 0 ? (
+      {linhas === null ? null : erro ? (
+        <div className="cartao p-3 space-y-2" role="alert">
+          <p className="erro">Não foi possível carregar os custos da sua área agora.</p>
+          <button type="button" className="btn btn-sm btn-secundario" onClick={() => { setErro(false); setLinhas(null); setTentativa((n) => n + 1); }}>Tentar de novo</button>
+        </div>
+      ) : linhas.length === 0 ? (
         <Vazio>Sem orçamento nem gasto de T.I. registrado para a sua área em {ano}.</Vazio>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Numero rotulo="Previsto" valor={brl(previsto)} />
             <Numero rotulo="Pago" valor={brl(realizado)} />
-            <Numero rotulo="Disponível" valor={brl(previsto - realizado)} tom={previsto - realizado < 0 ? 'problema' : undefined} />
+            <Numero rotulo="A pagar" valor={brl(aPagar)} />
+            <Numero rotulo="Disponível" valor={brl(previsto - usado)} tom={previsto - usado < 0 ? 'problema' : undefined} />
           </div>
           <div className="cartao-tabela">
             <table className="tabela tabela-cartoes">
@@ -944,6 +980,7 @@ export const CustosMinhaAreaView: React.FC = () => {
                   <th>Categoria</th>
                   <th className="num">Previsto</th>
                   <th className="num">Pago</th>
+                  <th className="num">A pagar</th>
                   <th className="num">% usado</th>
                 </tr>
               </thead>
@@ -953,7 +990,8 @@ export const CustosMinhaAreaView: React.FC = () => {
                     <td data-label="Categoria">{ROTULO_CATEGORIA[l.categoria as CategoriaDespesa] || l.categoria}</td>
                     <td data-label="Previsto" className="num">{brl(l.previsto)}</td>
                     <td data-label="Pago" className="num">{brl(l.realizado)}</td>
-                    <td data-label="% usado" className="num">{l.previsto ? pct(l.realizado / l.previsto) : '—'}</td>
+                    <td data-label="A pagar" className="num">{brl(l.aPagar)}</td>
+                    <td data-label="% usado" className="num">{l.previsto ? pct((l.realizado + l.aPagar) / l.previsto) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

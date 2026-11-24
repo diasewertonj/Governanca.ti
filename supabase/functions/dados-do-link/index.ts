@@ -7,8 +7,8 @@
 //
 // Segurança:
 // - exige login (JWT) de um colaborador ativo do Nexus;
-// - só links https; recusa endereços internos (localhost, rede privada, IPs de nuvem),
-//   inclusive depois de resolver o nome e em cada redirecionamento (proteção SSRF);
+// - só links https na porta 443; recusa endereços internos (localhost, rede privada, IPs de nuvem),
+//   inclusive depois de resolver o nome e em cada redirecionamento, e confere de novo o DNS depois da resposta (rebinding);
 // - tempo máximo de 6 s, no máximo 3 redirecionamentos e 2 MB lidos;
 // - não guarda nada e não usa chave secreta (só a pública do projeto).
 //
@@ -33,33 +33,43 @@ function cabecalhos(origem: string | null) {
   };
 }
 
-async function hostSeguro(host: string): Promise<boolean> {
-  if (enderecoBloqueado(host)) return false;
-  // Nome que resolve para endereço interno também é recusado
+/** Endereços (A/AAAA) do nome; vazio se não resolver ou se algum for interno */
+async function enderecosPublicos(host: string): Promise<string[]> {
+  if (enderecoBloqueado(host)) return [];
   try {
     const ips = [
       ...(await Deno.resolveDns(host, 'A').catch(() => [] as string[])),
       ...(await Deno.resolveDns(host, 'AAAA').catch(() => [] as string[])),
     ];
-    return ips.length > 0 && ips.every((ip) => !enderecoBloqueado(ip));
+    return ips.length > 0 && ips.every((ip) => !enderecoBloqueado(ip)) ? ips.sort() : [];
   } catch {
-    return false;
+    return [];
   }
 }
-
 async function buscar(inicial: string): Promise<{ html: string; url: string }> {
   let url = inicial;
   const fim = AbortSignal.timeout(6000);
   for (let i = 0; i < 4; i++) {
     const u = new URL(url);
     if (u.protocol !== 'https:') throw new Error('Use um link https.');
-    if (!(await hostSeguro(u.hostname))) throw new Error('Endereço não permitido.');
+    // Só a porta padrão (443) e sem usuário/senha no endereço
+    if ((u.port && u.port !== '443') || u.username || u.password) throw new Error('Endereço não permitido.');
+    const antes = await enderecosPublicos(u.hostname);
+    if (!antes.length) throw new Error('Endereço não permitido.');
     const r = await fetch(u, {
       redirect: 'manual',
       signal: fim,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NexusCompras/1.0)', Accept: 'text/html,application/xhtml+xml', 'Accept-Language': 'pt-BR,pt;q=0.9' },
     });
+    // Contra DNS rebinding (o Deno não deixa fixar o IP da conexão): resolve de novo depois da resposta
+    // e exige o mesmo conjunto de endereços públicos que foi validado antes de conectar
+    const depois = await enderecosPublicos(u.hostname);
+    if (depois.length !== antes.length || depois.some((ip, n) => ip !== antes[n])) {
+      await r.body?.cancel().catch(() => undefined);
+      throw new Error('Endereço não permitido.');
+    }
     if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
+      await r.body?.cancel().catch(() => undefined);
       url = new URL(r.headers.get('location')!, u).toString();
       continue;
     }

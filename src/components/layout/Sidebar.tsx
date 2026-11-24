@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
+import { isoLocal } from '../../utils/formatters.ts';
 import {
   ArrowLeftRight,
   Bell,
@@ -33,7 +34,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { menuDoPapel, type Contador, type Icone } from '../../utils/navegacao.ts';
-import { termoAberto } from '../../utils/termos.ts';
+import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import { listarVencimentos, pendenciasConciliacao } from '../../utils/financeiro.ts';
@@ -109,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     return () => window.removeEventListener('keydown', tecla);
   }, [aberto, onFechar]);
 
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = isoLocal(new Date());
   const emAberto = (s: string) => s === 'aberto' || s === 'em_andamento' || s === 'aguardando_terceiro';
   const contadores: Record<Contador, number> = {
     // A RLS já limita o que cada perfil enxerga (RH: os próprios e os de admissão/desligamento)
@@ -119,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     meus_chamados: tickets.filter((t) => t.solicitanteId === currentUser?.id && emAberto(t.status)).length,
     // Lote 1: termo cancelado/substituído não conta (mesma regra de "Meus termos")
     termos_para_assinar: terms.filter(
-      (t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm
+      (t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm && !termoContestadoAberto(t)
     ).length,
     vencimentos: qtdVencimentos,
     conciliar: qtdConciliar,

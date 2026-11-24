@@ -48,8 +48,9 @@ export function situacaoContrato(
   if (c.status === 'encerrado') return { situacao: 'encerrado' };
   const dias = c.fim ? diasAte(c.fim, agora) : undefined;
   if (dias !== undefined && dias < 0) return { situacao: 'encerrado', dias };
-  if (dias !== undefined && dias <= DIAS_ALERTA_CONTRATO) return { situacao: 'vencendo', dias };
+  // Contrato que ainda não começou é "a iniciar", mesmo que termine logo
   if (c.inicio > isoLocal(agora)) return { situacao: 'a_iniciar', dias };
+  if (dias !== undefined && dias <= DIAS_ALERTA_CONTRATO) return { situacao: 'vencendo', dias };
   return { situacao: 'vigente', dias };
 }
 

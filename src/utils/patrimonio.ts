@@ -66,7 +66,7 @@ export const VIDA_UTIL_PADRAO: Required<Omit<VidaUtil, 'residualPct'>> = {
   moveis: 10,
 };
 
-type AtivoDepreciavel = Pick<Asset, 'fiscal'> & Partial<Pick<Asset, 'categoria' | 'nome' | 'modelo' | 'grupoDepreciacao' | 'status'>>;
+type AtivoDepreciavel = Pick<Asset, 'fiscal'> & Partial<Pick<Asset, 'categoria' | 'nome' | 'modelo' | 'grupoDepreciacao' | 'status' | 'baixas'>>;
 
 /** Grupo de vida útil: o escolhido na ficha ou, sem escolha, pela categoria e pelo nome */
 export function grupoDoAtivo(a: AtivoDepreciavel): GrupoDepreciacao {
@@ -138,7 +138,12 @@ export function depreciacao(a: AtivoDepreciavel, vida?: VidaUtil, ate: Date | st
     return { ...base, residual: anos === 0 ? valorCompra : residual, mesesDecorridos: 0, acumulada: 0, valorAtual: valorCompra, semDados: anos !== 0 };
   }
   const vidaMeses = anos * 12;
-  const dataFim = typeof ate === 'string' ? ate.slice(0, 10) : hojeIso(ate);
+  let dataFim = typeof ate === 'string' ? ate.slice(0, 10) : hojeIso(ate);
+  // Ativo baixado deixa de depreciar na data da baixa (a vigente, não a estornada)
+  if (a.status === 'descartado') {
+    const dataBaixa = a.baixas?.find((b) => !b.estornadaEm)?.dataBaixa?.slice(0, 10);
+    if (dataBaixa && dataBaixa < dataFim) dataFim = dataBaixa;
+  }
   const mesesDecorridos = mesesEntre(aquisicao, dataFim);
   const acumulada = centavos(((valorCompra - residual) * Math.min(mesesDecorridos, vidaMeses)) / vidaMeses);
   return {

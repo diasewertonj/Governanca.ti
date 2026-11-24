@@ -34,8 +34,9 @@ select harness.rodar('seguranca', 'L4 RH vê o catálogo sem valores nem cartão
       where valor_mensal = 0 and cartao_final is null and colaboradores_ids = '["emp-colab"]'::jsonb$s$, 1)$q$);
 select harness.rodar('seguranca', 'L5 suporte lê tudo (tabela e função)', 'ok', :'sup', 'authenticated',
   $q$do $x$ begin
-    perform harness.espera($s$select 1 from public.licencas_software where cartao_final = '1234'$s$, 1);
-    perform harness.espera($s$select 1 from public.licencas_visiveis() where valor_mensal = 99 and cartao_final = '1234'$s$, 1);
+    -- Check geral: o suporte lê a licença, mas não o cartão (só admin e Compras veem pagamento)
+    perform harness.espera($s$select 1 from public.licencas_software where valor_mensal = 99$s$, 1);
+    perform harness.espera($s$select 1 from public.licencas_visiveis() where valor_mensal = 99 and cartao_final is null$s$, 1);
   end $x$$q$);
 select harness.rodar('seguranca', 'L6 anônimo não executa licencas_visiveis', 'bloqueado', :'anon', 'anon',
   $q$select * from public.licencas_visiveis()$q$);

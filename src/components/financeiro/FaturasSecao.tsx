@@ -61,7 +61,7 @@ const SELO_STATUS: Record<StatusExibidoFatura, string> = {
  * Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
 export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal, nomeOrigem }) => {
-  const { faturas, currentRole, alterarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
+  const { faturas, currentRole, cancelarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
   const [editando, setEditando] = useState<Fatura | null>(null);
   const [lancando, setLancando] = useState(false);
   // Pagamento: janela própria (data, forma, valor pago, comprovante), nunca só a data
@@ -122,7 +122,9 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
       cancelar: 'Voltar',
       perigo: true,
     });
-    if (ok) alterarFatura(f.id, { status: 'cancelada' });
+    if (!ok) return;
+    const falha = await cancelarFatura(f.id);
+    setErro(falha ? `Não foi possível cancelar: ${falha}` : '');
   };
 
   const escolherArquivo = (arquivo: File | undefined) => {

@@ -251,6 +251,13 @@ export async function fetchPedidosSolicitadosDb(): Promise<PedidoCompra[] | null
   );
 }
 
+/** Existe colaborador ativo com a pessoa logada como gestor (função do banco; a RLS esconde o cadastro) */
+export async function souGestorDb(): Promise<boolean> {
+  if (!supabase) return false;
+  const data = await ler(bd().rpc('sou_gestor'));
+  return data === true;
+}
+
 export async function podePedirCompraDb(): Promise<boolean> {
   if (!supabase) return false;
   const data = await ler(bd().rpc('pode_pedir_compra'));
@@ -323,12 +330,15 @@ export async function salvarPedidoDb(p: PedidoCompra, novo: boolean): Promise<st
   }
   const idsItens = p.itens.map((i) => i.id);
   const idsCot = p.cotacoes.map((c) => c.id);
-  await checar(bd().from('pedido_itens').delete().eq('pedido_id', p.id).not('id', 'in', `(${idsItens.map((x) => `"${x}"`).join(',') || '""'})`));
-  await checar(bd().from('pedido_cotacoes').delete().eq('pedido_id', p.id).not('id', 'in', `(${idsCot.map((x) => `"${x}"`).join(',') || '""'})`));
+  // Grava primeiro (upsert) e só depois apaga o que saiu: se algo falhar, nada some
   if (p.itens.length) await checar(bd().from('pedido_itens').upsert(p.itens.map((i) => linhaItem(p.id, i)), { onConflict: 'id' }));
   if (p.cotacoes.length) {
     // Primeiro todas sem vencedora; depois marca a escolhida (índice único por pedido)
     await checar(bd().from('pedido_cotacoes').upsert(p.cotacoes.map((c) => ({ ...linhaCotacao(p.id, c), vencedora: false })), { onConflict: 'id' }));
+  }
+  await checar(bd().from('pedido_cotacoes').delete().eq('pedido_id', p.id).not('id', 'in', `(${idsCot.map((x) => `"${x}"`).join(',') || '""'})`));
+  await checar(bd().from('pedido_itens').delete().eq('pedido_id', p.id).not('id', 'in', `(${idsItens.map((x) => `"${x}"`).join(',') || '""'})`));
+  if (p.cotacoes.length) {
     // Uma escolhida por item (e a do pedido inteiro, nas cotações antigas)
     for (const v of p.cotacoes.filter((c) => c.vencedora)) await atualizar('pedido_cotacoes', v.id, { vencedora: true });
   }
