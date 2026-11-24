@@ -4,12 +4,13 @@
  * Relatórios/exportações. Tudo lê do mesmo livro (useGestao) — nada é somado à parte.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, FileSpreadsheet, Lock, LockOpen, Sparkles, Split } from 'lucide-react';
+import { CalendarRange, Download, FileSpreadsheet, ListTree, Lock, LockOpen, Search, Sparkles, Split } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { CategoriaDespesa, FechamentoImobilizado, Orcamento, Rateio } from '../../types/index.ts';
-import { assentosOciosos, baixarCsv, baixarExcel, brl, paraCsv, paraExcel, ROTULO_CATEGORIA, valorPatrimonio } from '../../utils/financeiro.ts';
+import type { FichaAberta } from '../../utils/fichas.ts';
+import { assentosOciosos, baixarCsv, baixarExcel, brl, brlOuTraco, paraCsv, paraExcel, ROTULO_CATEGORIA, valorPatrimonio } from '../../utils/financeiro.ts';
 import { distribuirMensal } from '../../utils/compras.ts';
 import { diasAte, formatDate } from '../../utils/formatters.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
@@ -22,9 +23,13 @@ import {
   imobilizadoDoAno,
   imobilizadoPor,
   indicadoresExecutivos,
+  lancamentosDaLinha,
+  projecaoPorAno,
   totaisImobilizado,
+  type Lancamento,
   type LinhaGestao,
   type LinhaImobilizado,
+  type Projecao,
   type TotaisImobilizado,
 } from '../../utils/gestaoFinanceira.ts';
 import { fecharImobilizado, listarFechamentos, listarRateios, reabrirImobilizado, salvarRateioDe } from '../../services/financeiroDb.ts';
@@ -43,13 +48,66 @@ const rotuloMes = (aaaamm: string) => `${MESES[Number(aaaamm.slice(5, 7)) - 1]}/
 const pct = (v?: number) => (v === undefined ? '—' : `${Math.round(v * 100)}%`);
 const ANO_ATUAL = new Date().getFullYear();
 
-const Numero: React.FC<{ rotulo: string; valor: string; detalhe?: React.ReactNode; tom?: 'atencao' | 'problema' }> = ({ rotulo, valor, detalhe, tom }) => (
-  <div className="cartao p-3 min-w-0">
-    <p className="texto-aux">{rotulo}</p>
-    <p className={`text-lg font-semibold font-mono ${tom === 'problema' ? 'text-red-700' : tom === 'atencao' ? 'text-amber-800' : 'text-slate-900'}`}>{valor}</p>
-    {detalhe && <p className="texto-aux">{detalhe}</p>}
-  </div>
-);
+/** Número de painel; com `onAbrir`, o cartão inteiro leva à tela do assunto (seção 21) */
+const Numero: React.FC<{ rotulo: string; valor: string; detalhe?: React.ReactNode; tom?: 'atencao' | 'problema'; onAbrir?: () => void }> = ({ rotulo, valor, detalhe, tom, onAbrir }) => {
+  const conteudo = (
+    <>
+      <span className="block texto-aux">{rotulo}</span>
+      <span className={`block text-lg font-semibold font-mono ${tom === 'problema' ? 'text-red-700' : tom === 'atencao' ? 'text-amber-800' : 'text-slate-900'}`}>{valor}</span>
+      {detalhe && <span className="block texto-aux">{detalhe}</span>}
+    </>
+  );
+  return onAbrir ? (
+    <button type="button" onClick={onAbrir} className="cartao p-3 min-w-0 text-left hover:border-blue-300 hover:bg-slate-50">
+      {conteudo}
+    </button>
+  ) : (
+    <div className="cartao p-3 min-w-0">{conteudo}</div>
+  );
+};
+
+/** Texto e ficha de onde veio um lançamento do livro (fatura de contrato, licença, pedido, equipamento ou avulsa) */
+function useOrigemDoLancamento() {
+  const { faturas, contratos, licenses, assets, fornecedores } = useApp();
+  const { pedidos } = useCompras();
+  return (l: Lancamento): { texto: string; ficha?: FichaAberta } => {
+    const o = l.origem || {};
+    if (o.contrato) {
+      const c = contratos.find((x) => x.id === o.contrato);
+      return c ? { texto: nomeContrato(c), ficha: { tipo: 'contrato', id: c.id } } : { texto: 'Contrato' };
+    }
+    if (o.licenca) {
+      const s = licenses.find((x) => x.id === o.licenca);
+      return s ? { texto: s.nome, ficha: { tipo: 'software', id: s.id } } : { texto: 'Software' };
+    }
+    if (o.pedido) {
+      const p = pedidos.find((x) => x.id === o.pedido);
+      return p ? { texto: `${p.codigo} · ${p.titulo}`, ficha: { tipo: 'pedido', id: p.id } } : { texto: 'Pedido de compra' };
+    }
+    if (o.ativo) {
+      const a = assets.find((x) => x.id === o.ativo);
+      return a ? { texto: `${a.tag} · ${a.nome}`, ficha: { tipo: 'ativo', id: a.id } } : { texto: 'Equipamento' };
+    }
+    const f = o.fatura ? faturas.find((x) => x.id === o.fatura) : undefined;
+    const forn = f?.fornecedorId ? fornecedores.find((x) => x.id === f.fornecedorId) : undefined;
+    return { texto: f?.descricao || forn?.nome || 'Conta avulsa', ficha: forn ? { tipo: 'fornecedor', id: forn.id } : undefined };
+  };
+}
+
+/** Item citado numa lista: com ficha, vira link que abre a ficha */
+const LinkFicha: React.FC<{ ficha?: FichaAberta; children: React.ReactNode }> = ({ ficha, children }) => {
+  const { abrirFicha } = useApp();
+  return ficha ? (
+    <button type="button" onClick={() => abrirFicha(ficha)} className="link text-left min-w-0 truncate">
+      {children}
+    </button>
+  ) : (
+    <span className="min-w-0 truncate">{children}</span>
+  );
+};
+
+const ROTULO_SITUACAO: Record<Lancamento['situacao'], string> = { realizado: 'Realizado (pago)', a_pagar: 'A pagar', comprometido: 'Comprometido' };
+const SELO_SITUACAO: Record<Lancamento['situacao'], string> = { realizado: 'selo-ok', a_pagar: 'selo-atencao', comprometido: 'selo-neutro' };
 
 const SeletorAno: React.FC<{ ano: number; onMudar: (a: number) => void; anos?: number[] }> = ({ ano, onMudar, anos }) => {
   const lista = anos?.length ? anos : [ANO_ATUAL + 1, ANO_ATUAL, ANO_ATUAL - 1, ANO_ATUAL - 2, ANO_ATUAL - 3];
@@ -78,7 +136,7 @@ function useFornecedorDaFatura() {
 // Painel executivo (só o admin — decisão 2)
 // -----------------------------------------------------------------------------
 export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> = ({ onNavigate }) => {
-  const { faturas, contratos, licenses, assets, fornecedores, settings } = useApp();
+  const { faturas, contratos, licenses, assets, fornecedores, settings, abrirFicha } = useApp();
   const { estoque } = useRecursos();
   const g = useGestao(ANO_ATUAL);
   const fornecedorDe = useFornecedorDaFatura();
@@ -91,13 +149,17 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
   // Mesma definição da tela Orçamento: usado = pago + a pagar + comprometido
   const pctUsado = orcadoAno > 0 ? (ind.totalAno + comprometido) / orcadoAno : undefined;
   const patrimonio = useMemo(() => valorPatrimonio(assets, estoque, settings.vidaUtil), [assets, estoque, settings.vidaUtil]);
+  // Mesmo número da tela Patrimônio (saldo do imobilizado CAPEX em 31/12), para a diferença de base ficar à vista
+  const imobilizado3112 = useMemo(() => totaisImobilizado(imobilizadoDoAno(assets, ANO_ATUAL, settings.vidaUtil, g.limite)).liquidoFinal, [assets, settings.vidaUtil, g.limite]);
   const ociosos = assentosOciosos(licenses, contratos);
+  // Só os meses com valor (meses zerados não ocupam linha)
   const porMes = MESES.map((_, m) => ({
+    m,
     opex: usados.filter((l) => l.mes === m && l.natureza === 'opex').reduce((s, l) => s + l.valor, 0),
     capex: usados.filter((l) => l.mes === m && l.natureza === 'capex').reduce((s, l) => s + l.valor, 0),
-  }));
+  })).filter((x) => x.opex + x.capex > 0.004);
   const maior = Math.max(1, ...porMes.map((m) => m.opex + m.capex));
-  const top = useMemo(() => {
+  const { top, semFornecedor } = useMemo(() => {
     const m = new Map<string, number>();
     faturas
       .filter((f) => f.status === 'paga' && f.competencia.startsWith(`${ANO_ATUAL}-`))
@@ -105,67 +167,89 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         const id = fornecedorDe(f) || '';
         m.set(id, (m.get(id) || 0) + (f.valorPago ?? f.valor));
       });
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const sem = m.get('') || 0;
+    m.delete('');
+    return { top: [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10), semFornecedor: sem };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faturas]);
   const vencendo = contratos
     .filter((c) => c.status !== 'encerrado' && c.fim && diasAte(c.fim) >= 0 && diasAte(c.fim) <= 90)
     .sort((a, b) => (a.fim || '').localeCompare(b.fim || ''));
   const reposicoes = g.projecao.itens.filter((i) => i.origem === 'reposicao').slice(0, 8);
+  const primeiroMesProj = g.projecao.meses[0]?.mes;
 
   return (
     <div className="space-y-4">
-      <CabecalhoTela titulo="Painel executivo" subtitulo={`Custo de T.I. em ${ANO_ATUAL} (faturas pagas e a pagar, por competência) · para apresentar à diretoria`} />
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        <Numero rotulo={`Custo de T.I. em ${ANO_ATUAL}`} valor={brl(ind.totalAno)} detalhe={`OPEX ${brl(ind.opexAno)} · CAPEX ${brl(ind.capexAno)}`} />
-        <Numero rotulo={`Custo em ${MESES[mes]}`} valor={brl(doMes)} />
+      <CabecalhoTela titulo="Painel executivo" subtitulo={`Custo de T.I. em ${ANO_ATUAL} por competência · realizado = pago; a pagar = fatura lançada · para apresentar à diretoria`} />
+      <div className="grid items-start grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <Numero rotulo={`Realizado + a pagar em ${ANO_ATUAL}`} valor={brl(ind.totalAno)} detalhe={`OPEX ${brl(ind.opexAno)} · CAPEX ${brl(ind.capexAno)}`} onAbrir={() => onNavigate('orcamento')} />
+        <Numero rotulo={`Realizado + a pagar em ${MESES[mes]}`} valor={brl(doMes)} detalhe="ver contas a pagar" onAbrir={() => onNavigate('financeiro')} />
         <Numero
           rotulo="Orçamento usado"
           valor={pct(pctUsado)}
           detalhe={orcadoAno ? `de ${brl(orcadoAno)} · inclui ${brl(comprometido)} comprometido` : 'sem orçamento no ano'}
           tom={pctUsado !== undefined && pctUsado >= 1 ? 'problema' : pctUsado !== undefined && pctUsado >= 0.9 ? 'atencao' : undefined}
+          onAbrir={() => onNavigate('orcamento')}
         />
-        <Numero rotulo="OPEX por colaborador (ano)" valor={ind.custoPorColaborador !== undefined ? brl(ind.custoPorColaborador) : '—'} detalhe={`${g.colaboradoresAtivos} colaboradores ativos`} />
-        <Numero rotulo="Projeção 12 meses" valor={brl(ind.projecao12m)} detalhe={<button type="button" className="link" onClick={() => onNavigate('projecao')}>ver projeção</button>} />
-        <Numero rotulo="Patrimônio (valor atual)" valor={brl(patrimonio.totalAtual)} detalhe={`custo ${brl(patrimonio.total)}`} />
+        <Numero rotulo={`OPEX por colaborador em ${ANO_ATUAL}`} valor={ind.custoPorColaborador !== undefined ? brl(ind.custoPorColaborador) : '—'} detalhe={`${g.colaboradoresAtivos} colaboradores ativos`} />
+        <Numero
+          rotulo="Projeção · próximos 12 meses"
+          valor={brl(ind.projecao12m)}
+          detalhe={primeiroMesProj ? `a partir de ${rotuloMes(primeiroMesProj)} · recorrentes, reposições e pedidos` : undefined}
+          onAbrir={() => onNavigate('projecao')}
+        />
+        <Numero
+          rotulo="Patrimônio · valor hoje"
+          valor={brl(patrimonio.totalAtual)}
+          detalhe={`equipamentos e estoque · imobilizado (CAPEX) em 31/12: ${brl(imobilizado3112)}`}
+          onAbrir={() => onNavigate('patrimonio')}
+        />
       </div>
 
       <div className="grid items-start grid-cols-1 xl:grid-cols-2 gap-3">
         <div className="cartao p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="secao-titulo">Mês a mês ({ANO_ATUAL})</h3>
+            <h3 className="secao-titulo">Mês a mês ({ANO_ATUAL}, realizado + a pagar)</h3>
             <span className="texto-aux">
               <span className="inline-block w-2.5 h-2.5 bg-blue-600 rounded-sm align-middle" /> OPEX{' '}
               <span className="inline-block w-2.5 h-2.5 bg-emerald-600 rounded-sm align-middle ml-2" /> CAPEX
             </span>
           </div>
-          <ul className="space-y-2">
-            {porMes.map((m, i) => (
-              <li key={i} className="grid grid-cols-[2.5rem_1fr_6.5rem] items-center gap-2">
-                <span className="text-slate-600">{MESES[i]}</span>
-                <span className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
-                  <span className="block h-full bg-blue-600" style={{ width: `${(m.opex / maior) * 100}%` }} />
-                  <span className="block h-full bg-emerald-600" style={{ width: `${(m.capex / maior) * 100}%` }} />
-                </span>
-                <span className="text-right num">{brl(m.opex + m.capex)}</span>
-              </li>
-            ))}
-          </ul>
+          {porMes.length === 0 ? (
+            <p className="texto-aux">Nada lançado em {ANO_ATUAL}.</p>
+          ) : (
+            <ul className="space-y-2">
+              {porMes.map((x) => (
+                <li key={x.m} className="grid grid-cols-[2.5rem_1fr_6.5rem] items-center gap-2">
+                  <span className="text-slate-600">{MESES[x.m]}</span>
+                  <span className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
+                    <span className="block h-full bg-blue-600" style={{ width: `${(x.opex / maior) * 100}%` }} />
+                    <span className="block h-full bg-emerald-600" style={{ width: `${(x.capex / maior) * 100}%` }} />
+                  </span>
+                  <span className="text-right num">{brl(x.opex + x.capex)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Maiores fornecedores ({ANO_ATUAL}, pago)</h3>
           {top.length === 0 ? (
-            <p className="texto-aux">Nada pago no ano.</p>
+            <p className="texto-aux">Nada pago a fornecedor no ano.</p>
           ) : (
             <ol className="space-y-1">
               {top.map(([id, v], i) => (
-                <li key={id || i} className="flex justify-between gap-2">
-                  <span className="truncate">{i + 1}. {fornecedores.find((f) => f.id === id)?.nome || 'Sem fornecedor'}</span>
+                <li key={id} className="flex justify-between gap-2">
+                  <span className="flex min-w-0 gap-1">
+                    <span className="text-slate-500">{i + 1}.</span>
+                    <LinkFicha ficha={{ tipo: 'fornecedor', id }}>{fornecedores.find((f) => f.id === id)?.nome || 'Fornecedor'}</LinkFicha>
+                  </span>
                   <span className="num">{brl(v)}</span>
                 </li>
               ))}
             </ol>
           )}
+          {semFornecedor > 0 && <p className="texto-aux">Sem fornecedor: <span className="num">{brl(semFornecedor)}</span></p>}
         </div>
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Contratos que vencem em 90 dias</h3>
@@ -175,8 +259,8 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
             <ul className="space-y-1">
               {vencendo.map((c) => (
                 <li key={c.id} className="flex justify-between gap-2">
-                  <span className="truncate">{nomeContrato(c)}</span>
-                  <span className="text-slate-600">{formatDate(c.fim || '')} ({diasAte(c.fim || '')} dias)</span>
+                  <LinkFicha ficha={{ tipo: 'contrato', id: c.id }}>{nomeContrato(c)}</LinkFicha>
+                  <span className="num text-slate-600">{formatDate(c.fim || '')} ({diasAte(c.fim || '')} dias)</span>
                 </li>
               ))}
             </ul>
@@ -184,9 +268,15 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
         </div>
         <div className="cartao p-3 space-y-2">
           <h3 className="secao-titulo">Desperdício e reposições</h3>
-          <p className="">
+          <p>
             Licenças sem uso: <span className="num font-semibold text-amber-800">{brl(ociosos.reduce((s, o) => s + o.custoMensal, 0))}/mês</span>{' '}
-            <span className="text-slate-500">{ociosos.map((o) => `${o.licenca.nome} (${o.livres})`).join(', ') || ''}</span>
+            {ociosos.map((o, i) => (
+              <React.Fragment key={o.licenca.id}>
+                {i > 0 && ', '}
+                <button type="button" onClick={() => abrirFicha({ tipo: 'software', id: o.licenca.id })} className="link">{o.licenca.nome}</button>
+                <span className="text-slate-500"> ({o.livres})</span>
+              </React.Fragment>
+            ))}
           </p>
           <p className="text-slate-700">Próximas reposições (fim da vida útil)</p>
           {reposicoes.length === 0 ? (
@@ -195,7 +285,7 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
             <ul className="space-y-1">
               {reposicoes.map((r) => (
                 <li key={r.nome + r.mes} className="flex justify-between gap-2">
-                  <span className="truncate">{r.nome}</span>
+                  <LinkFicha ficha={r.origemId ? { tipo: 'ativo', id: r.origemId } : undefined}>{r.nome}</LinkFicha>
                   <span className="num">{rotuloMes(r.mes)} · {brl(r.valor)}</span>
                 </li>
               ))}
@@ -243,6 +333,10 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
   });
   const grupos = (['opex', 'capex'] as const).map((n) => ({ n, ls: linhas.filter((l) => l.natureza === n) })).filter((x) => x.ls.length);
   const total = soma(linhas);
+  // Coluna sem nenhum dado some (ex.: nenhuma linha com área)
+  const comArea = linhas.some((l) => l.area);
+  const [aberta, setAberta] = useState<LinhaGestao | null>(null);
+  const passado = ano < ANO_ATUAL;
 
   const exportar = (excel: boolean) => {
     const cab = ['Natureza', 'Categoria', 'Área', 'Previsto', 'Comprometido', 'A pagar', 'Realizado', 'Disponível', 'Projeção até dezembro', '% usado'];
@@ -251,17 +345,15 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
     else baixarCsv(`orcamento-${ano}.csv`, paraCsv(cab, ls));
   };
 
-  const Linha: React.FC<{ l: LinhaGestao }> = ({ l }) => (
-    <tr>
-      <td data-label="Categoria">{ROTULO_CATEGORIA[l.categoria]}</td>
-      <td data-label="Área">{l.area || 'Geral'}</td>
-      <td data-label="Previsto" className="num">{brl(l.previsto)}</td>
-      <td data-label="Comprometido" className="num">{brl(l.comprometido)}</td>
-      <td data-label="A pagar" className="num">{brl(l.aPagar)}</td>
-      <td data-label="Realizado" className="num">{brl(l.realizado)}</td>
-      <td data-label="Disponível" className={`num ${l.disponivel < 0 ? 'text-red-700' : ''}`}>{brl(l.disponivel)}</td>
-      <td data-label="Projeção dez." className={`num ${l.previsto && l.projecaoDezembro > l.previsto ? 'text-amber-800' : ''}`}>{brl(l.projecaoDezembro)}</td>
-      <td data-label="% usado" className="num">{pct(l.pct)}</td>
+  const pctDe = (s: SomaGestao) => (s.previsto ? (s.realizado + s.aPagar + s.comprometido) / s.previsto : undefined);
+
+  const linha = (l: LinhaGestao) => (
+    <tr key={l.chave} className="cursor-pointer hover:bg-slate-50" onClick={() => setAberta(l)}>
+      <td data-label="Categoria">
+        <button type="button" onClick={(e) => { e.stopPropagation(); setAberta(l); }} className="link text-left">{ROTULO_CATEGORIA[l.categoria]}</button>
+      </td>
+      {comArea && <td data-label="Área">{l.area || 'Geral'}</td>}
+      <ValoresGestao s={l} pctUso={l.pct} />
     </tr>
   );
 
@@ -269,7 +361,7 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
     <div className="space-y-3">
       <CabecalhoTela
         titulo="Orçamento"
-        subtitulo="Previsto × comprometido (pedido aprovado sem fatura) × a pagar × realizado · área = departamento · projeção até dezembro = usado + recorrente que falta"
+        subtitulo="Comprometido = pedido aprovado sem fatura · realizado = pago · área = departamento · clique na linha para ver os lançamentos"
         abas={abas}
         acoes={
           <>
@@ -292,12 +384,17 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
           </>
         }
       />
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid items-start grid-cols-2 lg:grid-cols-5 gap-3">
         <Numero rotulo="Previsto" valor={brl(total.previsto)} />
-        <Numero rotulo="Comprometido" valor={brl(total.comprometido)} />
-        <Numero rotulo="Realizado + a pagar" valor={brl(total.realizado + total.aPagar)} />
-        <Numero rotulo="Disponível" valor={brl(total.disponivel)} tom={total.disponivel < 0 ? 'problema' : undefined} />
-        <Numero rotulo="Projeção até dezembro" valor={brl(total.projecaoDezembro)} tom={total.previsto && total.projecaoDezembro > total.previsto ? 'atencao' : undefined} />
+        <Numero rotulo="Comprometido" valor={brl(total.comprometido)} detalhe="pedido aprovado sem fatura" />
+        <Numero rotulo="Realizado + a pagar" valor={brl(total.realizado + total.aPagar)} detalhe={`realizado (pago) ${brl(total.realizado)}`} />
+        <Numero rotulo="Disponível" valor={brl(total.disponivel)} detalhe="previsto − (realizado + a pagar + comprometido)" tom={total.disponivel < 0 ? 'problema' : undefined} />
+        <Numero
+          rotulo="Projeção até dezembro"
+          valor={brl(total.projecaoDezembro)}
+          detalhe={passado ? 'ano encerrado: igual ao usado' : 'usado + recorrente que falta até 31/12'}
+          tom={total.previsto && total.projecaoDezembro > total.previsto ? 'atencao' : undefined}
+        />
       </div>
       {linhas.length === 0 ? (
         <Vazio>Sem orçamento nem gastos em {ano}. Cadastre as linhas na aba Planejamento ou gere a partir da Projeção.</Vazio>
@@ -307,13 +404,13 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
             <thead>
               <tr>
                 <th>Categoria</th>
-                <th>Área</th>
+                {comArea && <th>Área</th>}
                 <th className="num">Previsto</th>
                 <th className="num">Comprometido</th>
                 <th className="num">A pagar</th>
                 <th className="num">Realizado</th>
                 <th className="num">Disponível</th>
-                <th className="num">Projeção dez.</th>
+                <th className="num">Projeção até dez.</th>
                 <th className="num">% usado</th>
               </tr>
             </thead>
@@ -322,25 +419,105 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
               return (
                 <tbody key={n}>
                   <tr className="bg-slate-50">
-                    <td colSpan={2} className="font-semibold text-slate-900">{n === 'opex' ? 'OPEX (despesas do dia a dia)' : 'CAPEX (investimentos)'}</td>
-                    <td className="num font-semibold">{brl(s.previsto)}</td>
-                    <td className="num font-semibold">{brl(s.comprometido)}</td>
-                    <td className="num font-semibold">{brl(s.aPagar)}</td>
-                    <td className="num font-semibold">{brl(s.realizado)}</td>
-                    <td className="num font-semibold">{brl(s.disponivel)}</td>
-                    <td className="num font-semibold">{brl(s.projecaoDezembro)}</td>
-                    <td className="num">{s.previsto ? pct((s.realizado + s.aPagar + s.comprometido) / s.previsto) : '—'}</td>
+                    <td colSpan={comArea ? 2 : 1} className="font-semibold text-slate-900">{n === 'opex' ? 'OPEX (despesas do dia a dia)' : 'CAPEX (investimentos)'}</td>
+                    <ValoresGestao s={s} pctUso={pctDe(s)} forte />
                   </tr>
-                  {ls.map((l) => (
-                    <Linha key={l.chave} l={l} />
-                  ))}
+                  {ls.map(linha)}
                 </tbody>
               );
             })}
+            <tfoot>
+              <tr>
+                <td colSpan={comArea ? 2 : 1} className="font-semibold text-slate-900">Total</td>
+                <ValoresGestao s={total} pctUso={pctDe(total)} forte />
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
+      {aberta && <JanelaRecorte linha={aberta} lancamentos={lancamentosDaLinha(g.lancamentos, aberta.chave)} ano={ano} onFechar={() => setAberta(null)} />}
     </div>
+  );
+};
+
+type SomaGestao = Pick<LinhaGestao, 'previsto' | 'comprometido' | 'aPagar' | 'realizado' | 'disponivel' | 'projecaoDezembro'>;
+
+/** Colunas de valor do orçamento; vermelho só para o que estourou (disponível negativo), projeção acima do previsto é aviso */
+const ValoresGestao: React.FC<{ s: SomaGestao; pctUso?: number; forte?: boolean }> = ({ s, pctUso, forte }) => {
+  const peso = forte ? 'font-semibold' : '';
+  return (
+    <>
+      <td data-label="Previsto" className={`num ${peso}`}>{brlOuTraco(s.previsto)}</td>
+      <td data-label="Comprometido" className={`num ${peso}`}>{brlOuTraco(s.comprometido)}</td>
+      <td data-label="A pagar" className={`num ${peso}`}>{brlOuTraco(s.aPagar)}</td>
+      <td data-label="Realizado" className={`num ${peso}`}>{brlOuTraco(s.realizado)}</td>
+      <td data-label="Disponível" className={`num ${peso} ${s.disponivel < 0 ? 'text-red-700' : ''}`}>{brlOuTraco(s.disponivel)}</td>
+      <td data-label="Projeção até dez." className={`num ${peso} ${s.previsto && s.projecaoDezembro > s.previsto ? 'text-amber-800' : ''}`}>{brlOuTraco(s.projecaoDezembro)}</td>
+      <td data-label="% usado" className="num">{pct(pctUso)}</td>
+    </>
+  );
+};
+
+/** Colunas do imobilizado (saldo inicial, aquisições, baixas, depreciação, saldo final) */
+const TotaisImob: React.FC<{ t: TotaisImobilizado; forte?: boolean }> = ({ t, forte }) => {
+  const peso = forte ? 'font-semibold' : '';
+  return (
+    <>
+      <td data-label="Saldo em 01/01" className={`num ${peso}`}>{brlOuTraco(t.liquidoInicial)}</td>
+      <td data-label="Aquisições" className={`num ${peso}`}>{brlOuTraco(t.aquisicoes)}</td>
+      <td data-label="Baixas" className={`num ${peso}`}>{brlOuTraco(t.baixasCusto - t.baixasDepAcum)}</td>
+      <td data-label="Depreciação" className={`num ${peso}`}>{brlOuTraco(t.depreciacaoAno)}</td>
+      <td data-label="Saldo em 31/12" className="num font-semibold">{brlOuTraco(t.liquidoFinal)}</td>
+    </>
+  );
+};
+
+/** Orçamento: a linha (categoria · área) abre os lançamentos daquele recorte, cada um com link para a origem */
+const JanelaRecorte: React.FC<{ linha: LinhaGestao; lancamentos: Lancamento[]; ano: number; onFechar: () => void }> = ({ linha, lancamentos, ano, onFechar }) => {
+  const origemDe = useOrigemDoLancamento();
+  const lista = [...lancamentos].sort((a, b) => b.mes - a.mes || b.valor - a.valor);
+  const falta = Math.round((linha.projecaoDezembro - (linha.realizado + linha.aPagar + linha.comprometido)) * 100) / 100;
+  return (
+    <Janela
+      tamanho="m"
+      titulo={`${ROTULO_CATEGORIA[linha.categoria]} · ${linha.area || 'Geral'}`}
+      subtitulo={`${linha.natureza.toUpperCase()} · ${ano} · ${lancamentos.length} lançamento(s)`}
+      icone={<ListTree className="ico" />}
+      onFechar={onFechar}
+    >
+      <div className="space-y-2">
+        {lista.length === 0 ? (
+          <p className="texto-aux">Nenhum lançamento em {ano} nesta linha{linha.previsto ? ' (só o previsto)' : ''}.</p>
+        ) : (
+          <table className="tabela tabela-cartoes">
+            <thead>
+              <tr>
+                <th>Competência</th>
+                <th>Origem</th>
+                <th>Situação</th>
+                <th className="num">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map((l, i) => {
+                const o = origemDe(l);
+                return (
+                  <tr key={(l.origem?.fatura || l.origem?.pedido || l.origem?.ativo || '') + i}>
+                    <td data-label="Competência" className="num">{MESES[l.mes]}/{String(ano).slice(2)}</td>
+                    <td data-label="Origem"><LinkFicha ficha={o.ficha}>{o.texto}</LinkFicha></td>
+                    <td data-label="Situação"><span className={`selo ${SELO_SITUACAO[l.situacao]}`}>{ROTULO_SITUACAO[l.situacao]}</span></td>
+                    <td data-label="Valor" className="num">{brl(l.valor)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        {falta > 0.004 && (
+          <p className="texto-aux">Recorrente que falta até 31/12 (projeção, ainda sem fatura): <span className="num">{brl(falta)}</span></p>
+        )}
+      </div>
+    </Janela>
   );
 };
 
@@ -355,8 +532,9 @@ export const ProjecaoView: React.FC = () => {
   const [aviso, setAviso] = useState('');
   const isAdmin = currentRole === 'ti_admin';
   const detalhe = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const [mesAberto, setMesAberto] = useState<string | null>(null);
   const lista = g.projecao.meses.slice(0, meses);
-  const maior = Math.max(1, ...lista.map((m) => m.total));
+  const porAno = projecaoPorAno(lista);
   const total = lista.reduce((s, m) => s + m.total, 0);
   const capex = lista.reduce((s, m) => s + m.capex, 0);
   const ate = lista[lista.length - 1]?.mes;
@@ -437,42 +615,121 @@ export const ProjecaoView: React.FC = () => {
         }
       />
       {aviso && <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700" role="status">{aviso}</p>}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Numero rotulo={`Total em ${meses} meses`} valor={brl(total)} />
+      <div className="grid items-start grid-cols-2 lg:grid-cols-4 gap-3">
+        <Numero rotulo={`Total · próximos ${meses} meses`} valor={brl(total)} detalhe={lista[0] ? `de ${rotuloMes(lista[0].mes)} a ${rotuloMes(lista[lista.length - 1].mes)}` : undefined} />
         <Numero rotulo="OPEX" valor={brl(total - capex)} />
         <Numero rotulo="CAPEX (reposição e compras)" valor={brl(capex)} />
         <Numero rotulo="Média mensal" valor={brl(lista.length ? total / lista.length : 0)} />
       </div>
-      <div className="grid items-start grid-cols-1 xl:grid-cols-[2fr_1fr] gap-3">
-        <div className="cartao p-3 space-y-2">
-          <h3 className="secao-titulo">Mês a mês</h3>
-          {lista.map((m) => (
-            <div key={m.mes} className="grid grid-cols-[3.5rem_1fr_6.5rem] items-center gap-2">
-              <span className="text-slate-600">{rotuloMes(m.mes)}</span>
-              <span className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
-                <span className="block h-full bg-blue-600" style={{ width: `${(m.opex / maior) * 100}%` }} />
-                <span className="block h-full bg-emerald-600" style={{ width: `${(m.capex / maior) * 100}%` }} />
-              </span>
-              <span className="text-right num">{brl(m.total)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="cartao p-3 space-y-2">
-          <h3 className="secao-titulo">Por categoria</h3>
-          <ul className="space-y-1">
-            {porCategoria.map(([cat, v]) => (
-              <li key={cat} className="flex justify-between gap-2">
-                <span>{ROTULO_CATEGORIA[cat as CategoriaDespesa] || cat}</span>
-                <span className="num">{brl(v)}</span>
-              </li>
+      {/* Decisão 21.3-2: tabela por ano (meses em colunas, total do ano); o mês abre a composição */}
+      <div className="cartao-tabela">
+        <table className="tabela tabela-cartoes">
+          <thead>
+            <tr>
+              <th>Ano</th>
+              {MESES.map((m) => (
+                <th key={m} className="num">{m}</th>
+              ))}
+              <th className="num">Total do ano</th>
+            </tr>
+          </thead>
+          <tbody>
+            {porAno.map((a) => (
+              <tr key={a.ano}>
+                <td data-label="Ano" className="font-semibold text-slate-900">{a.ano}</td>
+                {a.meses.map((m, i) => (
+                  <td key={i} data-label={MESES[i]} className="num">
+                    {!m ? '' : m.total > 0.004 ? (
+                      <button type="button" onClick={() => setMesAberto(m.mes)} className="link" title={`OPEX ${brl(m.opex)} · CAPEX ${brl(m.capex)}`}>
+                        {brl(m.total)}
+                      </button>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                ))}
+                <td data-label="Total do ano" className="num font-semibold">{brlOuTraco(a.total)}</td>
+              </tr>
             ))}
-          </ul>
-          <p className="ajuda">
-            Premissas: reajuste padrão de {g.premissas.reajustePadraoPct ?? 5}% ao ano (contratos com mês de reajuste usam o mês deles) · limite de capitalização {brl(g.limite)}. Altere em Configurações.
-          </p>
-        </div>
+          </tbody>
+        </table>
       </div>
+      <div className="grid items-start grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="cartao-tabela">
+          <table className="tabela tabela-cartoes">
+            <thead>
+              <tr>
+                <th>Por categoria</th>
+                <th className="num">Próximos {meses} meses</th>
+              </tr>
+            </thead>
+            <tbody>
+              {porCategoria.map(([cat, v]) => (
+                <tr key={cat}>
+                  <td data-label="Categoria">{ROTULO_CATEGORIA[cat as CategoriaDespesa] || cat}</td>
+                  <td data-label="Valor" className="num">{brl(v)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="font-semibold text-slate-900">Total</td>
+                <td className="num font-semibold">{brl(total)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p className="ajuda">
+          Premissas: reajuste padrão de {g.premissas.reajustePadraoPct ?? 5}% ao ano (contratos com mês de reajuste usam o mês deles) · limite de capitalização {brl(g.limite)}. Altere em Configurações.
+        </p>
+      </div>
+      {mesAberto && <JanelaMesProjecao mes={mesAberto} itens={itens.filter((i) => i.mes === mesAberto)} detalhe={detalhe} onFechar={() => setMesAberto(null)} />}
     </div>
+  );
+};
+
+const GRUPOS_PROJECAO: { titulo: string; origens: string[] }[] = [
+  { titulo: 'Recorrentes (contratos, softwares e linhas)', origens: ['contrato', 'licenca', 'linha'] },
+  { titulo: 'Reposições (fim da vida útil)', origens: ['reposicao'] },
+  { titulo: 'Pedidos aprovados ainda não pagos', origens: ['pedido'] },
+];
+const FICHA_DA_ORIGEM: Record<string, FichaAberta['tipo'] | undefined> = { contrato: 'contrato', licenca: 'software', reposicao: 'ativo', pedido: 'pedido' };
+
+/** Projeção: a composição de um mês (recorrentes, reposições, pedidos), cada item com link */
+const JanelaMesProjecao: React.FC<{ mes: string; itens: Projecao['itens']; detalhe: boolean; onFechar: () => void }> = ({ mes, itens, detalhe, onFechar }) => {
+  const total = itens.reduce((s, i) => s + i.valor, 0);
+  return (
+    <Janela tamanho="m" titulo={`Projeção de ${rotuloMes(mes)}`} subtitulo={`Total ${brl(total)}`} icone={<CalendarRange className="ico" />} onFechar={onFechar}>
+      <div className="space-y-4">
+        {GRUPOS_PROJECAO.map((gr) => {
+          const doGrupo = itens.filter((i) => gr.origens.includes(i.origem)).sort((a, b) => b.valor - a.valor);
+          if (!doGrupo.length) return null;
+          return (
+            <section key={gr.titulo} className="space-y-1">
+              <h3 className="secao-titulo flex justify-between gap-2">
+                <span>{gr.titulo}</span>
+                <span className="num">{brl(doGrupo.reduce((s, i) => s + i.valor, 0))}</span>
+              </h3>
+              <ul className="space-y-1">
+                {doGrupo.map((i, k) => {
+                  const tipo = FICHA_DA_ORIGEM[i.origem];
+                  return (
+                    <li key={(i.origemId || i.nome) + k} className="flex justify-between gap-2">
+                      {detalhe ? (
+                        <LinkFicha ficha={tipo && i.origemId ? { tipo, id: i.origemId } : undefined}>{i.nome}</LinkFicha>
+                      ) : (
+                        <span>{ROTULO_CATEGORIA[i.categoria as CategoriaDespesa] || i.categoria}</span>
+                      )}
+                      <span className="num">{brl(i.valor)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    </Janela>
   );
 };
 
@@ -505,7 +762,7 @@ export function useFechamentos() {
 }
 
 export const PatrimonioView: React.FC = () => {
-  const { assets, departments, settings, currentRole, currentUser } = useApp();
+  const { assets, departments, settings, currentRole, currentUser, abrirFicha } = useApp();
   const [ano, setAno] = useState(ANO_ATUAL);
   const [agrupar, setAgrupar] = useState<'grupo' | 'area'>('grupo');
   const [erro, setErro] = useState('');
@@ -567,15 +824,8 @@ export const PatrimonioView: React.FC = () => {
     }
   };
 
-  const Totais = ({ t }: { t: TotaisImobilizado }) => (
-    <>
-      <td className="num">{brl(t.liquidoInicial)}</td>
-      <td className="num">{brl(t.aquisicoes)}</td>
-      <td className="num">{brl(t.baixasCusto - t.baixasDepAcum)}</td>
-      <td className="num">{brl(t.depreciacaoAno)}</td>
-      <td className="num font-semibold">{brl(t.liquidoFinal)}</td>
-    </>
-  );
+  const comBaixa = linhas.some((l) => l.baixa);
+  const anoEmCurso = ano >= ANO_ATUAL && !fechado;
 
   return (
     <div className="space-y-3">
@@ -615,12 +865,16 @@ export const PatrimonioView: React.FC = () => {
           Reaberturas: {reaberturas.map((r) => `${formatDate(r.reabertoEm || '')} — ${r.reaberturaMotivo || ''}`).join(' · ')}
         </p>
       )}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Numero rotulo={`Saldo em 1º/jan`} valor={brl(totais.liquidoInicial)} detalhe={`custo ${brl(totais.custoInicial)}`} />
+      <div className="grid items-start grid-cols-2 lg:grid-cols-5 gap-3">
+        <Numero rotulo={`Saldo em 01/01/${ano}`} valor={brl(totais.liquidoInicial)} detalhe={`custo ${brl(totais.custoInicial)}`} />
         <Numero rotulo="Aquisições" valor={brl(totais.aquisicoes)} />
         <Numero rotulo="Baixas (valor líquido)" valor={brl(totais.baixasCusto - totais.baixasDepAcum)} detalhe={`vendas ${brl(totais.vendas)} · ganho/perda ${brl(totais.resultadoBaixas)}`} />
-        <Numero rotulo="Depreciação do ano" valor={brl(totais.depreciacaoAno)} />
-        <Numero rotulo="Saldo em 31/dez" valor={brl(totais.liquidoFinal)} detalhe={`custo ${brl(totais.custoFinal)}`} />
+        <Numero rotulo={anoEmCurso ? 'Depreciação do ano (até 31/12)' : 'Depreciação do ano'} valor={brl(totais.depreciacaoAno)} />
+        <Numero
+          rotulo={`Saldo em 31/12/${ano}`}
+          valor={brl(totais.liquidoFinal)}
+          detalhe={anoEmCurso ? `projetado (o ano não terminou) · custo ${brl(totais.custoFinal)}` : `custo ${brl(totais.custoFinal)}`}
+        />
       </div>
       {linhas.length === 0 ? (
         <Vazio>Nenhum equipamento CAPEX com valor e data de compra em {ano}.</Vazio>
@@ -631,21 +885,27 @@ export const PatrimonioView: React.FC = () => {
               <thead>
                 <tr>
                   <th>{agrupar === 'grupo' ? 'Grupo' : 'Área'}</th>
-                  <th className="num">Saldo inicial</th>
+                  <th className="num">Saldo em 01/01</th>
                   <th className="num">Aquisições</th>
                   <th className="num">Baixas</th>
                   <th className="num">Depreciação</th>
-                  <th className="num">Saldo final</th>
+                  <th className="num">Saldo em 31/12</th>
                 </tr>
               </thead>
               <tbody>
                 {grupos.map((gr) => (
                   <tr key={gr.chave}>
                     <td className="font-semibold text-slate-900">{gr.chave}</td>
-                    <Totais t={gr.totais} />
+                    <TotaisImob t={gr.totais} />
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-semibold text-slate-900">Total</td>
+                  <TotaisImob t={totais} forte />
+                </tr>
+              </tfoot>
             </table>
           </div>
           <details className="cartao p-3">
@@ -657,19 +917,22 @@ export const PatrimonioView: React.FC = () => {
                   <th>Aquisição</th>
                   <th className="num">Custo</th>
                   <th className="num">Depreciação do ano</th>
-                  <th>Baixa</th>
-                  <th className="num">Líquido final</th>
+                  {comBaixa && <th>Baixa</th>}
+                  <th className="num">Saldo em 31/12</th>
                 </tr>
               </thead>
               <tbody>
                 {linhas.map((l) => (
                   <tr key={l.ativoId}>
-                    <td data-label="Patrimônio">{l.tag} · {l.nome}</td>
-                    <td data-label="Aquisição">{l.dataAquisicao ? formatDate(l.dataAquisicao) : '—'}</td>
-                    <td data-label="Custo" className="num">{brl(l.custo)}</td>
-                    <td data-label="Depreciação" className="num">{brl(l.depreciacaoAno)}</td>
-                    <td data-label="Baixa">{l.baixa ? `${formatDate(l.baixa.data)} · venda ${brl(l.baixa.valorVenda)}` : '—'}</td>
-                    <td data-label="Líquido final" className="num">{brl(l.custoFinal - l.depAcumFinal)}</td>
+                    <td data-label="Patrimônio">
+                      <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: l.ativoId })} className="link text-left">{l.tag}</button>
+                      <span className="text-slate-600"> · {l.nome}</span>
+                    </td>
+                    <td data-label="Aquisição" className="num">{l.dataAquisicao ? formatDate(l.dataAquisicao) : '—'}</td>
+                    <td data-label="Custo" className="num">{brlOuTraco(l.custo)}</td>
+                    <td data-label="Depreciação" className="num">{brlOuTraco(l.depreciacaoAno)}</td>
+                    {comBaixa && <td data-label="Baixa">{l.baixa ? `${formatDate(l.baixa.data)} · venda ${brl(l.baixa.valorVenda)}` : '—'}</td>}
+                    <td data-label="Saldo em 31/12" className="num">{brlOuTraco(l.custoFinal - l.depAcumFinal)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -694,7 +957,8 @@ export const RelatoriosView: React.FC = () => {
   const [rateiosErro, setRateiosErro] = useState(false);
   const [tentativaRateios, setTentativaRateios] = useState(0);
   const [rateando, setRateando] = useState<{ tipo: 'contrato' | 'licenca'; id: string; nome: string } | null>(null);
-  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const [buscaRateio, setBuscaRateio] = useState('');
+  const isTI =currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   useEffect(() => {
     if (!isTI) return;
     let vivo = true;
@@ -769,7 +1033,13 @@ export const RelatoriosView: React.FC = () => {
     },
   ];
 
-  const recorrentesRateaveis = g.recorrentes.filter((r) => r.origem !== 'linha');
+  // Rateio entre áreas: os de maior custo primeiro, com busca (escala: dezenas de contratos e licenças)
+  const termo = buscaRateio.trim().toLowerCase();
+  const recorrentesRateaveis = g.recorrentes
+    .filter((r) => r.origem !== 'linha' && (!termo || r.nome.toLowerCase().includes(termo)))
+    .sort((a, b) => b.mensal - a.mensal);
+  const totalPorArea = porArea.reduce((s, a) => s + a.valor, 0);
+  const AVISO_RATEIO = 'Os rateios não carregaram (falha de conexão ou de permissão). Clique em "Tentar de novo"; se continuar, recarregue a página. Os outros relatórios funcionam normalmente.';
 
   return (
     <div className="space-y-3">
@@ -786,7 +1056,7 @@ export const RelatoriosView: React.FC = () => {
               <div className="min-w-0">
                 <p className="font-semibold text-slate-900">{r.titulo}</p>
                 <p className="texto-aux">{r.descricao}</p>
-                {r.bloqueado && <p className="erro" role="alert">Não deu para carregar os rateios; sem eles o relatório sairia errado.</p>}
+                {r.bloqueado && <p className="erro" role="alert">Este relatório espera os rateios: sem eles, o custo por área sairia errado. {AVISO_RATEIO}</p>}
               </div>
               <span className="flex gap-2">
                 {r.bloqueado && <button type="button" onClick={() => setTentativaRateios((n) => n + 1)} className="btn btn-sm btn-secundario">Tentar de novo</button>}
@@ -797,41 +1067,77 @@ export const RelatoriosView: React.FC = () => {
           ))}
       </div>
       <div className="grid items-start grid-cols-1 xl:grid-cols-2 gap-3">
-        <div className="cartao p-3 space-y-2">
-          <h3 className="secao-titulo">Custo por área ({ano}, realizado)</h3>
-          {porArea.length === 0 ? (
+        {porArea.length === 0 ? (
+          <div className="cartao p-3 space-y-2">
+            <h3 className="secao-titulo">Custo por área ({ano}, realizado)</h3>
             <p className="texto-aux">Nada pago no ano.</p>
-          ) : (
-            <ul className="space-y-1">
-              {porArea.map((a) => (
-                <li key={a.area} className="flex justify-between gap-2">
-                  <span>{a.area}</span>
-                  <span className="num">{brl(a.valor)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="cartao-tabela">
+            <table className="tabela tabela-cartoes">
+              <thead>
+                <tr>
+                  <th>Custo por área ({ano}){isTI && rateiosErro ? ' · sem rateio' : ''}</th>
+                  <th className="num">Realizado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porArea.map((a) => (
+                  <tr key={a.area}>
+                    <td data-label="Área">{a.area}</td>
+                    <td data-label="Realizado" className="num">{brlOuTraco(a.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-semibold text-slate-900">Total</td>
+                  <td className="num font-semibold">{brl(totalPorArea)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
         {isTI && (
           <div className="cartao p-3 space-y-2">
             <h3 className="secao-titulo">Rateio entre áreas</h3>
             <p className="ajuda">Divide o custo de um contrato ou licença entre as áreas que usam. Não é cobrança: só muda o relatório de custo por área.</p>
-            <ul className="space-y-1 max-h-72 overflow-auto">
-              {recorrentesRateaveis.map((r) => {
-                const partes = rateios.filter((x) => x.origemTipo === r.origem && x.origemId === r.id);
-                return (
-                  <li key={r.origem + r.id} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate">
-                      {r.nome}
-                      <span className="block text-slate-500">{partes.length ? partes.map((p) => `${nomeDep(p.departamentoId)} ${p.percentual}%`).join(' · ') : 'sem rateio'}</span>
-                    </span>
-                    <button type="button" onClick={() => setRateando({ tipo: r.origem as 'contrato' | 'licenca', id: r.id, nome: r.nome })} className="btn btn-sm btn-secundario">
-                      <Split /> Ratear
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            {rateiosErro ? (
+              <div className="space-y-2" role="alert">
+                <p className="erro">{AVISO_RATEIO}</p>
+                <button type="button" onClick={() => setTentativaRateios((n) => n + 1)} className="btn btn-sm btn-secundario">Tentar de novo</button>
+              </div>
+            ) : (
+              <>
+                <label className="relative block">
+                  <span className="sr-only">Buscar contrato ou software</span>
+                  <Search className="ico absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                  <input type="search" value={buscaRateio} onChange={(e) => setBuscaRateio(e.target.value)} placeholder="Buscar contrato ou software…" className="campo campo-sm pl-8" />
+                </label>
+                {recorrentesRateaveis.length === 0 ? (
+                  <p className="texto-aux">{termo ? 'Nada encontrado com essa busca.' : 'Nenhum contrato ou software com custo recorrente.'}</p>
+                ) : (
+                  <ul className="space-y-1 max-h-72 overflow-auto">
+                    {recorrentesRateaveis.map((r) => {
+                      const partes = rateios.filter((x) => x.origemTipo === r.origem && x.origemId === r.id);
+                      return (
+                        <li key={r.origem + r.id} className="flex items-center justify-between gap-2">
+                          <span className="min-w-0">
+                            <LinkFicha ficha={{ tipo: r.origem === 'contrato' ? 'contrato' : 'software', id: r.id }}>{r.nome}</LinkFicha>
+                            <span className="block texto-aux">
+                              <span className="num">{brl(r.mensal)}/mês</span> · {partes.length ? partes.map((p) => `${nomeDep(p.departamentoId)} ${p.percentual}%`).join(' · ') : 'sem rateio'}
+                            </span>
+                          </span>
+                          <button type="button" onClick={() => setRateando({ tipo: r.origem as 'contrato' | 'licenca', id: r.id, nome: r.nome })} className="btn btn-sm btn-secundario">
+                            <Split /> Ratear
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -988,9 +1294,9 @@ export const CustosMinhaAreaView: React.FC = () => {
                 {linhas.map((l) => (
                   <tr key={l.categoria}>
                     <td data-label="Categoria">{ROTULO_CATEGORIA[l.categoria as CategoriaDespesa] || l.categoria}</td>
-                    <td data-label="Previsto" className="num">{brl(l.previsto)}</td>
-                    <td data-label="Pago" className="num">{brl(l.realizado)}</td>
-                    <td data-label="A pagar" className="num">{brl(l.aPagar)}</td>
+                    <td data-label="Previsto" className="num">{brlOuTraco(l.previsto)}</td>
+                    <td data-label="Pago" className="num">{brlOuTraco(l.realizado)}</td>
+                    <td data-label="A pagar" className="num">{brlOuTraco(l.aPagar)}</td>
                     <td data-label="% usado" className="num">{l.previsto ? pct((l.realizado + l.aPagar) / l.previsto) : '—'}</td>
                   </tr>
                 ))}

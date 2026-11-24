@@ -18,6 +18,7 @@ import {
   orcamentoDeGestao,
   projecaoGastos,
   recorrentesParaProjecao,
+  recorrenteRestante,
   type Natureza,
   type Premissas,
 } from '../../utils/gestaoFinanceira.ts';
@@ -111,7 +112,7 @@ export function useGestao(ano: number, regime: Regime = 'competencia', agora: Da
         {
           recorrentes: recorrentesProj,
           ativos: assets,
-          pedidosAprovados: pedidosEmAberto.map((p) => ({ codigo: p.codigo, titulo: p.titulo, valor: valorDoPedido(p), previstoPara: p.necessarioEm, categoria: p.categoria })),
+          pedidosAprovados: pedidosEmAberto.map((p) => ({ id: p.id, codigo: p.codigo, titulo: p.titulo, valor: valorDoPedido(p), previstoPara: p.necessarioEm, categoria: p.categoria })),
         },
         36,
         premissas,
@@ -155,35 +156,19 @@ export function useGestao(ano: number, regime: Regime = 'competencia', agora: Da
     [faturas, origensLivro, pedidos, assets, departments, ano, limite, regime, mapa]
   );
 
-  // "Projeção até dezembro" (só no ano corrente): sai da própria projeção mês a mês, com fim de
-  // contrato, renovação e reajuste. O mês corrente entra se ainda não foi faturado; competência
-  // que já tem fatura lançada (a pagar ou paga) não conta de novo, pois já está nos lançamentos.
+  // "Projeção até dezembro" = usado + recorrente que falta (utils/gestaoFinanceira › recorrenteRestante):
+  // sai da própria projeção mês a mês, com fim de contrato, renovação e reajuste; o mês corrente
+  // entra se ainda não foi faturado; ano futuro usa os meses dele que a projeção cobre.
   const restanteDoAno = useMemo(() => {
-    if (ano !== anoAtual) return [];
-    const mesCorrente = `${ano}-${String(mesAtual + 1).padStart(2, '0')}`;
     const nome = (r: RecorrenteGestao) => {
       const dep = r.departamentoId || depDoTexto(mapa, r.centroCusto);
       return (dep && departments.find((d) => d.id === dep)?.nome) || (r.centroCusto || '').trim();
     };
-    const faturado = (r: RecorrenteGestao, mes: string) =>
-      faturas.some(
-        (f) =>
-          f.status !== 'cancelada' &&
-          f.competencia.startsWith(mes) &&
-          (r.origem === 'contrato' ? f.contratoId === r.id : r.origem === 'licenca' ? f.licencaId === r.id : false)
-      );
     const porChave = new Map(recorrentes.map((r) => [`${r.origem}|${r.id}`, r]));
     const out: { natureza: Natureza; categoria: CategoriaDespesa; area: string; valor: number }[] = [];
-    projecao.itens.forEach((i) => {
-      if (!i.origemId || i.natureza !== 'opex' || !i.mes.startsWith(`${ano}-`) || i.mes <= mesCorrente) return;
-      const r = porChave.get(`${i.origem}|${i.origemId}`);
-      if (!r || faturado(r, i.mes)) return;
-      out.push({ natureza: 'opex', categoria: r.categoria, area: nome(r), valor: i.valor });
-    });
-    recorrentesProj.forEach((r) => {
-      if (r.mensal <= 0 || faturado(r, mesCorrente)) return;
-      if (r.fim && r.fim.slice(0, 7) < mesCorrente && !r.renova) return;
-      out.push({ natureza: 'opex', categoria: r.categoria, area: nome(r), valor: r.mensal });
+    recorrenteRestante({ projecao, recorrentes: recorrentesProj, faturas }, ano, new Date(anoAtual, mesAtual, 15)).forEach(({ recorrente, valor }) => {
+      const r = porChave.get(`${recorrente.origem}|${recorrente.id}`);
+      if (r) out.push({ natureza: 'opex', categoria: r.categoria, area: nome(r), valor });
     });
     return out;
   }, [recorrentes, recorrentesProj, projecao, faturas, ano, anoAtual, mesAtual, mapa, departments]);

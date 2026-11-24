@@ -594,6 +594,24 @@ export function baixarExcel(nome: string, conteudo: string) {
 
 export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+/** Seção 21: em tabela de valores, zero vira "—" */
+export const brlOuTraco = (v: number) => (Math.abs(v) < 0.005 ? '—' : brl(v));
+
+/**
+ * Seção 21 · Custos do período: previsto e realizado no MESMO recorte — competências até
+ * o mês corrente. O previsto dos meses seguintes do período fica à parte, como "a vencer".
+ * `comp` é a competência (AAAA-MM ou AAAA-MM-DD).
+ */
+export function previstoRealizadoAteHoje(porMes: { comp: string; previsto: number; realizado: number }[], agora: Date = new Date()) {
+  const corte = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+  const cent = (v: number) => Math.round(v * 100) / 100;
+  const ate = porMes.filter((m) => m.comp.slice(0, 7) <= corte);
+  const previsto = cent(ate.reduce((s, m) => s + m.previsto, 0));
+  const realizado = cent(ate.reduce((s, m) => s + m.realizado, 0));
+  const aVencer = cent(porMes.filter((m) => m.comp.slice(0, 7) > corte).reduce((s, m) => s + m.previsto, 0));
+  return { previsto, realizado, aVencer, diferenca: cent(realizado - previsto) };
+}
+
 // -----------------------------------------------------------------------------
 // Seção 9.4 · Compras de equipamento e valor do patrimônio. O valor vem da
 // ficha fiscal (já digitado no cadastro): nada é lançado de novo.
