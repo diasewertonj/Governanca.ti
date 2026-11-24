@@ -4,13 +4,16 @@ import { AlertTriangle, CheckCircle2, Paperclip, Pencil, Plus, Receipt, RotateCc
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { Asset, CategoriaDespesa, Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
+import type { FichaAberta } from '../../utils/fichas.ts';
 import { LIMITE_CAPITALIZACAO_PADRAO, naturezaDoLancamento } from '../../utils/gestaoFinanceira.ts';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
 import { confirmarDescarte } from '../comum/BarraAlteracoes.tsx';
-import { TIPOS_ARQUIVO_ACEITOS, validarArquivo } from '../../services/supabaseDb.ts';
+import { TIPOS_ARQUIVO_ACEITOS, linkTemporarioDb, mensagemDeErro, validarArquivo } from '../../services/supabaseDb.ts';
 import { formatCurrency, formatDate, isoLocal } from '../../utils/formatters.ts';
+import { normalizar } from '../../utils/processos.ts';
 import {
   ROTULO_STATUS_FATURA,
+  competenciaDe,
   faturasDoAlvo,
   opcoesCompetencia,
   proximaCompetencia,
@@ -22,13 +25,13 @@ import {
   type AlvoFatura,
   type StatusExibidoFatura,
 } from '../../utils/faturas.ts';
-import { AbrirArquivo } from '../comum/AbrirArquivo.tsx';
 import { CLASSE_ARQUIVO, CLASSE_CAMPO, CLASSE_ROTULO } from '../comum/campos.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
-import { formaCobrancaDe, ROTULO_CATEGORIA, ROTULO_FORMA_PAGAMENTO, valorDaFatura } from '../../utils/financeiro.ts';
+import { formaCobrancaDe, ROTULO_CATEGORIA, ROTULO_FORMA_PAGAMENTO, valorEfetivo } from '../../utils/financeiro.ts';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { CampoMoeda } from '../ui/Campos.tsx';
 import { Janela } from '../ui/Janela.tsx';
+import { MenuAcoes } from '../ui/MenuAcoes.tsx';
 import { Vazio } from '../ui/Tela.tsx';
 
 interface FaturasSecaoProps {
@@ -44,7 +47,35 @@ interface FaturasSecaoProps {
   bloqueioLancamento?: string;
   /** Seção 17: nome da origem calculado pela tela (Compras usa o resumo de contratos) */
   nomeOrigem?: (f: Fatura) => string;
+  /** Seção 21: fornecedor da fatura calculado pela tela (Compras usa o resumo de contratos) */
+  fornecedorDe?: (f: Fatura) => string | undefined;
 }
+
+/** Seção 21: moeda estrangeira em uma linha só ("US$ 780,00 · R$ 4.300,00") */
+const textoValor = (f: Fatura) => {
+  const reais = formatCurrency(valorEfetivo(f));
+  return f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null ? `${formatCurrency(f.valorMoeda, f.moeda)} · ${reais}` : reais;
+};
+
+/** Seção 21: clipe que abre o arquivo da fatura (só aparece quando há arquivo) */
+const BotaoArquivo: React.FC<{ caminho: string; rotulo: string; onErro: (msg: string) => void }> = ({ caminho, rotulo, onErro }) => (
+  <button
+    type="button"
+    title={rotulo}
+    aria-label={rotulo}
+    className="btn-icone"
+    onClick={async () => {
+      onErro('');
+      try {
+        window.open(await linkTemporarioDb(caminho), '_blank', 'noopener');
+      } catch (err) {
+        onErro(`Não foi possível abrir o arquivo: ${mensagemDeErro(err)}`);
+      }
+    }}
+  >
+    <Paperclip aria-hidden="true" />
+  </button>
+);
 
 /** Selo de situação da fatura (padrão único: ok / atenção / problema / neutro) */
 const SELO_STATUS: Record<StatusExibidoFatura, string> = {
@@ -60,17 +91,19 @@ const SELO_STATUS: Record<StatusExibidoFatura, string> = {
  * próxima competência e o valor cadastrado), "Pagar" e "Cancelar fatura".
  * Excluir só para ti_admin. Nada grava sem o clique no botão.
  */
-export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal, nomeOrigem }) => {
-  const { faturas, currentRole, cancelarFatura, excluirFatura, anexarArquivoFatura, desfazerPagamento, contratos, licenses } = useApp();
+export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade = 'mensal', valorPadrao = 0, bloqueioLancamento, listaGlobal, nomeOrigem, fornecedorDe }) => {
+  const { faturas, currentRole, cancelarFatura, excluirFatura, desfazerPagamento, contratos, licenses, fornecedores, assets, abrirFicha } = useApp();
   const [editando, setEditando] = useState<Fatura | null>(null);
   const [lancando, setLancando] = useState(false);
   // Pagamento: janela própria (data, forma, valor pago, comprovante), nunca só a data
   const [pagando, setPagando] = useState<Fatura | null>(null);
-  // Arquivo de uma fatura já lançada sem arquivo: escolhe e só sobe ao clicar em "Enviar"
-  const [anexando, setAnexando] = useState<{ id: string; arquivo: File | null; enviando: boolean } | null>(null);
+  // Arquivo de uma fatura já lançada sem arquivo: janela própria, só sobe ao clicar em "Enviar"
+  const [anexando, setAnexando] = useState<Fatura | null>(null);
+  // Seção 21: pagamento em lote (Contas a pagar)
+  const [selecao, setSelecao] = useState<Set<string>>(() => new Set());
+  const [pagandoLote, setPagandoLote] = useState(false);
   const [erro, setErro] = useState('');
   const { pedidos: pedidosCompra } = useCompras();
-  useRegistrarPendencias(`fatura-arquivo:${alvo ? alvo.licencaId || alvo.contratoId : 'todas'}`, anexando?.arquivo ? ['Arquivo da fatura não enviado'] : []);
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   // Seção 13: Compras vê e paga as faturas dos pedidos (a RLS só entrega essas)
@@ -114,6 +147,62 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   const formaCadastrada = (f: Fatura) =>
     (f.contratoId ? contratos.find((c) => c.id === f.contratoId)?.pagamento : licenses.find((l) => l.id === f.licencaId)?.pagamento) || undefined;
 
+  // Seção 21: fornecedor da fatura (a tela pode calcular; senão, pelo pedido, contrato ou licença)
+  const fornecedorDaFatura = (f: Fatura): string | undefined =>
+    fornecedorDe
+      ? fornecedorDe(f)
+      : f.fornecedorId ||
+        (f.pedidoId
+          ? pedidosCompra.find((p) => p.id === f.pedidoId)?.fornecedorId
+          : f.contratoId
+            ? contratos.find((c) => c.id === f.contratoId)?.fornecedorId
+            : licenses.find((l) => l.id === f.licencaId)?.fornecedorId);
+
+  // Pagar rápido: a forma da própria fatura; senão a última usada com o mesmo fornecedor
+  // (ou com a mesma origem); senão a cadastrada no contrato ou no software
+  const formaSugerida = (f: Fatura): Fatura['formaPagamento'] => {
+    if (f.formaPagamento) return f.formaPagamento;
+    const forn = fornecedorDaFatura(f);
+    const pagas = faturas
+      .filter((x) => x.id !== f.id && x.status === 'paga' && x.formaPagamento)
+      .sort((a, b) => (b.pagoEm || '').localeCompare(a.pagoEm || ''));
+    const doFornecedor = forn ? pagas.find((x) => fornecedorDaFatura(x) === forn) : undefined;
+    const daOrigem = pagas.find((x) => (f.contratoId && x.contratoId === f.contratoId) || (f.licencaId && x.licencaId === f.licencaId));
+    return doFornecedor?.formaPagamento || daOrigem?.formaPagamento || formaCadastrada(f)?.formaPagamento;
+  };
+
+  // Seção 21 (tudo leva ao item): a origem abre a ficha do contrato, do software, do pedido ou do equipamento
+  const fichaDaOrigem = (f: Fatura): FichaAberta | undefined => {
+    if (f.pedidoId) return pedidosCompra.some((p) => p.id === f.pedidoId) ? { tipo: 'pedido', id: f.pedidoId } : undefined;
+    if (f.contratoId) return contratos.some((c) => c.id === f.contratoId) ? { tipo: 'contrato', id: f.contratoId } : undefined;
+    if (f.licencaId) return licenses.some((l) => l.id === f.licencaId) ? { tipo: 'software', id: f.licencaId } : undefined;
+    if (f.ativoId && assets.some((a) => a.id === f.ativoId)) return { tipo: 'ativo', id: f.ativoId };
+    return undefined;
+  };
+
+  // A linha abre a edição da fatura (a ação principal que existe hoje), quando a pessoa pode editar
+  const podeEditar = (f: Fatura) => f.status === 'a_pagar' && !f.pedidoId && isTI;
+  const abrirEdicao = (f: Fatura) => {
+    setLancando(false);
+    setEditando(f);
+  };
+
+  // Pagamento em lote: só em Contas a pagar, para quem pode pagar; vale só o que está na lista e em aberto
+  const emLote = !alvo && podePagar;
+  const abertas = lista.filter((f) => f.status === 'a_pagar');
+  const selecionadas = abertas.filter((f) => selecao.has(f.id));
+  const totalSelecionado = selecionadas.reduce((s, f) => s + valorEfetivo(f), 0);
+  const todasMarcadas = abertas.length > 0 && selecionadas.length === abertas.length;
+  const marcar = (id: string, sim: boolean) =>
+    setSelecao((antes) => {
+      const nova = new Set(antes);
+      if (sim) nova.add(id);
+      else nova.delete(id);
+      return nova;
+    });
+  const formasSelecionadas = new Set(selecionadas.map(formaSugerida));
+  const temDocumento = lista.some((f) => f.numeroDocumento);
+
   const cancelar = async (f: Fatura) => {
     const ok = await confirmar({
       titulo: `Cancelar a fatura de ${rotuloCompetencia(f.competencia)}?`,
@@ -125,21 +214,6 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
     if (!ok) return;
     const falha = await cancelarFatura(f.id);
     setErro(falha ? `Não foi possível cancelar: ${falha}` : '');
-  };
-
-  const escolherArquivo = (arquivo: File | undefined) => {
-    if (!anexando || !arquivo) return;
-    const msg = validarArquivo(arquivo);
-    setErro(msg || '');
-    setAnexando({ ...anexando, arquivo: msg ? null : arquivo });
-  };
-
-  const enviarArquivo = async () => {
-    if (!anexando?.arquivo || anexando.enviando) return;
-    setAnexando({ ...anexando, enviando: true });
-    // Sobe para faturas/<id>/ e grava o caminho; se falhar, o aviso de erro explica
-    const ok = await anexarArquivoFatura(anexando.id, anexando.arquivo);
-    setAnexando(ok ? null : { ...anexando, enviando: false });
   };
 
   const excluir = async (f: Fatura) => {
@@ -196,36 +270,87 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
           <table className="tabela tabela-cartoes">
             <thead>
               <tr>
+                {emLote && (
+                  <th className="w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todas as faturas em aberto da lista"
+                      title="Selecionar todas as faturas em aberto"
+                      checked={todasMarcadas}
+                      disabled={abertas.length === 0}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selecionadas.length > 0 && !todasMarcadas;
+                      }}
+                      onChange={(e) => setSelecao(e.target.checked ? new Set(abertas.map((f) => f.id)) : new Set())}
+                    />
+                  </th>
+                )}
                 {!alvo && <th>Origem</th>}
                 <th>Competência</th>
                 <th className="num">Valor</th>
                 <th>Vencimento</th>
                 <th>Situação</th>
-                <th className="hidden xl:table-cell">Nº do documento</th>
-                <th>Arquivo</th>
+                {temDocumento && <th className="hidden xl:table-cell">Nº do documento</th>}
                 <th className="col-acoes">Ações</th>
               </tr>
             </thead>
             <tbody>
               {lista.map((f) => {
                 const status = statusExibido(f, agora);
+                const comp = rotuloCompetencia(f.competencia);
+                const editavel = podeEditar(f);
+                const ficha = !alvo ? fichaDaOrigem(f) : undefined;
+                const fornId = !alvo ? fornecedorDaFatura(f) : undefined;
+                const forn = fornId ? fornecedores.find((x) => x.id === fornId) : undefined;
+                const nome = origem(f) || 'Conta avulsa';
                 return (
-                  <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
+                  <tr
+                    key={f.id}
+                    onClick={(e) => {
+                      // Botões, links e caixas da linha fazem a própria ação
+                      if (!editavel || (e.target as HTMLElement).closest('button, a, input, select, label, textarea')) return;
+                      abrirEdicao(f);
+                    }}
+                    className={`${editavel ? 'cursor-pointer hover:bg-slate-50/70' : ''} ${status === 'cancelada' ? 'opacity-60' : ''}`}
+                  >
+                    {emLote && (
+                      <td data-label="Selecionar">
+                        {f.status === 'a_pagar' && (
+                          <input
+                            type="checkbox"
+                            aria-label={`Selecionar a fatura ${nome} de ${comp}`}
+                            checked={selecao.has(f.id)}
+                            onChange={(e) => marcar(f.id, e.target.checked)}
+                          />
+                        )}
+                      </td>
+                    )}
                     {!alvo && (
-                      <td data-label="Origem" className="min-w-64 font-semibold text-slate-900">
-                        {origem(f) || 'Conta avulsa'}
+                      <td data-label="Origem" className="min-w-64">
+                        {ficha ? (
+                          <button type="button" onClick={() => abrirFicha(ficha)} className="link text-left">
+                            {nome}
+                          </button>
+                        ) : (
+                          <span className="font-semibold text-slate-900">{nome}</span>
+                        )}
+                        {forn && (
+                          <span className="block texto-aux">
+                            <button type="button" onClick={() => abrirFicha({ tipo: 'fornecedor', id: forn.id })} className="link text-left">
+                              {forn.nome}
+                            </button>
+                          </span>
+                        )}
                       </td>
                     )}
                     <td data-label="Competência" className="font-semibold text-slate-900">
-                      {rotuloCompetencia(f.competencia)}
+                      <span className="inline-flex items-center gap-1">
+                        {comp}
+                        {f.arquivoCaminho && <BotaoArquivo caminho={f.arquivoCaminho} rotulo={`Abrir o arquivo da fatura de ${comp}`} onErro={setErro} />}
+                      </span>
                     </td>
                     <td data-label="Valor" className="num text-slate-800">
-                      {valorDaFatura(f)}
-                      {f.moeda && f.moeda !== 'BRL' && f.valorMoeda != null && (
-                        <span className="block text-slate-500">
-                          {f.moeda} {f.valorMoeda.toFixed(2)}
-                        </span>
-                      )}
+                      {textoValor(f)}
                       {f.formaPagamento && <span className="block font-sans text-slate-500">{ROTULO_FORMA_PAGAMENTO[f.formaPagamento]}</span>}
                     </td>
                     <td data-label="Vencimento">{formatDate(f.vencimento)}</td>
@@ -237,129 +362,77 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                       </span>
                       {f.status === 'paga' && f.pagoEm && <span className="mt-0.5 block text-slate-500">em {formatDate(f.pagoEm)}</span>}
                     </td>
-                    <td data-label="Nº do documento" className="hidden font-mono break-all xl:table-cell">
-                      {f.numeroDocumento || '-'}
-                    </td>
-                    <td data-label="Arquivo" className="min-w-0">
-                      {f.arquivoCaminho ? (
-                        <AbrirArquivo caminho={f.arquivoCaminho} />
-                      ) : anexando?.id === f.id ? (
-                        <span className="flex min-w-0 flex-col gap-2">
-                          <label htmlFor={`fatura-arq-${f.id}`} className="sr-only">
-                            Arquivo da fatura de {rotuloCompetencia(f.competencia)}
-                          </label>
-                          <input
-                            id={`fatura-arq-${f.id}`}
-                            type="file"
-                            accept={TIPOS_ARQUIVO_ACEITOS.join(',')}
-                            onChange={(e) => escolherArquivo(e.target.files?.[0])}
-                            className={CLASSE_ARQUIVO}
-                          />
-                          <span className="inline-flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={enviarArquivo}
-                              disabled={!anexando.arquivo || anexando.enviando}
-                              className="btn btn-sm btn-primario"
-                            >
-                              <Upload aria-hidden="true" />
-                              {anexando.enviando ? 'Enviando...' : 'Enviar'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAnexando(null);
-                                setErro('');
-                              }}
-                              disabled={anexando.enviando}
-                              className="btn btn-sm btn-secundario"
-                            >
-                              Voltar
-                            </button>
-                          </span>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAnexando({ id: f.id, arquivo: null, enviando: false });
-                            setErro('');
-                          }}
-                          aria-label={`Anexar arquivo à fatura de ${rotuloCompetencia(f.competencia)}`}
-                          className="link inline-flex items-center gap-1"
-                        >
-                          <Paperclip className="ico-sm" aria-hidden="true" /> Anexar
-                        </button>
-                      )}
-                    </td>
+                    {temDocumento && (
+                      <td data-label="Nº do documento" className="hidden font-mono break-all xl:table-cell">
+                        {f.numeroDocumento || '—'}
+                      </td>
+                    )}
                     <td data-label="Ações" className="col-acoes">
-                      {(
-                        <span className="acoes-linha">
-                          {f.status === 'a_pagar' && podePagar && (
-                            <button
-                              type="button"
-                              onClick={() => setPagando(f)}
-                              aria-label={`Pagar a fatura de ${rotuloCompetencia(f.competencia)}`}
-                              className="btn btn-sm btn-secundario mr-1"
-                            >
-                              <CheckCircle2 aria-hidden="true" /> Pagar
-                            </button>
-                          )}
-                          {f.status === 'a_pagar' && !f.pedidoId && isTI && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLancando(false);
-                                setEditando(f);
-                              }}
-                              title="Editar fatura"
-                              aria-label={`Editar a fatura de ${rotuloCompetencia(f.competencia)}`}
-                              className="btn-icone"
-                            >
-                              <Pencil aria-hidden="true" />
-                            </button>
-                          )}
-                          {f.status === 'paga' && currentRole === 'ti_admin' && (
-                            <button
-                              type="button"
-                              onClick={() => desfazer(f)}
-                              title="Desfazer pagamento"
-                              aria-label={`Desfazer o pagamento da fatura de ${rotuloCompetencia(f.competencia)}`}
-                              className="btn-icone"
-                            >
-                              <RotateCcw aria-hidden="true" />
-                            </button>
-                          )}
-                          {f.status === 'a_pagar' && (isTI || currentRole === 'compras') && (
-                            <button
-                              type="button"
-                              onClick={() => cancelar(f)}
-                              title="Cancelar fatura"
-                              aria-label={`Cancelar a fatura de ${rotuloCompetencia(f.competencia)}`}
-                              className="btn-icone"
-                            >
-                              <XCircle aria-hidden="true" />
-                            </button>
-                          )}
-                          {currentRole === 'ti_admin' && !f.pedidoId && (
-                            <button
-                              type="button"
-                              onClick={() => excluir(f)}
-                              title="Excluir fatura"
-                              aria-label={`Excluir a fatura de ${rotuloCompetencia(f.competencia)}`}
-                              className="btn-icone btn-icone-perigo"
-                            >
-                              <Trash2 aria-hidden="true" />
-                            </button>
-                          )}
-                        </span>
-                      )}
+                      <span className="acoes-linha">
+                        {f.status === 'a_pagar' && podePagar && (
+                          <button type="button" onClick={() => setPagando(f)} aria-label={`Pagar a fatura de ${comp}`} className="btn btn-sm btn-secundario mr-1">
+                            <CheckCircle2 aria-hidden="true" /> Pagar
+                          </button>
+                        )}
+                        <MenuAcoes
+                          rotulo={`Mais ações da fatura de ${comp}`}
+                          acoes={[
+                            { rotulo: 'Editar fatura', icone: <Pencil aria-hidden="true" />, onClick: () => abrirEdicao(f), oculto: !editavel },
+                            {
+                              rotulo: 'Anexar arquivo',
+                              icone: <Paperclip aria-hidden="true" />,
+                              onClick: () => {
+                                setErro('');
+                                setAnexando(f);
+                              },
+                              oculto: !!f.arquivoCaminho,
+                            },
+                            {
+                              rotulo: 'Desfazer pagamento',
+                              icone: <RotateCcw aria-hidden="true" />,
+                              onClick: () => void desfazer(f),
+                              oculto: !(f.status === 'paga' && currentRole === 'ti_admin'),
+                            },
+                            {
+                              rotulo: 'Cancelar fatura',
+                              icone: <XCircle aria-hidden="true" />,
+                              onClick: () => void cancelar(f),
+                              oculto: !(f.status === 'a_pagar' && (isTI || currentRole === 'compras')),
+                            },
+                            {
+                              rotulo: 'Excluir fatura',
+                              icone: <Trash2 aria-hidden="true" />,
+                              onClick: () => void excluir(f),
+                              perigo: true,
+                              oculto: !(currentRole === 'ti_admin' && !f.pedidoId),
+                            },
+                          ]}
+                        />
+                      </span>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Seção 21: barra fixa do pagamento em lote */}
+      {emLote && selecionadas.length > 0 && (
+        <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+          <span>
+            <span className="num font-semibold text-slate-900">{selecionadas.length}</span> {selecionadas.length === 1 ? 'selecionada' : 'selecionadas'} · total{' '}
+            <span className="num font-semibold text-slate-900">{formatCurrency(totalSelecionado)}</span>
+          </span>
+          <span className="ml-auto flex flex-wrap gap-2">
+            <button type="button" onClick={() => setSelecao(new Set())} className="btn btn-sm btn-secundario">
+              Limpar seleção
+            </button>
+            <button type="button" onClick={() => setPagandoLote(true)} className="btn btn-sm btn-primario">
+              <CheckCircle2 aria-hidden="true" /> Registrar pagamento
+            </button>
+          </span>
         </div>
       )}
 
@@ -395,7 +468,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
           <JanelaPagamento
             fatura={pagando}
             origem={origem(pagando)}
-            formaSugerida={pagando.formaPagamento || formaCadastrada(pagando)?.formaPagamento}
+            formaSugerida={formaSugerida(pagando)}
             cartaoFinal={formaCadastrada(pagando)?.cartaoFinal}
             onFechar={() => setPagando(null)}
             onPago={() => {
@@ -405,7 +478,196 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
           />,
           document.body
         )}
+      {pagandoLote &&
+        selecionadas.length > 0 &&
+        createPortal(
+          <JanelaPagamentoLote
+            faturas={selecionadas}
+            nome={(f) => `${origem(f) || 'Conta avulsa'} · ${rotuloCompetencia(f.competencia)}`}
+            formaSugerida={formasSelecionadas.size === 1 ? [...formasSelecionadas][0] : undefined}
+            onFechar={() => setPagandoLote(false)}
+            onPagas={(ids) => setSelecao((antes) => new Set([...antes].filter((id) => !ids.includes(id))))}
+          />,
+          document.body
+        )}
+      {anexando && createPortal(<JanelaAnexo fatura={anexando} onFechar={() => setAnexando(null)} />, document.body)}
     </div>
+  );
+};
+
+/**
+ * Seção 21: pagamento em lote. Uma janela (data e forma) registra cada fatura com o
+ * mesmo `editarFatura` do pagamento individual, uma por vez; diz qual falhou.
+ */
+const JanelaPagamentoLote: React.FC<{
+  faturas: Fatura[];
+  nome: (f: Fatura) => string;
+  formaSugerida?: Fatura['formaPagamento'];
+  onFechar: () => void;
+  onPagas: (ids: string[]) => void;
+}> = ({ faturas, nome, formaSugerida, onFechar, onPagas }) => {
+  const { editarFatura } = useApp();
+  const [data, setData] = useState(() => isoLocal(new Date()));
+  const [forma, setForma] = useState<string>(formaSugerida || '');
+  const [erros, setErros] = useState<string[]>([]);
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const total = faturas.reduce((s, f) => s + valorEfetivo(f), 0);
+  const id = 'pagamento-lote';
+
+  const registrar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (salvando) return;
+    if (!data) return setErro('Informe a data do pagamento.');
+    if (data > isoLocal(new Date())) return setErro('A data do pagamento não pode ser no futuro.');
+    if (!forma) return setErro('Informe a forma de pagamento.');
+    setErro('');
+    setErros([]);
+    setSalvando(true);
+    const pagas: string[] = [];
+    const falhas: string[] = [];
+    for (const f of faturas) {
+      const falha = await editarFatura(f.id, { status: 'paga', pagoEm: data, formaPagamento: forma as Fatura['formaPagamento'] });
+      if (falha) falhas.push(`${nome(f)}: ${falha}`);
+      else pagas.push(f.id);
+    }
+    setSalvando(false);
+    onPagas(pagas);
+    if (falhas.length === 0) return onFechar();
+    setErros(falhas);
+  };
+
+  return (
+    <Janela
+      tamanho="p"
+      titulo="Registrar pagamento"
+      subtitulo={`${faturas.length} ${faturas.length === 1 ? 'fatura' : 'faturas'} · total ${formatCurrency(total)}`}
+      icone={<CheckCircle2 className="ico" />}
+      onFechar={onFechar}
+      rodape={
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={onFechar} className="btn btn-secundario">
+            Cancelar
+          </button>
+          <button type="submit" form={id} disabled={salvando} autoFocus={!!forma} className="btn btn-primario">
+            {salvando ? 'Registrando…' : 'Confirmar'}
+          </button>
+        </div>
+      }
+    >
+      <form id={id} onSubmit={registrar} className="space-y-3">
+        <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+          {faturas.map((f) => (
+            <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-2">
+              <span className="min-w-0 truncate">{nome(f)}</span>
+              <span className="num shrink-0">{textoValor(f)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor={`${id}-data`} className={CLASSE_ROTULO}>
+              Data do pagamento *
+            </label>
+            <input id={`${id}-data`} type="date" required max={isoLocal(new Date())} value={data} onChange={(e) => setData(e.target.value)} className={CLASSE_CAMPO} />
+          </div>
+          <div>
+            <label htmlFor={`${id}-forma`} className={CLASSE_ROTULO}>
+              Forma de pagamento *
+            </label>
+            <select id={`${id}-forma`} required autoFocus={!forma} value={forma} onChange={(e) => setForma(e.target.value)} className={CLASSE_CAMPO}>
+              <option value="">Escolha…</option>
+              {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className="ajuda">Cada fatura é registrada pelo valor lançado. Juros, desconto ou comprovante: pague a fatura sozinha.</p>
+        {erro && (
+          <p className="erro" role="alert">
+            {erro}
+          </p>
+        )}
+        {erros.length > 0 && (
+          <div className="erro" role="alert">
+            <p>Estas não foram registradas (as demais foram):</p>
+            <ul className="list-disc pl-4">
+              {erros.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </form>
+    </Janela>
+  );
+};
+
+/** Seção 21: anexar o arquivo de uma fatura já lançada (sai da linha; vem do menu de ações) */
+const JanelaAnexo: React.FC<{ fatura: Fatura; onFechar: () => void }> = ({ fatura, onFechar }) => {
+  const { anexarArquivoFatura } = useApp();
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  useRegistrarPendencias(`fatura-arquivo:${fatura.id}`, arquivo ? ['Arquivo da fatura não enviado'] : []);
+  const id = `fatura-arq-${fatura.id}`;
+
+  const escolher = (f: File | undefined) => {
+    if (!f) return;
+    const msg = validarArquivo(f);
+    setErro(msg || '');
+    setArquivo(msg ? null : f);
+  };
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!arquivo || enviando) return;
+    setEnviando(true);
+    // Sobe para faturas/<id>/ e grava o caminho; se falhar, o aviso de erro explica
+    const ok = await anexarArquivoFatura(fatura.id, arquivo);
+    setEnviando(false);
+    if (ok) onFechar();
+    else setErro('Não foi possível enviar o arquivo. Tente de novo.');
+  };
+
+  return (
+    <Janela
+      tamanho="p"
+      titulo="Anexar arquivo"
+      subtitulo={`Fatura de ${rotuloCompetencia(fatura.competencia)} · ${formatCurrency(valorEfetivo(fatura))}`}
+      icone={<Paperclip className="ico" />}
+      onFechar={onFechar}
+      rodape={
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={onFechar} disabled={enviando} className="btn btn-secundario">
+            Cancelar
+          </button>
+          <button type="submit" form={id} disabled={!arquivo || enviando} className="btn btn-primario">
+            <Upload aria-hidden="true" />
+            {enviando ? 'Enviando…' : 'Enviar'}
+          </button>
+        </div>
+      }
+    >
+      <form id={id} onSubmit={enviar} className="space-y-3">
+        <div>
+          <label htmlFor={`${id}-campo`} className={CLASSE_ROTULO}>
+            Arquivo (PDF ou imagem)
+          </label>
+          <input id={`${id}-campo`} type="file" accept={TIPOS_ARQUIVO_ACEITOS.join(',')} onChange={(e) => escolher(e.target.files?.[0])} className={CLASSE_ARQUIVO} />
+        </div>
+        {erro && (
+          <p className="erro" role="alert">
+            {erro}
+          </p>
+        )}
+      </form>
+    </Janela>
   );
 };
 
@@ -489,8 +751,9 @@ const JanelaPagamento: React.FC<{
             <button type="button" onClick={onFechar} className="btn btn-secundario">
               Cancelar
             </button>
-            <button type="submit" form={id} disabled={salvando} className="btn btn-primario">
-              {salvando ? 'Registrando…' : 'Registrar pagamento'}
+            {/* Seção 21 (pagar rápido): já vem preenchida; o foco fica em Confirmar, um clique conclui */}
+            <button type="submit" form={id} disabled={salvando} autoFocus={!!formaSugerida} className="btn btn-primario">
+              {salvando ? 'Registrando…' : 'Confirmar'}
             </button>
           </span>
         </>
@@ -507,7 +770,7 @@ const JanelaPagamento: React.FC<{
           <label htmlFor={`${id}-forma`} className={CLASSE_ROTULO}>
             Forma de pagamento *
           </label>
-          <select id={`${id}-forma`} required value={forma} onChange={(e) => setForma(e.target.value)} className={CLASSE_CAMPO}>
+          <select id={`${id}-forma`} required autoFocus={!formaSugerida} value={forma} onChange={(e) => setForma(e.target.value)} className={CLASSE_CAMPO}>
             <option value="">Escolha…</option>
             {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([k, v]) => (
               <option key={k} value={k}>
@@ -601,6 +864,9 @@ export const BotaoContaDoAtivo: React.FC<{ ativo: Asset; compacto?: boolean }> =
   );
 };
 
+/** Seção 21: grupos da escolha de origem em "Lançar fatura" */
+const GRUPOS_ORIGEM = ['Contratos', 'Licenças', 'Pedidos'] as const;
+
 /** Fatura avulsa: sem contrato, licença ou pedido (seção 17) */
 export const ehAvulsa = (f: Pick<Fatura, 'licencaId' | 'contratoId' | 'pedidoId'>) => !f.licencaId && !f.contratoId && !f.pedidoId;
 
@@ -638,8 +904,24 @@ export const FormFatura: React.FC<{
       : alvoEscolhido.startsWith('l:')
         ? { licencaId: alvoEscolhido.slice(2) }
         : undefined);
-  const doMesmoAlvo = alvoFixo ? doMesmoAlvoFixo : alvo ? faturasDoAlvo(faturas, alvo) : [];
-  const [sugerida] = useState(() => editando?.competencia || proximaCompetencia(doMesmoAlvo, periodicidade));
+  // Seção 21: pedido comprado cuja fatura foi cancelada pode ganhar fatura nova aqui
+  const { pedidos: pedidosCompra } = useCompras();
+  const pedidoId = !alvoFixo && alvoEscolhido.startsWith('p:') ? alvoEscolhido.slice(2) : '';
+  const pedidoEscolhido = pedidoId ? pedidosCompra.find((p) => p.id === pedidoId) : undefined;
+  const doMesmoAlvo = alvoFixo ? doMesmoAlvoFixo : alvo ? faturasDoAlvo(faturas, alvo) : pedidoId ? faturas.filter((f) => f.pedidoId === pedidoId) : [];
+  // Seção 21: em Contas a pagar a competência padrão é o mês atual; na ficha, a próxima da sequência
+  const [sugerida] = useState(() => editando?.competencia || (alvoFixo ? proximaCompetencia(doMesmoAlvo, periodicidade) : competenciaDe(isoLocal(new Date()))));
+  const [filtroOrigem, setFiltroOrigem] = useState('');
+  // Origens possíveis, em grupos: contratos ativos, licenças com cobrança própria e pedidos comprados sem fatura
+  const opcoesOrigem: { grupo: (typeof GRUPOS_ORIGEM)[number]; valor: string; nome: string; valorPadrao?: number }[] = [
+    ...contratos.filter((c) => c.status !== 'encerrado').map((c) => ({ grupo: 'Contratos' as const, valor: `c:${c.id}`, nome: nomeContrato(c), valorPadrao: c.valor })),
+    ...licenses
+      .filter((l) => l.status !== 'inativa' && formaCobrancaDe(l, contratos) === 'propria')
+      .map((l) => ({ grupo: 'Licenças' as const, valor: `l:${l.id}`, nome: l.nome, valorPadrao: l.valorMensal })),
+    ...pedidosCompra
+      .filter((p) => (p.status === 'comprado' || p.status === 'recebido') && !p.semValores && !faturas.some((f) => f.pedidoId === p.id && f.status !== 'cancelada'))
+      .map((p) => ({ grupo: 'Pedidos' as const, valor: `p:${p.id}`, nome: `${p.codigo} · ${p.titulo}`, valorPadrao: p.valorFinal })),
+  ];
   const [competencia, setCompetencia] = useState(avulsaInicial?.competencia || sugerida);
   const [valor, setValor] = useState<number | undefined>(editando?.valor ?? avulsaInicial?.valor ?? valorPadrao);
   const naturezaAuto = naturezaDoLancamento({ categoria, valorUnitario: valor || 0 }, limite);
@@ -666,6 +948,7 @@ export const FormFatura: React.FC<{
 
   const nomeAlvo = (() => {
     if (avulsa) return 'Conta avulsa (sem contrato, licença ou pedido)';
+    if (pedidoEscolhido) return `Pedido ${pedidoEscolhido.codigo} · ${pedidoEscolhido.titulo}`;
     if (!alvo) return 'Escolha de quem é a fatura';
     if (alvo.contratoId) {
       const c = contratos.find((x) => x.id === alvo.contratoId);
@@ -693,7 +976,7 @@ export const FormFatura: React.FC<{
     // A janela fica em portal, mas o React ainda propaga o "submit" pela árvore: não deixa chegar a um formulário de fora
     e.stopPropagation();
     if (salvando) return;
-    if (!alvo && !avulsa) return setErro('Escolha de quem é a fatura (contrato, licença ou avulsa).');
+    if (!alvo && !avulsa && !pedidoId) return setErro('Escolha de quem é a fatura (contrato, licença, pedido ou avulsa).');
     if (avulsa && !fornecedorId) return setErro('Conta avulsa: escolha o fornecedor.');
     if (avulsa && descricao.trim().length < 3) return setErro('Conta avulsa: descreva o que foi comprado ou contratado.');
     if (naturezaManual && naturezaManual !== naturezaAuto && naturezaMotivo.trim().length < 3)
@@ -712,6 +995,7 @@ export const FormFatura: React.FC<{
       : {};
     const dados = {
       ...(alvo || {}),
+      ...(pedidoId ? { pedidoId } : {}),
       ...extrasAvulsa,
       moeda: moeda as Fatura['moeda'],
       valorMoeda: moeda !== 'BRL' && valorMoeda !== '' ? Number(valorMoeda) : undefined,
@@ -806,38 +1090,41 @@ export const FormFatura: React.FC<{
               <label htmlFor={id('alvo')} className={CLASSE_ROTULO}>
                 De quem é a fatura *
               </label>
+              {/* Seção 21 (escala): com muitas opções, um filtro acima da lista agrupada */}
+              {opcoesOrigem.length > 15 && (
+                <input
+                  type="search"
+                  value={filtroOrigem}
+                  onChange={(e) => setFiltroOrigem(e.target.value)}
+                  aria-label="Filtrar contratos, licenças e pedidos"
+                  placeholder="Filtrar contratos, licenças e pedidos…"
+                  className={`${CLASSE_CAMPO} mb-2`}
+                />
+              )}
               <select
                 id={id('alvo')}
                 value={alvoEscolhido}
                 onChange={(e) => {
                   setAlvoEscolhido(e.target.value);
-                  const c = contratos.find((x) => 'c:' + x.id === e.target.value);
-                  const l = licenses.find((x) => 'l:' + x.id === e.target.value);
-                  if (c) setValor(c.valor);
-                  if (l) setValor(l.valorMensal);
+                  const escolhida = opcoesOrigem.find((o) => o.valor === e.target.value);
+                  if (escolhida?.valorPadrao !== undefined) setValor(escolhida.valorPadrao);
                 }}
                 className={CLASSE_CAMPO}
               >
                 <option value="">Escolha…</option>
                 <option value="avulsa">Conta avulsa (sem contrato, licença ou pedido)</option>
-                <optgroup label="Contratos">
-                  {contratos
-                    .filter((c) => c.status !== 'encerrado')
-                    .map((c) => (
-                      <option key={c.id} value={`c:${c.id}`}>
-                        {nomeContrato(c)}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Softwares com cobrança própria">
-                  {licenses
-                    .filter((l) => l.status !== 'inativa' && formaCobrancaDe(l, contratos) === 'propria')
-                    .map((l) => (
-                      <option key={l.id} value={`l:${l.id}`}>
-                        {l.nome}
-                      </option>
-                    ))}
-                </optgroup>
+                {GRUPOS_ORIGEM.map((g) => {
+                  const doGrupo = opcoesOrigem.filter((o) => o.grupo === g && (o.valor === alvoEscolhido || !filtroOrigem || normalizar(o.nome).includes(normalizar(filtroOrigem))));
+                  return doGrupo.length === 0 ? null : (
+                    <optgroup key={g} label={g}>
+                      {doGrupo.map((o) => (
+                        <option key={o.valor} value={o.valor}>
+                          {o.nome}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
             </div>
           )}
