@@ -20,8 +20,6 @@ import { SELO_STATUS_CHAMADO } from '../servicedesk/SeloSla.tsx';
 import { imprimirRelatorio } from '../servicedesk/relatorioChamado.ts';
 import { Vazio } from '../ui/Tela.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
-import { Abas } from '../ui/Abas.tsx';
-import { modeloLayout } from '../../utils/layoutTeste.ts';
 
 const PAPEL: Record<string, string> = {
   ti_admin: 'Admin de T.I.',
@@ -59,9 +57,6 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
   const ticket = tickets.find((t) => t.id === chamadoId);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   const [cancelando, setCancelando] = useState(false);
-  // TEMPORÁRIO: modelo de disposição em teste (A ou B)
-  const [modelo] = useState(modeloLayout);
-  const [abaLado, setAbaLado] = useState<'pedido' | 'anotacoes' | 'atendimento'>('pedido');
 
   // Abre no topo da página (a lista podia estar rolada) e com o título do processo na aba
   const codigo = ticket?.codigo;
@@ -232,54 +227,21 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
 
       {ticket.status === 'cancelado' && ticket.cancelamento && <BlocoCancelamento ticket={ticket} />}
 
-      {/* Seção 19 (TEMPORÁRIO, escolha do dono): modelo A = atendimento embaixo do checklist e resumo fixo à direita;
-          modelo B = à direita um cartão único com abas Pedido | Anotações | Atendimento */}
+      {/* Seção 19 (modelo A, escolhido pelo dono): checklist e atendimento na coluna larga;
+          pedido e anotações à direita, fixos ao rolar (no celular tudo empilhado) */}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           {usaChecklistLegado ? <ChecklistLegado ticket={ticket} isTI={isTI} concluir={concluirOffboarding} /> : <ChecklistProcesso ticket={ticket} />}
-          {modelo === 'a' && (
-            <>
-              <section className="cartao space-y-3 p-4">
-                <Conversa ticket={ticket} isTI={isTI} encerrado={encerrado} enviar={addTicketMessage} meuId={currentUser?.id} />
-              </section>
-              {trilha}
-            </>
-          )}
+          <section className="cartao space-y-3 p-4">
+            <Conversa ticket={ticket} isTI={isTI} encerrado={encerrado} enviar={addTicketMessage} meuId={currentUser?.id} />
+          </section>
+          {trilha}
         </div>
 
-        {modelo === 'a' ? (
-          <aside className={`min-w-0 space-y-4 lg:sticky ${emJanela ? 'lg:top-4' : 'lg:top-20'}`} aria-label="Pedido e anotações">
-            {ehOnb ? <PedidoAdmissao ticket={ticket} /> : ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
-            <AnotacoesProcesso ticket={ticket} podeEditar={isTI} onSalvar={salvarAnotacoesProcesso} />
-          </aside>
-        ) : (
-          <aside className="cartao min-w-0" aria-label="Pedido, anotações e atendimento">
-            <div className="border-b border-slate-200 px-4">
-              <Abas
-                rotulo="Pedido, anotações e atendimento"
-                className="abas-linha"
-                ativa={abaLado}
-                onMudar={setAbaLado}
-                itens={[
-                  { id: 'pedido', rotulo: 'Pedido' },
-                  { id: 'anotacoes', rotulo: 'Anotações' },
-                  { id: 'atendimento', rotulo: 'Atendimento', contador: ticket.mensagens.length },
-                ]}
-              />
-            </div>
-            {/* Os blocos já são cartões: aqui dentro perdem borda e respiro próprios */}
-            <div className="space-y-4 p-4 [&>*]:border-0 [&>*]:p-0 [&>*]:shadow-none">
-              {abaLado === 'pedido' && (ehOnb ? <PedidoAdmissao ticket={ticket} /> : ticket.offboarding && <PedidoDesligamento ticket={ticket} />)}
-              {abaLado === 'anotacoes' && <AnotacoesProcesso ticket={ticket} podeEditar={isTI} onSalvar={salvarAnotacoesProcesso} />}
-              {abaLado === 'atendimento' && (
-                <>
-                  <Conversa ticket={ticket} isTI={isTI} encerrado={encerrado} enviar={addTicketMessage} meuId={currentUser?.id} />
-                  {trilha}
-                </>
-              )}
-            </div>
-          </aside>
-        )}
+        <aside className={`min-w-0 space-y-4 lg:sticky ${emJanela ? 'lg:top-4' : 'lg:top-20'}`} aria-label="Pedido e anotações">
+          {ehOnb ? <PedidoAdmissao ticket={ticket} /> : ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
+          <AnotacoesProcesso ticket={ticket} podeEditar={isTI} onSalvar={salvarAnotacoesProcesso} />
+        </aside>
       </div>
       {cancelando && <FormCancelamento ticket={ticket} onClose={() => setCancelando(false)} />}
     </div>
