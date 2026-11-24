@@ -206,7 +206,7 @@ export function projecaoGastos(
   dados: {
     recorrentes: ItemRecorrente[];
     ativos: AtivoImobilizado[];
-    pedidosAprovados: { codigo: string; titulo: string; valor: number; previstoPara?: string; categoria?: CategoriaDespesa; natureza?: Natureza }[];
+    pedidosAprovados: { id?: string; codigo: string; titulo: string; valor: number; previstoPara?: string; categoria?: CategoriaDespesa; natureza?: Natureza }[];
   },
   meses = 24,
   premissas: Premissas = {},
@@ -237,7 +237,7 @@ export function projecaoGastos(
     const quando = d.zeraEm?.slice(0, 7);
     if (!quando || !lista.includes(quando)) return;
     const valor = premissas.reposicao?.[a.categoria || ''] ?? d.valorCompra;
-    if (valor > 0) itens.push({ mes: quando, natureza: 'capex', origem: 'reposicao', nome: `${a.tag} · ${a.nome}`, categoria: 'hardware', valor });
+    if (valor > 0) itens.push({ mes: quando, natureza: 'capex', origem: 'reposicao', origemId: a.id, nome: `${a.tag} · ${a.nome}`, categoria: 'hardware', valor });
   });
 
   dados.pedidosAprovados.forEach((p) => {
@@ -247,7 +247,7 @@ export function projecaoGastos(
     const mes = previsto && lista.includes(previsto) ? previsto : lista[0];
     const categoria = p.categoria || 'hardware';
     const natureza = p.natureza || naturezaDoLancamento({ categoria, valorUnitario: p.valor }, limite);
-    if (p.valor > 0) itens.push({ mes, natureza, origem: 'pedido', nome: `${p.codigo} · ${p.titulo}`, categoria, valor: p.valor });
+    if (p.valor > 0) itens.push({ mes, natureza, origem: 'pedido', origemId: p.id, nome: `${p.codigo} · ${p.titulo}`, categoria, valor: p.valor });
   });
 
   const porMes = lista.map((mes) => {
@@ -257,6 +257,58 @@ export function projecaoGastos(
     return { mes, opex, capex, total: c(opex + capex) };
   });
   return { meses: porMes, itens };
+}
+
+/** Seção 21: a projeção numa tabela por ano (linhas = anos, 12 colunas de mês, total do ano) */
+export function projecaoPorAno(meses: MesProjecao[]): { ano: number; meses: (MesProjecao | undefined)[]; total: number }[] {
+  const anos = new Map<number, (MesProjecao | undefined)[]>();
+  meses.forEach((m) => {
+    const ano = Number(m.mes.slice(0, 4));
+    const linha = anos.get(ano) || Array<MesProjecao | undefined>(12).fill(undefined);
+    linha[Number(m.mes.slice(5, 7)) - 1] = m;
+    anos.set(ano, linha);
+  });
+  return [...anos.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([ano, ms]) => ({ ano, meses: ms, total: c(ms.reduce((s, m) => s + (m?.total || 0), 0)) }));
+}
+
+/**
+ * Recorrente que ainda falta lançar no ano (a parte "que falta" da Projeção até dezembro
+ * do Orçamento). Ano passado: nada. Ano corrente: o mês corrente (se ainda não foi faturado)
+ * e os meses seguintes da projeção. Ano futuro: os meses dele que a projeção cobre.
+ * Competência que já tem fatura (a pagar ou paga) não conta de novo: já está no livro.
+ */
+export function recorrenteRestante<R extends ItemRecorrente>(
+  dados: { projecao: Projecao; recorrentes: R[]; faturas: { status: string; competencia: string; contratoId?: string; licencaId?: string }[] },
+  ano: number,
+  agora: Date = new Date()
+): { recorrente: R; mes: string; valor: number }[] {
+  const anoAtual = agora.getFullYear();
+  if (ano < anoAtual) return [];
+  const mesCorrente = `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+  const faturado = (r: R, mes: string) =>
+    dados.faturas.some(
+      (f) =>
+        f.status !== 'cancelada' &&
+        f.competencia.startsWith(mes) &&
+        (r.origem === 'contrato' ? f.contratoId === r.id : r.origem === 'licenca' ? f.licencaId === r.id : false)
+    );
+  const porChave = new Map(dados.recorrentes.map((r) => [`${r.origem}|${r.id}`, r]));
+  const out: { recorrente: R; mes: string; valor: number }[] = [];
+  dados.projecao.itens.forEach((i) => {
+    if (!i.origemId || i.natureza !== 'opex' || !i.mes.startsWith(`${ano}-`) || i.mes <= mesCorrente) return;
+    const r = porChave.get(`${i.origem}|${i.origemId}`);
+    if (!r || faturado(r, i.mes)) return;
+    out.push({ recorrente: r, mes: i.mes, valor: i.valor });
+  });
+  if (ano === anoAtual)
+    dados.recorrentes.forEach((r) => {
+      if (r.mensal <= 0 || faturado(r, mesCorrente)) return;
+      if (r.fim && r.fim.slice(0, 7) < mesCorrente && !r.renova) return;
+      out.push({ recorrente: r, mes: mesCorrente, valor: r.mensal });
+    });
+  return out;
 }
 
 /**
@@ -298,9 +350,15 @@ export interface Lancamento {
   area: string;
   mes: number; // 0–11, pela competência
   valor: number;
-  /** De onde veio (para o rateio entre áreas) */
-  origem?: { fatura?: string; contrato?: string; licenca?: string };
+  /** De onde veio (rateio entre áreas e link para o item na tela) */
+  origem?: { fatura?: string; contrato?: string; licenca?: string; pedido?: string; ativo?: string };
 }
+
+/** Chave da linha do orçamento de gestão: natureza + categoria + área */
+export const chaveGestao = (natureza: Natureza, categoria: CategoriaDespesa, area: string) => `${natureza}|${categoria}|${area.trim().toLowerCase()}`;
+
+/** Lançamentos que compõem uma linha do orçamento de gestão (para abrir o recorte) */
+export const lancamentosDaLinha = (lancs: Lancamento[], chave: string) => lancs.filter((l) => chaveGestao(l.natureza, l.categoria, l.area) === chave);
 
 export interface LinhaGestao {
   chave: string;
@@ -329,7 +387,7 @@ export function orcamentoDeGestao(
 ): LinhaGestao[] {
   const m = new Map<string, LinhaGestao>();
   const pegar = (natureza: Natureza, categoria: CategoriaDespesa, area: string) => {
-    const chave = `${natureza}|${categoria}|${area.trim().toLowerCase()}`;
+    const chave = chaveGestao(natureza, categoria, area);
     let l = m.get(chave);
     if (!l) {
       l = { chave, natureza, categoria, area: area.trim(), previsto: 0, comprometido: 0, aPagar: 0, realizado: 0, disponivel: 0, projecaoDezembro: 0 };
@@ -447,7 +505,7 @@ export function lancamentosDoLivro(
       area: ar,
       mes: Number(f.competencia.slice(5, 7)) - 1,
       valor: c(valor),
-      origem: { fatura: f.id, contrato: f.contratoId, licenca: f.licencaId },
+      origem: { fatura: f.id, contrato: f.contratoId, licenca: f.licencaId, pedido: f.pedidoId, ativo: f.ativoId },
     });
   });
 
@@ -458,7 +516,7 @@ export function lancamentosDoLivro(
       const mes = anoCorrenteMes(p.competencia);
       if (mes === null || !(p.valor > 0)) return;
       const categoria = p.categoria || 'hardware';
-      out.push({ situacao: 'comprometido', natureza: naturezaDoLancamento({ categoria, valorUnitario: p.valor }, limite), categoria, area: area(p.departamentoId, p.area), mes, valor: c(p.valor) });
+      out.push({ situacao: 'comprometido', natureza: naturezaDoLancamento({ categoria, valorUnitario: p.valor }, limite), categoria, area: area(p.departamentoId, p.area), mes, valor: c(p.valor), origem: { pedido: p.id } });
     });
 
   dados.ativos
@@ -467,7 +525,7 @@ export function lancamentosDoLivro(
       const mes = anoCorrenteMes(a.fiscal?.dataAquisicao);
       const valor = Number(a.fiscal?.valorCompra) || 0;
       if (mes === null || !valor) return;
-      out.push({ situacao: 'realizado', natureza: naturezaDoAtivo(a, limite), categoria: 'hardware', area: nomeDep(a.setorId), mes, valor: c(valor) });
+      out.push({ situacao: 'realizado', natureza: naturezaDoAtivo(a, limite), categoria: 'hardware', area: nomeDep(a.setorId), mes, valor: c(valor), origem: { ativo: a.id } });
     });
   return out;
 }
