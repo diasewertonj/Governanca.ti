@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { formatCurrency, formatDate } from '../../utils/formatters.ts';
 import { Key, ExternalLink, Pencil, UserPlus, UserMinus, CheckCircle2, AlertCircle, Ban, ChevronRight } from 'lucide-react';
@@ -10,13 +10,13 @@ import { ROTULO_FORMA_COBRANCA, ROTULO_FORMA_PAGAMENTO, dataLimiteCancelamento, 
 import { HistoricoAlteracoes } from '../comum/HistoricoAlteracoes.tsx';
 import { LembreteLicenca } from './LembreteLicenca.tsx';
 import { ContratoPorId } from '../financeiro/FinanceiroViews.tsx';
-import { historicoAssentos, licencaAtiva } from '../../utils/licencas.ts';
+import { PODE_AJUSTAR_ASSENTOS, historicoAssentos, licencaAtiva, quantidadeContratadaDaLicenca, valorProporcional } from '../../utils/licencas.ts';
 import { avisar, confirmar, confirmarMovimento, pedirTexto } from '../ui/dialogo.tsx';
 import { chamadoEncerrado } from '../../utils/atendimento.ts';
 import { Janela, Dado } from '../ui/Janela.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
 import { Busca, Vazio } from '../ui/Tela.tsx';
-import type { DadosPagamento, SoftwareLicense } from '../../types/index.ts';
+import type { DadosPagamento, EventoLicenca, SoftwareLicense } from '../../types/index.ts';
 
 interface Software360ModalProps {
   softwareId: string;
@@ -104,7 +104,8 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     departments,
     allocateLicense,
     revokeLicense,
-    editarLicenca,
+    ajustarAssentosLicenca,
+    eventosDaLicenca,
     setSelectedEmployeeIdFor360,
     setSelectedTicketIdForDetail,
     setSoftwareToEdit,
@@ -127,8 +128,30 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isEditingSeats, setIsEditingSeats] = useState(false);
   const [newTotalSeats, setNewTotalSeats] = useState<number>(0);
+  const [motivoAjuste, setMotivoAjuste] = useState('');
+  const [novoValor, setNovoValor] = useState('');
+  const [erroAjuste, setErroAjuste] = useState<string | null>(null);
+  const [salvandoAjuste, setSalvandoAjuste] = useState(false);
+  const [eventos, setEventos] = useState<EventoLicenca[]>([]);
 
   const license = licenses.find((l) => l.id === softwareId);
+  const podeAjustar = PODE_AJUSTAR_ASSENTOS.includes(currentRole);
+  const podeVerCapacidade = podeAjustar || currentRole === 'ti_suporte';
+  const totalAtual = license?.assentosTotais;
+  const valorAtual = license?.valorMensal;
+
+  useEffect(() => {
+    if (!podeVerCapacidade) return;
+    let vivo = true;
+    eventosDaLicenca(softwareId)
+      .then((lista) => vivo && setEventos(lista))
+      .catch(() => vivo && setEventos([]));
+    return () => {
+      vivo = false;
+    };
+    // eventosDaLicenca muda a cada render do provedor; recarrega quando total ou valor mudam
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [softwareId, totalAtual, valorAtual, podeVerCapacidade]);
 
   if (!license) return null;
 
@@ -276,17 +299,34 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     setTimeout(() => setFeedbackMsg(null), 3000);
   };
 
-  const handleSaveTotalSeats = async () => {
-    if (newTotalSeats < license.assentosAlocados) {
-      setFeedbackMsg({
-        text: `O total de assentos não pode ser menor que os assentos atualmente em uso (${license.assentosAlocados}).`,
-        type: 'error',
-      });
-      setTimeout(() => setFeedbackMsg(null), 4000);
-      return;
+  const formaCobranca = license.formaCobranca || 'propria';
+  const contratada = formaCobranca === 'contrato' ? quantidadeContratadaDaLicenca(license.id, contratos) : null;
+  const nomeQuem = (id?: string) => (id ? employees.find((e) => e.id === id)?.nome || 'Pessoa removida' : 'Sistema');
+
+  const abrirAjuste = () => {
+    setNewTotalSeats(license.assentosTotais);
+    setNovoValor(String(license.valorMensal ?? 0));
+    setMotivoAjuste('');
+    setErroAjuste(null);
+    setIsEditingSeats(true);
+  };
+
+  // Cobrança própria: ao mudar o total, sugere o valor proporcional (editável)
+  const mudarTotalAjuste = (v: number) => {
+    setNewTotalSeats(v);
+    if (formaCobranca === 'propria' && Number.isFinite(v) && v >= 0) {
+      setNovoValor(String(valorProporcional(license.valorMensal || 0, license.assentosTotais, v)));
     }
-    const falha = await editarLicenca(license.id, { assentosTotais: newTotalSeats });
-    if (falha) return setFeedbackMsg({ text: `Não foi possível salvar: ${falha}`, type: 'error' });
+  };
+
+  const handleSaveTotalSeats = async () => {
+    if (salvandoAjuste) return;
+    setErroAjuste(null);
+    setSalvandoAjuste(true);
+    const valor = formaCobranca === 'propria' ? Number(novoValor.replace(',', '.')) : undefined;
+    const falha = await ajustarAssentosLicenca(license.id, newTotalSeats, valor, motivoAjuste);
+    setSalvandoAjuste(false);
+    if (falha) return setErroAjuste(falha);
     setIsEditingSeats(false);
     setFeedbackMsg({
       text: `Quantidade total de assentos atualizada para ${newTotalSeats}!`,
@@ -484,47 +524,141 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
           <section className="cartao space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="secao-titulo">Capacidade</h3>
-              {isTI && !isEditingSeats && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewTotalSeats(license.assentosTotais);
-                    setIsEditingSeats(true);
-                  }}
-                  className="btn btn-sm btn-secundario"
-                >
+              {podeAjustar && ativa && !isEditingSeats && (
+                <button type="button" onClick={abrirAjuste} className="btn btn-sm btn-secundario">
                   <Pencil />
                   Ajustar total de assentos
                 </button>
               )}
             </div>
 
-            {isTI && isEditingSeats && (
-              <div className="flex flex-wrap items-end gap-2">
+            {contratada != null && (
+              <p className="texto-aux">
+                Contratado: <span className="font-mono font-semibold text-slate-900">{contratada}</span> assento(s) no contrato.
+              </p>
+            )}
+            {isTI && !podeAjustar && (
+              <p className="ajuda">O total de assentos é ajustado pelo administrador da T.I. ou por Compras; aqui você aloca e libera pessoas.</p>
+            )}
+
+            {podeAjustar && isEditingSeats && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSaveTotalSeats();
+                }}
+                className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3"
+              >
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label htmlFor={`total-assentos-${license.id}`} className="rotulo">
+                      Novo total de assentos
+                    </label>
+                    <input
+                      id={`total-assentos-${license.id}`}
+                      type="number"
+                      min={license.assentosAlocados}
+                      value={newTotalSeats}
+                      onChange={(e) => mudarTotalAjuste(Number(e.target.value))}
+                      className="campo campo-sm w-28 font-mono"
+                    />
+                  </div>
+                  {formaCobranca === 'propria' && (
+                    <div>
+                      <label htmlFor={`valor-assentos-${license.id}`} className="rotulo">
+                        Novo valor mensal (R$)
+                      </label>
+                      <input
+                        id={`valor-assentos-${license.id}`}
+                        inputMode="decimal"
+                        value={novoValor}
+                        onChange={(e) => setNovoValor(e.target.value)}
+                        className="campo campo-sm w-32 font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+                {formaCobranca === 'propria' && (
+                  <p className="ajuda">
+                    Sugestão proporcional: {formatCurrency(valorProporcional(license.valorMensal || 0, license.assentosTotais, newTotalSeats))} (hoje{' '}
+                    {formatCurrency(license.valorMensal || 0)} para {license.assentosTotais}). Ajuste se o fornecedor cobrar diferente.
+                  </p>
+                )}
+                {formaCobranca === 'contrato' && contratada != null && (
+                  <p className="ajuda">Não pode passar do contratado ({contratada}). Para mais, faça um aditivo/renovação do contrato ou um pedido de compra.</p>
+                )}
                 <div>
-                  <label htmlFor={`total-assentos-${license.id}`} className="rotulo">
-                    Total de assentos
+                  <label htmlFor={`motivo-assentos-${license.id}`} className="rotulo">
+                    Motivo do ajuste *
                   </label>
                   <input
-                    id={`total-assentos-${license.id}`}
-                    type="number"
-                    min={license.assentosAlocados}
-                    value={newTotalSeats}
-                    onChange={(e) => setNewTotalSeats(Number(e.target.value))}
-                    className="campo campo-sm w-28 font-mono"
+                    id={`motivo-assentos-${license.id}`}
+                    value={motivoAjuste}
+                    onChange={(e) => setMotivoAjuste(e.target.value)}
+                    placeholder="Ex.: nova equipe de vendas"
+                    className="campo"
                   />
                 </div>
-                <button type="button" onClick={handleSaveTotalSeats} className="btn btn-sm btn-primario">
-                  Salvar
-                </button>
-                <button type="button" onClick={() => setIsEditingSeats(false)} className="btn btn-sm btn-secundario">
-                  Cancelar
-                </button>
-                <p className="ajuda w-full">Não pode ser menor que os assentos em uso ({license.assentosAlocados}).</p>
-              </div>
+                <p className="ajuda">Não pode ser menor que os assentos em uso ({license.assentosAlocados}). Fica registrado no histórico.</p>
+                {erroAjuste && (
+                  <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
+                    <AlertCircle className="ico text-red-600" />
+                    <span>{erroAjuste}</span>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button type="submit" disabled={salvandoAjuste} className="btn btn-sm btn-primario">
+                    {salvandoAjuste ? 'Salvando...' : 'Salvar'}
+                  </button>
+                  <button type="button" onClick={() => setIsEditingSeats(false)} className="btn btn-sm btn-secundario">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
             )}
 
             <BarraAssentos license={license} />
+
+            {podeVerCapacidade && (
+              <div className="space-y-2 border-t border-slate-100 pt-3">
+                <h4 className="secao-titulo">Histórico de capacidade e valor</h4>
+                {eventos.length === 0 ? (
+                  <p className="texto-aux">Nenhuma mudança registrada ainda.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {eventos.map((ev) => (
+                      <li key={ev.id} className="space-y-0.5 py-2 text-sm">
+                        <p className="text-slate-900">
+                          <span className="font-semibold">{formatDate(ev.em)}</span>
+                          {ev.totalDepois != null && (
+                            <>
+                              {' · '}
+                              Assentos:{' '}
+                              <span className="font-mono">
+                                {ev.totalAntes != null && ev.totalAntes !== ev.totalDepois ? `${ev.totalAntes} → ${ev.totalDepois}` : ev.totalDepois}
+                              </span>
+                            </>
+                          )}
+                          {ev.valorDepois != null && (ev.valorAntes ?? null) !== ev.valorDepois && (
+                            <>
+                              {' · '}
+                              Valor:{' '}
+                              <span className="font-mono">
+                                {ev.valorAntes != null ? `${formatCurrency(ev.valorAntes)} → ` : ''}
+                                {formatCurrency(ev.valorDepois)}
+                              </span>
+                            </>
+                          )}
+                        </p>
+                        <p className="texto-aux">
+                          {ev.motivo} · {nomeQuem(ev.por)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {/* Alocação de assento (licença inativa não recebe assento) */}
             {isTI && ativa && (

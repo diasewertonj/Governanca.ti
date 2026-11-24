@@ -54,13 +54,58 @@ const SecaoResumo: React.FC<{ titulo: string; children: React.ReactNode }> = ({ 
   </div>
 );
 
+/** Quantidade de assentos que o contrato cobre (teto do total da licença); o administrador edita */
+const QuantidadeContratada: React.FC<{ valor?: number; podeEditar: boolean; aoSalvar: (q: number | undefined) => Promise<void> }> = ({
+  valor,
+  podeEditar,
+  aoSalvar,
+}) => {
+  const [texto, setTexto] = useState(valor == null ? '' : String(valor));
+  const [salvando, setSalvando] = useState(false);
+  if (!podeEditar) {
+    return <span className="block font-normal text-slate-500">{valor != null ? `Contratado: ${valor} assento(s)` : 'Quantidade contratada não informada'}</span>;
+  }
+  const q = texto.trim() === '' ? undefined : Number(texto);
+  const valido = q === undefined || (Number.isInteger(q) && q > 0);
+  const mudou = q !== valor;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-2 font-normal">
+      <label className="rotulo m-0">
+        Contratado
+        <input
+          inputMode="numeric"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value.replace(/\D/g, ''))}
+          placeholder="não informado"
+          aria-label="Quantidade contratada de assentos"
+          className="campo campo-sm ml-2 w-28 font-mono"
+        />
+      </label>
+      {mudou && (
+        <button
+          type="button"
+          disabled={!valido || salvando}
+          onClick={async () => {
+            setSalvando(true);
+            await aoSalvar(q);
+            setSalvando(false);
+          }}
+          className="btn btn-sm btn-secundario"
+        >
+          {salvando ? 'Salvando...' : 'Salvar'}
+        </button>
+      )}
+    </span>
+  );
+};
+
 /**
  * Seção 6 · Ficha do contrato (só a T.I.): resumo, itens cobertos, linhas (telefonia),
  * faturas, anexos e histórico. Editar abre o formulário; Renovar cria o contrato
  * seguinte; Encerrar pede o motivo; Reabrir só o administrador.
  */
 export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }> = ({ contratoId, onClose }) => {
-  const { contratos, fornecedores, faturas, assets, licenses, employees, currentRole, encerrarContrato, reabrirContrato, renovarContrato, abrirFicha, podeDescartarPendencias } =
+  const { contratos, fornecedores, faturas, assets, licenses, employees, currentRole, editarContrato, encerrarContrato, reabrirContrato, renovarContrato, abrirFicha, podeDescartarPendencias } =
     useApp();
   const { linhas, unidades, anexosContrato, anexarContrato, removerAnexoContrato, recarregarRecursos } = useRecursos();
   // Renovar leva à ficha do contrato novo; "Renovação de" volta ao anterior
@@ -441,7 +486,22 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
                               <Key className="ico-sm text-slate-500" aria-hidden="true" /> Software
                             </span>
                           </td>
-                          <td data-label="Detalhe">{l ? `${l.colaboradoresIds.length} de ${l.assentosTotais} assentos em uso` : '-'}</td>
+                          <td data-label="Detalhe">
+                            {l ? `${l.colaboradoresIds.length} de ${l.assentosTotais} assentos em uso` : '-'}
+                            {l && (
+                              <QuantidadeContratada
+                                key={`${l.id}:${i.quantidadeContratada ?? ''}`}
+                                valor={i.quantidadeContratada}
+                                podeEditar={currentRole === 'ti_admin' && contrato.status !== 'encerrado'}
+                                aoSalvar={async (q) => {
+                                  const falha = await editarContrato(contrato.id, {
+                                    itens: contrato.itens.map((x) => (x.licencaId === l.id ? { licencaId: l.id, quantidadeContratada: q } : x)),
+                                  });
+                                  setErro(falha || '');
+                                }}
+                              />
+                            )}
+                          </td>
                           <td data-label="Situação">{l ? ((l.status || 'ativa') === 'ativa' ? 'Ativo' : 'Inativo') : '-'}</td>
                         </tr>
                       );

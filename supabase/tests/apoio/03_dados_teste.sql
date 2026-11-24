@@ -42,6 +42,11 @@ begin
   execute 'select count(*) from (' || p_sql || ') s' into v;
   if v <> p_n then raise exception 'esperava % linha(s), obteve %', p_n, v; end if;
 end $f$;
+-- Preparo de teste: muda o total de assentos como "sistema" (o usuário comum só passa por ajustar_assentos_licenca)
+create function harness.assentos(p_licenca text, p_total int) returns void language plpgsql security definer as $f$
+begin
+  update public.licencas_software set assentos_totais = p_total where id = p_licenca;
+end $f$;
 create function harness.afeta(p_sql text, p_n bigint) returns void language plpgsql as $f$
 declare v bigint;
 begin

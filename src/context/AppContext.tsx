@@ -72,6 +72,8 @@ import {
   fetchAtribuicoesLicencaFromDb,
   insertLicenseDb,
   updateLicenseDb,
+  ajustarAssentosLicencaDb,
+  fetchEventosLicencaDb,
   deleteLicenseDb,
   alocarLicencaDb,
   revogarLicencaDb,
@@ -155,7 +157,8 @@ import {
   type TipoFicha,
 } from '../utils/fichas.ts';
 import { notaDaManutencao } from '../utils/vinculos.ts';
-import type { AguardandoMotivo, AtribuicaoLicenca, DadosResolucao, EventoChamado, MotivoCancelamento } from '../types/index.ts';
+import type { AguardandoMotivo, AtribuicaoLicenca, DadosResolucao, EventoChamado, EventoLicenca, MotivoCancelamento } from '../types/index.ts';
+import { erroAjusteAssentos, quantidadeContratadaDaLicenca } from '../utils/licencas.ts';
 import { ehProcesso, erroCancelamento, erroResolucao, passosAReverter, podeCancelar } from '../utils/atendimento.ts';
 import { prazosEfetivos, type PrazosSla } from '../utils/sla.ts';
 import { isoLocal } from '../utils/formatters.ts';
@@ -376,6 +379,10 @@ interface AppContextType {
   editarAtivo: (id: string, updates: Partial<Asset>) => Promise<string | null>;
   cadastrarLicenca: (license: Omit<SoftwareLicense, 'id' | 'assentosAlocados'>) => Promise<Resultado<SoftwareLicense>>;
   editarLicenca: (id: string, updates: Partial<SoftwareLicense>) => Promise<string | null>;
+  /** Único caminho para mudar o total de assentos (ti_admin e compras; motivo obrigatório; grava histórico) */
+  ajustarAssentosLicenca: (id: string, total: number, valorMensal: number | undefined, motivo: string) => Promise<string | null>;
+  /** Histórico de capacidade e valor da licença (mais recente primeiro) */
+  eventosDaLicenca: (id: string) => Promise<EventoLicenca[]>;
   mudarSituacaoLicenca: (id: string, ativa: boolean, motivo?: string) => Promise<string | null>;
   cadastrarFornecedor: (dados: Omit<Fornecedor, 'id' | 'criadoEm' | 'criadoPor'>) => Promise<Resultado<Fornecedor>>;
   editarFornecedor: (id: string, mudancas: Partial<Fornecedor>) => Promise<string | null>;
@@ -499,6 +506,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [atribuicoesLicenca, setAtribuicoesLicenca] = useState<AtribuicaoLicenca[]>([]);
+  // Modo demonstração: histórico de capacidade só em memória (com o banco, vem da tabela licenca_eventos)
+  const [eventosLicencaDemo, setEventosLicencaDemo] = useState<EventoLicenca[]>([]);
   const [licenses, setLicenses] = useState<SoftwareLicense[]>(() => {
     const saved = parseStoredOrNull<SoftwareLicense[]>(STORAGE_KEYS.LICENSES, (lic) =>
       lic.some((l) => l.id === 'lic-1' || l.id === 'lic-001')
@@ -1723,6 +1732,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (erro) return erro;
     setLicenses((prev) => trocar(prev, depois));
     return null;
+  };
+
+  const ajustarAssentosLicenca: AppContextType['ajustarAssentosLicenca'] = async (id, total, valorMensal, motivo) => {
+    const antes = licenses.find((l) => l.id === id);
+    if (!antes) return 'Licença não encontrada.';
+    const falha = erroAjusteAssentos({
+      licenca: antes,
+      total,
+      valorMensal,
+      motivo,
+      papel: currentRole,
+      quantidadeContratada: quantidadeContratadaDaLicenca(id, contratos),
+    });
+    if (falha) return falha;
+    if (total === antes.assentosTotais && (valorMensal == null || valorMensal === antes.valorMensal)) return 'Nada mudou: o total e o valor são os mesmos.';
+    const depois: SoftwareLicense = {
+      ...antes,
+      assentosTotais: total,
+      valorMensal: (antes.formaCobranca || 'propria') === 'propria' && valorMensal != null ? valorMensal : antes.valorMensal,
+    };
+    const erro = await confirmarNoBanco(() => ajustarAssentosLicencaDb(id, total, valorMensal, motivo), 'Ajustar assentos');
+    if (erro) return erro;
+    if (!isSupabaseConfigured) {
+      const valorMudou = depois.valorMensal !== antes.valorMensal;
+      setEventosLicencaDemo((prev) => [
+        {
+          id: novoId('evl'),
+          licencaId: id,
+          tipo: valorMudou ? 'capacidade_valor' : 'capacidade',
+          totalAntes: antes.assentosTotais,
+          totalDepois: total,
+          valorAntes: antes.valorMensal,
+          valorDepois: depois.valorMensal,
+          motivo: motivo.trim(),
+          por: currentUser?.id,
+          em: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    }
+    setLicenses((prev) => trocar(prev, depois));
+    return null;
+  };
+
+  const eventosDaLicenca: AppContextType['eventosDaLicenca'] = async (id) => {
+    if (!isSupabaseConfigured) return eventosLicencaDemo.filter((e) => e.licencaId === id);
+    return fetchEventosLicencaDb(id);
   };
 
   /** Lote 1 (L3): inativar com motivo e sem assento em uso; reativar só o admin */
@@ -2981,6 +3037,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         editarAtivo,
         cadastrarLicenca,
         editarLicenca,
+        ajustarAssentosLicenca,
+        eventosDaLicenca,
         mudarSituacaoLicenca,
         cadastrarFornecedor,
         editarFornecedor,

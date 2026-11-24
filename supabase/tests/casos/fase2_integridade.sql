@@ -24,7 +24,7 @@ select harness.rodar('fase2', 'P4 suporte aloca assento', 'ok', :'sup', 'authent
 select harness.rodar('fase2', 'P5 alocar além do limite de assentos', 'erro: Não há assentos livres nesta licença', :'sup', 'authenticated',
   $q$do $x$ begin perform public.alocar_licenca('lic-1', 'emp-colab'); perform public.alocar_licenca('lic-1', 'emp-outro'); end $x$$q$);
 select harness.rodar('fase2', 'P6 alocar duas vezes a mesma pessoa', 'erro: Colaborador já possui assento nesta licença', :'sup', 'authenticated',
-  $q$do $x$ begin update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+  $q$do $x$ begin perform harness.assentos('lic-1', 5);
     perform public.alocar_licenca('lic-1', 'emp-colab'); perform public.alocar_licenca('lic-1', 'emp-colab'); end $x$$q$);
 select harness.rodar('fase2', 'P7 colaborador tenta alocar', 'bloqueado', :'colab', 'authenticated',
   $q$select public.alocar_licenca('lic-1', 'emp-colab')$q$);

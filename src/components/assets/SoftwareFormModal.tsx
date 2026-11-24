@@ -502,8 +502,19 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <label htmlFor="licenca-assentos" className={ROTULO}>Total de assentos *</label>
-                  <input id="licenca-assentos" type="number" min={Math.max(1, emUso)} required value={assentosTotais} onChange={(e) => setAssentosTotais(Number(e.target.value))} className={`${CAMPO} font-mono font-semibold`} />
-                  <p className="ajuda">{isEditing ? `${emUso} em uso` : 'Quantas pessoas podem usar'}</p>
+                  {isEditing ? (
+                    <>
+                      <input id="licenca-assentos" type="number" value={assentosTotais} readOnly aria-readonly="true" className={`${CAMPO} bg-slate-50 font-mono font-semibold`} />
+                      <p className="ajuda">
+                        {emUso} em uso. Para mudar o total, use "Ajustar total de assentos" na ficha do software (pede motivo e fica no histórico; só administrador da T.I. e Compras).
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <input id="licenca-assentos" type="number" min={Math.max(1, emUso)} required value={assentosTotais} onChange={(e) => setAssentosTotais(Number(e.target.value))} className={`${CAMPO} font-mono font-semibold`} />
+                      <p className="ajuda">Quantas pessoas podem usar</p>
+                    </>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="licenca-cc" className={ROTULO}>Área / centro de custo</label>

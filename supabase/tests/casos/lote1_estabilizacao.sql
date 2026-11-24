@@ -129,7 +129,7 @@ select harness.rodar('lote1', 'T5 cancelar por update direto é recusado', 'erro
 -- Licença: ativa/inativa e histórico de assentos -----------------------------------------------
 select harness.rodar('lote1', 'L1 atribuir e liberar assento grava o histórico', 'ok', :'sup', 'authenticated',
   $q$do $x$ begin
-    update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+    perform harness.assentos('lic-1', 5);
     perform public.alocar_licenca('lic-1', 'emp-colab');
     perform harness.espera($s$select 1 from public.licenca_atribuicoes where licenca_id = 'lic-1' and colaborador_id = 'emp-colab'
       and fim is null and atribuido_por = 'emp-sup'$s$, 1);
@@ -140,7 +140,7 @@ select harness.rodar('lote1', 'L1 atribuir e liberar assento grava o histórico'
 select harness.rodar('lote1', 'L2 colaborador vê só o próprio histórico de assentos', 'ok', :'colab', 'authenticated',
   $q$do $x$ begin
     perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
-    update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+    perform harness.assentos('lic-1', 5);
     perform public.alocar_licenca('lic-1', 'emp-colab');
     perform public.alocar_licenca('lic-1', 'emp-outro');
     perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
@@ -149,23 +149,23 @@ select harness.rodar('lote1', 'L2 colaborador vê só o próprio histórico de a
 select harness.rodar('lote1', 'L3 assentos não ficam abaixo dos em uso',
   'erro: Assentos totais (1) não podem ser menos que os 2 em uso.', :'sup', 'authenticated',
   $q$do $x$ begin
-    update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+    perform harness.assentos('lic-1', 5);
     perform public.alocar_licenca('lic-1', 'emp-colab');
     perform public.alocar_licenca('lic-1', 'emp-outro');
-    update public.licencas_software set assentos_totais = 1 where id = 'lic-1';
+    perform harness.assentos('lic-1', 1);
   end $x$$q$);
 select harness.rodar('lote1', 'L4 inativar exige motivo', 'erro: Informe o motivo da inativação.', :'sup', 'authenticated',
   $q$update public.licencas_software set status = 'inativa' where id = 'lic-1'$q$);
 select harness.rodar('lote1', 'L5 inativar com assento em uso é recusado',
   'erro: Libere os 1 assento(s) em uso antes de inativar a licença.', :'sup', 'authenticated',
   $q$do $x$ begin
-    update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+    perform harness.assentos('lic-1', 5);
     perform public.alocar_licenca('lic-1', 'emp-colab');
     update public.licencas_software set status = 'inativa', inativacao_motivo = 'Contrato encerrado' where id = 'lic-1';
   end $x$$q$);
 select harness.rodar('lote1', 'L6 licença inativa não recebe assento', 'erro: Licença inativa não recebe assentos.', :'sup', 'authenticated',
   $q$do $x$ begin
-    update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+    perform harness.assentos('lic-1', 5);
     update public.licencas_software set status = 'inativa', inativacao_motivo = 'Contrato encerrado' where id = 'lic-1';
     perform harness.espera($s$select 1 from public.licencas_software where id = 'lic-1' and inativada_por = 'emp-sup'$s$, 1);
     perform public.alocar_licenca('lic-1', 'emp-colab');
@@ -185,7 +185,7 @@ select harness.rodar('lote1', 'L8 admin reativa licença (o motivo antigo não s
   end $x$$q$);
 select harness.rodar('lote1', 'L9 licença com histórico de assentos não é excluída', 'bloqueado', :'admin', 'authenticated',
   $q$do $x$ begin
-    update public.licencas_software set assentos_totais = 5 where id = 'lic-1';
+    perform harness.assentos('lic-1', 5);
     perform public.alocar_licenca('lic-1', 'emp-colab');
     perform public.revogar_licenca('lic-1', 'emp-colab');
     delete from public.licencas_software where id = 'lic-1';
