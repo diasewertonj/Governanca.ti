@@ -49,6 +49,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
   const [recebendo, setRecebendo] = useState(false);
   const [registrando, setRegistrando] = useState(false);
   const [painelAlterado, setPainelAlterado] = useState(false);
+  const [editandoCotacao, setEditandoCotacao] = useState(false);
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   // T.I. e Compras ("equipe") veem valores e operam; a T.I. recebe; Compras/admin aprovam e compram
@@ -84,6 +85,13 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
   const valor = p.semValores ? undefined : valorDoPedido(p);
   const esperando = !podeRegistrar && !podeComprar && !podeReceber && !podeEnviar ? proximoPasso(p) : '';
   void vez;
+  // Seção 21: cotação em leitura; os campos só aparecem em "Editar cotação"
+  const podeCotar = isTI && aberto;
+  const semOpcoes = p.cotacoes.length === 0;
+  const fecharCotacao = () => {
+    setEditandoCotacao(false);
+    setPainelAlterado(false);
+  };
 
   const agir = async (fn: () => Promise<string | null>) => {
     setOcupado(true);
@@ -243,9 +251,22 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </dl>
           </section>
 
-          {isTI && aberto && <PainelCotacao pedido={p} onAlterado={setPainelAlterado} />}
-          <section className={`cartao overflow-hidden ${isTI && aberto ? 'hidden' : ''}`}>
-            <h3 className="secao-titulo px-4 pt-4">Itens ({p.itens.length})</h3>
+          {/* Seção 21: a cotação aparece em leitura (itens e opções); "Editar cotação" abre os campos */}
+          {podeCotar && editandoCotacao ? (
+            <PainelCotacao pedido={p} onAlterado={setPainelAlterado} onConcluir={fecharCotacao} />
+          ) : (
+          <section className="cartao overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
+              <h3 className="secao-titulo">
+                {podeCotar ? 'Cotação' : 'Itens'} (<span className="num">{p.itens.length}</span> {p.itens.length === 1 ? 'item' : 'itens'})
+              </h3>
+              {podeCotar && (
+                <button type="button" onClick={() => setEditandoCotacao(true)} className={`btn btn-sm ${semOpcoes ? 'btn-primario' : 'btn-secundario'}`}>
+                  <Pencil /> Editar cotação
+                </button>
+              )}
+            </div>
+            {podeCotar && semOpcoes && <p className="texto-aux px-4 pt-1">Nenhuma opção de compra ainda. Use "Editar cotação" para incluir.</p>}
             <table className="tabela tabela-cartoes mt-2">
               <thead>
                 <tr>
@@ -268,20 +289,36 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                       )}
                       {i.valorReferencia != null && <span className="block text-slate-500">quem pediu viu {brl(i.valorReferencia)}</span>}
                       {opcoesDoItem(p, i.id).length > 0 && (
-                        <ul className="mt-1 space-y-0.5">
-                          {opcoesDoItem(p, i.id).map((o) => (
-                            <li key={o.id} className={` ${o.vencedora ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
-                              {o.vencedora ? '✓ recomendada · ' : '· '}
-                              {fornecedores.find((f) => f.id === o.fornecedorId)?.nome || o.loja || 'Opção'}
-                              {[o.marca, o.modelo].filter(Boolean).length ? ` · ${[o.marca, o.modelo].filter(Boolean).join(' ')}` : ''}
-                              {o.valor > 0 && !p.semValores ? ` · ${brl(o.valor)}` : o.valor > 0 && p.semValores ? ` · ${brl(o.valor)} (o seu)` : ''}
-                              {o.link && /^https?:\/\//i.test(o.link) && (
-                                <a href={o.link} target="_blank" rel="noopener noreferrer" className="link ml-1">
-                                  link
-                                </a>
-                              )}
-                            </li>
-                          ))}
+                        <ul className="mt-1 space-y-1" aria-label={`Opções de compra de ${i.descricao}`}>
+                          {opcoesDoItem(p, i.id).map((o) => {
+                            const forn = fornecedores.find((f) => f.id === o.fornecedorId);
+                            const marcaModelo = [o.marca, o.modelo].filter(Boolean).join(' ');
+                            return (
+                              <li key={o.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                {o.vencedora && <span className="selo selo-ok">Recomendada</span>}
+                                {forn && ehTI ? (
+                                  <button type="button" onClick={() => abrirFicha({ tipo: 'fornecedor', id: forn.id })} className="link break-words text-left">
+                                    {forn.nome}
+                                  </button>
+                                ) : (
+                                  <span className="break-words font-semibold text-slate-900">{forn?.nome || o.loja || 'Opção'}</span>
+                                )}
+                                {marcaModelo && <span className="texto-aux">{marcaModelo}</span>}
+                                {o.valor > 0 && (
+                                  <span className="num text-slate-900">
+                                    {brl(o.valor)}
+                                    {p.semValores ? ' (o seu)' : ''}
+                                  </span>
+                                )}
+                                {o.link && /^https?:\/\//i.test(o.link) && (
+                                  <a href={o.link} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-0.5">
+                                    <ExternalLink className="ico-sm" aria-hidden="true" /> ver na loja
+                                  </a>
+                                )}
+                                {o.arquivoCaminho && !p.semValores && <AbrirArquivo caminho={o.arquivoCaminho} rotulo="Proposta" />}
+                              </li>
+                            );
+                          })}
                         </ul>
                       )}
                       {(i.marca || i.modelo || i.especificacao) && <span className="block text-slate-500">{[i.marca, i.modelo, i.especificacao].filter(Boolean).join(' · ')}</span>}
@@ -295,6 +332,7 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
               </tbody>
             </table>
           </section>
+          )}
 
           {!p.semValores && p.cotacoes.some((c) => !c.itemId) && (
             <section className="cartao space-y-2 p-4">
@@ -319,16 +357,14 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             </section>
           )}
 
-          {impacto && aberto && (
+          {/* Seção 21: sem orçamento para a categoria e área, o quadro não aparece */}
+          {impacto && aberto && !impacto.semOrcamento && (
             <section className={`cartao space-y-2 p-4 ${impacto.pctDepois !== undefined && impacto.pctDepois > 1 ? 'border-red-300' : ''}`}>
               <h3 className="secao-titulo">
                 Impacto no orçamento de {ano} · {ROTULO_CATEGORIA[p.categoria]}
                 {p.area ? ` · ${p.area}` : ''}
               </h3>
-              {impacto.semOrcamento ? (
-                <p className="text-amber-800">Não há orçamento para esta categoria e área em {ano}. O gasto vai aparecer como "sem orçamento".</p>
-              ) : (
-                <dl className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                   <Dado rotulo="Previsto no ano"><span className="num">{brl(impacto.previsto)}</span></Dado>
                   <Dado rotulo="Já realizado"><span className="num">{brl(impacto.realizado)}</span></Dado>
                   <Dado rotulo="Outros pedidos aprovados"><span className="num">{brl(impacto.comprometido)}</span></Dado>
@@ -339,7 +375,6 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                     </span>
                   </Dado>
                 </dl>
-              )}
             </section>
           )}
 
@@ -347,7 +382,17 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
             <section className="cartao space-y-2 p-4">
               <h3 className="secao-titulo">Compra</h3>
               <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
-                <DadoLinha rotulo="Fornecedor">{p.lojaCompra ? `${p.lojaCompra} (fora do cadastro)` : fornecedor(p.fornecedorId)}</DadoLinha>
+                <DadoLinha rotulo="Fornecedor">
+                  {p.lojaCompra ? (
+                    `${p.lojaCompra} (fora do cadastro)`
+                  ) : ehTI && p.fornecedorId && fornecedores.some((f) => f.id === p.fornecedorId) ? (
+                    <button type="button" onClick={() => abrirFicha({ tipo: 'fornecedor', id: p.fornecedorId as string })} className="link text-left">
+                      {fornecedor(p.fornecedorId)}
+                    </button>
+                  ) : (
+                    fornecedor(p.fornecedorId)
+                  )}
+                </DadoLinha>
                 <DadoLinha rotulo="Nota fiscal">{p.numeroNf || null}</DadoLinha>
                 <DadoLinha rotulo="Data da compra">{p.dataCompra ? <span className="num">{formatDate(p.dataCompra)}</span> : null}</DadoLinha>
                 <DadoLinha rotulo="Pagamento">{p.formaPagamento ? ROTULO_FORMA_PAGAMENTO[p.formaPagamento] : null}</DadoLinha>

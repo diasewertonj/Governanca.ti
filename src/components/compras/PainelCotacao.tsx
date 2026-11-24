@@ -16,7 +16,12 @@ import { ProdutoDoItem } from './FormPedido.tsx';
 
 const chave = (p: Pick<PedidoCompra, 'itens' | 'cotacoes'>) => JSON.stringify({ i: p.itens, c: p.cotacoes });
 
-export const PainelCotacao: React.FC<{ pedido: PedidoCompra; onAlterado: (alterado: boolean) => void }> = ({ pedido, onAlterado }) => {
+/** Seção 21: abre por "Editar cotação" na ficha; salvar ou fechar (sem mudança) volta à leitura */
+export const PainelCotacao: React.FC<{ pedido: PedidoCompra; onAlterado: (alterado: boolean) => void; onConcluir?: () => void }> = ({
+  pedido,
+  onAlterado,
+  onConcluir,
+}) => {
   const { salvarPedido, anexarCotacao } = useCompras();
   const [p, setP] = useState(pedido);
   const [base, setBase] = useState(chave(pedido));
@@ -77,6 +82,7 @@ export const PainelCotacao: React.FC<{ pedido: PedidoCompra; onAlterado: (altera
     const r = await salvarPedido({ ...pedido, itens: p.itens, cotacoes: p.cotacoes }, false);
     setSalvando(false);
     setErro(r.erro || '');
+    if (!r.erro) onConcluir?.();
   };
 
   return (
@@ -127,10 +133,16 @@ export const PainelCotacao: React.FC<{ pedido: PedidoCompra; onAlterado: (altera
           <Plus /> Item
         </button>
         <span className="ml-auto" />
-        {alterado && (
+        {alterado ? (
           <button type="button" disabled={salvando} onClick={() => setP(pedido)} className="btn btn-sm btn-secundario">
             Descartar
           </button>
+        ) : (
+          onConcluir && (
+            <button type="button" onClick={onConcluir} className="btn btn-sm btn-secundario">
+              Fechar edição
+            </button>
+          )
         )}
         <button type="button" disabled={salvando || !alterado} onClick={salvar} className="btn btn-sm btn-primario">
           {salvando ? 'Salvando…' : 'Salvar cotação'}

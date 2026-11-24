@@ -23,7 +23,7 @@ export function situacaoLembrete(l: Pick<Lembrete, 'status' | 'venceEm'>, hoje =
  * ou são criados à mão. Concluir pede um registro do que foi feito.
  */
 export const LembretesView: React.FC = () => {
-  const { lembretes, tickets, employees, criarLembrete, encerrarLembrete, setSelectedTicketIdForDetail } = useApp();
+  const { lembretes, tickets, employees, criarLembrete, encerrarLembrete, setSelectedTicketIdForDetail, abrirFicha } = useApp();
   const [filtro, setFiltro] = useState<'abertos' | 'encerrados'>('abertos');
   const [novo, setNovo] = useState<{ titulo: string; descricao: string; venceEm: string } | null>(null);
   const [encerrando, setEncerrando] = useState<{ id: string; status: 'feito' | 'cancelado'; obs: string } | null>(null);
@@ -104,16 +104,12 @@ export const LembretesView: React.FC = () => {
             {lista.length === 0 ? (
               <tr>
                 <td colSpan={4}>
-                  <Vazio
-                    titulo={filtro === 'abertos' ? 'Nenhum lembrete em aberto' : 'Nenhum lembrete encerrado'}
-                    acao={
-                      filtro === 'abertos' && (
-                        <button type="button" onClick={() => setNovo({ titulo: '', descricao: '', venceEm: hoje })} className="btn btn-sm btn-primario">
-                          Novo lembrete
-                        </button>
-                      )
-                    }
-                  />
+                  {/* Seção 21: "Novo lembrete" fica só no cabeçalho; o vazio só explica */}
+                  <Vazio titulo={filtro === 'abertos' ? 'Nenhum lembrete em aberto' : 'Nenhum lembrete encerrado'}>
+                    {filtro === 'abertos'
+                      ? 'Os lembretes nascem dos passos do checklist ou são criados à mão.'
+                      : 'Os lembretes concluídos ou cancelados aparecem aqui.'}
+                  </Vazio>
                 </td>
               </tr>
             ) : (
@@ -126,7 +122,14 @@ export const LembretesView: React.FC = () => {
                       <span className="font-semibold text-slate-900 block">{l.titulo}</span>
                       {l.descricao && <span className="text-slate-600 block">{l.descricao}</span>}
                       <span className="text-slate-500 block">
-                        {l.colaboradorId && <>{nomeDe(l.colaboradorId) || 'colaborador'}</>}
+                        {l.colaboradorId &&
+                          (nomeDe(l.colaboradorId) ? (
+                            <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: l.colaboradorId as string })} className="link">
+                              {nomeDe(l.colaboradorId)}
+                            </button>
+                          ) : (
+                            'colaborador'
+                          ))}
                         {tkt && (
                           <>
                             {l.colaboradorId && ' · '}

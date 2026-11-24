@@ -284,7 +284,15 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
 
             <section className="cartao space-y-4 p-4">
             <SecaoResumo titulo="Contrato">
-              <DadoLinha rotulo="Fornecedor">{fornecedor?.nome || 'Fornecedor não encontrado'}</DadoLinha>
+              <DadoLinha rotulo="Fornecedor">
+                {fornecedor ? (
+                  <button type="button" onClick={() => abrirFicha({ tipo: 'fornecedor', id: fornecedor.id })} className="link text-left">
+                    {fornecedor.nome}
+                  </button>
+                ) : (
+                  'Fornecedor não encontrado'
+                )}
+              </DadoLinha>
               <DadoLinha rotulo="Tipo">{ROTULO_TIPO_CONTRATO[contrato.tipo]}</DadoLinha>
               <DadoLinha rotulo="Número">{contrato.numero ? <span className="font-mono">{contrato.numero}</span> : undefined}</DadoLinha>
               <DadoLinha rotulo="Vigência" naoMostrar={!!contrato.fim}>
@@ -296,7 +304,13 @@ export const ContratoFicha: React.FC<{ contratoId: string; onClose: () => void }
               <DadoLinha rotulo="Valor">
                 <span className="num">{formatCurrency(contrato.valor)}</span> · {ROTULO_PERIODICIDADE[contrato.periodicidade]}
               </DadoLinha>
-              <DadoLinha rotulo="Itens cobertos">{resumoItens(contrato.itens)}</DadoLinha>
+              <DadoLinha rotulo="Itens cobertos">
+                {contrato.itens.length > 0 ? (
+                  <button type="button" onClick={() => setAba('itens')} className="link text-left">
+                    {resumoItens(contrato.itens)}
+                  </button>
+                ) : undefined}
+              </DadoLinha>
               <DadoLinha rotulo="Categoria da despesa">{ROTULO_CATEGORIA[contrato.categoriaDespesa || CATEGORIA_DO_TIPO[contrato.tipo]]}</DadoLinha>
               <DadoLinha rotulo="Área / centro de custo">{contrato.centroCusto || undefined}</DadoLinha>
               <DadoLinha rotulo="Responsável interno">

@@ -7,7 +7,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters.ts';
 import { ROTULO_TIPO_CONTRATO, nomeContrato, resumoVinculos, vinculosDoFornecedor } from '../../utils/contratos.ts';
 import { ROTULO_FORMA_COBRANCA, despesasRecorrentes, formaCobrancaDe, valorDaFatura } from '../../utils/financeiro.ts';
 import { ROTULO_STATUS_FATURA, rotuloCompetencia, statusExibido, totalPagoNoAno, type StatusExibidoFatura } from '../../utils/faturas.ts';
-import { ContratoFicha, SeloContrato } from './ContratoFicha.tsx';
+import { SeloContrato } from './ContratoFicha.tsx';
 import { ContratoFormModal } from './ContratoFormModal.tsx';
 import { FornecedorFormModal } from './FornecedorFormModal.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
@@ -23,8 +23,9 @@ const ROTULO_STATUS_ATIVO: Record<string, string> = { disponivel: 'Disponível',
 const SELO_STATUS_ATIVO: Record<string, string> = { disponivel: 'selo-ok', em_uso: 'selo-info', manutencao: 'selo-atencao', descartado: 'selo-neutro' };
 const ROTULO_ORIGEM: Record<'licenca' | 'contrato' | 'linha', string> = { licenca: 'Software', contrato: 'Contrato', linha: 'Linha' };
 
-/** Linhas da tabela abrem a ficha; o botão do nome cobre teclado e leitor de tela */
-const LINHA_CLICAVEL = 'cursor-pointer hover:bg-slate-50/70';
+/** Seção 21: a linha inteira abre a ficha — o botão do nome cobre a linha (teclado e leitor de tela) */
+const LINHA_CLICAVEL = 'relative hover:bg-slate-50/70';
+const BOTAO_LINHA = "text-left font-semibold text-slate-900 after:absolute after:inset-0 after:content-[''] hover:text-blue-700";
 
 /**
  * Seção 6 · Ficha do fornecedor (só a T.I.): resumo com o custo mensal de hoje,
@@ -36,7 +37,6 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
   const { linhas } = useRecursos();
   const [aba, setAba] = useState<AbaFicha>('resumo');
   const [editando, setEditando] = useState(false);
-  const [contratoAberto, setContratoAberto] = useState<string | null>(null);
   const [novoContrato, setNovoContrato] = useState(false);
   const [mudandoSituacao, setMudandoSituacao] = useState(false);
   const [erro, setErro] = useState('');
@@ -205,7 +205,17 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                     <li key={`${d.origem}:${d.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
                       <span className="min-w-0 text-slate-700">
                         <span className="text-slate-500">{ROTULO_ORIGEM[d.origem]} · </span>
-                        {d.nome}
+                        {d.origem === 'linha' ? (
+                          d.nome
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => abrirFicha({ tipo: d.origem === 'contrato' ? 'contrato' : 'software', id: d.id })}
+                            className="link text-left"
+                          >
+                            {d.nome}
+                          </button>
+                        )}
                       </span>
                       <span className="num text-slate-900">{formatCurrency(d.mensal)}</span>
                     </li>
@@ -240,16 +250,9 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                   </thead>
                   <tbody>
                     {seusContratos.map((c) => (
-                      <tr key={c.id} onClick={() => setContratoAberto(c.id)} className={LINHA_CLICAVEL}>
-                        <td data-label="Contrato" className="font-semibold text-slate-900">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setContratoAberto(c.id);
-                            }}
-                            className="link text-left"
-                          >
+                      <tr key={c.id} className={LINHA_CLICAVEL}>
+                        <td data-label="Contrato">
+                          <button type="button" onClick={() => abrirFicha({ tipo: 'contrato', id: c.id })} className={BOTAO_LINHA}>
                             {c.numero && <span className="mr-2 font-mono">{c.numero}</span>}
                             {c.descricao}
                           </button>
@@ -376,7 +379,7 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
                         <tr key={f.id} className={status === 'cancelada' ? 'opacity-60' : ''}>
                           <td data-label="Origem" className="font-semibold text-slate-900">
                             {f.contratoId ? (
-                              <button type="button" onClick={() => setContratoAberto(f.contratoId as string)} className="link text-left">
+                              <button type="button" onClick={() => abrirFicha({ tipo: 'contrato', id: f.contratoId as string })} className="link text-left">
                                 {origemFatura(f)}
                               </button>
                             ) : (
@@ -410,7 +413,6 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
 
       {/* Janelas por cima da ficha: fora dela, para o fundo desfocado não prender a nova na rolagem */}
       {editando && <FornecedorFormModal fornecedor={fornecedor} onClose={() => setEditando(false)} />}
-      {contratoAberto && <ContratoFicha key={contratoAberto} contratoId={contratoAberto} onClose={() => setContratoAberto(null)} />}
       {novoContrato && <ContratoFormModal contrato={null} inicial={{ fornecedorId: fornecedor.id }} onClose={() => setNovoContrato(false)} />}
     </>
   );
