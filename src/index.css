@@ -525,6 +525,8 @@
     background-color: var(--cor-superficie-suave);
   }
   .janela-faixa .abas {
+    /* a linha da aba ativa encosta na borda de baixo sem criar barra de rolagem */
+    overflow-y: hidden;
     @apply gap-4 rounded-none bg-transparent p-0;
   }
   .janela-faixa .aba {

@@ -14,6 +14,7 @@ import { historicoAssentos } from '../../utils/licencas.ts';
 import { FileText, FilePlus, Pencil, KeyRound, CheckCircle2, AlertCircle, Copy, ShieldOff } from 'lucide-react';
 import { avisar, confirmar } from '../ui/dialogo.tsx';
 import { Janela, DadoLinha } from '../ui/Janela.tsx';
+import { CartaoItem, iconeDoAcessorio, iconeDoAtivo } from '../comum/ItemPatrimonio.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
 import { Vazio } from '../ui/Tela.tsx';
 
@@ -166,6 +167,15 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   const acessoriosRecebidos = movimentos.filter(
     (m) => m.colaboradorId === employee.id && (m.tipo === 'saida' || m.tipo === 'devolucao')
   );
+  // Seção 19: o que está com a pessoa agora, por item (recebeu − devolveu)
+  const acessoriosComPessoa = Object.values(
+    acessoriosRecebidos.reduce<Record<string, { itemId: string; qtd: number; ultimo: string }>>((acc, m) => {
+      const a = (acc[m.itemId] ??= { itemId: m.itemId, qtd: 0, ultimo: '' });
+      a.qtd += m.tipo === 'saida' ? m.quantidade : -m.quantidade;
+      if (m.tipo === 'saida' && m.criadoEm > a.ultimo) a.ultimo = m.criadoEm;
+      return acc;
+    }, {})
+  ).filter((a) => a.qtd > 0);
 
   // Termos gerados para o colaborador
   const employeeTerms = terms.filter((t) => t.colaboradorId === employee.id);
@@ -517,40 +527,23 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
             {currentAssets.length === 0 ? (
               <Vazio>Nenhum equipamento físico alocado no momento para este colaborador.</Vazio>
             ) : (
-              <div className="cartao-tabela">
-                <table className="tabela tabela-cartoes">
-                  <thead>
-                    <tr>
-                      <th>Equipamento</th>
-                      <th>Marca e modelo</th>
-                      <th>Número de série</th>
-                      <th>Em posse desde</th>
-                      <th className="col-acoes">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentAssets.map((asset) => (
-                      <tr key={asset.id}>
-                        <td data-label="Equipamento">
-                          <span className="block font-mono font-semibold text-blue-700">{asset.tag}</span>
-                          <span className="font-semibold text-slate-900">{asset.nome}</span>
-                        </td>
-                        <td data-label="Marca e modelo">{[asset.marca, asset.modelo].filter(Boolean).join(' ') || '—'}</td>
-                        <td data-label="Número de série" className="font-mono break-all">
-                          {asset.serialNumber || '—'}
-                        </td>
-                        <td data-label="Em posse desde">{formatDate(asset.dataEntregaAtual)}</td>
-                        <td data-label="Ações" className="col-acoes">
-                          <span className="acoes-linha">
-                            <button type="button" onClick={() => handleOpenAsset(asset.id)} className="btn btn-sm btn-secundario">
-                              Abrir ficha
-                            </button>
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {currentAssets.map((asset) => (
+                  <CartaoItem
+                    key={asset.id}
+                    icone={iconeDoAtivo(asset)}
+                    codigo={asset.tag}
+                    titulo={asset.nome}
+                    detalhes={[
+                      [asset.marca, asset.modelo].filter(Boolean).join(' '),
+                      [asset.serialNumber && `S/N ${asset.serialNumber}`, asset.dataEntregaAtual && `desde ${formatDate(asset.dataEntregaAtual)}`]
+                        .filter(Boolean)
+                        .join(' · '),
+                    ]}
+                    onAbrir={() => handleOpenAsset(asset.id)}
+                    rotuloAbrir={`Abrir a ficha de ${asset.tag} · ${asset.nome}`}
+                  />
+                ))}
               </div>
             )}
           </section>
@@ -595,11 +588,29 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           {/* Seção 6: acessórios recebidos e devolvidos (só a T.I.) */}
           {isTIFicha && (
             <section className="space-y-2">
-              <h3 className="secao-titulo">Acessórios ({acessoriosRecebidos.length})</h3>
-              {acessoriosRecebidos.length === 0 ? (
-                <Vazio>Nenhum acessório entregue a esta pessoa.</Vazio>
+              <h3 className="secao-titulo">Acessórios com a pessoa ({acessoriosComPessoa.length})</h3>
+              {acessoriosComPessoa.length === 0 ? (
+                <Vazio>Nenhum acessório com esta pessoa.</Vazio>
               ) : (
-                <div className="cartao-tabela">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {acessoriosComPessoa.map((a) => {
+                    const item = estoque.find((i) => i.id === a.itemId);
+                    return (
+                      <CartaoItem
+                        key={a.itemId}
+                        icone={iconeDoAcessorio(item?.tipo)}
+                        titulo={item?.nome || 'Acessório'}
+                        detalhes={[[item?.marca, item?.modelo].filter(Boolean).join(' '), a.ultimo && `recebeu em ${formatDate(a.ultimo.slice(0, 10))}`]}
+                        extra={<span className="contador">× {a.qtd}</span>}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {acessoriosRecebidos.length > 0 && (
+                <details className="cartao p-3">
+                  <summary className="secao-titulo cursor-pointer">Histórico de acessórios ({acessoriosRecebidos.length})</summary>
+                <div className="cartao-tabela mt-3">
                   <table className="tabela tabela-cartoes">
                     <thead>
                       <tr>
@@ -629,6 +640,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                     </tbody>
                   </table>
                 </div>
+                </details>
               )}
             </section>
           )}

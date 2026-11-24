@@ -106,6 +106,15 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
   const data = ehOnb ? ticket.onboarding?.dataAdmissao : ticket.offboarding?.dataDesligamento;
   const setor = departments.find((d) => d.id === (colab?.setorId || ticket.onboarding?.setorId))?.nome;
 
+  const trilha = (
+    <details className="cartao p-4">
+      <summary className="secao-titulo cursor-pointer">Quem fez cada passo do checklist</summary>
+      <div className="mt-3">
+        <TrilhaAuditoria chamadoId={ticket.id} nomeDe={(id) => employees.find((e) => e.id === id)?.nome} atualizar={itens.filter((i) => i.status !== 'pendente').length} />
+      </div>
+    </details>
+  );
+
   const mudarSituacao = (status: TicketStatus, aguardandoMotivo?: AguardandoMotivo | '') =>
     salvarAlteracoesChamado(ticket.id, { status, ...(status === 'aguardando_terceiro' ? { aguardandoMotivo: aguardandoMotivo ?? '' } : {}) });
 
@@ -218,24 +227,20 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
 
       {ticket.status === 'cancelado' && ticket.cancelamento && <BlocoCancelamento ticket={ticket} />}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      {/* Seção 19 (modelo A, escolhido pelo dono): checklist e atendimento na coluna larga;
+          pedido e anotações à direita, fixos ao rolar (no celular tudo empilhado) */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           {usaChecklistLegado ? <ChecklistLegado ticket={ticket} isTI={isTI} concluir={concluirOffboarding} /> : <ChecklistProcesso ticket={ticket} />}
-        </div>
-
-        <aside className="min-w-0 space-y-4" aria-label="Pedido, anotações e conversa">
-          {ehOnb ? <PedidoAdmissao ticket={ticket} /> : ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
-          <AnotacoesProcesso ticket={ticket} podeEditar={isTI} onSalvar={salvarAnotacoesProcesso} />
-          {/* Seção 19: conversa, notas e histórico já vêm em abas no próprio bloco (sem abas repetidas por fora) */}
           <section className="cartao space-y-3 p-4">
             <Conversa ticket={ticket} isTI={isTI} encerrado={encerrado} enviar={addTicketMessage} meuId={currentUser?.id} />
           </section>
-          <details className="cartao p-4">
-            <summary className="secao-titulo cursor-pointer">Quem fez cada passo do checklist</summary>
-            <div className="mt-3">
-              <TrilhaAuditoria chamadoId={ticket.id} nomeDe={(id) => employees.find((e) => e.id === id)?.nome} atualizar={itens.filter((i) => i.status !== 'pendente').length} />
-            </div>
-          </details>
+          {trilha}
+        </div>
+
+        <aside className={`min-w-0 space-y-4 lg:sticky ${emJanela ? 'lg:top-4' : 'lg:top-20'}`} aria-label="Pedido e anotações">
+          {ehOnb ? <PedidoAdmissao ticket={ticket} /> : ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
+          <AnotacoesProcesso ticket={ticket} podeEditar={isTI} onSalvar={salvarAnotacoesProcesso} />
         </aside>
       </div>
       {cancelando && <FormCancelamento ticket={ticket} onClose={() => setCancelando(false)} />}

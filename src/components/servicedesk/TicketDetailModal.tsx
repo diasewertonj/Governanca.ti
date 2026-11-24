@@ -257,6 +257,60 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
     </div>
   );
 
+  // Conversa e resposta (seção 19, modelo A: embaixo do problema, na coluna larga)
+  const atendimento = (
+    <div className="flex min-w-0 flex-col gap-4">
+    <div className="flex-1">
+      {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
+      <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} abaInicial={isTI ? 'notas' : 'conversa'} />
+    </div>
+
+    {/* Caixa de resposta */}
+    {encerrado ? (
+      <p className="ajuda border-t border-slate-200 pt-4">
+        Chamado {ticket.status === 'cancelado' ? 'cancelado' : 'encerrado'}: a conversa fica registrada como está.
+        {ticket.status === 'resolvido' && ticket.tipo === 'suporte' && ' Se o problema voltar, reabra o chamado.'}
+      </p>
+    ) : (
+      <form onSubmit={handleSendMessage} className="space-y-2 border-t border-slate-200 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor={`resposta-${ticket.id}`} className="rotulo !mb-0">
+            Responder
+          </label>
+          {isTI && (
+            <label className="flex cursor-pointer items-center gap-2 text-slate-700 select-none">
+              <input
+                type="checkbox"
+                checked={isInternalNote}
+                onChange={(e) => setIsInternalNote(e.target.checked)}
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <Lock className="ico-sm text-slate-500" aria-hidden="true" />
+              <span>Nota interna (só a T.I. vê)</span>
+            </label>
+          )}
+        </div>
+
+        <textarea
+          id={`resposta-${ticket.id}`}
+          rows={3}
+          value={newMessageText}
+          onChange={(e) => setNewMessageText(e.target.value)}
+          placeholder={isInternalNote ? 'Escreva uma nota para a equipe de T.I.…' : 'Escreva uma resposta…'}
+          className="campo"
+        />
+
+        <div className="flex justify-end">
+          <button type="submit" disabled={!newMessageText.trim()} className="btn btn-primario">
+            <Send aria-hidden="true" />
+            {isInternalNote ? 'Salvar nota' : 'Enviar'}
+          </button>
+        </div>
+      </form>
+    )}
+    </div>
+  );
+
   return (
     <div className={`janela-fundo modal-tela ${nav.topo ? '' : 'hidden'}`}>
       <div role="dialog" aria-modal="true" aria-labelledby={`chamado-titulo-${ticket.id}`} className="janela janela-ficha">
@@ -461,7 +515,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
 
         <div className="sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
           {/* Prazos e vínculos numa faixa fina (sem cartões) */}
-          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-start lg:gap-8">
+          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:hidden">
             <PrazosChamado tkt={ticket} embutido />
             <div className="min-w-0 flex-1">
               <VinculosChamado
@@ -474,7 +528,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             </div>
           </div>
           {/* O pedido, o checklist e a solução ocupam 2/3; anotações e conversa ficam ao lado (1/3) */}
-          <div className="grid grid-cols-1 gap-0 divide-y divide-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
+          <div className="grid grid-cols-1 items-start gap-0 divide-y divide-slate-200 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
             <div className="min-w-0 space-y-3 p-4 sm:p-6">
               {/* Desligamento: o pedido organizado, com o que está com a pessoa (só leitura) */}
               {ticket.tipo === 'offboarding' && ticket.offboarding && <PedidoDesligamento ticket={ticket} />}
@@ -654,58 +708,19 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
               {(ticket.tipo === 'onboarding' || (ticket.tipo === 'offboarding' && !usaChecklistLegado)) && (
                 <ChecklistProcesso ticket={ticket} />
               )}
+              <div className="border-t border-slate-200 pt-4">{atendimento}</div>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
-              <div className="flex-1">
-                {/* Conversa única: a abertura é o 1º item, sem repetir a descrição */}
-                <ConversaChamado ticket={ticket} podeVerNotas={isTI} meuId={currentUser?.id} abaInicial={isTI ? 'notas' : 'conversa'} />
-              </div>
-
-              {/* Caixa de resposta */}
-              {encerrado ? (
-                <p className="ajuda border-t border-slate-200 pt-4">
-                  Chamado {ticket.status === 'cancelado' ? 'cancelado' : 'encerrado'}: a conversa fica registrada como está.
-                  {ticket.status === 'resolvido' && ticket.tipo === 'suporte' && ' Se o problema voltar, reabra o chamado.'}
-                </p>
-              ) : (
-                <form onSubmit={handleSendMessage} className="space-y-2 border-t border-slate-200 pt-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <label htmlFor={`resposta-${ticket.id}`} className="rotulo !mb-0">
-                      Responder
-                    </label>
-                    {isTI && (
-                      <label className="flex cursor-pointer items-center gap-2 text-slate-700 select-none">
-                        <input
-                          type="checkbox"
-                          checked={isInternalNote}
-                          onChange={(e) => setIsInternalNote(e.target.checked)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <Lock className="ico-sm text-slate-500" aria-hidden="true" />
-                        <span>Nota interna (só a T.I. vê)</span>
-                      </label>
-                    )}
-                  </div>
-
-                  <textarea
-                    id={`resposta-${ticket.id}`}
-                    rows={3}
-                    value={newMessageText}
-                    onChange={(e) => setNewMessageText(e.target.value)}
-                    placeholder={isInternalNote ? 'Escreva uma nota para a equipe de T.I.…' : 'Escreva uma resposta…'}
-                    className="campo"
-                  />
-
-                  <div className="flex justify-end">
-                    <button type="submit" disabled={!newMessageText.trim()} className="btn btn-primario">
-                      <Send aria-hidden="true" />
-                      {isInternalNote ? 'Salvar nota' : 'Enviar'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
+              <aside className="hidden min-w-0 space-y-4 p-4 sm:p-6 lg:sticky lg:top-0 lg:block" aria-label="Prazos e vínculos">
+                <PrazosChamado tkt={ticket} embutido />
+                <VinculosChamado
+                  key={`lado-${salvamentos}`}
+                  ticket={ticket}
+                  rascunho={rascVinculos}
+                  onMudar={(campo, valor) => setRascVinculos((r) => ({ ...r, [campo]: valor }))}
+                  embutido
+                />
+              </aside>
           </div>
         </div>
         <BarraAlteracoes itens={itensPendentes} onCancelar={descartarRascunho} onSalvar={salvarRascunho} />
