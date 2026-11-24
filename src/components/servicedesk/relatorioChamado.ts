@@ -32,7 +32,8 @@ export function htmlRelatorio(t: Ticket, employees: Employee[], incluirNotas: bo
   .meta{color:#475569;font-size:12px} table{border-collapse:collapse;width:100%} th{text-align:left;color:#475569;font-weight:600;width:170px;vertical-align:top;padding:3px 8px 3px 0} td{padding:3px 0}
   .caixa{border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px} .ok{border-color:#6ee7b7;background:#ecfdf5}
   .msg{margin:8px 0;padding:8px 10px;border-left:3px solid #cbd5e1} .nota{border-color:#f59e0b;background:#fffbeb}
-  @media print{body{margin:12mm}}
+  @page{size:A4;margin:14mm}
+  @media print{body{margin:0;max-width:none} h2{break-after:avoid} .caixa,.msg,tr{break-inside:avoid}}
 </style></head><body>
 <div class="meta">${esc(t.codigo)} · ${esc(ROTULO_TIPO_CHAMADO[t.tipo])} · ${esc(t.categoria)}</div>
 <h1>${esc(t.titulo)}</h1>
