@@ -83,6 +83,17 @@
 }
 
 @layer base {
+  /* Campos numéricos sem as setinhas de subir/descer (padrão do sistema; o teclado numérico continua) */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     font-size: var(--fs-corpo);
@@ -793,22 +804,57 @@ body:has(.modal-tela) {
     display: block !important;
   }
 
+  /* Só a folha sai: com um termo ou etiqueta aberto, tudo o que não é a folha (nem a contém) some.
+     Sem isto a tela de trás (lista, ficha) era impressa junto com o termo. */
+  body:has(.print-a4-page, .print-label-sticker)
+    *:not(:has(.print-a4-page, .print-label-sticker)):not(.print-a4-page, .print-a4-page *, .print-label-sticker, .print-label-sticker *) {
+    display: none !important;
+  }
+  /* Os "embrulhos" da folha (layout, janela) não somam margem, borda nem largura */
+  body:has(.print-a4-page, .print-label-sticker) :has(.print-a4-page, .print-label-sticker) {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    transform: none !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+
   .print-a4-page {
     width: 210mm;
-    min-height: 297mm;
+    min-height: 0;
     padding: 15mm;
     margin: 0 auto;
     background: white;
     box-shadow: none;
     border: none;
-    page-break-after: always;
+    page: folha-a4;
   }
 
   .print-label-sticker {
-    width: 80mm;
+    width: 80mm !important;
+    max-width: none !important;
     height: 45mm;
-    page-break-after: always;
-    border: 1px dashed #cbd5e1;
-    padding: 4mm;
+    overflow: hidden;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 3mm !important;
+    page: etiqueta;
   }
+}
+
+/* Folha A4 sem margem do navegador (a margem é o padding da folha): some também
+   o cabeçalho/rodapé que o navegador imprime (data, título da aba, endereço) */
+@page folha-a4 {
+  size: A4;
+  margin: 0;
+}
+@page etiqueta {
+  size: 80mm 45mm;
+  margin: 0;
 }
