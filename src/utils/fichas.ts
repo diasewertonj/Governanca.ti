@@ -1,7 +1,8 @@
 // Fase 9: fichas (chamado, equipamento, colaborador, software) abrem uma por
 // cima da outra. Fechar a de cima volta para a anterior, do jeito que estava.
 
-export type TipoFicha = 'ativo' | 'colaborador' | 'software' | 'chamado';
+// Seção 21: contrato, fornecedor e pedido de compra também abrem de qualquer tela
+export type TipoFicha = 'ativo' | 'colaborador' | 'software' | 'chamado' | 'contrato' | 'fornecedor' | 'pedido';
 
 export interface FichaAberta {
   tipo: TipoFicha;
