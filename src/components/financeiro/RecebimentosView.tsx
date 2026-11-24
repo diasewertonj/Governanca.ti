@@ -285,7 +285,8 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
       valor,
       previstoPara: previstoPara || undefined,
       // Só a venda de equipamento liga o recebimento a um equipamento
-      ativoId: tipo === 'venda_ativo' ? ativoId || undefined : undefined,
+      // Venda do equipamento baixado ou ressarcimento por equipamento danificado/perdido
+      ativoId: tipo === 'venda_ativo' || tipo === 'ressarcimento' ? ativoId || undefined : undefined,
       colaboradorId: tipo === 'ressarcimento' ? colaboradorId || undefined : undefined,
       fornecedorId: tipo === 'reembolso_fornecedor' || tipo === 'devolucao_compra' || tipo === 'outro' ? fornecedorId || undefined : undefined,
       departamentoId: departamentoId || undefined,
@@ -330,7 +331,7 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
           <label htmlFor={`${id}-prev`} className={CLASSE_ROTULO}>Previsto para</label>
           <input id={`${id}-prev`} type="date" value={previstoPara} onChange={(e) => setPrevistoPara(e.target.value)} className={CLASSE_CAMPO} />
         </div>
-        {tipo === 'venda_ativo' && (
+        {(tipo === 'venda_ativo' || tipo === 'ressarcimento') && (
           <div className="sm:col-span-2 space-y-1">
             <label htmlFor={`${id}-ativo`} className={CLASSE_ROTULO}>Equipamento vendido</label>
             <input
