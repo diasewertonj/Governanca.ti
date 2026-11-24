@@ -409,6 +409,7 @@ revoke all on function public.solicitar_compra(jsonb, jsonb) from public, anon;
 grant execute on function public.solicitar_compra(jsonb, jsonb) to authenticated;
 
 -- O que cada um vê dos pedidos, com nomes; valores só para T.I. e Compras
+drop function if exists public.pedidos_visiveis(); -- reexecução depois de migrations que mudam as colunas
 create or replace function public.pedidos_visiveis()
 returns table (
   id text, codigo text, titulo text, justificativa text, categoria text, area text, status text, tipo_pedido text,

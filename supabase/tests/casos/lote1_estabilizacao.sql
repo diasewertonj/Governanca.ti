@@ -51,6 +51,7 @@ select harness.rodar('lote1', 'P9 concluir pelo checklist continua funcionando',
   $q$do $x$ begin
     insert into public.processo_itens (chamado_id, tipo, titulo, status, observacao)
       values ('tkt-3', 'tarefa', 'Boas-vindas', 'nao_se_aplica', 'Remoto');
+    update public.chamados set colaborador_id = 'emp-outro' where id = 'tkt-3';  -- o passo "Cadastro" liga a pessoa
     perform public.concluir_processo('tkt-3');
     perform harness.espera($s$select 1 from public.chamados where id = 'tkt-3' and status = 'resolvido'$s$, 1);
   end $x$$q$);

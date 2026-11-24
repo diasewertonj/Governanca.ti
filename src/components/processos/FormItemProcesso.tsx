@@ -211,7 +211,8 @@ export const FormItemProcesso: React.FC<Props> = ({ item, ticket, onFechar, onLo
     if (falha) return setErro(falha);
     // Conta criada: ocupa o assento da licença correspondente (função atômica do banco)
     if (status === 'feito' && licencaConta && colabId && atribuirLicenca && !jaTemLicenca && livresConta > 0) {
-      allocateLicense(licencaConta.id, colabId);
+      const erroAssento = await allocateLicense(licencaConta.id, colabId);
+      if (erroAssento) return setErro(`Passo registrado, mas o assento da licença não foi alocado: ${erroAssento}`);
     }
     // Seção 6: linha entregue / devolvida e acessório que sai do estoque
     if (status === 'feito' && item.tipo === 'entregar_linha' && colabId) {

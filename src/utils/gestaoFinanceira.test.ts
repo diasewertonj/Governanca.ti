@@ -113,6 +113,66 @@ describe('livro único', () => {
     expect(l.find((x) => x.situacao === 'comprometido')).toMatchObject({ valor: 6000, natureza: 'capex', mes: 5 });
     expect(l.at(-1)).toMatchObject({ situacao: 'realizado', natureza: 'capex', area: 'Tecnologia', valor: 3000 });
   });
+
+  const base = { licencas: [], contratos: [], pedidos: [], ativos: [], departamentos: [] };
+
+  it('pedido com fatura cancelada volta a contar como comprometido', () => {
+    const l = lancamentosDoLivro(
+      {
+        ...base,
+        faturas: [{ id: 'f1', status: 'cancelada', competencia: '2025-06-01', valor: 6000, pedidoId: 'p1' }],
+        pedidos: [{ id: 'p1', status: 'comprado', categoria: 'hardware', valor: 6000, competencia: '2025-06-10' }],
+      },
+      2025
+    );
+    expect(l).toHaveLength(1);
+    expect(l[0]).toMatchObject({ situacao: 'comprometido', valor: 6000 });
+  });
+
+  it('fatura de contrato ou licença é OPEX mesmo acima do limite; manual vence', () => {
+    const l = lancamentosDoLivro(
+      {
+        ...base,
+        faturas: [
+          { id: 'f1', status: 'a_pagar', competencia: '2025-03-01', valor: 20000, contratoId: 'c1', categoriaDespesa: 'hardware' },
+          { id: 'f2', status: 'a_pagar', competencia: '2025-03-01', valor: 20000, licencaId: 'l1', categoriaDespesa: 'hardware' },
+          { id: 'f3', status: 'a_pagar', competencia: '2025-03-01', valor: 20000, contratoId: 'c1', natureza: 'capex', naturezaManual: true },
+        ],
+        contratos: [{ id: 'c1' }],
+        licencas: [{ id: 'l1' }],
+      },
+      2025
+    );
+    expect(l.map((x) => x.natureza)).toEqual(['opex', 'opex', 'capex']);
+  });
+
+  it('a natureza da fatura de pedido usa o valor da fatura, não o pago com juros', () => {
+    const l = lancamentosDoLivro(
+      {
+        ...base,
+        faturas: [{ id: 'f1', status: 'paga', competencia: '2025-03-01', valor: 1150, valorPago: 1250, pedidoId: 'p1', categoriaDespesa: 'hardware' }],
+        pedidos: [{ id: 'p1', status: 'comprado', categoria: 'hardware', valor: 1150, competencia: '2025-03-01' }],
+      },
+      2025
+    );
+    expect(l[0]).toMatchObject({ natureza: 'opex', valor: 1250 });
+  });
+});
+
+describe('projeção · pedido aprovado fora da janela', () => {
+  const agora = new Date(2025, 10, 15);
+  const projeta = (previstoPara?: string) =>
+    projecaoGastos({ recorrentes: [], ativos: [], pedidosAprovados: [{ codigo: 'PC', titulo: 'x', valor: 500, previstoPara }] }, 12, {}, undefined, agora);
+  it('data passada ou sem data vai para o 1º mês; dentro da janela fica no mês; além dela sai', () => {
+    expect(projeta('2025-01-10').itens[0].mes).toBe('2025-12');
+    expect(projeta(undefined).itens[0].mes).toBe('2025-12');
+    expect(projeta('2026-05-10').itens[0].mes).toBe('2026-05');
+    expect(projeta('2028-01-10').itens).toHaveLength(0);
+  });
+  it('itens recorrentes carregam o id da origem', () => {
+    const p = projecaoGastos({ recorrentes: [{ origem: 'contrato', id: 'c9', nome: 'Link', categoria: 'internet', mensal: 10, renova: true }], ativos: [], pedidosAprovados: [] }, 2, {}, undefined, agora);
+    expect(p.itens[0].origemId).toBe('c9');
+  });
 });
 
 describe('orçamento de gestão', () => {

@@ -6,6 +6,7 @@ import { UserPlus } from 'lucide-react';
 import { Janela } from '../ui/Janela.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
 import { CampoMascara } from '../ui/Campos.tsx';
+import { isoLocal } from '../../utils/formatters.ts';
 
 /** Fase 10: dados que já vêm preenchidos (ex.: do chamado de admissão) */
 export interface DadosIniciaisColaborador {
@@ -52,7 +53,7 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
   const [gestorId, setGestorId] = useState(colaborador?.gestorId ?? inicial?.gestorId ?? '');
   const [status, setStatus] = useState<EmployeeStatus>(colaborador?.status ?? 'ativo');
   const [dataAdmissao, setDataAdmissao] = useState(
-    colaborador?.dataAdmissao || inicial?.dataAdmissao || new Date().toISOString().split('T')[0]
+    colaborador?.dataAdmissao || inicial?.dataAdmissao || isoLocal(new Date())
   );
   const [telefone, setTelefone] = useState(colaborador?.telefone ?? '');
   const emailMudou = editando && email.trim().toLowerCase() !== colaborador.email;

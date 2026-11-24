@@ -11,7 +11,7 @@ import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts'
 import { listarVencimentos } from '../../utils/financeiro.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { VencimentosView } from '../financeiro/FinanceiroViews.tsx';
-import { termoAberto } from '../../utils/termos.ts';
+import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
 import { IndicadoresAtendimento } from './IndicadoresAtendimento.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 import { ArrowLeftRight, ArrowRight, CheckCircle2, ChevronRight, FileSignature, Laptop, LifeBuoy, Plus, Wallet } from 'lucide-react';
@@ -50,7 +50,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
   const { linhas, estoque } = useRecursos();
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
-  const termosAguardando = terms.filter((t) => termoAberto(t) && (!t.formaAssinatura || t.formaAssinatura === 'pendente'));
+  // Contestado fica à parte: quem deve a próxima ação é a T.I., não o colaborador
+  const termosContestados = terms.filter((t) => termoAberto(t) && termoContestadoAberto(t));
+  const termosAguardando = terms.filter((t) => termoAberto(t) && !termoContestadoAberto(t));
   const totalAssets = assets.filter((a) => a.status !== 'descartado').length;
   const assetsInUse = assets.filter((a) => a.status === 'em_uso').length;
   const assetsAvailable = assets.filter((a) => a.status === 'disponivel').length;
@@ -127,6 +129,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
       acao: 'Ver termos',
       onClick: () => onNavigate('terms'),
     });
+  if (termosContestados.length > 0)
+    atencao.push({
+      id: 'termos-contestados',
+      tom: 'atencao',
+      texto: plural(termosContestados.length, 'termo contestado — aguardando a T.I.', 'termos contestados — aguardando a T.I.'),
+      itens: termosContestados.map((t) => ({ id: t.id, rotulo: nomeDe(t.colaboradorId), abrir: () => abrirFicha({ tipo: 'colaborador', id: t.colaboradorId }) })),
+      acao: 'Responder',
+      onClick: () => onNavigate('terms'),
+    });
   if (contratosVencendo.length > 0)
     atencao.push({
       id: 'contratos',
@@ -162,8 +173,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
     {
       rotulo: 'Termos a assinar',
       valor: String(termosAguardando.length),
-      detalhe: termosAguardando.length ? 'aguardando o colaborador' : 'Tudo assinado',
-      tom: termosAguardando.length ? 'atencao' : 'ok',
+      detalhe: [
+        termosAguardando.length ? 'aguardando o colaborador' : '',
+        termosContestados.length ? `${termosContestados.length} contestado(s) — aguardando a T.I.` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ') || 'Tudo assinado',
+      tom: termosAguardando.length || termosContestados.length ? 'atencao' : 'ok',
       icone: <FileSignature className="ico" />,
       vista: 'terms',
     },

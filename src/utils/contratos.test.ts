@@ -51,6 +51,10 @@ describe('situacaoContrato', () => {
   it('sem fim continua vigente; começo futuro fica "a iniciar"', () => {
     expect(situacaoContrato({ inicio: '2025-01-01' }, agora)).toEqual({ situacao: 'vigente', dias: undefined });
     expect(situacaoContrato({ inicio: '2026-12-01', fim: '2027-12-01' }, agora).situacao).toBe('a_iniciar');
+    // Começa no futuro e já termina dentro do prazo de alerta: continua "a iniciar", não "vencendo"
+    expect(situacaoContrato({ inicio: '2026-12-01', fim: '2026-12-20' }, agora)).toEqual({ situacao: 'a_iniciar', dias: 38 });
+    // Já começou e termina logo: vencendo
+    expect(situacaoContrato({ inicio: '2026-11-12', fim: '2026-12-20' }, agora).situacao).toBe('vencendo');
   });
 
   it('vigência considera início e fim', () => {

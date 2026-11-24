@@ -24,6 +24,7 @@ import {
   fetchPedidosDb,
   fetchPedidosVisiveisDb,
   incluirItemInventarioDb,
+  souGestorDb,
   mudarStatusPedidoDb,
   receberPedidoDb,
   registrarCompraDb,
@@ -266,9 +267,21 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [inventarios, setInventarios] = useState<InventarioFisico[]>(demo ? DEMO_INVENTARIOS : []);
   const [mensagens, setMensagens] = useState<Record<string, MensagemPedido[]>>(demo ? DEMO_MENSAGENS : {});
   const podePedirCompra = !!currentUser;
+  // Produção: a função do banco (a RLS só mostra ao colaborador a própria linha); demonstração: a lista local
+  const [gestorBanco, setGestorBanco] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (demo || !eu) return;
+    let vivo = true;
+    souGestorDb().then((v) => {
+      if (vivo) setGestorBanco(v);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [demo, eu]);
   const ehGestor = useMemo(
-    () => !!eu && (employees.some((e) => e.gestorId === eu && e.id !== eu && e.status !== 'desligado') || pedidosTodos.some((p) => p.gestorId === eu)),
-    [eu, employees, pedidosTodos]
+    () => !!eu && (gestorBanco === true || employees.some((e) => e.gestorId === eu && e.id !== eu && e.status !== 'desligado') || pedidosTodos.some((p) => p.gestorId === eu)),
+    [eu, employees, pedidosTodos, gestorBanco]
   );
   const [pessoasBanco, setPessoasBanco] = useState<{ id: string; nome: string; cargo?: string }[]>([]);
   // Demonstração e T.I.: o cadastro; Compras (produção): pela função do banco
@@ -505,7 +518,8 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id = await solicitarCompraDb(dados);
     });
     if (erro) return { erro };
-    const status: StatusPedido = dados.tipoPedido === 'outros' ? 'aguardando' : 'em_cotacao';
+    // Seção 15: todo pedido novo vai para a cotação (o banco faz igual)
+    const status: StatusPedido = 'em_cotacao';
     const item: PedidoCompra = {
       ...dados,
       id: id || dados.id,
@@ -524,9 +538,14 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ],
       eventos: [{ para: status, por: eu, em: agoraIso() }],
     };
-    if (demo) setPedidos((prev) => [item, ...prev]);
-    else await recarregarCompras();
-    return { item };
+    if (demo) {
+      setPedidos((prev) => [item, ...prev]);
+      return { item };
+    }
+    // Produção: vale o que o banco devolveu (código, situação, gestor)
+    const r = await buscar();
+    aplicar(r);
+    return { item: r?.p?.find((x) => x.id === id) || item };
   };
 
   const mudarStatusPedido: ComprasContextType['mudarStatusPedido'] = async (id, acao, motivo) => {
@@ -541,6 +560,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (precisaMotivo && (motivo || '').trim().length < 5) return 'Explique o motivo.';
     if (acao === 'aprovar' || acao === 'recusar') return 'Use "Registrar aprovação" (com quem aprovou) ou "Devolver".';
     if (acao === 'devolver' && !(equipe && ['em_cotacao', 'aguardando', 'aprovado'].includes(p.status))) return 'Só a T.I. ou Compras devolvem um pedido em cotação ou aprovado.';
+    if (acao === 'devolver' && p.status === 'aprovado' && !(isCompras || isAdmin)) return 'Só Compras ou o administrador da T.I. devolvem um pedido aprovado.';
     if (acao === 'enviar' && !['rascunho', 'recusado'].includes(p.status)) return 'Só um rascunho ou um pedido devolvido vai para cotação.';
     const erro = await noBanco(() => mudarStatusPedidoDb(p.id, acao, motivo));
     if (erro) return erro;
@@ -548,7 +568,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await recarregarCompras();
       return null;
     }
-    const limpaAprov = { aprovadoPor: undefined, aprovadoEm: undefined, aprovadorId: undefined, aprovacaoForma: undefined };
+    const limpaAprov = { aprovadoPor: undefined, aprovadoEm: undefined, aprovadorId: undefined, aprovacaoForma: undefined, aprovacaoObs: undefined, aprovadoGestorPor: undefined, aprovadoGestorEm: undefined };
     if (acao === 'enviar') mudarLocal(p.id, 'em_cotacao', { motivo: undefined, ...limpaAprov });
     else if (acao === 'devolver') mudarLocal(p.id, p.status === 'aprovado' ? 'em_cotacao' : 'recusado', { motivo: motivo?.trim(), ...(p.status === 'aprovado' ? limpaAprov : {}) }, motivo?.trim());
     else mudarLocal(p.id, 'cancelado', { motivo: motivo?.trim() }, motivo?.trim());
@@ -559,8 +579,9 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const registrarAprovacao: ComprasContextType['registrarAprovacao'] = async (id, aprovadorId, forma, obs) => {
     const p = pedidosTodos.find((x) => x.id === id);
     if (!p) return 'Pedido não encontrado.';
-    if (!equipe && !(eu && p.gestorId === eu && aprovadorId === eu)) return 'Só a T.I., Compras ou o gestor de quem pediu registram a aprovação.';
-    if (!['rascunho', 'em_cotacao', 'aguardando', 'recusado'].includes(p.status)) return 'Este pedido não está aguardando aprovação.';
+    if (!(isCompras || isAdmin) && !(eu && p.gestorId === eu && aprovadorId === eu)) return 'Só Compras, o administrador da T.I. ou o gestor de quem pediu registram a aprovação.';
+    if (eu && eu === p.solicitanteId) return 'Quem pediu não pode registrar a aprovação do próprio pedido.';
+    if (!['em_cotacao', 'aguardando'].includes(p.status)) return 'Este pedido não está aguardando aprovação.';
     if (!aprovadorId) return 'Escolha quem aprovou.';
     if (aprovadorId === p.solicitanteId) return 'Quem pediu não pode aprovar o próprio pedido.';
     // Seção 16: recomendar uma opção é opcional (sem recomendação, Compras escolhe na compra)
@@ -591,6 +612,8 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!p || p.status !== 'aprovado') return 'Só um pedido aprovado pode ser registrado como comprado.';
     if (!d.fornecedorId && !(d.loja || '').trim()) return 'Informe o fornecedor ou a loja da compra.';
     if (!d.dataCompra || !d.vencimento) return 'Informe a data da compra e o vencimento.';
+    if (d.dataCompra > hoje()) return 'A data da compra não pode ser futura.';
+    if (d.vencimento < d.dataCompra) return 'O vencimento não pode ser antes da data da compra.';
     const sugeridos = p.cotacoes.filter((c) => c.vencedora && c.fornecedorId).map((c) => c.fornecedorId);
     const trocou = sugeridos.length > 0 && !sugeridos.includes(d.fornecedorId);
     if (trocou && (d.motivoTroca || '').trim().length < 5) return 'Explique por que a compra foi feita em outro fornecedor.';
@@ -598,6 +621,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const valores = new Map(d.itens.map((i) => [i.id, i.valorUnitario]));
     const itens = p.itens.map((i) => ({ ...i, valorUnitario: valores.get(i.id) ?? i.valorUnitario }));
     const total = Math.round(itens.reduce((s, i) => s + i.quantidade * (i.valorUnitario || 0), 0) * 100) / 100;
+    if (itens.some((i) => !((i.valorUnitario || 0) > 0))) return 'Informe o valor pago de cada item (maior que zero).';
     if (!(total > 0)) return 'Informe o valor pago de cada item.';
     const erro = await noBanco(() => registrarCompraDb(id, d));
     if (erro) return erro;
@@ -744,6 +768,7 @@ export const ComprasProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const inv = inventarios.find((i) => i.id === inventarioId);
     if (!inv || inv.status !== 'aberto') return 'Esta conferência já foi encerrada.';
     if (inv.itens.some((i) => i.ativoId === dados.ativoId)) return 'O equipamento já está nesta conferência.';
+    if (assets.find((a) => a.id === dados.ativoId)?.status === 'descartado') return 'Equipamento descartado não entra na conferência.';
     const item: ItemInventario = { ...dados, id: novoId('ii'), conferidoPor: eu, conferidoEm: agoraIso() };
     const erro = await noBanco(() => incluirItemInventarioDb(inventarioId, item));
     if (erro) return erro;

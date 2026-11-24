@@ -49,19 +49,22 @@ select harness.rodar('fase11', 'P4 RH não lê a tabela de pedidos (0 linhas)', 
 select harness.rodar('fase11', 'P5 uma só cotação vencedora por pedido (seção 14: opções sem limite de 3)', 'erro: duplicate key value violates unique constraint "uq_pedido_opcao_escolhida"', :'sup', 'authenticated',
   $q$insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor, vencedora) values ('pc-1', 'for-f11', 1, true), ('pc-1', 'for-f11', 2, true)$q$);
 
--- Aprovação: só o admin --------------------------------------------------------------------------
-select harness.rodar('fase11', 'A1 quem pediu não aprova o próprio pedido', 'erro: Quem pediu não pode aprovar o próprio pedido', :'sup', 'authenticated',
+-- Aprovação: só o admin (o pedido já foi enviado e cotado)
+select set_config('app.operacao_pedido', 'sim', false);
+update public.pedidos_compra set status = 'em_cotacao' where id = 'pc-1';
+select set_config('app.operacao_pedido', '', false); --------------------------------------------------------------------------
+select harness.rodar('fase11', 'A1 quem pediu não é o aprovador do próprio pedido', 'erro: Quem pediu não pode aprovar o próprio pedido', :'admin', 'authenticated',
   $q$select public.aprovar_pedido('pc-1', 'emp-sup', 'pessoalmente')$q$);
 select harness.rodar('fase11', 'A2 recomendar é opcional: aprova com cotações sem vencedora (seção 16)', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor) values ('pc-1', 'for-f11', 10230);
     perform public.aprovar_pedido('pc-1', 'emp-admin', 'pessoalmente');
   end $x$$q$);
-select harness.rodar('fase11', 'A3 T.I. registra a aprovação (quem aprovou e como); fornecedor e histórico gravados', 'ok', :'sup', 'authenticated',
+select harness.rodar('fase11', 'A3 admin registra a aprovação (quem aprovou e como); fornecedor e histórico gravados', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin
     insert into public.pedido_cotacoes (pedido_id, fornecedor_id, valor, vencedora) values ('pc-1', 'for-f11', 10230, true);
     perform public.aprovar_pedido('pc-1', 'emp-admin', 'email', 'Confirmado por e-mail');
-    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pc-1' and status = 'aprovado' and aprovado_por = 'emp-sup'
+    perform harness.espera($s$select 1 from public.pedidos_compra where id = 'pc-1' and status = 'aprovado' and aprovado_por = 'emp-admin'
       and aprovador_id = 'emp-admin' and aprovacao_forma = 'email' and fornecedor_id = 'for-f11'$s$, 1);
     perform harness.espera($s$select 1 from public.pedido_eventos where pedido_id = 'pc-1' and para = 'aprovado' and motivo like 'Aprovado por Admin (email)%'$s$, 1);
   end $x$$q$);
@@ -139,7 +142,7 @@ select harness.rodar('fase11', 'R2 RH vê os pedidos sem valores (nenhuma chave 
   end $x$$q$);
 select harness.rodar('fase11', 'R2b RH não vê rascunho de outra pessoa', 'ok', :'rh', 'authenticated',
   $q$do $x$ begin
-    perform harness.espera($s$select 1 from public.pedidos_solicitados() where id = 'pc-1'$s$, 0);
+    perform harness.espera($s$select 1 from public.pedidos_visiveis() where id = 'pc-1'$s$, 0);
   end $x$$q$);
 select harness.rodar('fase11', 'R3 qualquer colaborador pede compra (seção 13)', 'ok', :'colab', 'authenticated',
   $q$select public.solicitar_compra('{"titulo":"Monitor","justificativa":"Trabalho remoto"}', '[{"descricao":"Monitor"}]')$q$);

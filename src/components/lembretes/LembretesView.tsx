@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { CheckCircle2, Plus, XCircle, Bell } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Lembrete } from '../../types/index.ts';
-import { formatDate, formatDateTime } from '../../utils/formatters.ts';
+import { formatDate, formatDateTime, isoLocal } from '../../utils/formatters.ts';
 import { Abas } from '../ui/Abas.tsx';
 import { Janela } from '../ui/Janela.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 
-const hojeISO = () => new Date().toISOString().split('T')[0];
+const hojeISO = () => isoLocal(new Date());
 
 /** Situação do lembrete em aberto: vencido, vence hoje ou futuro */
 export function situacaoLembrete(l: Pick<Lembrete, 'status' | 'venceEm'>, hoje = hojeISO()) {

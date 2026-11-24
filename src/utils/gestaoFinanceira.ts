@@ -189,7 +189,7 @@ export interface MesProjecao {
 export interface Projecao {
   meses: MesProjecao[];
   /** Detalhe para o relatório: o que compõe cada valor */
-  itens: { mes: string; natureza: Natureza; origem: string; nome: string; categoria: CategoriaDespesa | string; valor: number }[];
+  itens: { mes: string; natureza: Natureza; origem: string; origemId?: string; nome: string; categoria: CategoriaDespesa | string; valor: number }[];
 }
 
 const mesIso = (base: Date, soma: number) => {
@@ -226,7 +226,7 @@ export function projecaoGastos(
       const numMes = Number(mes.slice(5, 7));
       const reajusta = r.reajusteMes ? numMes === r.reajusteMes && i > 0 : i > 0 && i % 12 === 0;
       if (reajusta) valor = c(valor * (1 + pct));
-      if (valor > 0) itens.push({ mes, natureza: 'opex', origem: r.origem, nome: r.nome, categoria: r.categoria, valor });
+      if (valor > 0) itens.push({ mes, natureza: 'opex', origem: r.origem, origemId: r.id, nome: r.nome, categoria: r.categoria, valor });
     });
   });
 
@@ -241,7 +241,10 @@ export function projecaoGastos(
   });
 
   dados.pedidosAprovados.forEach((p) => {
-    const mes = p.previstoPara && lista.includes(p.previstoPara.slice(0, 7)) ? p.previstoPara.slice(0, 7) : lista[0];
+    // Sem data ou data já passada: 1º mês da janela; data depois da janela: fora da projeção
+    const previsto = p.previstoPara?.slice(0, 7);
+    if (previsto && previsto > lista[lista.length - 1]) return;
+    const mes = previsto && lista.includes(previsto) ? previsto : lista[0];
     const categoria = p.categoria || 'hardware';
     const natureza = p.natureza || naturezaDoLancamento({ categoria, valorUnitario: p.valor }, limite);
     if (p.valor > 0) itens.push({ mes, natureza, origem: 'pedido', nome: `${p.codigo} · ${p.titulo}`, categoria, valor: p.valor });
@@ -406,8 +409,11 @@ export function lancamentosDoLivro(
   const ativosComFatura = new Set<string>();
 
   dados.faturas.forEach((f) => {
-    if (f.pedidoId) comFatura.add(f.pedidoId);
-    if (f.ativoId) ativosComFatura.add(f.ativoId);
+    // Fatura cancelada não cobre o pedido nem o equipamento: eles voltam a contar como comprometido/realizado
+    if (f.status !== 'cancelada') {
+      if (f.pedidoId) comFatura.add(f.pedidoId);
+      if (f.ativoId) ativosComFatura.add(f.ativoId);
+    }
     if (f.status === 'cancelada' || !f.competencia.startsWith(prefixo)) return;
     let categoria: CategoriaDespesa = f.categoriaDespesa || 'outros';
     let ar = nomeDep(f.departamentoId);
@@ -424,10 +430,19 @@ export function lancamentosDoLivro(
       categoria = f.categoriaDespesa || p?.categoria || 'hardware';
       ar = ar || area(p?.departamentoId, p?.area);
     }
+    // Valor lançado (com juros/desconto no pagamento, o que sai é o valorPago)
     const valor = f.status === 'paga' && f.valorPago != null ? Number(f.valorPago) : Number(f.valor);
+    // Natureza: manual vence; fatura de contrato ou licença é sempre OPEX; só pedido/avulsa usa o limite,
+    // sobre o valor da fatura (não o pago com juros)
+    const natureza: Natureza =
+      f.naturezaManual && f.natureza
+        ? f.natureza
+        : f.contratoId || f.licencaId
+          ? 'opex'
+          : naturezaDoLancamento({ categoria, valorUnitario: Number(f.valor) }, limite);
     out.push({
       situacao: f.status === 'paga' ? 'realizado' : 'a_pagar',
-      natureza: naturezaDoLancamento({ categoria, valorUnitario: valor, natureza: f.natureza, naturezaManual: f.naturezaManual }, limite),
+      natureza,
       categoria,
       area: ar,
       mes: Number(f.competencia.slice(5, 7)) - 1,

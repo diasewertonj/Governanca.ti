@@ -25,7 +25,7 @@ const PAPEL: Record<string, string> = {
   ti_admin: 'Admin de T.I.',
   ti_suporte: 'Suporte de T.I.',
   rh: 'Recursos Humanos (RH)',
-  colaborador: 'Colaborador',
+  colaborador: 'Colaborador Padrão',
 };
 
 /** Linha "rótulo à esquerda, valor à direita" */
@@ -127,7 +127,7 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
             {ehOnb ? 'Admissão' : 'Desligamento'}
           </span>
           <span className="flex-1" />
-          <span className={SELO_STATUS_CHAMADO[ticket.status]}>{ticket.status === 'resolvido' ? 'Concluído' : rotuloSituacao(ticket)}</span>
+          <span className={SELO_STATUS_CHAMADO[ticket.status]}>{ticket.status === 'resolvido' ? 'Concluído' : ticket.status === 'aberto' ? 'Aguardando a T.I.' : rotuloSituacao(ticket)}</span>
           <button
             type="button"
             onClick={() => imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla))}

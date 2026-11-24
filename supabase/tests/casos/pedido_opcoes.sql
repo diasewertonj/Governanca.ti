@@ -25,12 +25,12 @@ select harness.rodar('opcoes', 'O1 quem pede informa link, valor, marca e opçõ
       where p.id = %L and i ->> 'link' = 'https://loja.test/lg' and (i ->> 'valor_referencia')::numeric = 1800
         and jsonb_array_length(i -> 'opcoes') = 2 and (i -> 'opcoes' -> 0 ->> 'loja') = 'loja.test'$s$, v), 1);
   end $x$$q$);
-select harness.rodar('opcoes', 'O2 RH vê o item e o link, mas não os valores de quem pediu', 'ok', :'rh', 'authenticated',
+select harness.rodar('opcoes', 'O2 RH (pedido de admissão) vê o item e o link, mas não os valores de quem pediu', 'ok', :'rh', 'authenticated',
   $q$do $x$
   declare v text;
   begin
     perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000009","role":"authenticated"}', true);
-    v := public.solicitar_compra('{"titulo":"Monitor","justificativa":"Segunda tela"}',
+    v := public.solicitar_compra('{"titulo":"Monitor","justificativa":"Segunda tela","chamado_id":"tkt-3"}',
       '[{"descricao":"Monitor 27","link":"https://loja.test/lg","valor_referencia":1800,"opcoes":[{"loja":"Outra","valor":1700}]}]');
     perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000005","role":"authenticated"}', true);
     perform harness.espera(format($s$select 1 from public.pedidos_visiveis() p, jsonb_array_elements(p.itens) i

@@ -107,7 +107,7 @@ export const FormPedido: React.FC<{
   return (
     <Janela
       titulo={novo ? (simples ? 'Pedir compra' : 'Novo pedido de compra') : `Editar ${p.codigo}`}
-      subtitulo={simples ? 'Pedido de T.I.: a T.I. cota; depois o seu gestor e Compras aprovam' : 'Cotação → aprovação do gestor e de Compras → compra → recebimento'}
+      subtitulo={simples ? 'Pedido de T.I.: a T.I. cota; Compras (ou o seu gestor) registra a aprovação; Compras compra' : 'Cotação → aprovação registrada (Compras, T.I. admin ou o gestor) → compra → recebimento'}
       icone={<ShoppingCart className="ico" />}
       tamanho="g"
       onFechar={fechar}

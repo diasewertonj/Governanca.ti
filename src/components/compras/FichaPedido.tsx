@@ -75,7 +75,9 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
   const podeEnviar = (isTI || souSolicitante) && (p.status === 'rascunho' || p.status === 'recusado');
   const podeDevolver = isTI && ['em_cotacao', 'aguardando', 'aprovado'].includes(p.status) && !(p.status === 'aprovado' && !(ehCompras || isAdmin));
   const souGestor = !!eu && p.gestorId === eu && !souSolicitante;
-  const podeRegistrar = aberto && p.status !== 'rascunho' && (isTI || souGestor);
+  // Só Compras e o admin da T.I. registram a aprovação (o suporte não); só com o pedido já em cotação; quem pediu nunca
+  const aprovaPelaEquipe = isAdmin || ehCompras;
+  const podeRegistrar = ['em_cotacao', 'aguardando'].includes(p.status) && !souSolicitante && (aprovaPelaEquipe || souGestor);
   const podeComprar = p.status === 'aprovado' && (ehCompras || isAdmin);
   const podeReceber = p.status === 'comprado' && (ehTI || (ehCompras && p.tipoPedido === 'outros'));
   const podeCancelar = isTI ? ['rascunho', 'em_cotacao', 'aguardando', 'aprovado', 'recusado'].includes(p.status) : souSolicitante && ['rascunho', 'em_cotacao', 'aguardando'].includes(p.status);
@@ -156,12 +158,12 @@ export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = 
                 <Send /> {p.status === 'recusado' ? 'Reenviar para cotação' : 'Enviar para cotação'}
               </button>
             )}
-            {podeRegistrar && isTI && (
+            {podeRegistrar && aprovaPelaEquipe && (
               <button type="button" disabled={ocupado || painelAlterado} title={painelAlterado ? 'Salve a cotação antes' : undefined} onClick={() => setRegistrando(true)} className="btn btn-primario">
                 <Check /> Registrar aprovação
               </button>
             )}
-            {podeRegistrar && !isTI && souGestor && (
+            {podeRegistrar && !aprovaPelaEquipe && souGestor && (
               <button type="button" disabled={ocupado} onClick={aprovarComoGestor} className="btn btn-primario">
                 <Check /> Aprovar (sou o gestor)
               </button>
@@ -564,7 +566,7 @@ const FormCompra: React.FC<{ pedido: PedidoCompra; onClose: () => void }> = ({ p
           </div>
           <div>
             <label htmlFor="compra-data" className="rotulo">Data da compra</label>
-            <input id="compra-data" type="date" value={dataCompra} onChange={(e) => setDataCompra(e.target.value)} className="campo" />
+            <input id="compra-data" type="date" value={dataCompra} max={hoje()} onChange={(e) => setDataCompra(e.target.value)} className="campo" />
             <p className="ajuda">Vira a data de aquisição dos equipamentos e a competência da fatura.</p>
           </div>
           <div>

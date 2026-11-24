@@ -203,7 +203,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
       (emp) => emp.nome.toLowerCase().includes(termo) || emp.email.toLowerCase().includes(termo) || emp.cargo.toLowerCase().includes(termo)
     );
 
-  const handleAllocate = (e: React.FormEvent) => {
+  const handleAllocate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedColabToAssign) return;
 
@@ -217,7 +217,12 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     }
 
     const colab = employees.find((emp) => emp.id === selectedColabToAssign);
-    allocateLicense(license.id, selectedColabToAssign);
+    const erroAlocar = await allocateLicense(license.id, selectedColabToAssign);
+    if (erroAlocar) {
+      setFeedbackMsg({ text: erroAlocar, type: 'error' });
+      setTimeout(() => setFeedbackMsg(null), 5000);
+      return;
+    }
     setSelectedColabToAssign('');
     setFeedbackMsg({
       text: `Assento alocado com sucesso para ${colab?.nome || 'o colaborador'}!`,

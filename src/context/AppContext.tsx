@@ -96,8 +96,7 @@ import {
   saveSettingsDb,
   checkSupabaseHealth,
   clearAllDatabaseTables,
-  insertCustodyEntryDb,
-  updateCustodyEntryDb,
+  transferirCustodiaDb,
   mensagemDeErro,
   concluirOffboardingDb,
   anonimizarColaboradorDb,
@@ -278,7 +277,7 @@ interface AppContextType {
   addLicense: (license: Omit<SoftwareLicense, 'id' | 'assentosAlocados'>) => SoftwareLicense;
   updateLicense: (id: string, updates: Partial<SoftwareLicense>) => void;
   deleteLicense: (id: string) => { success: boolean; message?: string };
-  allocateLicense: (licenseId: string, employeeId: string) => void;
+  allocateLicense: (licenseId: string, employeeId: string) => Promise<string | null>;
   /** Seção 9.1: o motivo vai para o histórico de assentos */
   revokeLicense: (licenseId: string, employeeId: string, motivo?: string) => void;
 
@@ -395,6 +394,7 @@ interface AppContextType {
   reabrirContrato: (id: string) => Promise<string | null>;
   renovarContrato: (id: string, inicio: string, fim: string | undefined, valor: number, numero?: string) => Promise<Resultado<Contrato>>;
   desfazerPagamento: (faturaId: string, motivo: string) => Promise<string | null>;
+  cancelarFatura: (faturaId: string) => Promise<string | null>;
 
   erroLinkAuth: string | null;
   solicitarRecuperacaoSenha: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -575,6 +575,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Limpa todo o estado de negócio (logout, sessão expirada)
   const limparEstado = () => {
+    // Demonstração: sair só encerra a sessão. Os dados de exemplo são a única cópia (ficam no
+    // localStorage), então limpá-los deixaria "Meus equipamentos" e Hardware vazios ao entrar de novo.
+    if (!isProduction) {
+      setCurrentUserId(null);
+      setSupabaseUser(null);
+      return;
+    }
     setEmployees(isProduction ? [] : INITIAL_EMPLOYEES);
     setAssets([]);
     setLicenses([]);
@@ -1178,21 +1185,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     const antes = assets.find((a) => a.id === assetId);
     if (!antes) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = isoLocal(new Date());
     const historico = [...antes.historicoCustodia];
 
-    let entradaAberta: CustodyHistoryEntry | undefined;
-    let entradaFechada: CustodyHistoryEntry | undefined;
     if (antes.custodianteId && antes.custodianteId !== newColaboradorId) {
       const ultima = historico[historico.length - 1];
       if (ultima && !ultima.dataDevolucao) {
-        entradaAberta = ultima;
-        entradaFechada = {
+        historico[historico.length - 1] = {
           ...ultima,
           dataDevolucao: today,
           motivoDevolucao: motivoDevolucao || 'Devolução/Transferência para o estoque de TI',
         };
-        historico[historico.length - 1] = entradaFechada;
       }
     }
 
@@ -1221,10 +1224,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setAssets((prev) => trocar(prev, depois));
 
+    // Uma função do banco faz as três gravações numa transação; depois a tela relê os ativos
+    // (os ids das entradas de custódia nascem no banco)
     const gravar = async () => {
-      if (entradaAberta && entradaFechada) await updateCustodyEntryDb(assetId, entradaAberta, entradaFechada);
-      if (entradaNova) await insertCustodyEntryDb(assetId, entradaNova);
-      await updateAssetDb(antes, depois);
+      await transferirCustodiaDb(assetId, newColaboradorId, {
+        motivo: motivoDevolucao,
+        observacao: observacaoEntrega,
+        data: today,
+      });
+      const lista = await fetchAssetsFromDb();
+      if (lista) setAssets(lista);
     };
     persistir(gravar(), () => setAssets((prev) => trocar(prev, antes)), `Não foi possível transferir a custódia de ${antes.tag}`);
   };
@@ -1478,25 +1487,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const allocateLicense = (licenseId: string, employeeId: string) => {
+  /** Devolve a mensagem de erro (ou null quando o assento foi mesmo alocado). */
+  const allocateLicense = async (licenseId: string, employeeId: string): Promise<string | null> => {
     const antes = licenses.find((l) => l.id === licenseId);
-    if (!antes || antes.colaboradoresIds.includes(employeeId)) return;
-    if (antes.status === 'inativa') {
-      setDbErro(`A licença ${antes.nome} está inativa e não recebe assentos.`);
-      return;
+    if (!antes) return 'Licença não encontrada.';
+    if (antes.colaboradoresIds.includes(employeeId)) return 'Este colaborador já tem um assento nesta licença.';
+    if (antes.status === 'inativa') return `A licença ${antes.nome} está inativa e não recebe assentos.`;
+    if (antes.colaboradoresIds.length >= antes.assentosTotais) {
+      return 'Não há assentos livres nesta licença. Aumente o total de assentos antes de alocar.';
     }
-    if (antes.colaboradoresIds.length >= antes.assentosTotais) return;
     const ids = [...antes.colaboradoresIds, employeeId];
-    setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
-    if (!isProduction) registrarAtribuicaoLocal(licenseId, employeeId, true);
-    persistir(
-      alocarLicencaDb(licenseId, employeeId).then((doBanco) => {
-        aplicarAssentos(licenseId, doBanco);
-        if (isProduction) void recarregarAtribuicoes();
-      }),
-      () => setLicenses((prev) => trocar(prev, antes)),
-      `Não foi possível alocar assento em ${antes.nome}`
-    );
+    const aplicarLocal = () => {
+      setLicenses((prev) => trocar(prev, { ...antes, colaboradoresIds: ids, assentosAlocados: ids.length }));
+      if (!isProduction) registrarAtribuicaoLocal(licenseId, employeeId, true);
+    };
+    if (!isProduction) {
+      aplicarLocal();
+      return null;
+    }
+    let doBanco: string[] | null = null;
+    const erro = await confirmarNoBanco(async () => {
+      doBanco = await alocarLicencaDb(licenseId, employeeId);
+    }, `Alocar assento em ${antes.nome}`);
+    if (erro) return erro;
+    if (doBanco) aplicarAssentos(licenseId, doBanco);
+    else aplicarLocal();
+    void recarregarAtribuicoes();
+    return null;
   };
 
   const revokeLicense = (licenseId: string, employeeId: string, motivo?: string) => {
@@ -1796,7 +1813,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const antes = contratos.find((c) => c.id === id);
     if (!antes) return 'Contrato não encontrado.';
     if (motivo.trim().length < 5) return 'Informe o motivo do encerramento (mínimo 5 caracteres).';
-    const data = em || new Date().toISOString().slice(0, 10);
+    const data = em || isoLocal(new Date());
     const erro = await confirmarNoBanco(() => situacaoContratoDb(id, 'encerrado', motivo, data), 'Encerrar contrato');
     if (erro) return erro;
     setContratos((prev) =>
@@ -1829,7 +1846,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (erro) return { erro };
     const vespera = new Date(`${inicio}T12:00:00`);
     vespera.setDate(vespera.getDate() - 1);
-    const fimAnterior = vespera.toISOString().slice(0, 10);
+    const fimAnterior = isoLocal(vespera);
     const novo: Contrato = {
       ...antes,
       id: novoIdDb || novoId('ctr'),
@@ -1859,6 +1876,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const erro = await confirmarNoBanco(() => desfazerPagamentoDb(faturaId, motivo), 'Desfazer pagamento');
     if (erro) return erro;
     setFaturas((prev) => trocar(prev, { ...antes, status: 'a_pagar', pagoEm: undefined, valorPago: undefined, estornoMotivo: motivo.trim() }));
+    return null;
+  };
+
+  /** Cancela a fatura esperando o banco; devolve o erro para a tela mostrar (null = ok) */
+  const cancelarFatura: AppContextType['cancelarFatura'] = async (faturaId) => {
+    const antes = faturas.find((f) => f.id === faturaId);
+    if (!antes) return 'Fatura não encontrada.';
+    const depois: Fatura = { ...antes, status: 'cancelada' };
+    const erro = await confirmarNoBanco(() => updateFaturaDb(antes, depois), 'Cancelar fatura');
+    if (erro) return erro;
+    setFaturas((prev) => trocar(prev, depois));
     return null;
   };
 
@@ -2082,7 +2110,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...data,
       id: novoId('tr'),
       codigo: `#TR-${new Date().getFullYear()}-${(terms.length + 1).toString().padStart(4, '0')}`,
-      dataEmissao: new Date().toISOString().split('T')[0],
+      dataEmissao: isoLocal(new Date()),
     };
     try {
       const doBanco = await insertTermDb(novo);
@@ -2202,7 +2230,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: novoId('lem'),
               titulo: `Reverter passos do processo cancelado — ${chamado.codigo}`,
               descricao: `Processo cancelado com passos já feitos. Reverter: ${feitos.map((i) => i.titulo).join('; ')}. Motivo: ${(detalhe || '').trim()}`,
-              venceEm: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+              venceEm: isoLocal(new Date(Date.now() + 2 * 86400000)),
               status: 'aberto',
               chamadoId: ticketId,
               colaboradorId: chamado.colaboradorId,
@@ -2316,7 +2344,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Modo demonstração: mesma regra, só na memória
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = isoLocal(new Date());
     const ativosDoColab = assets.filter((a) => a.custodianteId === colabId);
     const licsDoColab = licenses.filter((l) => l.colaboradoresIds.includes(colabId));
     setAssets((prev) =>
@@ -2868,7 +2896,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setorId: 'dep-1',
           status: 'ativo',
           role: 'ti_admin',
-          dataAdmissao: new Date().toISOString().split('T')[0],
+          dataAdmissao: isoLocal(new Date()),
         }
       : null;
 
@@ -2964,6 +2992,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reabrirContrato,
         renovarContrato,
         desfazerPagamento,
+        cancelarFatura,
         atribuicoesLicenca,
         alterarFatura,
         excluirFatura,

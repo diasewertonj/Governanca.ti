@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase.ts';
+import { isoLocal } from '../utils/formatters.ts';
 import type { Json, Tables, TablesInsert } from '../types/database.types.ts';
 import {
   AnexoAtivo,
@@ -793,6 +794,24 @@ export async function deleteAssetDb(id: string) {
   await excluir('ativos', id);
 }
 
+/** Entrega, troca ou devolução: fecha a entrada aberta, abre a nova e atualiza o ativo numa transação só */
+export async function transferirCustodiaDb(
+  ativoId: string,
+  paraColaboradorId: string | null,
+  dados: { motivo?: string; observacao?: string; data: string }
+) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('transferir_custodia', {
+      p_ativo: ativoId,
+      p_para: paraColaboradorId || undefined,
+      p_motivo: dados.motivo || undefined,
+      p_observacao: dados.observacao || undefined,
+      p_data: dados.data,
+    })
+  );
+}
+
 export async function insertCustodyEntryDb(ativoId: string, entry: CustodyHistoryEntry) {
   if (!supabase) return;
   await checar(supabase.from('historico_custodia').insert(linhaCustodia(ativoId, entry)));
@@ -815,6 +834,7 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
   // (sem valores, pagamento ou cartão; colaborador só as dele). Antes da migration, lê a tabela direto.
   let { data, error } = await supabase.rpc('licencas_visiveis');
   if (error && /licencas_visiveis|PGRST202/i.test(`${error.code} ${error.message}`)) {
+    // Antes da migration: lê a tabela direto (depois dela, as colunas de pagamento só saem pela função)
     ({ data, error } = await supabase.from('licencas_software').select('*').order('nome'));
   }
   if (error) {
@@ -1016,10 +1036,16 @@ const linhaContrato = (c: Contrato): TablesInsert<'contratos'> => ({
 
 export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
   if (!supabase) return null;
-  const [{ data, error }, { data: itensData }] = await Promise.all([
-    supabase.from('contratos').select('*').order('inicio', { ascending: false }),
+  const [contratosRes, { data: itensData }] = await Promise.all([
+    // A função do banco entrega o pagamento só ao administrador (suporte recebe nulo)
+    supabase.rpc('contratos_visiveis' as never) as unknown as PromiseLike<{ data: Tables<'contratos'>[] | null; error: { code?: string; message: string } | null }>,
     supabase.from('contrato_itens').select('contrato_id, ativo_id, licenca_id'),
   ]);
+  let { data, error } = contratosRes;
+  if (error && /contratos_visiveis|PGRST202/i.test(`${error.code} ${error.message}`)) {
+    // Antes da migration: lê a tabela direto
+    ({ data, error } = await supabase.from('contratos').select('*').order('inicio', { ascending: false }));
+  }
   if (error) return erroDeLeitura(error);
   const itensPorContrato: Record<string, ItemContrato[]> = {};
   (itensData || []).forEach((i) => {
@@ -1063,7 +1089,7 @@ export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
 /** Seção 6: encerrar e reabrir (reabrir só o admin; o banco confere) */
 export async function situacaoContratoDb(id: string, status: 'ativo' | 'encerrado', motivo?: string, em?: string) {
   await atualizar('contratos', id, status === 'encerrado'
-    ? { status, encerrado_em: em || new Date().toISOString().slice(0, 10), encerramento_motivo: motivo?.trim() || null }
+    ? { status, encerrado_em: em || isoLocal(new Date()), encerramento_motivo: motivo?.trim() || null }
     : { status });
 }
 
@@ -1749,11 +1775,40 @@ export async function updateTermDb(antes: ResponsibilityTerm, depois: Responsibi
 // ---------------------------------------------------------------------------
 // 7. Configurações da empresa (linha única)
 // ---------------------------------------------------------------------------
+// Leitura por coluna: sem login só o que a tela de login usa; com login tudo, menos as premissas
+// financeiras e a vida útil (vêm por função do banco, só para T.I. e Compras)
+const COLUNAS_CONFIG_PUBLICAS = 'id, razao_social, nome_fantasia, logo_url';
+const COLUNAS_CONFIG =
+  'id, razao_social, nome_fantasia, cnpj, endereco, cidade_uf, cep, email_ti, telefone_ti, texto_termo_entrega, texto_termo_devolucao, ' +
+  'campos_personalizados, doc_entrega, doc_devolucao, logo_url, sla, termo_exige';
+
 export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('configuracoes_empresa').select('*').limit(1).maybeSingle();
-  if (error || !data) {
+  const { data: sessao } = await supabase.auth.getSession();
+  const logado = !!sessao.session;
+  const { data: linha, error } = await supabase
+    .from('configuracoes_empresa')
+    .select(logado ? COLUNAS_CONFIG : COLUNAS_CONFIG_PUBLICAS)
+    .limit(1)
+    .maybeSingle();
+  if (error || !linha) {
     return null;
+  }
+  const data = linha as unknown as Tables<'configuracoes_empresa'>;
+  let premissas: unknown;
+  let vida: unknown;
+  if (logado) {
+    const r = await supabase.rpc('premissas_financeiras_ler' as never);
+    const l = (Array.isArray(r.data) ? r.data[0] : r.data) as { premissas_financeiras?: unknown; vida_util?: unknown } | null | undefined;
+    if (!r.error) {
+      premissas = l?.premissas_financeiras;
+      vida = l?.vida_util;
+    } else if (/premissas_financeiras_ler|PGRST202/i.test(`${r.error.code} ${r.error.message}`)) {
+      // Antes da migration as colunas ainda são legíveis direto
+      const antigo = await supabase.from('configuracoes_empresa').select('premissas_financeiras, vida_util').limit(1).maybeSingle();
+      premissas = antigo.data?.premissas_financeiras;
+      vida = antigo.data?.vida_util;
+    }
   }
   return {
     razaoSocial: data.razao_social,
@@ -1772,8 +1827,8 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     logoUrl: data.logo_url || undefined,
     sla: (data.sla || undefined) as CompanySettings['sla'],
     termoExige: (data.termo_exige || undefined) as CompanySettings['termoExige'],
-    vidaUtil: (data.vida_util || undefined) as CompanySettings['vidaUtil'],
-    premissasFinanceiras: (data.premissas_financeiras || undefined) as CompanySettings['premissasFinanceiras'],
+    vidaUtil: (vida || undefined) as CompanySettings['vidaUtil'],
+    premissasFinanceiras: (premissas || undefined) as CompanySettings['premissasFinanceiras'],
   };
 }
 
@@ -1799,10 +1854,6 @@ export async function saveSettingsDb(st: CompanySettings) {
         ...(st.docDevolucao ? { doc_devolucao: json(st.docDevolucao) } : {}),
         // Seção 9.5: só vai quando configurado (antes da migration a coluna não existe)
         ...(st.termoExige ? { termo_exige: json(st.termoExige) } : {}),
-        // Fase 11: idem para a vida útil (depreciação)
-        ...(st.vidaUtil ? { vida_util: json(st.vidaUtil) } : {}),
-        // Seção 17: premissas financeiras (idem)
-        ...(st.premissasFinanceiras ? { premissas_financeiras: json(st.premissasFinanceiras) } : {}),
         logo_url: st.logoUrl || null,
         sla: st.sla ? json(st.sla) : null,
         updated_at: new Date().toISOString(),
@@ -1810,6 +1861,15 @@ export async function saveSettingsDb(st: CompanySettings) {
       .select('id')
   );
   if (!data || (data as unknown[]).length === 0) throw new DbError(SEM_PERMISSAO, '42501');
+  // Vida útil e premissas financeiras (seção 17) não vão no upsert: a leitura por coluna as esconde da tabela
+  if (st.vidaUtil || st.premissasFinanceiras) {
+    await checar(
+      supabase.rpc('salvar_premissas_financeiras' as never, {
+        p_premissas: st.premissasFinanceiras ? json(st.premissasFinanceiras) : null,
+        p_vida_util: st.vidaUtil ? json(st.vidaUtil) : null,
+      } as never) as unknown as PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

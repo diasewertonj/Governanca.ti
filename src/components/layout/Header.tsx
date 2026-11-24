@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { MeusDadosModal } from '../lgpd/MeusDadosModal.tsx';
 import { Shield, LogOut, ChevronDown, Menu, Briefcase } from 'lucide-react';
-import { termoAberto } from '../../utils/termos.ts';
+import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
 import { TITULO_VISTA, type Vista } from '../../utils/navegacao.ts';
 import { SeletorDensidade } from '../ui/Tela.tsx';
 
@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
   const { currentUser, currentRole, supabaseUser, logout, podeDescartarPendencias, settings, terms } = useApp();
   // T.I./admin não têm Minha área no menu: Meus equipamentos fica aqui, com o aviso de termo a assinar
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
-  const termosParaAssinar = terms.filter((t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm).length;
+  const termosParaAssinar = terms.filter((t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm && !termoContestadoAberto(t)).length;
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showMeusDados, setShowMeusDados] = useState(false);
 

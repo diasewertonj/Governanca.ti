@@ -11,9 +11,15 @@ export interface SituacaoTermo {
 type TermoBase = Pick<
   ResponsibilityTerm,
   'statusAssinatura' | 'formaAssinatura' | 'aceiteColaboradorEm' | 'aceiteTiEm' | 'canceladoEm' | 'substituidoPor'
->;
+> &
+  Partial<Pick<ResponsibilityTerm, 'contestacaoEm' | 'contestacaoRespondidaEm'>>;
 
 export const termoCancelado = (t: Pick<ResponsibilityTerm, 'canceladoEm'>) => !!t.canceladoEm;
+
+/** Colaborador contestou e a T.I. ainda não respondeu: a bola está com a T.I. e ninguém assina */
+export const termoContestadoAberto = (
+  t: Pick<ResponsibilityTerm, 'canceladoEm'> & Partial<Pick<ResponsibilityTerm, 'contestacaoEm' | 'contestacaoRespondidaEm'>>
+) => !termoCancelado(t) && !!t.contestacaoEm && !t.contestacaoRespondidaEm;
 
 /** Termo que ainda pode ser assinado (nem cancelado, nem encerrado) */
 export const termoAberto = (t: TermoBase) =>
@@ -37,6 +43,7 @@ export function situacaoTermo(t: TermoBase, paraColaborador = false, codigoSubst
       tom: 'ok',
     };
   }
+  if (termoContestadoAberto(t)) return { rotulo: 'Contestado — aguardando a T.I.', tom: 'pendente' };
   if (t.aceiteColaboradorEm && !t.aceiteTiEm) {
     return { rotulo: paraColaborador ? 'Você assinou; falta a T.I.' : 'Falta a assinatura da T.I.', tom: 'pendente' };
   }
