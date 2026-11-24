@@ -261,7 +261,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               ) : (
                 <tr>
                   <td colSpan={colunasContratos}>
-                    <Vazio acao={novoContrato}>
+                    <Vazio>
                       {contratos.length === 0
                         ? 'Nenhum contrato cadastrado. Use "Novo contrato" para começar.'
                         : 'Nenhum contrato encontrado com os filtros aplicados.'}
@@ -338,7 +338,7 @@ export const FornecedoresView: React.FC<{ modo?: 'fornecedores' | 'contratos' }>
               ) : (
                 <tr>
                   <td colSpan={colunasFornecedores}>
-                    <Vazio acao={novoFornecedor}>
+                    <Vazio>
                       {fornecedores.length === 0
                         ? 'Nenhum fornecedor cadastrado. Use "Novo fornecedor" para começar.'
                         : 'Nenhum fornecedor encontrado com os filtros aplicados.'}

@@ -92,7 +92,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
         }
       />
       {lista.length === 0 ? (
-        <Vazio acao={podePedirCompra ? <button type="button" onClick={() => setNovo(pedidoVazio({ colaboradorDestinoId: currentUser?.id }))} className="btn btn-sm btn-primario"><Plus /> {isTI && !ehCompras ? 'Novo pedido' : 'Pedir compra'}</button> : undefined}>
+        <Vazio>
           {pedidos.length === 0 ? 'Nenhum pedido de compra ainda.' : 'Nenhum pedido com estes filtros.'}
         </Vazio>
       ) : (
