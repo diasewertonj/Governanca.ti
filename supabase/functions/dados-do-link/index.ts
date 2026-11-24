@@ -41,7 +41,7 @@ async function enderecosPublicos(host: string): Promise<string[]> {
       ...(await Deno.resolveDns(host, 'A').catch(() => [] as string[])),
       ...(await Deno.resolveDns(host, 'AAAA').catch(() => [] as string[])),
     ];
-    return ips.length > 0 && ips.every((ip) => !enderecoBloqueado(ip)) ? ips.sort() : [];
+    return ips.length > 0 && ips.every((ip) => !enderecoBloqueado(ip)) ? ips : [];
   } catch {
     return [];
   }
@@ -62,9 +62,10 @@ async function buscar(inicial: string): Promise<{ html: string; url: string }> {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NexusCompras/1.0)', Accept: 'text/html,application/xhtml+xml', 'Accept-Language': 'pt-BR,pt;q=0.9' },
     });
     // Contra DNS rebinding (o Deno não deixa fixar o IP da conexão): resolve de novo depois da resposta
-    // e exige o mesmo conjunto de endereços públicos que foi validado antes de conectar
+    // e exige que continue só com endereços públicos (lojas em CDN trocam de IP a cada consulta,
+    // por isso não se exige o mesmo conjunto)
     const depois = await enderecosPublicos(u.hostname);
-    if (depois.length !== antes.length || depois.some((ip, n) => ip !== antes[n])) {
+    if (!depois.length) {
       await r.body?.cancel().catch(() => undefined);
       throw new Error('Endereço não permitido.');
     }
