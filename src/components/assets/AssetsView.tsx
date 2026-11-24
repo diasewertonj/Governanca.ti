@@ -6,7 +6,7 @@ import { licencaAtiva } from '../../utils/licencas.ts';
 import { fonteCustoLicenca, ROTULO_FORMA_COBRANCA } from '../../utils/financeiro.ts';
 import type { Asset, Contrato, SoftwareLicense } from '../../types/index.ts';
 import { EstoqueAcessorios } from './EstoqueAcessorios.tsx';
-import { Copy, ExternalLink, Key, Plus, QrCode, ShieldAlert, ShieldCheck, User, Users } from 'lucide-react';
+import { Copy, Key, Pencil, Plus, QrCode, ShieldAlert, ShieldCheck, User } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 import { MenuAcoes } from '../ui/MenuAcoes.tsx';
 import { CHAVE } from '../../utils/especificacoes.ts';
@@ -168,7 +168,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
         licencasFiltradas.length === 0 ? (
           <Vazio titulo="Nenhuma licença encontrada">Confira a busca ou cadastre um software novo.</Vazio>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {/* Lote 1 (L3): inativas no fim, apagadas e marcadas */}
             {[...licencasFiltradas]
               .sort((a, b) => Number(!licencaAtiva(a)) - Number(!licencaAtiva(b)))
@@ -176,104 +176,70 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                 const perc = Math.round((lic.assentosAlocados / lic.assentosTotais) * 100);
                 const freeCount = Math.max(0, lic.assentosTotais - lic.assentosAlocados);
                 return (
-                  <div key={lic.id} className={`cartao p-4 space-y-4 ${licencaAtiva(lic) ? '' : 'opacity-60'}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <button type="button" onClick={() => setSelectedSoftwareIdFor360(lic.id)} className="flex items-center gap-2 group text-left min-w-0">
-                        <div className="w-8 h-8 shrink-0 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-                          <Key className="ico" />
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-slate-900 group-hover:text-blue-700 flex items-center gap-2">
-                            <span>{lic.nome}</span>
-                            {!licencaAtiva(lic) && <span className="selo selo-neutro">Inativa</span>}
-                          </h3>
-                          <p className="texto-aux mt-0.5">
-                            {fornecedores.find((f) => f.id === lic.fornecedorId)?.nome || lic.fornecedor}
-                            {lic.chaveContrato && (
-                              <>
-                                {' · '}
-                                <span className="font-mono">{lic.chaveContrato}</span>
-                              </>
-                            )}
-                          </p>
-                        </div>
-                      </button>
-
-                      <div className="text-right shrink-0">
-                        <span className="font-mono font-semibold text-slate-700 block">
+                  /* Seção 19: cartão compacto — a lista de pessoas fica na ficha (aba Pessoas e assentos), que aguenta centenas */
+                  <div key={lic.id} className={`cartao relative flex flex-col gap-3 p-3 transition-colors hover:border-blue-300 ${licencaAtiva(lic) ? '' : 'opacity-60'}`}>
+                    <div className="flex items-start gap-3">
+                      <span className="janela-icone" aria-hidden="true">
+                        <Key className="ico" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSoftwareIdFor360(lic.id)}
+                          className="block max-w-full truncate text-left font-semibold text-slate-900 after:absolute after:inset-0 after:content-[''] hover:text-blue-700"
+                        >
+                          {lic.nome}
+                        </button>
+                        <p className="texto-aux truncate">{fornecedores.find((f) => f.id === lic.fornecedorId)?.nome || lic.fornecedor}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="num block font-semibold text-slate-900">
                           {(() => {
                             const fonte = fonteCustoLicenca(lic, contratos);
                             if (fonte.forma === 'sem_custo') return 'Sem custo';
-                            if (fonte.semContratoVigente) return 'Sem contrato vigente';
+                            if (fonte.semContratoVigente) return 'Sem contrato';
                             return `${formatCurrency(fonte.mensalDaLicenca)}/mês`;
                           })()}
                         </span>
-                        <span className="texto-aux block mt-0.5">{origemCurta(lic, contratos)}</span>
-                        <span className="mt-1 block">
-                          {freeCount > 0 ? (
-                            <span className="selo selo-ok">{freeCount} assento(s) livre(s)</span>
-                          ) : (
-                            <span className="selo selo-problema">Esgotado (100%)</span>
-                          )}
-                        </span>
+                        <span className="texto-aux block">{origemCurta(lic, contratos)}</span>
                       </div>
                     </div>
 
-                    {/* Barra de progresso de assentos (ex.: 24/30) */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Ocupação de assentos</span>
-                        <span className="font-mono font-semibold text-slate-900">
-                          {lic.assentosAlocados} / {lic.assentosTotais} ({perc}%)
-                        </span>
-                      </div>
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    {/* Ocupação: barra fina e a conta em uma linha */}
+                    <div className="space-y-1">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                         <div
-                          className={`h-full rounded-full transition-all duration-300 ${perc >= 100 ? 'bg-red-600' : perc >= 85 ? 'bg-amber-500' : 'bg-blue-600'}`}
+                          className={`h-full rounded-full ${perc >= 100 ? 'bg-red-600' : perc >= 85 ? 'bg-amber-500' : 'bg-blue-600'}`}
                           style={{ width: `${Math.min(100, perc)}%` }}
                         />
                       </div>
-                    </div>
-
-                    {/* Colaboradores vinculados (rastreabilidade 360°) */}
-                    <div className="pt-2 border-t border-slate-100">
-                      <p className="secao-titulo mb-2">Colaboradores alocados ({lic.colaboradoresIds.length})</p>
-                      {lic.colaboradoresIds.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {lic.colaboradoresIds.slice(0, 6).map((empId) => {
-                            const emp = employees.find((e) => e.id === empId);
-                            if (!emp) return null;
-                            return (
-                              <button key={empId} type="button" onClick={() => setSelectedEmployeeIdFor360(emp.id)} className="btn btn-secundario btn-sm">
-                                <span>{emp.nome}</span>
-                                <ExternalLink />
-                              </button>
-                            );
-                          })}
-                          {lic.colaboradoresIds.length > 6 && <span className="selo selo-neutro">+{lic.colaboradoresIds.length - 6} outros</span>}
-                        </div>
-                      ) : (
-                        <p className="texto-aux italic">Nenhum colaborador com assento alocado nesta licença.</p>
-                      )}
-                    </div>
-
-                    {/* Ações da licença */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                      {isTI && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSoftwareToEdit(lic);
-                            setSoftwareModalOpen(true);
-                          }}
-                          className="btn btn-sm btn-secundario"
-                        >
-                          Editar
-                        </button>
-                      )}
-                      <button type="button" onClick={() => setSelectedSoftwareIdFor360(lic.id)} className="btn btn-sm btn-secundario">
-                        <Users /> Assentos e ficha
-                      </button>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="texto-aux">
+                          <span className="num font-semibold text-slate-900">
+                            {lic.assentosAlocados} de {lic.assentosTotais}
+                          </span>{' '}
+                          {lic.assentosAlocados === 1 ? 'pessoa' : 'pessoas'}
+                          {freeCount > 0 && <> · {freeCount} {freeCount === 1 ? 'livre' : 'livres'}</>}
+                        </span>
+                        <span className="relative z-10 flex items-center gap-1">
+                          {!licencaAtiva(lic) && <span className="selo selo-neutro">Inativa</span>}
+                          {freeCount === 0 && licencaAtiva(lic) && <span className="selo selo-problema">Esgotado</span>}
+                          {isTI && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSoftwareToEdit(lic);
+                                setSoftwareModalOpen(true);
+                              }}
+                              title="Editar"
+                              aria-label={`Editar ${lic.nome}`}
+                              className="btn-icone"
+                            >
+                              <Pencil />
+                            </button>
+                          )}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
