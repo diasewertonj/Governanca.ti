@@ -43,9 +43,9 @@ describe('ajuste do total de assentos', () => {
   const lic = { status: 'ativa' as const, assentosTotais: 10, assentosAlocados: 4, formaCobranca: 'contrato' as const };
   const d = { licenca: lic, total: 12, motivo: 'Nova equipe', papel: 'ti_admin', quantidadeContratada: 12 as number | null };
 
-  it('só administrador e compras ajustam', () => {
+  it('só o administrador ajusta', () => {
     expect(erroAjusteAssentos({ ...d, papel: 'ti_suporte' })).toMatch(/Só o administrador/);
-    expect(erroAjusteAssentos({ ...d, papel: 'compras' })).toBeNull();
+    expect(erroAjusteAssentos({ ...d, papel: 'compras' })).toMatch(/Só o administrador/);
     expect(erroAjusteAssentos(d)).toBeNull();
   });
   it('exige motivo, licença ativa e total não abaixo do em uso', () => {

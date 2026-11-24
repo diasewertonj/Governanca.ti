@@ -41,11 +41,8 @@ select harness.rodar('assentos', 'A5 administrador ajusta (sem custo) com motivo
     perform harness.espera($s$select 1 from public.licencas_software where id = 'asl-semcusto' and assentos_totais = 8$s$, 1);
     perform harness.espera($s$select 1 from public.licenca_eventos where licenca_id = 'asl-semcusto' and tipo = 'capacidade' and total_antes = 5 and total_depois = 8 and motivo = 'Nova equipe' and por = 'emp-admin'$s$, 1);
   end $x$$q$);
-select harness.rodar('assentos', 'A6 compras ajusta com motivo', 'ok', :'compras', 'authenticated',
-  $q$do $x$ begin
-    perform public.ajustar_assentos_licenca('asl-semcusto', 7, null, 'Compra aprovada');
-    perform harness.espera($s$select 1 from public.licenca_eventos where licenca_id = 'asl-semcusto' and por = 'emp-compras'$s$, 1);
-  end $x$$q$);
+select harness.rodar('assentos', 'A6 compras não ajusta (só o admin)', 'bloqueado', :'compras', 'authenticated',
+  $q$select public.ajustar_assentos_licenca('asl-semcusto', 7, null, 'Compra aprovada')$q$);
 select harness.rodar('assentos', 'A7 sem motivo é recusado', 'erro: Informe o motivo do ajuste (mínimo 5 caracteres)', :'admin', 'authenticated',
   $q$select public.ajustar_assentos_licenca('asl-semcusto', 7, null, 'ok')$q$);
 select harness.rodar('assentos', 'A8 licença inativa é recusada', 'erro: Licença inativa não muda de total. Reative-a antes', :'admin', 'authenticated',
@@ -66,7 +63,7 @@ select harness.rodar('assentos', 'P2 própria grava total e valor juntos no hist
 -- Por contrato ----------------------------------------------------------------------------------------
 select harness.rodar('assentos', 'C1 acima do contratado é recusado', 'erro: Acima do contratado (12). Faça um aditivo/renovação do contrato com a nova quantidade ou um pedido de compra.', :'admin', 'authenticated',
   $q$select public.ajustar_assentos_licenca('asl-contrato', 13, null, 'Quero mais assentos')$q$);
-select harness.rodar('assentos', 'C2 dentro do contratado é permitido', 'ok', :'compras', 'authenticated',
+select harness.rodar('assentos', 'C2 dentro do contratado é permitido', 'ok', :'admin', 'authenticated',
   $q$select public.ajustar_assentos_licenca('asl-contrato', 12, null, 'Usar o contratado')$q$);
 select harness.rodar('assentos', 'C3 admin salva a quantidade contratada pelo contrato; suporte não altera', 'ok', :'admin', 'authenticated',
   $q$do $x$ begin

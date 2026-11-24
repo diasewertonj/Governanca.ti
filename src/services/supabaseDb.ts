@@ -930,7 +930,7 @@ export async function updateLicenseDb(antes: SoftwareLicense, depois: SoftwareLi
   }
 }
 
-/** Ajuste do total de assentos (e, na cobrança própria, do valor): só ti_admin e Compras; o banco confere e grava o histórico */
+/** Ajuste do total de assentos (e, na cobrança própria, do valor): só ti_admin; o banco confere e grava o histórico */
 export async function ajustarAssentosLicencaDb(id: string, total: number, valorMensal: number | undefined, motivo: string) {
   if (!supabase) return;
   await checar(

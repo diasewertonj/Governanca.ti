@@ -3,7 +3,7 @@
 --
 -- 1. licenca_eventos            histórico de capacidade e valor (só gatilho/funções gravam)
 -- 2. contrato_itens.quantidade_contratada  teto de assentos que o contrato cobre (nulo = não informado)
--- 3. ajustar_assentos_licenca   único caminho da tela: só ti_admin e compras, com motivo
+-- 3. ajustar_assentos_licenca   único caminho da tela: só ti_admin (decisão do dono), com motivo
 -- 4. gatilhos em licencas_software: o usuário não muda o total direto; todo ajuste vira evento
 -- 5. salvar_contrato / renovar_contrato levam a quantidade contratada
 --
@@ -134,8 +134,8 @@ declare
   v_contratado integer;
   v_valor     numeric(12,2);
 begin
-  if auth.uid() is not null and coalesce(public.meu_papel(), '') not in ('ti_admin', 'compras') then
-    raise exception 'Só o administrador da T.I. ou Compras ajustam o total de assentos' using errcode = '42501';
+  if auth.uid() is not null and coalesce(public.meu_papel(), '') <> 'ti_admin' then
+    raise exception 'Só o administrador da T.I. ajusta o total de assentos' using errcode = '42501';
   end if;
   if length(v_motivo) < 5 then
     raise exception 'Informe o motivo do ajuste (mínimo 5 caracteres)' using errcode = '23514';
