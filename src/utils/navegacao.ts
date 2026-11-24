@@ -46,7 +46,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   contratos: 'Contratos',
   vencimentos: 'Vencimentos',
   contas_pagar: 'Contas a pagar',
-  despesas: 'Custos recorrentes',
+  despesas: 'Custos do período',
   conciliar: 'Conciliar fornecedores',
   financeiro: 'Contas a pagar',
   collaborators: 'Colaboradores',

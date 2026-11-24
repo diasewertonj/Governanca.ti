@@ -312,7 +312,7 @@ export function recorrenteRestante<R extends ItemRecorrente>(
 }
 
 /**
- * Ponte cadastro → projeção: o mesmo custo recorrente da tela Custos recorrentes,
+ * Ponte cadastro → projeção: o mesmo custo recorrente da tela Custos do período,
  * com fim de vigência, renovação e mês de reajuste de cada origem.
  */
 export function recorrentesParaProjecao(

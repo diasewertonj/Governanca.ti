@@ -7,6 +7,8 @@
  * Realizado = faturas pagas cuja competência cai no período.
  * Previsto  = custo recorrente de cada mês do período (contratos vigentes naquele mês,
  *             softwares com cobrança própria, linhas avulsas) — o que se espera gastar.
+ * Seção 21: previsto e realizado são comparados no mesmo recorte (competências até o mês
+ * corrente); o previsto dos meses seguintes do período aparece à parte, como "a vencer".
  */
 import React, { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
@@ -26,10 +28,10 @@ import {
   mensalDaLicenca,
   mensalDoContrato,
   paraCsv,
+  previstoRealizadoAteHoje,
   somarPor,
   valorEfetivo,
 } from '../../utils/financeiro.ts';
-import { ContratoPorId } from './FinanceiroViews.tsx';
 import { ComprasView } from './ComprasView.tsx';
 import { Abas } from '../ui/Abas.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
@@ -97,8 +99,8 @@ interface Origem {
 }
 
 /**
- * Seção 17: "Custos recorrentes" (lado técnico): o que a T.I. custa e as compras de
- * equipamento. Contas a pagar e Orçamento saíram daqui (Financeiro e Gestão de T.I.).
+ * Seção 17: "Custos do período" (lado técnico; antes "Custos recorrentes"): o que a T.I.
+ * custa e as compras de equipamento. Contas a pagar e Orçamento ficam no Financeiro e na Gestão de T.I.
  */
 export const FinanceiroView: React.FC = () => {
   const [aba, setAba] = useState<'despesas' | 'compras'>('despesas');
@@ -113,11 +115,11 @@ export const FinanceiroView: React.FC = () => {
 
   const abas = (
     <Abas
-      rotulo="Custos recorrentes"
+      rotulo="Custos do período"
       ativa={aba}
       onMudar={setAba}
       itens={[
-        { id: 'despesas' as const, rotulo: 'Custos do período' },
+        { id: 'despesas' as const, rotulo: 'Recorrentes' },
         { id: 'compras' as const, rotulo: 'Compras de equipamento' },
       ]}
     />
@@ -155,7 +157,6 @@ export const DespesasView: React.FC<{
   const [fArea, setFArea] = useState('');
   const [fOrigem, setFOrigem] = useState<'' | Origem['tipo']>('');
   const [agrupar, setAgrupar] = useState<'categoria' | 'fornecedor' | 'area' | 'origem'>('categoria');
-  const [contratoAberto, setContratoAberto] = useState<string | null>(null);
 
   const meses = mesesEntre(periodo.de, periodo.ate);
   const anterior = periodoAnterior(periodo.de, periodo.ate);
@@ -226,7 +227,9 @@ export const DespesasView: React.FC<{
     const chave = (o: Origem) =>
       agrupar === 'categoria' ? ROTULO_CATEGORIA[o.categoria] : agrupar === 'fornecedor' ? nomeForn(o.fornecedorId) : agrupar === 'area' ? o.area || 'Sem área' : o.tipo === 'contrato' ? 'Contratos' : o.tipo === 'licenca' ? 'Softwares' : 'Linhas';
     const grupos = somarPor(pagas, (f) => chave(origemDaFatura(f) as Origem), (f) => valorEfetivo(f));
-    return { doPeriodo, realizado, realizadoAnterior, porMes, previsto, aPagar, grupos };
+    // Mesmo recorte para comparar: competências até o mês corrente; o resto do previsto fica "a vencer"
+    const ateHoje = previstoRealizadoAteHoje(porMes);
+    return { doPeriodo, realizado, realizadoAnterior, porMes, previsto, aPagar, grupos, ateHoje };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faturas, contratos, licenses, linhas, periodo.de, periodo.ate, fFornecedor, fCategoria, fArea, fOrigem, agrupar]);
 
@@ -239,7 +242,7 @@ export const DespesasView: React.FC<{
 
   const abrirOrigem = (o?: Origem) => {
     if (!o) return;
-    if (o.tipo === 'contrato') setContratoAberto(o.id);
+    if (o.tipo === 'contrato') abrirFicha({ tipo: 'contrato', id: o.id });
     else if (o.tipo === 'licenca') abrirFicha({ tipo: 'software', id: o.id });
   };
 
@@ -261,12 +264,15 @@ export const DespesasView: React.FC<{
     setFArea('');
     setFOrigem('');
   };
+  const temFiltro = !!(fFornecedor || fCategoria || fArea || fOrigem);
+  // Coluna sem nenhum dado some
+  const comArea = dados.doPeriodo.some((f) => origemDaFatura(f)?.area);
 
   return (
     <div className="space-y-4">
       {/* Período e filtros */}
       <CabecalhoTela
-        titulo="Custos recorrentes"
+        titulo="Custos do período"
         subtitulo={`${formatDate(periodo.de)} a ${formatDate(periodo.ate)} (${meses.length} ${meses.length === 1 ? 'mês' : 'meses'}) · comparado com ${formatDate(anterior.de)} a ${formatDate(anterior.ate)}`}
         acoes={
           <button type="button" onClick={exportar} className="btn btn-secundario">
@@ -301,30 +307,38 @@ export const DespesasView: React.FC<{
               <option value="licenca">Softwares</option>
               <option value="linha">Linhas avulsas</option>
             </select>
-            <button type="button" onClick={limpar} className="btn btn-sm btn-secundario">Limpar filtros</button>
+            {temFiltro && <button type="button" onClick={limpar} className="btn btn-sm btn-secundario">Limpar filtros</button>}
           </>
         }
       />
-      {/* Números do período (o valor do patrimônio é de hoje: só leitura da ficha fiscal) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Números do período: previsto e realizado no mesmo recorte (até hoje); o resto do previsto é "a vencer" */}
+      <div className="grid items-start grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="cartao p-3">
-          <p className="texto-aux">Realizado (pago)</p>
+          <p className="texto-aux">Realizado até hoje (pago)</p>
           <p className="text-lg font-semibold num text-slate-900">{brl(dados.realizado)}</p>
           {variacao !== undefined && (
-            <p className={` ${variacao > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+            <p className="texto-aux">
               {variacao > 0 ? '+' : ''}
               {variacao.toFixed(0)}% vs período anterior ({brl(dados.realizadoAnterior)})
             </p>
           )}
         </div>
         <div className="cartao p-3">
-          <p className="texto-aux">Previsto (recorrente)</p>
-          <p className="text-lg font-semibold num text-slate-900">{brl(dados.previsto)}</p>
-          <p className="texto-aux">diferença: {brl(dados.realizado - dados.previsto)}</p>
+          <p className="texto-aux">Previsto até hoje (recorrente)</p>
+          <p className="text-lg font-semibold num text-slate-900">{brl(dados.ateHoje.previsto)}</p>
+          <p className="texto-aux">
+            realizado − previsto: <span className="num">{brl(dados.ateHoje.diferenca)}</span>
+            {dados.ateHoje.aVencer > 0 && (
+              <>
+                {' '}· a vencer no período: <span className="num">{brl(dados.ateHoje.aVencer)}</span>
+              </>
+            )}
+          </p>
         </div>
         <div className="cartao p-3">
           <p className="texto-aux">A pagar no período</p>
-          <p className="text-lg font-semibold num text-amber-800">{brl(dados.aPagar)}</p>
+          <p className="text-lg font-semibold num text-slate-900">{brl(dados.aPagar)}</p>
+          <p className="texto-aux">faturas lançadas e ainda não pagas</p>
         </div>
         <div className="cartao p-3">
           <p className="texto-aux">Assentos sem uso (por mês)</p>
@@ -404,12 +418,14 @@ export const DespesasView: React.FC<{
             <Vazio
               titulo="Nenhuma fatura no período"
               acao={
-                <button type="button" onClick={() => { setFFornecedor(''); setFCategoria(''); setFArea(''); setFOrigem(''); }} className="btn btn-sm btn-secundario">
-                  Limpar filtros
-                </button>
+                temFiltro ? (
+                  <button type="button" onClick={limpar} className="btn btn-sm btn-secundario">
+                    Limpar filtros
+                  </button>
+                ) : undefined
               }
             >
-              Nenhuma fatura no período com estes filtros.
+              {temFiltro ? 'Nenhuma fatura no período com estes filtros.' : 'Nenhuma fatura de contrato ou software lançada para estas competências.'}
             </Vazio>
           </div>
         ) : (
@@ -420,8 +436,8 @@ export const DespesasView: React.FC<{
                 <th>Origem</th>
                 <th>Fornecedor</th>
                 <th className="hidden xl:table-cell">Categoria</th>
-                <th className="hidden xl:table-cell">Área</th>
-                <th>Valor</th>
+                {comArea && <th className="hidden xl:table-cell">Área</th>}
+                <th className="num">Valor</th>
                 <th>Situação</th>
               </tr>
             </thead>
@@ -441,9 +457,15 @@ export const DespesasView: React.FC<{
                           o?.nome || '—'
                         )}
                       </td>
-                      <td data-label="Fornecedor">{nomeForn(o?.fornecedorId)}</td>
+                      <td data-label="Fornecedor">
+                        {o?.fornecedorId ? (
+                          <button type="button" onClick={() => abrirFicha({ tipo: 'fornecedor', id: o.fornecedorId! })} className="link text-left">{nomeForn(o.fornecedorId)}</button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td data-label="Categoria" className="hidden xl:table-cell">{o ? ROTULO_CATEGORIA[o.categoria] : '—'}</td>
-                      <td data-label="Área" className="hidden xl:table-cell">{o?.area || '—'}</td>
+                      {comArea && <td data-label="Área" className="hidden xl:table-cell">{o?.area || '—'}</td>}
                       <td data-label="Valor" className="num">{brl(valorEfetivo(f))}</td>
                       <td data-label="Situação">
                         <span className={`selo ${SELO_FATURA[st]}`}>{ROTULO_STATUS_FATURA[st]}</span>
@@ -455,7 +477,7 @@ export const DespesasView: React.FC<{
             </tbody>
           </table>
         )}
-      </div>      {contratoAberto && <ContratoPorId id={contratoAberto} onClose={() => setContratoAberto(null)} />}
+      </div>
     </div>
   );
 };
