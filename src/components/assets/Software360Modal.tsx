@@ -538,7 +538,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
               </p>
             )}
             {isTI && !podeAjustar && (
-              <p className="ajuda">O total de assentos é ajustado pelo administrador da T.I. ou por Compras; aqui você aloca e libera pessoas.</p>
+              <p className="ajuda">O total de assentos é ajustado pelo administrador da T.I.; aqui você aloca e libera pessoas.</p>
             )}
 
             {podeAjustar && isEditingSeats && (

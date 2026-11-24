@@ -41,7 +41,7 @@ export function quantidadeContratadaDaLicenca(licencaId: string, contratos: Cont
   return candidatos[0]?.item?.quantidadeContratada ?? null;
 }
 
-export const PODE_AJUSTAR_ASSENTOS = ['ti_admin', 'compras'];
+export const PODE_AJUSTAR_ASSENTOS = ['ti_admin'];
 
 /** Regras do ajuste do total de assentos (o banco repete todas; aqui só dá a resposta rápida e vale no modo demonstração) */
 export function erroAjusteAssentos(d: {
@@ -52,7 +52,7 @@ export function erroAjusteAssentos(d: {
   papel?: string;
   quantidadeContratada: number | null;
 }): string | null {
-  if (!PODE_AJUSTAR_ASSENTOS.includes(d.papel || '')) return 'Só o administrador da T.I. ou Compras ajustam o total de assentos.';
+  if (!PODE_AJUSTAR_ASSENTOS.includes(d.papel || '')) return 'Só o administrador da T.I. ajusta o total de assentos.';
   if (d.motivo.trim().length < 5) return 'Informe o motivo do ajuste (mínimo 5 caracteres).';
   if (!Number.isInteger(d.total) || d.total < 0) return 'Informe um total de assentos válido.';
   if (!licencaAtiva(d.licenca)) return 'Licença inativa não muda de total. Reative-a antes.';

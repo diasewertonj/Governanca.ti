@@ -506,7 +506,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                     <>
                       <input id="licenca-assentos" type="number" value={assentosTotais} readOnly aria-readonly="true" className={`${CAMPO} bg-slate-50 font-mono font-semibold`} />
                       <p className="ajuda">
-                        {emUso} em uso. Para mudar o total, use "Ajustar total de assentos" na ficha do software (pede motivo e fica no histórico; só administrador da T.I. e Compras).
+                        {emUso} em uso. Para mudar o total, use "Ajustar total de assentos" na ficha do software (pede motivo e fica no histórico; só o administrador da T.I.).
                       </p>
                     </>
                   ) : (
