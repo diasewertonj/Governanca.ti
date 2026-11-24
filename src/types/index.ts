@@ -257,7 +257,24 @@ export type TipoContrato =
 export type PeriodicidadeContrato = 'mensal' | 'anual' | 'unico';
 
 /** O que o contrato cobre: um ativo OU uma licença (o banco confere) */
-export type ItemContrato = { ativoId: string; licencaId?: never } | { licencaId: string; ativoId?: never };
+export type ItemContrato =
+  | { ativoId: string; licencaId?: never; quantidadeContratada?: never }
+  /** quantidadeContratada: assentos que o contrato cobre (vazio = não informado) */
+  | { licencaId: string; ativoId?: never; quantidadeContratada?: number };
+
+/** Histórico de capacidade e valor da licença (o banco grava por gatilho) */
+export interface EventoLicenca {
+  id: string;
+  licencaId: string;
+  tipo: 'cadastro' | 'capacidade' | 'valor' | 'capacidade_valor' | 'recebimento';
+  totalAntes?: number;
+  totalDepois?: number;
+  valorAntes?: number;
+  valorDepois?: number;
+  motivo: string;
+  por?: string;
+  em: string;
+}
 
 export interface Contrato {
   id: string;

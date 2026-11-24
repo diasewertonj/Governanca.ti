@@ -871,18 +871,21 @@ export type Database = {
           contrato_id: string
           id: string
           licenca_id: string | null
+          quantidade_contratada: number | null
         }
         Insert: {
           ativo_id?: string | null
           contrato_id: string
           id?: string
           licenca_id?: string | null
+          quantidade_contratada?: number | null
         }
         Update: {
           ativo_id?: string | null
           contrato_id?: string
           id?: string
           licenca_id?: string | null
+          quantidade_contratada?: number | null
         }
         Relationships: [
           {
@@ -1744,6 +1747,45 @@ export type Database = {
         }
         Relationships: []
       }
+      licenca_eventos: {
+        Row: {
+          id: string
+          licenca_id: string
+          tipo: string
+          total_antes: number | null
+          total_depois: number | null
+          valor_antes: number | null
+          valor_depois: number | null
+          motivo: string
+          por: string | null
+          em: string
+        }
+        Insert: {
+          id?: string
+          licenca_id: string
+          tipo: string
+          total_antes?: number | null
+          total_depois?: number | null
+          valor_antes?: number | null
+          valor_depois?: number | null
+          motivo: string
+          por?: string | null
+          em?: string
+        }
+        Update: {
+          id?: string
+          licenca_id?: string
+          tipo?: string
+          total_antes?: number | null
+          total_depois?: number | null
+          valor_antes?: number | null
+          valor_depois?: number | null
+          motivo?: string
+          por?: string | null
+          em?: string
+        }
+        Relationships: []
+      }
       lembretes: {
         Row: {
           licenca_id: string | null
@@ -1954,6 +1996,10 @@ export type Database = {
       alocar_licenca: {
         Args: { p_colaborador: string; p_licenca: string }
         Returns: Json
+      }
+      ajustar_assentos_licenca: {
+        Args: { p_licenca: string; p_total: number; p_valor_mensal?: number | null; p_motivo?: string | null }
+        Returns: undefined
       }
       anonimizar_colaborador: {
         Args: { p_colaborador: string }
