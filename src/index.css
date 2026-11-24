@@ -524,13 +524,16 @@
     border-color: var(--cor-borda);
     background-color: var(--cor-superficie-suave);
   }
-  .janela-faixa .abas {
+  .janela-faixa .abas,
+  .abas.abas-linha {
     @apply gap-4 rounded-none bg-transparent p-0;
   }
-  .janela-faixa .aba {
+  .janela-faixa .aba,
+  .abas-linha .aba {
     @apply -mb-px rounded-none border-b-2 border-transparent px-1 py-2;
   }
-  .janela-faixa .aba[aria-selected='true'] {
+  .janela-faixa .aba[aria-selected='true'],
+  .abas-linha .aba[aria-selected='true'] {
     @apply bg-transparent shadow-none;
     border-bottom-color: var(--cor-primaria);
     color: var(--cor-texto-forte);
