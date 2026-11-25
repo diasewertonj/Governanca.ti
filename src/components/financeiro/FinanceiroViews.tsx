@@ -111,11 +111,9 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
           </>
         }
         acoes={
-          !noInicio && (
-            <button type="button" onClick={exportar} className="btn btn-secundario">
-              <Download /> Exportar CSV
-            </button>
-          )
+          <button type="button" onClick={exportar} className="btn btn-secundario">
+            <Download /> Exportar CSV
+          </button>
         }
       />
       {lista.length === 0 ? (
