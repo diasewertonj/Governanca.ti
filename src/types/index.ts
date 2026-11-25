@@ -187,6 +187,8 @@ export interface SoftwareLicense {
   valorMensal: number;
   urlPainel?: string;
   tipoCobranca?: 'mensal' | 'anual';
+  /** Seção 26: dia do vencimento das faturas geradas automaticamente (padrão 10) */
+  diaVencimento?: number;
   observacoes?: string;
   fornecedorId?: string; // Fase 8: vínculo com o cadastro; `fornecedor` guarda o nome (texto)
   // Lote 1 (L3): inativa sai das listas de atribuição; reativar só o admin
@@ -304,6 +306,8 @@ export interface Contrato {
   pagamento?: DadosPagamento;
   reajusteIndice?: string;
   reajusteMes?: number;
+  /** Seção 26: dia do vencimento das faturas geradas automaticamente (padrão 10) */
+  diaVencimento?: number;
   multaCancelamento?: string;
   responsavelId?: string;
   centroCusto?: string;
@@ -347,6 +351,8 @@ export interface LinhaTelefonica {
   centroCusto?: string;
   observacoes?: string;
   criadoEm: string;
+  /** Seção 26: dia do vencimento das faturas geradas automaticamente (padrão 10) */
+  diaVencimento?: number;
 }
 
 export interface AtribuicaoLinha {
@@ -434,6 +440,11 @@ export interface Fatura {
   descricao?: string;
   ativoId?: string;
   categoriaDespesa?: CategoriaDespesa;
+  /** Seção 26: linha sem contrato (fatura gerada automaticamente) */
+  linhaId?: string;
+  /** Seção 26: gerada pelo sistema, lançada à mão (a do mês) ou adicional (com motivo) */
+  origemGeracao?: 'automatica' | 'manual' | 'adicional';
+  motivoAdicional?: string;
 }
 
 /** Seção 17: CAPEX (investimento, deprecia) × OPEX (despesa do período) */

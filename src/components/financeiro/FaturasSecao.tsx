@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Paperclip, Pencil, Plus, Receipt, RotateCcw, Trash2, Upload, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
+import { useRecursos } from '../../context/RecursosContext.tsx';
 import type { Asset, CategoriaDespesa, Fatura, PeriodicidadeContrato, StatusFatura } from '../../types/index.ts';
 import type { FichaAberta } from '../../utils/fichas.ts';
 import { LIMITE_CAPITALIZACAO_PADRAO, naturezaDoLancamento } from '../../utils/gestaoFinanceira.ts';
@@ -104,6 +105,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
   const [pagandoLote, setPagandoLote] = useState(false);
   const [erro, setErro] = useState('');
   const { pedidos: pedidosCompra } = useCompras();
+  const { linhas } = useRecursos();
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   // Seção 13: Compras vê e paga as faturas dos pedidos (a RLS só entrega essas)
@@ -120,6 +122,7 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
       const c = contratos.find((x) => x.id === f.contratoId);
       return c ? nomeContrato(c) : 'Contrato';
     }
+    if (f.linhaId) return `Linha ${linhas.find((l) => l.id === f.linhaId)?.numero || ''}`.trim();
     if (ehAvulsa(f)) return f.descricao || 'Conta avulsa';
     return licenses.find((l) => l.id === f.licencaId)?.nome || 'Licença';
   };
@@ -348,6 +351,11 @@ export const FaturasSecao: React.FC<FaturasSecaoProps> = ({ alvo, periodicidade 
                         {comp}
                         {f.arquivoCaminho && <BotaoArquivo caminho={f.arquivoCaminho} rotulo={`Abrir o arquivo da fatura de ${comp}`} onErro={setErro} />}
                       </span>
+                      {f.origemGeracao && f.origemGeracao !== 'manual' && (
+                        <span className="mt-1 block font-normal">
+                          <SeloGeracao f={f} />
+                        </span>
+                      )}
                     </td>
                     <td data-label="Valor" className="num text-slate-800">
                       {textoValor(f)}
@@ -868,7 +876,18 @@ export const BotaoContaDoAtivo: React.FC<{ ativo: Asset; compacto?: boolean }> =
 const GRUPOS_ORIGEM = ['Contratos', 'Licenças', 'Pedidos'] as const;
 
 /** Fatura avulsa: sem contrato, licença ou pedido (seção 17) */
-export const ehAvulsa = (f: Pick<Fatura, 'licencaId' | 'contratoId' | 'pedidoId'>) => !f.licencaId && !f.contratoId && !f.pedidoId;
+export const ehAvulsa = (f: Pick<Fatura, 'licencaId' | 'contratoId' | 'pedidoId'> & Partial<Pick<Fatura, 'linhaId'>>) =>
+  !f.licencaId && !f.contratoId && !f.pedidoId && !f.linhaId;
+
+/** Seção 26: selo de como a fatura nasceu (a lançada à mão "do mês" fica sem selo) */
+export const SeloGeracao: React.FC<{ f: Pick<Fatura, 'origemGeracao' | 'motivoAdicional'> }> = ({ f }) =>
+  f.origemGeracao === 'automatica' ? (
+    <span className="selo selo-info" title="Criada pelo sistema a partir do contrato, software ou linha">Automática</span>
+  ) : f.origemGeracao === 'adicional' ? (
+    <span className="selo selo-atencao" title={f.motivoAdicional ? `Motivo: ${f.motivoAdicional}` : undefined}>
+      Adicional{f.motivoAdicional ? `: ${f.motivoAdicional}` : ''}
+    </span>
+  ) : null;
 
 /** Dados que já vêm preenchidos na avulsa (ex.: "lançar conta a pagar" da ficha do ativo) */
 export type AvulsaInicial = Partial<Pick<Fatura, 'fornecedorId' | 'descricao' | 'categoriaDespesa' | 'departamentoId' | 'ativoId' | 'valor' | 'competencia'>>;
@@ -936,6 +955,13 @@ export const FormFatura: React.FC<{
   const [formaPagamento, setFormaPagamento] = useState(editando?.formaPagamento || '');
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [erro, setErro] = useState('');
+  // Seção 26: a fatura do mês nasce sozinha; à mão, o normal é a adicional (multa, ajuste, cobrança extra)
+  const [tipoLancamento, setTipoLancamento] = useState<'mes' | 'adicional'>('mes');
+  const [motivoAdicional, setMotivoAdicional] = useState('');
+  const regulares = doMesmoAlvo.filter((f) => f.origemGeracao !== 'adicional');
+  const mesJaTemFatura = regulares.some((f) => f.id !== editando?.id && f.status !== 'cancelada' && f.competencia === competencia);
+  const podeSerAdicional = !editando && !avulsa;
+  const adicional = podeSerAdicional && (tipoLancamento === 'adicional' || mesJaTemFatura);
 
   const chave = editando ? `editar:${editando.id}` : avulsaInicial?.ativoId ? `ativo:${avulsaInicial.ativoId}` : alvo?.licencaId ? `licenca:${alvo.licencaId}` : alvo?.contratoId ? `contrato:${alvo.contratoId}` : 'nova';
   const valores = JSON.stringify([competencia, valor, vencimento, status, pagoEm, numeroDocumento, observacoes, fornecedorId, descricao, categoria, departamentoId, naturezaManual]);
@@ -993,10 +1019,12 @@ export const FormFatura: React.FC<{
           naturezaMotivo: naturezaManual && naturezaManual !== naturezaAuto ? naturezaMotivo.trim() : undefined,
         }
       : {};
+    if (adicional && motivoAdicional.trim().length < 3) return setErro('Fatura adicional: informe o motivo (ex.: multa, hora extra, ajuste).');
     const dados = {
       ...(alvo || {}),
       ...(pedidoId ? { pedidoId } : {}),
       ...extrasAvulsa,
+      ...(adicional ? { origemGeracao: 'adicional' as const, motivoAdicional: motivoAdicional.trim() } : {}),
       moeda: moeda as Fatura['moeda'],
       valorMoeda: moeda !== 'BRL' && valorMoeda !== '' ? Number(valorMoeda) : undefined,
       formaPagamento: (formaPagamento || undefined) as Fatura['formaPagamento'],
@@ -1011,10 +1039,11 @@ export const FormFatura: React.FC<{
     // Fatura lançada já paga: mesmo cuidado do "Registrar pagamento" (data e forma)
     if (!editando && status === 'paga' && !formaPagamento) return setErro('Fatura já paga: informe a forma de pagamento.');
     if (!editando && status === 'paga' && pagoEm && pagoEm > isoLocal(new Date())) return setErro('A data do pagamento não pode ser no futuro.');
-    const problema = validarFatura({ id: editando?.id || '', ...dados }, doMesmoAlvo.filter((f) => f.id !== editando?.id));
+    // Adicional não disputa a competência; a do mês, só com as outras "do mês"
+    const problema = validarFatura({ id: editando?.id || '', ...dados }, adicional ? [] : regulares.filter((f) => f.id !== editando?.id));
     if (problema) return setErro(problema);
     // Mesmo mês já lançado do outro lado (na licença e no contrato que a paga): seria contado em dobro
-    if (!editando && alvo) {
+    if (!editando && alvo && !adicional) {
       const mesmoMes = (f: Fatura) => f.status !== 'cancelada' && f.competencia === dados.competencia;
       const contrato = alvo.contratoId ? contratos.find((c) => c.id === alvo.contratoId) : undefined;
       const cobertas = new Set((contrato?.itens || []).map((i) => i.licencaId).filter(Boolean));
@@ -1323,6 +1352,44 @@ export const FormFatura: React.FC<{
                 className={CLASSE_ARQUIVO}
               />
             </div>
+          )}
+          {podeSerAdicional && (
+            <fieldset className="sm:col-span-2 space-y-2">
+              <legend className={CLASSE_ROTULO}>Tipo de lançamento</legend>
+              {mesJaTemFatura ? (
+                <p className="ajuda">
+                  {rotuloCompetencia(competencia)} já tem a fatura do mês (o sistema gera sozinho). Esta entra como <strong>adicional</strong>.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-4">
+                  <label className="inline-flex items-center gap-2 text-slate-700">
+                    <input type="radio" name={id('tipo')} checked={tipoLancamento === 'mes'} onChange={() => setTipoLancamento('mes')} />
+                    Fatura do mês
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-slate-700">
+                    <input type="radio" name={id('tipo')} checked={tipoLancamento === 'adicional'} onChange={() => setTipoLancamento('adicional')} />
+                    Adicional (multa, ajuste, cobrança extra)
+                  </label>
+                </div>
+              )}
+              {adicional && (
+                <div>
+                  <label htmlFor={id('motivo')} className={CLASSE_ROTULO}>
+                    Motivo do adicional *
+                  </label>
+                  <input
+                    id={id('motivo')}
+                    type="text"
+                    required
+                    minLength={3}
+                    value={motivoAdicional}
+                    onChange={(e) => setMotivoAdicional(e.target.value)}
+                    placeholder="Ex.: multa por atraso, horas extras, ajuste de assentos"
+                    className={CLASSE_CAMPO}
+                  />
+                </div>
+              )}
+            </fieldset>
           )}
           <div className="sm:col-span-2">
             <label htmlFor={id('obs')} className={CLASSE_ROTULO}>

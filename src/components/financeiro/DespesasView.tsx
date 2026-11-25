@@ -107,6 +107,12 @@ export const DespesasView: React.FC<{
       if (!c) return undefined;
       return { tipo: 'contrato', id: c.id, nome: nomeContrato(c), fornecedorId: c.fornecedorId, categoria: c.categoriaDespesa || CATEGORIA_DO_TIPO[c.tipo], area: c.centroCusto };
     }
+    // Seção 26: fatura automática de linha sem contrato
+    if (f.linhaId) {
+      const li = linhas.find((x) => x.id === f.linhaId);
+      if (!li) return undefined;
+      return { tipo: 'linha', id: li.id, nome: `Linha ${li.numero}`, categoria: f.categoriaDespesa || 'telefonia', area: li.centroCusto };
+    }
     const l = licenses.find((x) => x.id === f.licencaId);
     if (!l) return undefined;
     return { tipo: 'licenca', id: l.id, nome: l.nome, fornecedorId: l.fornecedorId, categoria: l.categoriaDespesa || 'software', area: l.centroCusto };

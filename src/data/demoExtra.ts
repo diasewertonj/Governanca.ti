@@ -329,6 +329,8 @@ const faturasDasSeries: Fatura[] = SERIES.flatMap((s) =>
       status: paga ? ('paga' as const) : ('a_pagar' as const),
       numeroDocumento: `${s.doc}-${mes.replace('-', '')}`,
       criadoEm: `${mes}-01T10:00:00Z`,
+      // Seção 26: as recorrentes em aberto já nascem sozinhas
+      ...(paga ? {} : { origemGeracao: 'automatica' as const }),
       ...s.extra,
     };
   })

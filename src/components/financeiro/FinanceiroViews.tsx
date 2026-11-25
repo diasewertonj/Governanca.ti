@@ -218,6 +218,7 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
   }, [currentRole]);
 
   const { pedidos: pedidosCompra } = useCompras();
+  const { linhas: linhasDaConta } = useRecursos();
   const fornecedorDe = (f: Fatura) =>
     f.fornecedorId ||
     (f.pedidoId
@@ -231,6 +232,7 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
       const p = pedidosCompra.find((x) => x.id === f.pedidoId);
       return p ? `Pedido ${p.codigo} · ${p.titulo}` : 'Pedido de compra';
     }
+    if (f.linhaId) return `Linha ${linhasDaConta.find((l) => l.id === f.linhaId)?.numero || ''}`.trim();
     if (!f.contratoId && !f.licencaId) return f.descricao || 'Conta avulsa';
     if (f.contratoId && !c) {
       const r = resumo.contratos.find((x) => x.id === f.contratoId);

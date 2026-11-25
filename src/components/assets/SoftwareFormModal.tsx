@@ -77,6 +77,8 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
   const [assentosTotais, setAssentosTotais] = useState<number>(softwareToEdit?.assentosTotais || 1);
   // Vazio (undefined) = ainda não informado; no cadastro novo começa vazio
   const [valorMensal, setValorMensal] = useState<number | undefined>(softwareToEdit ? (softwareToEdit.valorMensal ?? 0) : undefined);
+  // Seção 26: dia do vencimento das faturas automáticas
+  const [diaVencimento, setDiaVencimento] = useState(String(softwareToEdit?.diaVencimento ?? 10));
   const [tipoCobranca, setTipoCobranca] = useState<'mensal' | 'anual'>(softwareToEdit?.tipoCobranca || 'mensal');
   const renovacaoInicial = softwareToEdit?.dataRenovacao || '';
   const [dataRenovacao, setDataRenovacao] = useState(renovacaoInicial);
@@ -182,6 +184,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
       // Fora da cobrança própria, custo e renovação vêm do contrato (ou não existem): guarda zerado
       valorMensal: propria ? Number(valorMensal) || 0 : 0,
       tipoCobranca: propria ? tipoCobranca : ('mensal' as const),
+      diaVencimento: Math.min(31, Math.max(1, Number(diaVencimento) || 10)),
       dataRenovacao: propria ? dataRenovacao : semCusto ? dataRenovacao : '',
       pagamento: propria
         ? {
@@ -442,6 +445,13 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
                     <label htmlFor="licenca-renovacao" className={ROTULO}>{escolha === 'novo_contrato' ? 'Fim do contrato' : 'Próxima renovação *'}</label>
                     <input id="licenca-renovacao" type="date" required={propria} value={dataRenovacao} onChange={(e) => setDataRenovacao(e.target.value)} className={CAMPO} />
                   </div>
+                  {propria && (
+                    <div>
+                      <label htmlFor="licenca-dia-venc" className={ROTULO}>Dia do vencimento</label>
+                      <input id="licenca-dia-venc" type="number" min={1} max={31} value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} className={CAMPO} />
+                      <p className="ajuda">A fatura é gerada sozinha 30 dias antes.</p>
+                    </div>
+                  )}
                 </div>
               )}
 

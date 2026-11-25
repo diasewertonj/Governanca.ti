@@ -132,6 +132,7 @@ import {
   updateContratoDb,
   deleteContratoDb,
   fetchFaturasFromDb,
+  gerarFaturasPrevistasDb,
   insertFaturaDb,
   updateFaturaDb,
   deleteFaturaDb,
@@ -684,6 +685,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (dbRecursos) setRecursos(dbRecursos);
         if (dbLembretes) setLembretes(dbLembretes);
 
+        // Seção 26: reserva do agendador diário — gera as faturas previstas antes de ler (só T.I. e Compras;
+        // para os demais o banco recusa e segue sem gerar)
+        await gerarFaturasPrevistasDb().catch(() => 0);
         // Fase 8: só a T.I. lê (para os demais a RLS devolve vazio; sem a migration, também)
         const [dbFornecedores, dbContratos, dbFaturas] = await Promise.all([
           fetchFornecedoresFromDb(),
