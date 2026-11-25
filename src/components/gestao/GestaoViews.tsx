@@ -300,20 +300,25 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
 // -----------------------------------------------------------------------------
 // Orçamento: acompanhamento (previsto · comprometido · a pagar · realizado) e planejamento
 // -----------------------------------------------------------------------------
-export const OrcamentoGestaoView: React.FC = () => {
-  const [aba, setAba] = useState<'acompanhamento' | 'planejamento'>('acompanhamento');
+export type AbaOrcamento = 'acompanhamento' | 'planejamento' | 'projecao';
+
+// Seção 23: Orçamento e Projeção num item só do menu; a projeção virou a terceira aba
+export const OrcamentoGestaoView: React.FC<{ abaInicial?: AbaOrcamento }> = ({ abaInicial = 'acompanhamento' }) => {
+  const [aba, setAba] = useState<AbaOrcamento>(abaInicial);
   const abas = (
     <Abas
-      rotulo="Orçamento"
+      rotulo="Orçamento e projeção"
       ativa={aba}
       onMudar={setAba}
       itens={[
         { id: 'acompanhamento' as const, rotulo: 'Acompanhamento' },
         { id: 'planejamento' as const, rotulo: 'Planejamento (linhas)' },
+        { id: 'projecao' as const, rotulo: 'Projeção' },
       ]}
     />
   );
   if (aba === 'planejamento') return <OrcamentoView abas={abas} />;
+  if (aba === 'projecao') return <ProjecaoView abas={abas} />;
   return <AcompanhamentoOrcamento abas={abas} />;
 };
 
@@ -524,7 +529,7 @@ const JanelaRecorte: React.FC<{ linha: LinhaGestao; lancamentos: Lancamento[]; a
 // -----------------------------------------------------------------------------
 // Projeção 12/24/36 meses (decisão 9) + gerar o orçamento do próximo ano
 // -----------------------------------------------------------------------------
-export const ProjecaoView: React.FC = () => {
+export const ProjecaoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
   const { currentRole } = useApp();
   const { orcamentos, salvarOrcamentos } = useCompras();
   const g = useGestao(ANO_ATUAL);
@@ -598,6 +603,7 @@ export const ProjecaoView: React.FC = () => {
       <CabecalhoTela
         titulo="Projeção de gastos"
         subtitulo="Recorrentes até o fim (com renovação e reajuste do contrato ou da premissa), reposição pelo fim da vida útil e pedidos aprovados ainda não pagos"
+        abas={abas}
         acoes={
           <>
             <button type="button" onClick={exportar} className="btn btn-secundario"><Download /> CSV</button>

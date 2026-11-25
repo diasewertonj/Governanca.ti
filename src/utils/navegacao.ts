@@ -61,8 +61,8 @@ export const TITULO_VISTA: Record<Vista, string> = {
   conferencia: 'Inventário físico',
   recebimentos: 'Recebimentos',
   painel_executivo: 'Painel executivo',
-  orcamento: 'Orçamento',
-  projecao: 'Projeção',
+  orcamento: 'Orçamento e projeção',
+  projecao: 'Orçamento e projeção',
   patrimonio: 'Patrimônio',
   relatorios: 'Relatórios',
   custos_area: 'Custos da minha área',
@@ -148,7 +148,7 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
     return [
       { itens: [item('pedidos_compra', 'compras', 'pedidos')] },
       { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('recebimentos', 'recebimentos'), item('fornecedores', 'fornecedores')] },
-      { titulo: 'Acompanhamento', itens: [item('orcamento', 'orcamento'), item('projecao', 'projecao'), item('relatorios', 'relatorios')] },
+      { titulo: 'Acompanhamento', itens: [item('orcamento', 'orcamento'), item('relatorios', 'relatorios')] },
       MINHA_AREA,
     ];
   }
@@ -185,8 +185,8 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
       itens: [
         // Painel executivo e exportações contábeis: só o admin (decisão 2)
         ...(papel === 'ti_admin' ? [item('painel_executivo', 'painel')] : []),
+        // Seção 23: Orçamento e Projeção num item só (a projeção é uma aba)
         item('orcamento', 'orcamento'),
-        item('projecao', 'projecao'),
         item('patrimonio', 'patrimonio'),
         ...(papel === 'ti_admin' ? [item('relatorios', 'relatorios')] : []),
       ],
@@ -201,9 +201,18 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
   return grupos;
 }
 
+/** Telas que abrem como aba de outro item do menu (seção 23): a tela → o item que fica marcado */
+export const VISTA_NO_MENU: Partial<Record<Vista, Vista>> = { projecao: 'orcamento' };
+
+/** Item do menu que fica marcado para a tela atual */
+export const itemDoMenu = (vista: string): string => VISTA_NO_MENU[vista as Vista] || vista;
+
 /** Telas que o perfil pode abrir (as que aparecem no menu dele) */
 export function vistasDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): Vista[] {
   const doMenu = menuDoPapel(papel, opcoes).flatMap((g) => g.itens.map((i) => i.vista));
+  // Telas que são aba de um item do menu valem para quem tem o item
+  const abas = (Object.keys(VISTA_NO_MENU) as Vista[]).filter((v) => doMenu.includes(VISTA_NO_MENU[v] as Vista));
+  const todas = [...doMenu, ...abas];
   // Meus equipamentos abre pelo menu da conta (cabeçalho) para quem não tem Minha área no menu
-  return doMenu.includes('my_assets') ? doMenu : [...doMenu, 'my_assets'];
+  return todas.includes('my_assets') ? todas : [...todas, 'my_assets'];
 }

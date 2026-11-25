@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { custoPorArea, type Lancamento } from './gestaoFinanceira.ts';
-import { menuDoPapel, vistasDoPapel } from './navegacao.ts';
+import { itemDoMenu, menuDoPapel, vistasDoPapel } from './navegacao.ts';
 
 const lanc = (p: Partial<Lancamento>): Lancamento => ({ situacao: 'realizado', natureza: 'opex', categoria: 'software', area: 'T.I.', mes: 0, valor: 100, ...p });
 const nome = (id: string) => ({ 'dep-a': 'Comercial', 'dep-b': 'Financeiro' })[id] || id;
@@ -50,6 +50,16 @@ describe('menu da seção 17 (Financeiro × Gestão de T.I.)', () => {
     expect(v).toEqual(expect.arrayContaining(['financeiro', 'recebimentos', 'orcamento', 'projecao', 'relatorios']));
     expect(v).not.toContain('despesas');
     expect(v).not.toContain('patrimonio');
+  });
+  it('seção 23: Orçamento e Projeção são um item só no menu; a projeção continua abrindo (aba)', () => {
+    for (const papel of ['ti_admin', 'ti_suporte', 'compras'] as const) {
+      const itens = menuDoPapel(papel).flatMap((g) => g.itens.map((i) => i.vista));
+      expect(itens).toContain('orcamento');
+      expect(itens).not.toContain('projecao');
+      expect(vistas(papel)).toContain('projecao');
+    }
+    expect(itemDoMenu('projecao')).toBe('orcamento');
+    expect(itemDoMenu('patrimonio')).toBe('patrimonio');
   });
   it('gestor vê só os custos da área; RH e colaborador sem telas financeiras', () => {
     expect(vistas('colaborador', true)).toContain('custos_area');
