@@ -30,7 +30,6 @@ const ContasPagarView = lazy(() => import('./components/financeiro/FinanceiroVie
 const RecebimentosView = lazy(() => import('./components/financeiro/RecebimentosView.tsx').then((m) => ({ default: m.RecebimentosView })));
 const PainelExecutivoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.PainelExecutivoView })));
 const OrcamentoGestaoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.OrcamentoGestaoView })));
-const ProjecaoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.ProjecaoView })));
 const PatrimonioView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.PatrimonioView })));
 const RelatoriosView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.RelatoriosView })));
 const CustosMinhaAreaView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.CustosMinhaAreaView })));
@@ -233,8 +232,10 @@ function MainApp() {
           {currentView === 'recebimentos' && <RecebimentosView />}
           {currentView === 'despesas' && <FinanceiroView />}
           {currentView === 'painel_executivo' && <PainelExecutivoView onNavigate={navegar} />}
-          {currentView === 'orcamento' && <OrcamentoGestaoView />}
-          {currentView === 'projecao' && <ProjecaoView />}
+          {/* Seção 23: a projeção abre como aba de Orçamento e projeção */}
+          {(currentView === 'orcamento' || currentView === 'projecao') && (
+            <OrcamentoGestaoView key={currentView} abaInicial={currentView === 'projecao' ? 'projecao' : 'acompanhamento'} />
+          )}
           {currentView === 'patrimonio' && <PatrimonioView />}
           {currentView === 'relatorios' && <RelatoriosView />}
           {currentView === 'custos_area' && <CustosMinhaAreaView />}

@@ -33,7 +33,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { menuDoPapel, type Contador, type Icone } from '../../utils/navegacao.ts';
+import { itemDoMenu, menuDoPapel, type Contador, type Icone } from '../../utils/navegacao.ts';
 import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
@@ -205,7 +205,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
           <nav className="space-y-3">
             {menuDoPapel(currentRole, { pedeCompra: podePedirCompra, gestor: ehGestor }).map((grupo, gi) => {
               // Grupos recolhíveis: o do item atual fica sempre aberto; recolhido mostra a soma dos contadores
-              const temAtual = grupo.itens.some((it) => it.vista === currentView);
+              const temAtual = grupo.itens.some((it) => it.vista === itemDoMenu(currentView));
               const recolhido = !!grupo.titulo && !temAtual && recolhidos.includes(grupo.titulo);
               const somaGrupo = grupo.itens.reduce((s, it) => s + (it.contador ? contadores[it.contador] : 0), 0);
               return (
@@ -224,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
                 )}
                 {!recolhido && grupo.itens.map((it) => {
                   const Icon = ICONES[it.icone];
-                  const ativo = currentView === it.vista;
+                  const ativo = itemDoMenu(currentView) === it.vista;
                   const n = it.contador ? contadores[it.contador] : 0;
                   return (
                     <button
