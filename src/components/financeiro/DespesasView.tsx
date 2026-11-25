@@ -1,8 +1,6 @@
 /**
- * Financeiro (um item no menu) com abas Contas a pagar, Despesas e Compras (seção 9.4).
- * Despesas: período escolhido pela pessoa, filtros combináveis, realizado × previsto,
+ * Custos do período: período escolhido pela pessoa, filtros combináveis, realizado × previsto,
  * comparação com o período anterior, evolução mês a mês, agrupamento, detalhe clicável e CSV.
- * O período é o mesmo em Despesas e Compras (trocar de aba não perde a escolha).
  *
  * Realizado = faturas pagas cuja competência cai no período.
  * Previsto  = custo recorrente de cada mês do período (contratos vigentes naquele mês,
@@ -32,8 +30,7 @@ import {
   somarPor,
   valorEfetivo,
 } from '../../utils/financeiro.ts';
-import { ComprasView } from './ComprasView.tsx';
-import { Abas } from '../ui/Abas.tsx';
+import { useCompras } from '../../context/ComprasContext.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 import { ATALHOS_PASSADO, mesesEntre, periodoDoAtalho, usePeriodo } from '../ui/FiltroPeriodo.tsx';
 
@@ -47,7 +44,7 @@ function periodoAnterior(de: string, ate: string) {
 const SELO_FATURA = { a_pagar: 'selo-atencao', vencida: 'selo-problema', paga: 'selo-ok', cancelada: 'selo-neutro' } as const;
 
 interface Origem {
-  tipo: 'contrato' | 'licenca' | 'linha';
+  tipo: 'contrato' | 'licenca' | 'linha' | 'pedido' | 'avulsa';
   id: string;
   nome: string;
   fornecedorId?: string;
@@ -55,29 +52,23 @@ interface Origem {
   area?: string;
 }
 
+const ROTULO_ORIGEM: Record<Origem['tipo'], string> = {
+  contrato: 'Contratos',
+  licenca: 'Softwares',
+  linha: 'Linhas',
+  pedido: 'Pedidos de compra',
+  avulsa: 'Contas avulsas',
+};
+
 /**
- * Seção 17: "Custos do período" (lado técnico; antes "Custos recorrentes"): o que a T.I.
- * custa e as compras de equipamento. Contas a pagar e Orçamento ficam no Financeiro e na Gestão de T.I.
+ * Seção 17: "Custos do período" (lado técnico). Seção 27: uma tela só, com todas as faturas
+ * do período (recorrentes, pedidos de compra e contas avulsas) e filtro por origem — a aba
+ * "Compras de equipamento" saiu (as aquisições estão em Patrimônio e na exportação do inventário).
  */
 export const FinanceiroView: React.FC = () => {
-  const [aba, setAba] = useState<'despesas' | 'compras'>('despesas');
-  // Período em comum entre Despesas e Compras (seletor comum; aqui sempre há período)
   const { periodo: p, seletor: filtroPeriodo } = usePeriodo('ult6', ATALHOS_PASSADO);
   const periodo = p || periodoDoAtalho('este_mes')!;
-
-  const abas = (
-    <Abas
-      rotulo="Custos do período"
-      ativa={aba}
-      onMudar={setAba}
-      itens={[
-        { id: 'despesas' as const, rotulo: 'Recorrentes' },
-        { id: 'compras' as const, rotulo: 'Compras de equipamento' },
-      ]}
-    />
-  );
-  if (aba === 'compras') return <ComprasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
-  return <DespesasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
+  return <DespesasView periodo={periodo} filtroPeriodo={filtroPeriodo} />;
 };
 
 export const DespesasView: React.FC<{
@@ -87,8 +78,9 @@ export const DespesasView: React.FC<{
   /** Seletor de período (atalhos ou de/até), montado pelo Financeiro */
   filtroPeriodo: React.ReactNode;
 }> = ({ abas, periodo, filtroPeriodo }) => {
-  const { licenses, contratos, faturas, fornecedores, abrirFicha } = useApp();
+  const { licenses, contratos, faturas, fornecedores, departments, settings, abrirFicha } = useApp();
   const { linhas } = useRecursos();
+  const { pedidos } = useCompras();
   const [fFornecedor, setFFornecedor] = useState('');
   const [fCategoria, setFCategoria] = useState('');
   const [fArea, setFArea] = useState('');
@@ -100,22 +92,38 @@ export const DespesasView: React.FC<{
 
   const nomeForn = (id?: string) => fornecedores.find((f) => f.id === id)?.nome || 'Sem fornecedor';
 
-  // De onde vem cada fatura (contrato ou software) com fornecedor, categoria e área
+  // Seção 27: área pelo critério oficial — departamento (da fatura ou da origem); sem ele, o mapa
+  // de áreas das premissas; sem mapa, o texto antigo do centro de custo
+  const mapa = settings.premissasFinanceiras?.mapaAreas;
+  const nomeArea = (depId?: string, texto?: string) => {
+    const dep = depId || (texto && mapa ? mapa[texto.trim().toLowerCase()] : undefined);
+    return (dep && departments.find((d) => d.id === dep)?.nome) || texto?.trim() || undefined;
+  };
+
+  // De onde vem cada fatura (contrato, software, linha, pedido ou conta avulsa) com fornecedor, categoria e área
   const origemDaFatura = (f: Fatura): Origem | undefined => {
     if (f.contratoId) {
       const c = contratos.find((x) => x.id === f.contratoId);
       if (!c) return undefined;
-      return { tipo: 'contrato', id: c.id, nome: nomeContrato(c), fornecedorId: c.fornecedorId, categoria: c.categoriaDespesa || CATEGORIA_DO_TIPO[c.tipo], area: c.centroCusto };
+      return { tipo: 'contrato', id: c.id, nome: nomeContrato(c), fornecedorId: c.fornecedorId, categoria: c.categoriaDespesa || CATEGORIA_DO_TIPO[c.tipo], area: nomeArea(f.departamentoId, c.centroCusto) };
     }
     // Seção 26: fatura automática de linha sem contrato
     if (f.linhaId) {
       const li = linhas.find((x) => x.id === f.linhaId);
       if (!li) return undefined;
-      return { tipo: 'linha', id: li.id, nome: `Linha ${li.numero}`, categoria: f.categoriaDespesa || 'telefonia', area: li.centroCusto };
+      return { tipo: 'linha', id: li.id, nome: `Linha ${li.numero}`, categoria: f.categoriaDespesa || 'telefonia', area: nomeArea(f.departamentoId, li.centroCusto) };
+    }
+    // Seção 27: Custos do período mostra todas as faturas — também pedidos de compra e contas avulsas
+    if (f.pedidoId) {
+      const p = pedidos.find((x) => x.id === f.pedidoId);
+      return { tipo: 'pedido', id: f.pedidoId, nome: p ? `${p.codigo} · ${p.titulo}` : 'Pedido de compra', fornecedorId: f.fornecedorId || p?.fornecedorId, categoria: f.categoriaDespesa || p?.categoria || 'outros', area: nomeArea(f.departamentoId, p?.area) };
+    }
+    if (!f.licencaId) {
+      return { tipo: 'avulsa', id: f.id, nome: f.descricao || 'Conta avulsa', fornecedorId: f.fornecedorId, categoria: f.categoriaDespesa || 'outros', area: nomeArea(f.departamentoId) };
     }
     const l = licenses.find((x) => x.id === f.licencaId);
     if (!l) return undefined;
-    return { tipo: 'licenca', id: l.id, nome: l.nome, fornecedorId: l.fornecedorId, categoria: l.categoriaDespesa || 'software', area: l.centroCusto };
+    return { tipo: 'licenca', id: l.id, nome: l.nome, fornecedorId: l.fornecedorId, categoria: l.categoriaDespesa || 'software', area: nomeArea(f.departamentoId, l.centroCusto) };
   };
 
   const passa = (o?: Origem) =>
@@ -133,7 +141,7 @@ export const DespesasView: React.FC<{
       .filter((c) => contratoEmVigorNoPeriodo(c, comp, ate))
       .forEach((c) =>
         itens.push({
-          origem: { tipo: 'contrato', id: c.id, nome: nomeContrato(c), fornecedorId: c.fornecedorId, categoria: c.categoriaDespesa || CATEGORIA_DO_TIPO[c.tipo], area: c.centroCusto },
+          origem: { tipo: 'contrato', id: c.id, nome: nomeContrato(c), fornecedorId: c.fornecedorId, categoria: c.categoriaDespesa || CATEGORIA_DO_TIPO[c.tipo], area: nomeArea(undefined, c.centroCusto) },
           valor: mensalDoContrato(c),
         })
       );
@@ -142,13 +150,13 @@ export const DespesasView: React.FC<{
       .filter((l) => (l.status !== 'inativa' || (!!l.inativadaEm && l.inativadaEm.slice(0, 10) >= comp)) && formaCobrancaDe(l, contratos) === 'propria')
       .forEach((l) =>
         itens.push({
-          origem: { tipo: 'licenca', id: l.id, nome: l.nome, fornecedorId: l.fornecedorId, categoria: l.categoriaDespesa || 'software', area: l.centroCusto },
+          origem: { tipo: 'licenca', id: l.id, nome: l.nome, fornecedorId: l.fornecedorId, categoria: l.categoriaDespesa || 'software', area: nomeArea(undefined, l.centroCusto) },
           valor: mensalDaLicenca(l),
         })
       );
     linhas
       .filter((ln) => ln.status === 'ativa' && !ln.contratoId && ln.valorMensal)
-      .forEach((ln) => itens.push({ origem: { tipo: 'linha', id: ln.id, nome: ln.numero, categoria: 'telefonia', area: ln.centroCusto }, valor: ln.valorMensal || 0 }));
+      .forEach((ln) => itens.push({ origem: { tipo: 'linha', id: ln.id, nome: ln.numero, categoria: 'telefonia', area: nomeArea(undefined, ln.centroCusto) }, valor: ln.valorMensal || 0 }));
     return itens.filter((i) => passa(i.origem));
   };
 
@@ -168,25 +176,36 @@ export const DespesasView: React.FC<{
     const previsto = porMes.reduce((s, m) => s + m.previsto, 0);
     const aPagar = doPeriodo.filter((f) => f.status === 'a_pagar').reduce((s, f) => s + valorEfetivo(f), 0);
     const chave = (o: Origem) =>
-      agrupar === 'categoria' ? ROTULO_CATEGORIA[o.categoria] : agrupar === 'fornecedor' ? nomeForn(o.fornecedorId) : agrupar === 'area' ? o.area || 'Sem área' : o.tipo === 'contrato' ? 'Contratos' : o.tipo === 'licenca' ? 'Softwares' : 'Linhas';
+      agrupar === 'categoria' ? ROTULO_CATEGORIA[o.categoria] : agrupar === 'fornecedor' ? nomeForn(o.fornecedorId) : agrupar === 'area' ? o.area || 'Sem área' : ROTULO_ORIGEM[o.tipo];
     const grupos = somarPor(pagas, (f) => chave(origemDaFatura(f) as Origem), (f) => valorEfetivo(f));
     // Mesmo recorte para comparar: competências até o mês corrente; o resto do previsto fica "a vencer"
     const ateHoje = previstoRealizadoAteHoje(porMes);
     return { doPeriodo, realizado, realizadoAnterior, porMes, previsto, aPagar, grupos, ateHoje };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [faturas, contratos, licenses, linhas, periodo.de, periodo.ate, fFornecedor, fCategoria, fArea, fOrigem, agrupar]);
+  }, [faturas, contratos, licenses, linhas, pedidos, departments, mapa, periodo.de, periodo.ate, fFornecedor, fCategoria, fArea, fOrigem, agrupar]);
 
   const variacao = dados.realizadoAnterior ? ((dados.realizado - dados.realizadoAnterior) / dados.realizadoAnterior) * 100 : undefined;
   const maior = Math.max(1, ...dados.porMes.map((m) => Math.max(m.realizado, m.previsto)));
-  const areas = [...new Set([...contratos.map((c) => c.centroCusto), ...licenses.map((l) => l.centroCusto), ...linhas.map((l) => l.centroCusto)].filter(Boolean))] as string[];
+  const areas = [
+    ...new Set(
+      [
+        ...departments.map((d) => d.nome),
+        ...contratos.map((c) => nomeArea(undefined, c.centroCusto)),
+        ...licenses.map((l) => nomeArea(undefined, l.centroCusto)),
+        ...linhas.map((l) => nomeArea(undefined, l.centroCusto)),
+      ].filter(Boolean)
+    ),
+  ].sort() as string[];
   const ociosos = assentosOciosos(licenses, contratos).filter((o) =>
-    passa({ tipo: 'licenca', id: o.licenca.id, nome: o.licenca.nome, fornecedorId: o.licenca.fornecedorId, categoria: o.licenca.categoriaDespesa || 'software', area: o.licenca.centroCusto })
+    passa({ tipo: 'licenca', id: o.licenca.id, nome: o.licenca.nome, fornecedorId: o.licenca.fornecedorId, categoria: o.licenca.categoriaDespesa || 'software', area: nomeArea(undefined, o.licenca.centroCusto) })
   );
 
   const abrirOrigem = (o?: Origem) => {
     if (!o) return;
     if (o.tipo === 'contrato') abrirFicha({ tipo: 'contrato', id: o.id });
     else if (o.tipo === 'licenca') abrirFicha({ tipo: 'software', id: o.id });
+    else if (o.tipo === 'pedido') abrirFicha({ tipo: 'pedido', id: o.id });
+    else if (o.tipo === 'avulsa' && o.fornecedorId) abrirFicha({ tipo: 'fornecedor', id: o.fornecedorId });
   };
 
   const exportar = () =>
@@ -249,6 +268,8 @@ export const DespesasView: React.FC<{
               <option value="contrato">Contratos</option>
               <option value="licenca">Softwares</option>
               <option value="linha">Linhas avulsas</option>
+              <option value="pedido">Pedidos de compra</option>
+              <option value="avulsa">Contas avulsas</option>
             </select>
             {temFiltro && <button type="button" onClick={limpar} className="btn btn-sm btn-secundario">Limpar filtros</button>}
           </>

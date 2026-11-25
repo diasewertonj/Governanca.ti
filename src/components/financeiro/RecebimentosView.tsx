@@ -61,7 +61,7 @@ export function useRecebimentos() {
   return { lista, salvar };
 }
 
-export const RecebimentosView: React.FC = () => {
+export const RecebimentosView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
   const { currentRole, fornecedores, employees, assets, departments, abrirFicha } = useApp();
   const { lista, salvar } = useRecebimentos();
   const [status, setStatus] = useState<'' | StatusRecebimento>('previsto');
@@ -120,7 +120,8 @@ export const RecebimentosView: React.FC = () => {
   return (
     <div className="space-y-3">
       <CabecalhoTela
-        titulo="Recebimentos"
+        titulo={abas ? 'Contas' : 'Recebimentos'}
+        abas={abas}
         subtitulo="Dinheiro que entra: venda de equipamento baixado, ressarcimento, crédito de fornecedor e devolução de compra"
         acoes={
           <>

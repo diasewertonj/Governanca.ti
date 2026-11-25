@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { Asset, Fatura, Orcamento, PedidoCompra } from '../types/index.ts';
+import type { Asset, Orcamento, PedidoCompra } from '../types/index.ts';
 import { ativoDoCodigo, depreciacao, grupoDoAtivo, mesesEntre, proximasTags, somarMeses } from './patrimonio.ts';
 import {
   alertasOrcamento,
   copiarOrcamentos,
   distribuirMensal,
   impactoNoOrcamento,
-  lancamentosRealizados,
-  resumoOrcamento,
   somaMeses,
+  type LinhaOrcamento,
   valorDoPedido,
   esperaPorMim,
   vezDoPedido,
@@ -128,34 +127,32 @@ describe('Fase 11 · orçamento', () => {
     expect(c.valorAnual).toBe(1320);
   });
 
-  it('realizado = faturas pagas (valor efetivo) + equipamentos fora de pedido; alertas em 90% e 100%', () => {
-    const faturas: Fatura[] = [
-      { id: 'f1', pedidoId: 'p1', competencia: '2026-03-01', valor: 10000, valorPago: 9500, vencimento: '2026-03-10', status: 'paga', pagoEm: '2026-03-09', criadoEm: '' },
-      { id: 'f2', pedidoId: 'p1', competencia: '2026-04-01', valor: 999, vencimento: '2026-04-10', status: 'a_pagar', criadoEm: '' },
-    ];
-    const ativos = [
-      ativo({ fiscal: fiscal(2000, '2026-05-02'), setorId: 'd1' }),
-      ativo({ id: 'a2', pedidoId: 'p1', fiscal: fiscal(5000, '2026-03-02') }),
-    ];
-    const lanc = lancamentosRealizados(
-      { faturas, contratos: [], licencas: [], pedidos: [pedido({ status: 'recebido' })], ativos, departamentos: [{ id: 'd1', nome: 'TI', codigo: 'TI', ativo: true }] },
-      2026
-    );
-    expect(lanc.reduce((s, l) => s + l.valor, 0)).toBe(11500);
-    const orc: Orcamento[] = [{ id: 'o1', ano: 2026, categoria: 'hardware', area: 'ti', valorAnual: 12000, meses: distribuirMensal(12000) }];
-    const linhas = resumoOrcamento(orc, lanc, 2026, new Date(2026, 5, 15));
-    expect(linhas).toHaveLength(1);
-    expect(linhas[0].realizado).toBe(11500);
-    expect(linhas[0].realizadoMeses[2]).toBe(9500);
-    expect(linhas[0].tendencia).toBe(23000);
-    const [alerta] = alertasOrcamento(linhas, 2026);
+  // Seção 27: as linhas vêm do livro (useOrcamentoAtual, mesma conta do Acompanhamento)
+  const linhaOrc = (previsto: number, realizado: number): LinhaOrcamento => ({
+    chave: 'hardware|ti',
+    categoria: 'hardware',
+    area: 'TI',
+    previstoMeses: [],
+    realizadoMeses: [],
+    previsto,
+    realizado,
+    pct: previsto > 0 ? realizado / previsto : undefined,
+  });
+
+  it('alertas em 90% (perto) e 100% (estourado) do previsto', () => {
+    const [alerta] = alertasOrcamento([linhaOrc(12000, 11500)], 2026);
     expect(alerta.nivel).toBe('perto');
-    expect(alertasOrcamento(resumoOrcamento(orc, [...lanc, { categoria: 'hardware', area: 'TI', mes: 6, valor: 600, origem: 'fatura' }], 2026), 2026)[0].nivel).toBe('estourado');
+    expect(alertasOrcamento([linhaOrc(12000, 12100)], 2026)[0].nivel).toBe('estourado');
+    expect(alertasOrcamento([linhaOrc(12000, 5000)], 2026)).toHaveLength(0);
+  });
+
+  it('copiar do ano anterior mantém a natureza (CAPEX/OPEX)', () => {
+    const o: Orcamento = { id: 'o', ano: 2025, categoria: 'software', area: 'TI', natureza: 'capex', valorAnual: 1200, meses: distribuirMensal(1200) };
+    expect(copiarOrcamentos([o], 2025, 2026, 0)[0].natureza).toBe('capex');
   });
 
   it('impacto do pedido soma realizado, outros aprovados e este pedido', () => {
-    const orc: Orcamento[] = [{ id: 'o1', ano: 2026, categoria: 'hardware', area: 'TI', valorAnual: 20000, meses: distribuirMensal(20000) }];
-    const linhas = resumoOrcamento(orc, [{ categoria: 'hardware', area: 'TI', mes: 0, valor: 5000, origem: 'fatura' }], 2026);
+    const linhas = [linhaOrc(20000, 5000)];
     const outro = pedido({ id: 'p2', status: 'aprovado', itens: [{ id: 'x', tipo: 'servico', descricao: 's', quantidade: 1, valorUnitario: 3000, ordem: 1 }] });
     const este = pedido({ cotacoes: [{ id: 'c', fornecedorId: 'f', valor: 9000, vencedora: true }] });
     expect(valorDoPedido(este)).toBe(9000);

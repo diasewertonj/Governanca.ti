@@ -4,7 +4,7 @@
  * Relatórios/exportações. Tudo lê do mesmo livro (useGestao) — nada é somado à parte.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarRange, Download, FileSpreadsheet, ListTree, Lock, LockOpen, Search, Sparkles, Split } from 'lucide-react';
+import { CalendarRange, Copy, Download, FileSpreadsheet, ListTree, Lock, LockOpen, Pencil, Plus, Search, Sparkles, Split, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
@@ -13,7 +13,8 @@ import type { FichaAberta } from '../../utils/fichas.ts';
 import { assentosOciosos, baixarCsv, baixarExcel, brl, brlOuTraco, paraCsv, paraExcel, ROTULO_CATEGORIA, valorPatrimonio } from '../../utils/financeiro.ts';
 import { distribuirMensal } from '../../utils/compras.ts';
 import { diasAte, formatDate } from '../../utils/formatters.ts';
-import { nomeContrato } from '../../utils/contratos.ts';
+import { DIAS_ALERTA_CONTRATO, nomeContrato, situacaoContrato } from '../../utils/contratos.ts';
+import { custoPorFornecedor } from '../../utils/analises.ts';
 import { ROTULO_GRUPO_DEPRECIACAO } from '../../utils/patrimonio.ts';
 import {
   csvImobilizado,
@@ -34,9 +35,10 @@ import {
 } from '../../utils/gestaoFinanceira.ts';
 import { fecharImobilizado, listarFechamentos, listarRateios, reabrirImobilizado, salvarRateioDe } from '../../services/financeiroDb.ts';
 import { supabase } from '../../services/supabase.ts';
-import { useGestao, type Regime } from './useGestao.ts';
-import { useRecebimentos, ROTULO_TIPO_RECEBIMENTO } from '../financeiro/RecebimentosView.tsx';
-import { OrcamentoView } from '../compras/OrcamentoView.tsx';
+import { areaDoOrcamento, useGestao, type Regime } from './useGestao.ts';
+import { LinkFicha, Numero, pct } from './pecas.tsx';
+import { CopiarOrcamento, FormOrcamento } from '../compras/OrcamentoView.tsx';
+import { copiarOrcamentos } from '../../utils/compras.ts';
 import { ABAS_ANALISE, AnalisesView, type AbaAnalise } from './AnalisesView.tsx';
 import { Abas } from '../ui/Abas.tsx';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
@@ -46,26 +48,7 @@ import { CLASSE_CAMPO } from '../comum/campos.ts';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const rotuloMes = (aaaamm: string) => `${MESES[Number(aaaamm.slice(5, 7)) - 1]}/${aaaamm.slice(2, 4)}`;
-const pct = (v?: number) => (v === undefined ? '—' : `${Math.round(v * 100)}%`);
 const ANO_ATUAL = new Date().getFullYear();
-
-/** Número de painel; com `onAbrir`, o cartão inteiro leva à tela do assunto (seção 21) */
-const Numero: React.FC<{ rotulo: string; valor: string; detalhe?: React.ReactNode; tom?: 'atencao' | 'problema'; onAbrir?: () => void }> = ({ rotulo, valor, detalhe, tom, onAbrir }) => {
-  const conteudo = (
-    <>
-      <span className="block texto-aux">{rotulo}</span>
-      <span className={`block text-lg font-semibold font-mono ${tom === 'problema' ? 'text-red-700' : tom === 'atencao' ? 'text-amber-800' : 'text-slate-900'}`}>{valor}</span>
-      {detalhe && <span className="block texto-aux">{detalhe}</span>}
-    </>
-  );
-  return onAbrir ? (
-    <button type="button" onClick={onAbrir} className="cartao p-3 min-w-0 text-left hover:border-blue-300 hover:bg-slate-50">
-      {conteudo}
-    </button>
-  ) : (
-    <div className="cartao p-3 min-w-0">{conteudo}</div>
-  );
-};
 
 /** Texto e ficha de onde veio um lançamento do livro (fatura de contrato, licença, pedido, equipamento ou avulsa) */
 function useOrigemDoLancamento() {
@@ -94,18 +77,6 @@ function useOrigemDoLancamento() {
     return { texto: f?.descricao || forn?.nome || 'Conta avulsa', ficha: forn ? { tipo: 'fornecedor', id: forn.id } : undefined };
   };
 }
-
-/** Item citado numa lista: com ficha, vira link que abre a ficha */
-const LinkFicha: React.FC<{ ficha?: FichaAberta; children: React.ReactNode }> = ({ ficha, children }) => {
-  const { abrirFicha } = useApp();
-  return ficha ? (
-    <button type="button" onClick={() => abrirFicha(ficha)} className="link text-left min-w-0 truncate">
-      {children}
-    </button>
-  ) : (
-    <span className="min-w-0 truncate">{children}</span>
-  );
-};
 
 const ROTULO_SITUACAO: Record<Lancamento['situacao'], string> = { realizado: 'Realizado (pago)', a_pagar: 'A pagar', comprometido: 'Comprometido' };
 const SELO_SITUACAO: Record<Lancamento['situacao'], string> = { realizado: 'selo-ok', a_pagar: 'selo-atencao', comprometido: 'selo-neutro' };
@@ -160,21 +131,19 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
     capex: usados.filter((l) => l.mes === m && l.natureza === 'capex').reduce((s, l) => s + l.valor, 0),
   })).filter((x) => x.opex + x.capex > 0.004);
   const maior = Math.max(1, ...porMes.map((m) => m.opex + m.capex));
+  // Seção 27: mesma conta de Análises › Fornecedores (custoPorFornecedor sobre o livro), só o pago
   const { top, semFornecedor } = useMemo(() => {
-    const m = new Map<string, number>();
-    faturas
-      .filter((f) => f.status === 'paga' && f.competencia.startsWith(`${ANO_ATUAL}-`))
-      .forEach((f) => {
-        const id = fornecedorDe(f) || '';
-        m.set(id, (m.get(id) || 0) + (f.valorPago ?? f.valor));
-      });
-    const sem = m.get('') || 0;
-    m.delete('');
-    return { top: [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10), semFornecedor: sem };
+    const doFornecedor = (id: string) => fornecedorDe(faturas.find((f) => f.id === id) || {});
+    const lista = custoPorFornecedor(g.lancamentos, doFornecedor, { contratos, licencas: licenses }).filter((x) => x.pago > 0.004);
+    return {
+      top: lista.filter((x) => x.fornecedorId).sort((a, b) => b.pago - a.pago).slice(0, 10).map((x) => [x.fornecedorId, x.pago] as const),
+      semFornecedor: lista.filter((x) => !x.fornecedorId).reduce((s, x) => s + x.pago, 0),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [faturas]);
+  }, [g.lancamentos, faturas, contratos, licenses]);
+  // Seção 27: a mesma janela do Início e dos alertas (situacaoContrato, 60 dias)
   const vencendo = contratos
-    .filter((c) => c.status !== 'encerrado' && c.fim && diasAte(c.fim) >= 0 && diasAte(c.fim) <= 90)
+    .filter((c) => situacaoContrato(c).situacao === 'vencendo')
     .sort((a, b) => (a.fim || '').localeCompare(b.fim || ''));
   const reposicoes = g.projecao.itens.filter((i) => i.origem === 'reposicao').slice(0, 8);
   const primeiroMesProj = g.projecao.meses[0]?.mes;
@@ -253,7 +222,7 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
           {semFornecedor > 0 && <p className="texto-aux">Sem fornecedor: <span className="num">{brl(semFornecedor)}</span></p>}
         </div>
         <div className="cartao p-3 space-y-2">
-          <h3 className="secao-titulo">Contratos que vencem em 90 dias</h3>
+          <h3 className="secao-titulo">Contratos que vencem em {DIAS_ALERTA_CONTRATO} dias</h3>
           {vencendo.length === 0 ? (
             <p className="texto-aux">Nenhum.</p>
           ) : (
@@ -301,9 +270,10 @@ export const PainelExecutivoView: React.FC<{ onNavigate: (v: string) => void }> 
 // -----------------------------------------------------------------------------
 // Orçamento: acompanhamento (previsto · comprometido · a pagar · realizado) e planejamento
 // -----------------------------------------------------------------------------
-export type AbaOrcamento = 'acompanhamento' | 'planejamento' | 'projecao';
+export type AbaOrcamento = 'acompanhamento' | 'projecao';
 
-// Seção 23: Orçamento e Projeção num item só do menu; a projeção virou a terceira aba
+// Seção 23: Orçamento e Projeção num item só do menu. Seção 27: o Planejamento entrou no
+// Orçamento (edição na própria linha) — duas abas, uma conta só.
 export const OrcamentoGestaoView: React.FC<{ abaInicial?: AbaOrcamento }> = ({ abaInicial = 'acompanhamento' }) => {
   const [aba, setAba] = useState<AbaOrcamento>(abaInicial);
   const abas = (
@@ -312,23 +282,72 @@ export const OrcamentoGestaoView: React.FC<{ abaInicial?: AbaOrcamento }> = ({ a
       ativa={aba}
       onMudar={setAba}
       itens={[
-        { id: 'acompanhamento' as const, rotulo: 'Acompanhamento' },
-        { id: 'planejamento' as const, rotulo: 'Planejamento (linhas)' },
+        { id: 'acompanhamento' as const, rotulo: 'Orçamento' },
         { id: 'projecao' as const, rotulo: 'Projeção' },
       ]}
     />
   );
-  if (aba === 'planejamento') return <OrcamentoView abas={abas} />;
   if (aba === 'projecao') return <ProjecaoView abas={abas} />;
   return <AcompanhamentoOrcamento abas={abas} />;
 };
 
+const naturezaDoOrcamento = (o: Pick<Orcamento, 'natureza' | 'categoria'>) => o.natureza || (o.categoria === 'hardware' ? 'capex' : 'opex');
+
 const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) => {
+  const { currentRole, departments, settings, contratos, licenses } = useApp();
+  const { orcamentos, salvarOrcamentos, excluirOrcamento } = useCompras();
+  const isAdmin = currentRole === 'ti_admin';
   const [ano, setAno] = useState(ANO_ATUAL);
   const [regime, setRegime] = useState<Regime>('competencia');
   const [natureza, setNatureza] = useState<'' | 'capex' | 'opex'>('');
+  const [visao, setVisao] = useState<'linhas' | 'meses'>('linhas');
+  const [editando, setEditando] = useState<Orcamento | null>(null);
+  const [copiando, setCopiando] = useState(false);
+  const [erro, setErro] = useState('');
   const g = useGestao(ano, regime);
+  // Base "o que foi gasto" da cópia: o ano anterior na mesma conta
+  const gAnterior = useGestao(ano - 1, regime);
+  const mapa = settings.premissasFinanceiras?.mapaAreas;
   const linhas = g.linhasGestao.filter((l) => !natureza || l.natureza === natureza);
+  const areas = useMemo(
+    () => [...new Set([...departments.map((d) => d.nome), ...orcamentos.map((o) => o.area), ...contratos.map((c) => c.centroCusto || ''), ...licenses.map((l) => l.centroCusto || '')].filter(Boolean))].sort(),
+    [departments, orcamentos, contratos, licenses]
+  );
+  // Linha da tabela → orçamento cadastrado (mesma natureza, categoria e área)
+  const orcamentoDaLinha = (l: LinhaGestao) =>
+    orcamentos.find(
+      (o) => o.ano === ano && o.categoria === l.categoria && naturezaDoOrcamento(o) === l.natureza && areaDoOrcamento(o, departments, mapa).toLowerCase() === l.area.trim().toLowerCase()
+    );
+  const editar = (l: LinhaGestao) => {
+    const o = orcamentoDaLinha(l);
+    setEditando(
+      o
+        ? { ...o, meses: o.meses.length === 12 ? [...o.meses] : distribuirMensal(o.valorAnual) }
+        : { id: `orc-${crypto.randomUUID()}`, ano, categoria: l.categoria, area: l.area, natureza: l.natureza, valorAnual: 0, meses: Array(12).fill(0) }
+    );
+  };
+  const nova = () => setEditando({ id: `orc-${crypto.randomUUID()}`, ano, categoria: 'hardware', area: '', valorAnual: 0, meses: Array(12).fill(0) });
+  const excluir = async (l: LinhaGestao) => {
+    const o = orcamentoDaLinha(l);
+    if (!o) return;
+    const ok = await confirmar({
+      titulo: `Excluir o orçamento de ${ROTULO_CATEGORIA[l.categoria]}${l.area ? ` · ${l.area}` : ''} em ${ano}?`,
+      mensagem: 'O previsto desta linha deixa de existir; os gastos continuam aparecendo, sem previsto. Não dá para desfazer: cadastre de novo se precisar.',
+      confirmar: 'Excluir',
+      cancelar: 'Voltar',
+      perigo: true,
+    });
+    if (!ok) return;
+    setErro((await excluirOrcamento(o.id)) || '');
+  };
+  // Mês a mês: previsto (meses do orçamento) × realizado + a pagar (livro)
+  const porMes = MESES.map((_, i) => {
+    const previsto = g.orcamentoDoAno
+      .filter((o) => !natureza || naturezaDoOrcamento(o) === natureza)
+      .reduce((s, o) => s + (o.meses.length === 12 ? o.meses[i] : o.valorAnual / 12), 0);
+    const usado = g.lancamentos.filter((x) => x.mes === i && x.situacao !== 'comprometido' && (!natureza || x.natureza === natureza)).reduce((s, x) => s + x.valor, 0);
+    return { previsto, usado };
+  });
   const soma = (ls: LinhaGestao[]) => ({
     previsto: ls.reduce((s, l) => s + l.previsto, 0),
     comprometido: ls.reduce((s, l) => s + l.comprometido, 0),
@@ -360,6 +379,20 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
       </td>
       {comArea && <td data-label="Área">{l.area || 'Geral'}</td>}
       <ValoresGestao s={l} pctUso={l.pct} />
+      {isAdmin && (
+        <td data-label="Ações" className="col-acoes" onClick={(e) => e.stopPropagation()}>
+          <span className="acoes-linha">
+            <button type="button" onClick={() => editar(l)} className="btn btn-sm btn-secundario">
+              {orcamentoDaLinha(l) ? <><Pencil /> Editar</> : <><Plus /> Orçar</>}
+            </button>
+            {orcamentoDaLinha(l) && (
+              <button type="button" onClick={() => excluir(l)} aria-label={`Excluir o orçamento de ${ROTULO_CATEGORIA[l.categoria]} ${l.area}`} title="Excluir" className="btn-icone btn-icone-perigo">
+                <Trash2 />
+              </button>
+            )}
+          </span>
+        </td>
+      )}
     </tr>
   );
 
@@ -367,10 +400,16 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
     <div className="space-y-3">
       <CabecalhoTela
         titulo="Orçamento"
-        subtitulo="Comprometido = pedido aprovado sem fatura · realizado = pago · área = departamento · clique na linha para ver os lançamentos"
+        subtitulo={`Comprometido = pedido aprovado sem fatura · realizado = pago · área = departamento · clique na linha para ver os lançamentos${isAdmin ? '' : ' · só o administrador edita o previsto'}`}
         abas={abas}
         acoes={
           <>
+            {isAdmin && (
+              <>
+                <button type="button" onClick={() => setCopiando(true)} className="btn btn-secundario"><Copy /> Copiar do ano anterior</button>
+                <button type="button" onClick={nova} className="btn btn-primario"><Plus /> Nova linha</button>
+              </>
+            )}
             <button type="button" onClick={() => exportar(false)} className="btn btn-secundario"><Download /> CSV</button>
             <button type="button" onClick={() => exportar(true)} className="btn btn-secundario"><FileSpreadsheet /> Excel</button>
           </>
@@ -387,9 +426,14 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
               <option value="opex">Só OPEX</option>
               <option value="capex">Só CAPEX</option>
             </select>
+            <select aria-label="Visão" value={visao} onChange={(e) => setVisao(e.target.value as typeof visao)} className="campo campo-sm">
+              <option value="linhas">Por categoria e área</option>
+              <option value="meses">Mês a mês</option>
+            </select>
           </>
         }
       />
+      {erro && <p role="alert" className="erro">{erro}</p>}
       <div className="grid items-start grid-cols-2 lg:grid-cols-5 gap-3">
         <Numero rotulo="Previsto" valor={brl(total.previsto)} />
         <Numero rotulo="Comprometido" valor={brl(total.comprometido)} detalhe="pedido aprovado sem fatura" />
@@ -402,8 +446,40 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
           tom={total.previsto && total.projecaoDezembro > total.previsto ? 'atencao' : undefined}
         />
       </div>
-      {linhas.length === 0 ? (
-        <Vazio>Sem orçamento nem gastos em {ano}. Cadastre as linhas na aba Planejamento ou gere a partir da Projeção.</Vazio>
+      {visao === 'meses' ? (
+        <div className="cartao-tabela">
+          <table className="tabela tabela-cartoes">
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th className="num">Previsto</th>
+                <th className="num">Realizado + a pagar</th>
+                <th className="num">Diferença</th>
+                <th className="num" title="Sem os pedidos comprometidos (eles não têm mês de pagamento)">Acumulado (realizado + a pagar ÷ previsto)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {porMes.map((m, i) => {
+                const prevAc = porMes.slice(0, i + 1).reduce((s, x) => s + x.previsto, 0);
+                const usoAc = porMes.slice(0, i + 1).reduce((s, x) => s + x.usado, 0);
+                const dif = m.previsto - m.usado;
+                return (
+                  <tr key={MESES[i]}>
+                    <td data-label="Mês">{MESES[i]}/{ano}</td>
+                    <td data-label="Previsto" className="num">{brlOuTraco(m.previsto)}</td>
+                    <td data-label="Realizado + a pagar" className="num">{brlOuTraco(m.usado)}</td>
+                    <td data-label="Diferença" className={`num ${dif < 0 ? 'text-red-700' : ''}`}>{brlOuTraco(dif)}</td>
+                    <td data-label="Acumulado" className="num">{prevAc > 0 ? pct(usoAc / prevAc) : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : linhas.length === 0 ? (
+        <Vazio acao={isAdmin ? <button type="button" onClick={nova} className="btn btn-sm btn-primario"><Plus /> Nova linha</button> : undefined}>
+          Sem orçamento nem gastos em {ano}. {isAdmin ? 'Cadastre uma linha, copie do ano anterior ou gere a partir da Projeção.' : ''}
+        </Vazio>
       ) : (
         <div className="cartao-tabela">
           <table className="tabela tabela-cartoes">
@@ -418,6 +494,7 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
                 <th className="num">Disponível</th>
                 <th className="num">Projeção até dez.</th>
                 <th className="num">% usado</th>
+                {isAdmin && <th className="col-acoes">Ações</th>}
               </tr>
             </thead>
             {grupos.map(({ n, ls }) => {
@@ -427,6 +504,7 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
                   <tr className="bg-slate-50">
                     <td colSpan={comArea ? 2 : 1} className="font-semibold text-slate-900">{n === 'opex' ? 'OPEX (despesas do dia a dia)' : 'CAPEX (investimentos)'}</td>
                     <ValoresGestao s={s} pctUso={pctDe(s)} forte />
+                    {isAdmin && <td />}
                   </tr>
                   {ls.map(linha)}
                 </tbody>
@@ -436,12 +514,52 @@ const AcompanhamentoOrcamento: React.FC<{ abas: React.ReactNode }> = ({ abas }) 
               <tr>
                 <td colSpan={comArea ? 2 : 1} className="font-semibold text-slate-900">Total</td>
                 <ValoresGestao s={total} pctUso={pctDe(total)} forte />
+                {isAdmin && <td />}
               </tr>
             </tfoot>
           </table>
         </div>
       )}
       {aberta && <JanelaRecorte linha={aberta} lancamentos={lancamentosDaLinha(g.lancamentos, aberta.chave)} ano={ano} onFechar={() => setAberta(null)} />}
+      {editando && (
+        <FormOrcamento
+          inicial={editando}
+          areas={areas}
+          onClose={() => setEditando(null)}
+          onSalvar={async (o) => {
+            const r = await salvarOrcamentos([o]);
+            if (!r) setEditando(null);
+            return r;
+          }}
+        />
+      )}
+      {copiando && (
+        <CopiarOrcamento
+          anoDestino={ano}
+          onClose={() => setCopiando(false)}
+          onCopiar={async (origem, reajuste, base) => {
+            // Base "gasto": realizado + a pagar do ano anterior, mês a mês, na mesma conta do Orçamento
+            const fonte: Orcamento[] =
+              base === 'previsto'
+                ? orcamentos
+                : gAnterior.linhasGestao.map((l) => {
+                    const meses = Array(12).fill(0) as number[];
+                    lancamentosDaLinha(gAnterior.lancamentos, l.chave)
+                      .filter((x) => x.situacao !== 'comprometido')
+                      .forEach((x) => (meses[x.mes] += x.valor));
+                    return { id: l.chave, ano: origem, categoria: l.categoria, area: l.area, natureza: l.natureza, valorAnual: l.realizado + l.aPagar, meses };
+                  });
+            const existentes = new Set(orcamentos.filter((o) => o.ano === ano).map((o) => `${o.categoria}|${naturezaDoOrcamento(o)}|${o.area.trim().toLowerCase()}`));
+            const novas = copiarOrcamentos(fonte, origem, ano, reajuste)
+              .filter((o) => o.valorAnual > 0 && !existentes.has(`${o.categoria}|${naturezaDoOrcamento(o)}|${o.area.trim().toLowerCase()}`))
+              .map((o) => ({ ...o, id: `orc-${crypto.randomUUID()}` }));
+            if (novas.length === 0) return `Nada para copiar: ${ano - 1} não tem ${base === 'previsto' ? 'orçamento' : 'gasto'} ou ${ano} já tem as mesmas linhas.`;
+            const r = await salvarOrcamentos(novas);
+            if (!r) setCopiando(false);
+            return r;
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -969,8 +1087,6 @@ const ExportacoesView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
   const { assets, departments, settings, currentRole } = useApp();
   const [ano, setAno] = useState(ANO_ATUAL);
   const g = useGestao(ano);
-  const { lista: recebimentos } = useRecebimentos();
-  const { lista: fechamentos } = useFechamentos();
   const [rateios, setRateios] = useState<Rateio[]>([]);
   const [rateiosErro, setRateiosErro] = useState(false);
   const [tentativaRateios, setTentativaRateios] = useState(0);
@@ -992,24 +1108,14 @@ const ExportacoesView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
     };
   }, [isTI, tentativaRateios]);
   const nomeDep = (id?: string) => departments.find((d) => d.id === id)?.nome || 'Sem área';
-  const fechado = fechamentos.find((f) => f.ano === ano && !f.reabertoEm);
   const contas = settings.premissasFinanceiras?.contaContabil || {};
   const porArea = custoPorArea(g.lancamentos, rateios, nomeDep);
 
   const baixar = (nome: string, aba: string, cab: string[], ls: (string | number | undefined)[][], excel: boolean) =>
     excel ? baixarExcel(`${nome}.xls`, paraExcel(aba, cab, ls)) : baixarCsv(`${nome}.csv`, paraCsv(cab, ls));
 
+  // Seção 27: só o que é contábil. O imobilizado sai da tela Patrimônio e os recebimentos, de Contas › A receber.
   const relatorios: { titulo: string; descricao: string; gerar: (excel: boolean) => void; so?: 'ti'; bloqueado?: boolean }[] = [
-    {
-      titulo: `Imobilizado de ${ano}${fechado ? ' (fechado)' : ''}`,
-      descricao: 'Saldo inicial, aquisições, baixas com valor de venda e ganho/perda, depreciação do ano e saldo final por equipamento.',
-      so: 'ti',
-      gerar: (excel) => {
-        const linhas = (fechado?.foto as FotoImobilizado | undefined)?.linhas || imobilizadoDoAno(assets, ano, settings.vidaUtil, g.limite);
-        const r = csvImobilizado(linhas, nomeDep);
-        baixar(`imobilizado-${ano}`, `Imobilizado ${ano}`, r.cabecalho, r.linhas, excel);
-      },
-    },
     {
       titulo: `Depreciação mês a mês de ${ano}`,
       descricao: 'Valor a lançar na contabilidade em cada mês, por grupo de depreciação.',
@@ -1026,20 +1132,6 @@ const ExportacoesView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
         const r = csvLancamentos(g.lancamentos, ano, contas);
         baixar(`lancamentos-${ano}`, `Lançamentos ${ano}`, r.cabecalho, r.linhas, excel);
       },
-    },
-    {
-      titulo: `Recebimentos de ${ano}`,
-      descricao: 'Vendas de equipamento, ressarcimentos, créditos de fornecedor e devoluções, previstos e recebidos.',
-      gerar: (excel) =>
-        baixar(
-          `recebimentos-${ano}`,
-          `Recebimentos ${ano}`,
-          ['Tipo', 'Descrição', 'Área', 'Valor previsto', 'Previsto para', 'Situação', 'Recebido em', 'Valor recebido'],
-          recebimentos
-            .filter((r) => (r.recebidoEm || r.previstoPara || r.criadoEm).startsWith(`${ano}`))
-            .map((r) => [ROTULO_TIPO_RECEBIMENTO[r.tipo], r.descricao, nomeDep(r.departamentoId), r.valor, r.previstoPara, r.status, r.recebidoEm, r.valorRecebido]),
-          excel
-        ),
     },
     {
       titulo: `Custo por área de ${ano} (${isTI ? 'com rateio' : 'sem rateio'})`,

@@ -8,6 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { Ban, Check, ExternalLink, PackageCheck, Pencil, Send, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
+import { useOrcamentoAtual } from '../gestao/useGestao.ts';
 import type { FormaAprovacao, FormaPagamento, PedidoCompra } from '../../types/index.ts';
 import { ROTULO_CATEGORIA, ROTULO_FORMA_PAGAMENTO, brl } from '../../utils/financeiro.ts';
 import {
@@ -42,7 +43,9 @@ const dataHora = (iso?: string) => (iso ? new Date(iso).toLocaleString('pt-BR', 
 
 export const FichaPedido: React.FC<{ pedidoId: string; onClose: () => void }> = ({ pedidoId, onClose }) => {
   const { currentRole, currentUser, employees, fornecedores, assets, tickets, faturas, abrirFicha, setSelectedTicketIdForDetail } = useApp();
-  const { pedidos, linhasAnoAtual, mudarStatusPedido, equipeCompras, registrarAprovacao } = useCompras();
+  const { pedidos, mudarStatusPedido, equipeCompras, registrarAprovacao } = useCompras();
+  // Seção 27: impacto no orçamento pela mesma conta do Acompanhamento
+  const { linhas: linhasAnoAtual } = useOrcamentoAtual();
   const p = pedidos.find((x) => x.id === pedidoId);
   const [editando, setEditando] = useState(false);
   const [comprando, setComprando] = useState(false);

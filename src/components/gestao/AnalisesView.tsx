@@ -9,7 +9,6 @@ import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { CategoriaDespesa, Employee } from '../../types/index.ts';
-import type { FichaAberta } from '../../utils/fichas.ts';
 import { baixarExcel, brl, brlOuTraco, paraExcel, ROTULO_CATEGORIA } from '../../utils/financeiro.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import {
@@ -25,12 +24,14 @@ import {
 } from '../../utils/analises.ts';
 import { useGestao } from './useGestao.ts';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
+import { LinkFicha, Numero, pct } from './pecas.tsx';
 
 export type AbaAnalise = 'pessoas' | 'desperdicio' | 'areas' | 'fornecedores' | 'equipamentos';
 export const ABAS_ANALISE: { id: AbaAnalise; rotulo: string }[] = [
   { id: 'pessoas', rotulo: 'Custo por pessoa' },
   { id: 'desperdicio', rotulo: 'Desperdício' },
-  { id: 'areas', rotulo: 'Custo por área' },
+  // Seção 27: o custo oficial por área (rateio + departamento) está em Exportações; aqui é a estimativa pelo uso
+  { id: 'areas', rotulo: 'Custo por área (estimativa pelo uso)' },
   { id: 'fornecedores', rotulo: 'Fornecedores' },
   { id: 'equipamentos', rotulo: 'Equipamentos' },
 ];
@@ -59,25 +60,6 @@ const USA: Record<AbaAnalise, (keyof Filtros)[]> = {
   equipamentos: ['area', 'fornecedor', 'soAlerta'],
 };
 
-const Link: React.FC<{ ficha?: FichaAberta; children: React.ReactNode }> = ({ ficha, children }) => {
-  const { abrirFicha } = useApp();
-  return ficha ? (
-    <button type="button" onClick={() => abrirFicha(ficha)} className="link text-left">
-      {children}
-    </button>
-  ) : (
-    <span>{children}</span>
-  );
-};
-
-const Numero: React.FC<{ rotulo: string; valor: string; detalhe?: string; tom?: 'atencao' }> = ({ rotulo, valor, detalhe, tom }) => (
-  <div className="cartao p-3 min-w-0">
-    <span className="block texto-aux">{rotulo}</span>
-    <span className={`block text-lg font-semibold font-mono ${tom === 'atencao' ? 'text-amber-800' : 'text-slate-900'}`}>{valor}</span>
-    {detalhe && <span className="block texto-aux">{detalhe}</span>}
-  </div>
-);
-
 /** Barra proporcional (visual rápido do peso de cada linha) */
 const Barra: React.FC<{ valor: number; maior: number }> = ({ valor, maior }) => (
   <span className="mt-1 block h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true">
@@ -96,7 +78,6 @@ const Bloco: React.FC<{ titulo: string; valor: string; vazio: string; children: 
   </div>
 );
 
-const pct = (v?: number) => (v === undefined ? '—' : `${Math.round(v * 100)}%`);
 
 export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> = ({ aba, abas }) => {
   const { employees, assets, licenses, contratos, faturas, fornecedores, departments, settings } = useApp();
@@ -197,7 +178,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
                 {linhasP.map((l) => (
                   <tr key={l.pessoa.id}>
                     <td data-label="Pessoa">
-                      <Link ficha={{ tipo: 'colaborador', id: l.pessoa.id }}>{l.pessoa.nome}</Link>
+                      <LinkFicha className="" ficha={{ tipo: 'colaborador', id: l.pessoa.id }}>{l.pessoa.nome}</LinkFicha>
                       {l.pessoa.status === 'desligado' && <span className="selo selo-problema ml-2">Desligado</span>}
                     </td>
                     <td data-label="Área · cargo">{nomeArea(l.pessoa.setorId)} · {l.pessoa.cargo || '—'}</td>
@@ -209,7 +190,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
                             {l.equipamentos.map((a, i) => (
                               <React.Fragment key={a.id}>
                                 {i > 0 && ', '}
-                                <Link ficha={{ tipo: 'ativo', id: a.id }}>{a.tag}</Link>
+                                <LinkFicha className="" ficha={{ tipo: 'ativo', id: a.id }}>{a.tag}</LinkFicha>
                               </React.Fragment>
                             ))}
                           </span>
@@ -226,7 +207,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
                             {l.licencas.map((x, i) => (
                               <React.Fragment key={x.licenca.id}>
                                 {i > 0 && ', '}
-                                <Link ficha={{ tipo: 'software', id: x.licenca.id }}>{x.licenca.nome}</Link>
+                                <LinkFicha className="" ficha={{ tipo: 'software', id: x.licenca.id }}>{x.licenca.nome}</LinkFicha>
                               </React.Fragment>
                             ))}
                           </span>
@@ -280,7 +261,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
             {d.desligados.map((c) => (
               <li key={c.pessoa.id} className="flex justify-between gap-2">
                 <span className="min-w-0">
-                  <Link ficha={{ tipo: 'colaborador', id: c.pessoa.id }}>{c.pessoa.nome}</Link>{' '}
+                  <LinkFicha className="" ficha={{ tipo: 'colaborador', id: c.pessoa.id }}>{c.pessoa.nome}</LinkFicha>{' '}
                   <span className="texto-aux">
                     {[c.equipamentos.length && `${c.equipamentos.length} equip.`, c.licencas.length && `${c.licencas.length} licença(s)`, c.linhas.length && `${c.linhas.length} linha(s)`].filter(Boolean).join(' · ')}
                   </span>
@@ -293,7 +274,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
             {d.assentosLivres.map((o) => (
               <li key={o.licenca.id} className="flex justify-between gap-2">
                 <span className="min-w-0">
-                  <Link ficha={{ tipo: 'software', id: o.licenca.id }}>{o.licenca.nome}</Link> <span className="texto-aux">{o.livres} livre(s)</span>
+                  <LinkFicha className="" ficha={{ tipo: 'software', id: o.licenca.id }}>{o.licenca.nome}</LinkFicha> <span className="texto-aux">{o.livres} livre(s)</span>
                 </span>
                 <span className="num">{brl(o.custoMensal)}</span>
               </li>
@@ -310,7 +291,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
           <Bloco titulo="Equipamentos em estoque" valor={brl(d.valorEmEstoque)} vazio="Nenhum." n={d.emEstoque.length}>
             {d.emEstoque.slice(0, 30).map((a) => (
               <li key={a.id} className="flex justify-between gap-2">
-                <Link ficha={{ tipo: 'ativo', id: a.id }}>{a.tag} · {a.nome}</Link>
+                <LinkFicha className="" ficha={{ tipo: 'ativo', id: a.id }}>{a.tag} · {a.nome}</LinkFicha>
                 <span className="num">{brlOuTraco(a.fiscal?.valorCompra || 0)}</span>
               </li>
             ))}
@@ -416,7 +397,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
                 {linhasF.map((x) => (
                   <tr key={x.fornecedorId || 'sem'}>
                     <td data-label="Fornecedor">
-                      <Link ficha={x.fornecedorId ? { tipo: 'fornecedor', id: x.fornecedorId } : undefined}>{nomeForn(x.fornecedorId)}</Link>
+                      <LinkFicha className="" ficha={x.fornecedorId ? { tipo: 'fornecedor', id: x.fornecedorId } : undefined}>{nomeForn(x.fornecedorId)}</LinkFicha>
                       <Barra valor={x.total} maior={maior} />
                     </td>
                     <td data-label="Total" className="num font-semibold">{brl(x.total)}</td>
@@ -495,7 +476,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
                 {linhasE.slice(0, 300).map((x) => (
                   <tr key={x.ativo.id}>
                     <td data-label="Equipamento">
-                      <Link ficha={{ tipo: 'ativo', id: x.ativo.id }}>{x.ativo.tag} · {x.ativo.nome}</Link>
+                      <LinkFicha className="" ficha={{ tipo: 'ativo', id: x.ativo.id }}>{x.ativo.tag} · {x.ativo.nome}</LinkFicha>
                       {x.alerta && <span className="selo selo-atencao ml-2">{x.alerta === 'vida' ? 'Vida útil vencida' : 'Manutenção alta'}</span>}
                     </td>
                     <td data-label="Área">{nomeArea(areaDoEquipamento(x.ativo, pessoasPorId))}</td>

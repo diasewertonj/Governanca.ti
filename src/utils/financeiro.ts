@@ -520,19 +520,7 @@ export function somarPor<T>(itens: T[], chave: (i: T) => string, valor: (i: T) =
   return [...m.entries()].map(([k, total]) => ({ chave: k, total })).sort((a, b) => b.total - a.total);
 }
 
-/** Total pago por mês (competência), últimos N meses */
-export function pagoPorMes(faturas: Fatura[], meses = 12, agora: Date = new Date()): { mes: string; total: number }[] {
-  const out: { mes: string; total: number }[] = [];
-  for (let i = meses - 1; i >= 0; i--) {
-    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
-    const mes = isoLocal(d);
-    out.push({
-      mes: mes.slice(0, 7),
-      total: faturas.filter((f) => f.status === 'paga' && f.competencia === mes).reduce((s, f) => s + valorEfetivo(f), 0),
-    });
-  }
-  return out;
-}
+
 
 /** Assentos livres de licenças próprias e o custo deles (ociosidade) */
 export function assentosOciosos(licencas: SoftwareLicense[], contratos: Contrato[]) {

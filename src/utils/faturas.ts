@@ -80,10 +80,11 @@ export function statusExibido(f: Pick<Fatura, 'status' | 'vencimento'>, agora: D
 }
 
 /** Total pago no ano (pela data de pagamento) */
-export function totalPagoNoAno(faturas: Pick<Fatura, 'status' | 'pagoEm' | 'valor'>[], ano: number): number {
+export function totalPagoNoAno(faturas: Pick<Fatura, 'status' | 'pagoEm' | 'valor' | 'valorPago'>[], ano: number): number {
+  // Seção 27: o que saiu do caixa (com juros, multa ou desconto), como em todo o sistema
   return faturas
     .filter((f) => f.status === 'paga' && f.pagoEm?.startsWith(`${ano}-`))
-    .reduce((soma, f) => soma + f.valor, 0);
+    .reduce((soma, f) => soma + (f.valorPago ?? f.valor), 0);
 }
 
 /** Faturas a pagar já vencidas e as que vencem nos próximos 7 dias (quadro do Início) */

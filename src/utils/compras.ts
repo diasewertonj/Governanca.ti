@@ -1,22 +1,10 @@
 // =============================================================================
-// Fase 11 · Orçamento (previsto × realizado) e pedidos de compra.
-// Realizado = faturas pagas (valor efetivo) + compras de equipamento pela data de
-// aquisição (as que vieram de um pedido já contam pela fatura do pedido).
+// Fase 11 · Orçamento (linhas, cópia e alertas) e pedidos de compra.
+// Seção 27: o realizado do orçamento vem do livro (utils/gestaoFinanceira › lancamentosDoLivro),
+// a mesma conta do Acompanhamento e do Painel executivo.
 // =============================================================================
-import type {
-  Asset,
-  CategoriaDespesa,
-  Contrato,
-  Department,
-  Fatura,
-  Orcamento,
-  PedidoCompra,
-  SoftwareLicense,
-  StatusPedido,
-  TipoItemPedido,
-  FormaAprovacao,
-} from '../types/index.ts';
-import { CATEGORIA_DO_TIPO, ROTULO_CATEGORIA, brl, valorEfetivo } from './financeiro.ts';
+import type { CategoriaDespesa, Fatura, Orcamento, PedidoCompra, StatusPedido, TipoItemPedido, FormaAprovacao } from '../types/index.ts';
+import { ROTULO_CATEGORIA, brl } from './financeiro.ts';
 
 export const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const centavos = (v: number) => Math.round(v * 100) / 100;
@@ -39,60 +27,8 @@ export function copiarOrcamentos(origem: Orcamento[], anoOrigem: number, anoDest
     .filter((o) => o.ano === anoOrigem)
     .map((o) => {
       const meses = (o.meses.length === 12 ? o.meses : distribuirMensal(o.valorAnual)).map((v) => centavos(v * fator));
-      return { ano: anoDestino, categoria: o.categoria, area: o.area, meses, valorAnual: somaMeses(meses), observacoes: o.observacoes };
+      return { ano: anoDestino, categoria: o.categoria, area: o.area, natureza: o.natureza, meses, valorAnual: somaMeses(meses), observacoes: o.observacoes };
     });
-}
-
-export interface LancamentoRealizado {
-  categoria: CategoriaDespesa;
-  area: string;
-  mes: number; // 0-11
-  valor: number;
-  origem: 'fatura' | 'equipamento';
-}
-
-/** Tudo o que conta como gasto no ano, com categoria e área */
-export function lancamentosRealizados(
-  dados: { faturas: Fatura[]; contratos: Contrato[]; licencas: SoftwareLicense[]; pedidos: PedidoCompra[]; ativos: Asset[]; departamentos: Department[] },
-  ano: number
-): LancamentoRealizado[] {
-  const out: LancamentoRealizado[] = [];
-  const prefixo = `${ano}-`;
-  dados.faturas
-    .filter((f) => f.status === 'paga' && f.competencia.startsWith(prefixo))
-    .forEach((f) => {
-      const mes = Number(f.competencia.slice(5, 7)) - 1;
-      let categoria: CategoriaDespesa = 'outros';
-      let area = '';
-      if (f.contratoId) {
-        const c = dados.contratos.find((x) => x.id === f.contratoId);
-        if (c) {
-          categoria = c.categoriaDespesa || CATEGORIA_DO_TIPO[c.tipo];
-          area = c.centroCusto || '';
-        }
-      } else if (f.licencaId) {
-        const l = dados.licencas.find((x) => x.id === f.licencaId);
-        categoria = l?.categoriaDespesa || 'software';
-        area = l?.centroCusto || '';
-      } else if (f.pedidoId) {
-        const p = dados.pedidos.find((x) => x.id === f.pedidoId);
-        categoria = p?.categoria || 'hardware';
-        area = p?.area || '';
-      }
-      out.push({ categoria, area, mes, valor: valorEfetivo(f), origem: 'fatura' });
-    });
-  dados.ativos
-    .filter((a) => !a.pedidoId && (Number(a.fiscal?.valorCompra) || 0) > 0 && (a.fiscal?.dataAquisicao || '').startsWith(prefixo))
-    .forEach((a) =>
-      out.push({
-        categoria: 'hardware',
-        area: dados.departamentos.find((d) => d.id === a.setorId)?.nome || '',
-        mes: Number(a.fiscal.dataAquisicao.slice(5, 7)) - 1,
-        valor: Number(a.fiscal.valorCompra) || 0,
-        origem: 'equipamento',
-      })
-    );
-  return out;
 }
 
 export interface LinhaOrcamento {
@@ -108,46 +44,6 @@ export interface LinhaOrcamento {
   pct?: number;
   /** Projeção para dezembro no ritmo atual (só no ano corrente) */
   tendencia?: number;
-}
-
-/** Previsto × realizado por categoria e área (linhas sem orçamento também aparecem) */
-export function resumoOrcamento(orcamentos: Orcamento[], lancamentos: LancamentoRealizado[], ano: number, agora: Date = new Date()): LinhaOrcamento[] {
-  const linhas = new Map<string, LinhaOrcamento>();
-  const pegar = (categoria: CategoriaDespesa, area: string) => {
-    const chave = `${categoria}|${chaveArea(area)}`;
-    let l = linhas.get(chave);
-    if (!l) {
-      l = { chave, categoria, area: area.trim(), previstoMeses: Array(12).fill(0), realizadoMeses: Array(12).fill(0), previsto: 0, realizado: 0 };
-      linhas.set(chave, l);
-    }
-    return l;
-  };
-  orcamentos
-    .filter((o) => o.ano === ano)
-    .forEach((o) => {
-      const l = pegar(o.categoria, o.area);
-      l.orcamentoId = o.id;
-      l.previstoMeses = o.meses.length === 12 ? [...o.meses] : distribuirMensal(o.valorAnual);
-    });
-  lancamentos.forEach((x) => {
-    const l = pegar(x.categoria, x.area);
-    l.realizadoMeses[x.mes] = centavos(l.realizadoMeses[x.mes] + x.valor);
-  });
-  const anoCorrente = agora.getFullYear() === ano;
-  const mesesPassados = agora.getMonth() + 1;
-  return [...linhas.values()]
-    .map((l) => {
-      const previsto = somaMeses(l.previstoMeses);
-      const realizado = somaMeses(l.realizadoMeses);
-      return {
-        ...l,
-        previsto,
-        realizado,
-        pct: previsto > 0 ? realizado / previsto : undefined,
-        tendencia: anoCorrente ? centavos((realizado / mesesPassados) * 12) : undefined,
-      };
-    })
-    .sort((a, b) => ROTULO_CATEGORIA[a.categoria].localeCompare(ROTULO_CATEGORIA[b.categoria]) || a.area.localeCompare(b.area));
 }
 
 export interface AlertaOrcamento {
