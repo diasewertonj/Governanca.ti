@@ -139,7 +139,7 @@ export const TelaProcesso: React.FC<{ chamadoId: string; onVoltar: () => void; e
           <span className={SELO_STATUS_CHAMADO[ticket.status]}>{ticket.status === 'resolvido' ? 'Concluído' : ticket.status === 'aberto' ? 'Aguardando a T.I.' : rotuloSituacao(ticket)}</span>
           <button
             type="button"
-            onClick={() => imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla))}
+            onClick={() => imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla), { itens, setores: departments })}
             title="Relatório do processo (imprimir ou salvar em PDF)"
             aria-label="Relatório do processo"
             className="btn btn-sm btn-secundario"

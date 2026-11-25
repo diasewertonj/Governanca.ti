@@ -330,7 +330,10 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ ticketId, 
             <button
               type="button"
               onClick={() =>
-                imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla))
+                imprimirRelatorio(ticket, employees, isTI, situacaoSla(ticket, eventosSla[ticket.id] || [], prazosSla), {
+                  itens: processoItens.filter((i) => i.chamadoId === ticket.id),
+                  setores: departments,
+                })
               }
               title="Relatório do chamado (imprimir ou salvar em PDF)"
               className="btn btn-sm btn-secundario"
