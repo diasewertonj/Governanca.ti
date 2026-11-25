@@ -72,6 +72,9 @@ describe('mensagemDeErro · regras da Fase 8 (fornecedores, contratos e faturas)
         'Já existe fatura não cancelada para esta competência'
       );
     }
+    for (const regra of ['uq_fatura_licenca_mes', 'uq_fatura_contrato_mes', 'uq_fatura_linha_mes']) {
+      expect(mensagemDeErro({ code: '23505', message: `duplicate key value violates unique constraint "${regra}"` })).toMatch(/lance como adicional/);
+    }
   });
 
   it('fatura paga sem data e contrato com fim antes do início', () => {

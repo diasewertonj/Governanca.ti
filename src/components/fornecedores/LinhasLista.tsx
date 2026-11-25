@@ -258,6 +258,7 @@ const FormLinha: React.FC<{
     valorMensal: linha?.valorMensal ?? undefined,
     centroCusto: linha?.centroCusto || '',
     observacoes: linha?.observacoes || '',
+    diaVencimento: String(linha?.diaVencimento ?? 10),
   });
   const [erro, setErro] = useState('');
   const set = (k: keyof typeof d, v: string) => setD((p) => ({ ...p, [k]: v }));
@@ -346,6 +347,7 @@ const FormLinha: React.FC<{
       valorMensal: d.valorMensal,
       centroCusto: d.centroCusto || undefined,
       observacoes: d.observacoes || undefined,
+      diaVencimento: Math.min(31, Math.max(1, Number(d.diaVencimento) || 10)),
     });
     if (falha) setErro(falha);
   };
@@ -401,6 +403,13 @@ const FormLinha: React.FC<{
           <div>
             <label htmlFor="ln-valor" className={CLASSE_ROTULO}>Valor mensal (R$)</label>
             <CampoMoeda id="ln-valor" valor={d.valorMensal} onMudar={(v) => setD((p) => ({ ...p, valorMensal: v }))} className={CLASSE_CAMPO} />
+          </div>
+        )}
+        {!d.contratoId && (
+          <div>
+            <label htmlFor="ln-dia-venc" className={CLASSE_ROTULO}>Dia do vencimento</label>
+            <input id="ln-dia-venc" type="number" min={1} max={31} value={d.diaVencimento} onChange={(e) => set('diaVencimento', e.target.value)} className={CLASSE_CAMPO} />
+            <p className="ajuda">Com valor mensal, a fatura é gerada sozinha 30 dias antes.</p>
           </div>
         )}
         <div>

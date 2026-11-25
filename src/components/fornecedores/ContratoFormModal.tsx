@@ -82,6 +82,8 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
   const [avisoDias, setAvisoDias] = useState(base.pagamento?.avisoCancelamentoDias != null ? String(base.pagamento.avisoCancelamentoDias) : '');
   const [reajusteIndice, setReajusteIndice] = useState(base.reajusteIndice ?? '');
   const [reajusteMes, setReajusteMes] = useState(base.reajusteMes != null ? String(base.reajusteMes) : '');
+  // Seção 26: dia do vencimento das faturas automáticas
+  const [diaVencimento, setDiaVencimento] = useState(String(base.diaVencimento ?? 10));
   const [multa, setMulta] = useState(base.multaCancelamento ?? '');
   const [responsavelId, setResponsavelId] = useState(base.responsavelId ?? '');
   const [centroCusto, setCentroCusto] = useState(base.centroCusto ?? '');
@@ -98,7 +100,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
   // Aviso ao fechar com alterações não salvas
   const valores = JSON.stringify([fornecedorId, tipo, numero, descricao, inicio, fim, valor, periodicidade, sla,
     contatoSuporte, itens, observacoes, detalhes, unidadeId, moeda, valorMoeda, formaPagamento, cartaoFinal, titular,
-    renovacaoAutomatica, avisoDias, reajusteIndice, reajusteMes, multa, responsavelId, centroCusto, categoria]);
+    renovacaoAutomatica, avisoDias, reajusteIndice, reajusteMes, multa, responsavelId, centroCusto, categoria, diaVencimento]);
   const [valoresIniciais] = useState(valores);
   const itensPendentes =
     valores !== valoresIniciais || arquivo
@@ -232,6 +234,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
       },
       reajusteIndice: reajusteIndice.trim() || undefined,
       reajusteMes: reajusteMes === '' ? undefined : Number(reajusteMes),
+      diaVencimento: Math.min(31, Math.max(1, Number(diaVencimento) || 10)),
       multaCancelamento: multa.trim() || undefined,
       responsavelId: responsavelId || undefined,
       centroCusto: centroCusto.trim() || undefined,
@@ -596,6 +599,13 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({ contrato: 
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ctr-dia-venc" className={CLASSE_ROTULO}>
+                      Dia do vencimento
+                    </label>
+                    <input id="ctr-dia-venc" type="number" min={1} max={31} value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} className={CLASSE_CAMPO} />
+                    <p className="ajuda">A fatura é gerada sozinha 30 dias antes.</p>
                   </div>
                   <div>
                     <label htmlFor="ctr-multa" className={CLASSE_ROTULO}>

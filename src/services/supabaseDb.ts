@@ -169,6 +169,11 @@ const MENSAGEM_DA_REGRA: Record<string, string> = {
   chk_fatura_competencia: 'A competência deve ser o primeiro dia do mês',
   uq_fatura_licenca_comp: 'Já existe fatura não cancelada para esta competência',
   uq_fatura_contrato_comp: 'Já existe fatura não cancelada para esta competência',
+  // Seção 26: a regra agora vale só para a fatura do mês; adicionais (com motivo) passam
+  uq_fatura_licenca_mes: 'Este mês já tem fatura. Para cobrar algo a mais, lance como adicional, com o motivo',
+  uq_fatura_contrato_mes: 'Este mês já tem fatura. Para cobrar algo a mais, lance como adicional, com o motivo',
+  uq_fatura_linha_mes: 'Este mês já tem fatura. Para cobrar algo a mais, lance como adicional, com o motivo',
+  chk_fatura_origem_geracao: 'Fatura adicional precisa do motivo',
   uq_manutencao_aberta: 'O ativo já tem uma manutenção em andamento',
   manutencoes_custo_check: 'O custo da manutenção não pode ser negativo',
   manutencoes_descricao_check: 'Descreva o problema ou o serviço',
@@ -304,7 +309,24 @@ const linhaLicenca = (l: SoftwareLicense): TablesInsert<'licencas_software'> => 
   centro_custo: l.centroCusto?.trim() || null,
   categoria_despesa: l.categoriaDespesa || 'software',
   responsavel_id: l.responsavelId || null,
+  ...diaVencimentoDb(l.diaVencimento),
 });
+
+/** Seção 26: dia do vencimento só vai quando preenchido (funciona antes da migration) */
+const diaVencimentoDb = (d?: number): Record<string, unknown> => (d ? { dia_vencimento: d } : {});
+const lerDiaVencimento = (l: unknown): number | undefined => {
+  const v = Number((l as Record<string, unknown>)?.dia_vencimento);
+  return v >= 1 && v <= 31 ? v : undefined;
+};
+
+/** Seção 26: gera as faturas previstas (contratos, licenças e linhas); devolve quantas criou */
+export async function gerarFaturasPrevistasDb(): Promise<number> {
+  if (!supabase) return 0;
+  const r = await supabase.rpc('gerar_faturas_previstas' as never);
+  // Antes da migration a função não existe: segue sem gerar
+  if (r.error) return 0;
+  return Number(r.data) || 0;
+}
 
 /** Seção 6: bloco de pagamento comum a licença e contrato */
 function colunasPagamento(pg?: DadosPagamento) {
@@ -872,6 +894,7 @@ export async function fetchLicensesFromDb(): Promise<SoftwareLicense[] | null> {
     pagamento: pagamentoDeLinha(l),
     centroCusto: l.centro_custo || undefined,
     categoriaDespesa: (l.categoria_despesa || 'software') as CategoriaDespesa,
+    diaVencimento: lerDiaVencimento(l),
     responsavelId: l.responsavel_id || undefined,
   })) : [];
 }
@@ -1068,6 +1091,7 @@ const linhaContrato = (c: Contrato): TablesInsert<'contratos'> => ({
   responsavel_id: c.responsavelId || null,
   centro_custo: c.centroCusto?.trim() || null,
   categoria_despesa: c.categoriaDespesa || null,
+  ...diaVencimentoDb(c.diaVencimento),
 });
 
 export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
@@ -1123,6 +1147,7 @@ export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
     responsavelId: l.responsavel_id || undefined,
     centroCusto: l.centro_custo || undefined,
     categoriaDespesa: (l.categoria_despesa || undefined) as CategoriaDespesa | undefined,
+    diaVencimento: lerDiaVencimento(l),
   }));
 }
 
@@ -1203,6 +1228,12 @@ function secao17Fatura(f: Fatura): Record<string, unknown> {
     out.natureza_manual = true;
     out.natureza_motivo = f.naturezaMotivo?.trim() || null;
   }
+  // Seção 26: adicional (com motivo) e fatura de linha
+  if (f.linhaId) out.linha_id = f.linhaId;
+  if (f.origemGeracao === 'adicional') {
+    out.origem_geracao = 'adicional';
+    out.motivo_adicional = f.motivoAdicional?.trim() || null;
+  }
   return out;
 }
 
@@ -1245,6 +1276,9 @@ function lerSecao17Fatura(l: Record<string, unknown>): Partial<Fatura> {
     natureza: t(l.natureza) as Fatura['natureza'],
     naturezaManual: l.natureza_manual === true ? true : undefined,
     naturezaMotivo: t(l.natureza_motivo),
+    linhaId: t(l.linha_id),
+    origemGeracao: t(l.origem_geracao) as Fatura['origemGeracao'],
+    motivoAdicional: t(l.motivo_adicional),
   };
 }
 
@@ -1341,6 +1375,7 @@ const linhaLinha = (l: LinhaTelefonica): TablesInsert<'linhas_telefonicas'> => (
   valor_mensal: l.valorMensal ?? null,
   centro_custo: l.centroCusto?.trim() || null,
   observacoes: l.observacoes?.trim() || null,
+  ...diaVencimentoDb(l.diaVencimento),
 });
 
 export async function fetchLinhasFromDb(): Promise<LinhaTelefonica[] | null> {
@@ -1362,6 +1397,7 @@ export async function fetchLinhasFromDb(): Promise<LinhaTelefonica[] | null> {
     centroCusto: l.centro_custo || undefined,
     observacoes: l.observacoes || undefined,
     criadoEm: l.criado_em,
+    diaVencimento: lerDiaVencimento(l),
   }));
 }
 export async function insertLinhaDb(l: LinhaTelefonica) {
