@@ -686,8 +686,13 @@
   .janela-corpo {
     @apply space-y-4 p-4 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:p-6;
   }
-  /* Seção 19 (pedido do dono): só a LARGURA é padronizada; a altura acompanha o
-     conteúdo, até o limite da tela (aí só o corpo rola) */
+  /* Altura (pedidos do dono): janelas pequenas e médias acompanham o conteúdo; fichas
+     e formulários em etapas (que têm abas) ficam com uma altura MÉDIA fixa, para a
+     janela não mudar de tamanho a cada aba — o corpo rola quando passa disso */
+  .janela-ficha,
+  .janela-g {
+    @apply sm:h-[min(40rem,calc(100dvh-2rem))];
+  }
   .janela-rodape {
     @apply flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 sm:px-6;
     border-color: var(--cor-borda);

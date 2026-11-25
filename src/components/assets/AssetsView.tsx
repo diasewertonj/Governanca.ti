@@ -186,7 +186,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
                         <button
                           type="button"
                           onClick={() => setSelectedSoftwareIdFor360(lic.id)}
-                          className="block max-w-full truncate text-left font-semibold text-slate-900 after:absolute after:inset-0 after:content-[''] hover:text-blue-700"
+                          className="line-clamp-2 block max-w-full break-words text-left font-semibold text-slate-900 after:absolute after:inset-0 after:content-[''] hover:text-blue-700"
                         >
                           {lic.nome}
                         </button>
