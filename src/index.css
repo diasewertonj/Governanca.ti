@@ -188,6 +188,14 @@
   .dark .btn-perigo-cheio:hover:not(:disabled) {
     background-color: #b91c1c;
   }
+  /* Contraste AA no escuro: contador de alerta mais fechado, links em azul-claro */
+  .dark .contador-alerta {
+    background-color: #dc2626;
+  }
+  .dark .link,
+  .dark .btn-discreto {
+    color: #93c5fd;
+  }
 }
 
 /* Galeria (Configurações › Galeria visual): quadro "Antes" com as medidas antigas */
