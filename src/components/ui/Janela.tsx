@@ -33,7 +33,9 @@ export const Janela: React.FC<{
   noCaminho?: boolean;
   /** Seção 19: fichas de pessoa mostram as iniciais num avatar no lugar do ícone */
   avatar?: string;
-}> = ({ titulo, subtitulo, icone, tamanho = 'm', acoes, rodape, onFechar, children, faixa, idTitulo = 'janela-titulo', rotuloCaminho, noCaminho, avatar }) => {
+  /** Ação da janela inteira (Imprimir, Relatório): sempre no topo, à direita, ao lado do fechar */
+  acaoTopo?: React.ReactNode;
+}> = ({ titulo, subtitulo, icone, tamanho = 'm', acoes, rodape, onFechar, children, faixa, idTitulo = 'janela-titulo', rotuloCaminho, noCaminho, avatar, acaoTopo }) => {
   const iniciais = avatar
     ? avatar
         .split(/\s+/)
@@ -71,6 +73,7 @@ export const Janela: React.FC<{
           </div>
           {/* Decisão do dono: fechar sempre no canto de cima; as ações sempre numa linha própria,
               abaixo do título e alinhadas à esquerda (igual em qualquer largura) */}
+          {acaoTopo && <div className="no-print flex items-center gap-2 self-start">{acaoTopo}</div>}
           {temAnterior ? (
             <button type="button" aria-label="Fechar tudo" title="Fechar tudo" onClick={() => void nav.fecharTudo?.()} className="btn-icone self-start">
               <X className="ico-lg" />
