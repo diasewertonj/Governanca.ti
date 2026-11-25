@@ -37,6 +37,7 @@ import { supabase } from '../../services/supabase.ts';
 import { useGestao, type Regime } from './useGestao.ts';
 import { useRecebimentos, ROTULO_TIPO_RECEBIMENTO } from '../financeiro/RecebimentosView.tsx';
 import { OrcamentoView } from '../compras/OrcamentoView.tsx';
+import { ABAS_ANALISE, AnalisesView, type AbaAnalise } from './AnalisesView.tsx';
 import { Abas } from '../ui/Abas.tsx';
 import { confirmar, pedirTexto } from '../ui/dialogo.tsx';
 import { Janela } from '../ui/Janela.tsx';
@@ -953,7 +954,18 @@ export const PatrimonioView: React.FC = () => {
 // -----------------------------------------------------------------------------
 // Relatórios e exportações para a contabilidade (decisão 12)
 // -----------------------------------------------------------------------------
+// Seção 23: o admin vê as análises cruzadas em abas, antes das exportações; Compras vê só as exportações
 export const RelatoriosView: React.FC = () => {
+  const { currentRole } = useApp();
+  const [aba, setAba] = useState<AbaAnalise | 'exportacoes'>('pessoas');
+  if (currentRole !== 'ti_admin') return <ExportacoesView />;
+  const abas = (
+    <Abas rotulo="Análises e relatórios" ativa={aba} onMudar={setAba} itens={[...ABAS_ANALISE, { id: 'exportacoes' as const, rotulo: 'Exportações' }]} />
+  );
+  return aba === 'exportacoes' ? <ExportacoesView abas={abas} /> : <AnalisesView aba={aba} abas={abas} />;
+};
+
+const ExportacoesView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
   const { assets, departments, settings, currentRole } = useApp();
   const [ano, setAno] = useState(ANO_ATUAL);
   const g = useGestao(ano);
@@ -1050,8 +1062,9 @@ export const RelatoriosView: React.FC = () => {
   return (
     <div className="space-y-3">
       <CabecalhoTela
-        titulo="Relatórios"
+        titulo={abas ? 'Análises e relatórios' : 'Relatórios'}
         subtitulo="Exportações para a contabilidade (CSV com ; e Excel), sempre com o mesmo layout, e custo por área"
+        abas={abas}
         filtros={<SeletorAno ano={ano} onMudar={setAno} anos={[ANO_ATUAL, ANO_ATUAL - 1, ANO_ATUAL - 2, ANO_ATUAL - 3]} />}
       />
       <div className="cartao divide-y divide-slate-100">

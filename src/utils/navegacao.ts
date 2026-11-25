@@ -188,7 +188,8 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
         // Seção 23: Orçamento e Projeção num item só (a projeção é uma aba)
         item('orcamento', 'orcamento'),
         item('patrimonio', 'patrimonio'),
-        ...(papel === 'ti_admin' ? [item('relatorios', 'relatorios')] : []),
+        // Seção 23: para o admin, Relatórios traz as análises cruzadas
+        ...(papel === 'ti_admin' ? [item('relatorios', 'relatorios', undefined, 'Análises e relatórios')] : []),
       ],
     },
     // T.I./admin: sem Minha área — Meus equipamentos fica no menu da conta; os próprios chamados, em Chamados
