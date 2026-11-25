@@ -201,7 +201,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
     <Janela
       tamanho="ficha"
       idTitulo="termo-titulo"
-      icone={<FileText className="h-4 w-4" />}
+      icone={<FileText className="ico" />}
       titulo={`${doc.codigo} · ${t.codigo}`}
       subtitulo={
         <span className={cancelado ? 'text-red-700' : encerrado ? 'text-emerald-700' : 'text-amber-700'}>
@@ -217,7 +217,7 @@ export const PrintableTermModal: React.FC<PrintableTermModalProps> = ({ term, on
           )}
         </span>
       }
-      acoes={
+      acaoTopo={
         <button type="button" onClick={() => window.print()} className="btn btn-primario btn-sm no-print">
           <Printer /> Imprimir A4
         </button>
