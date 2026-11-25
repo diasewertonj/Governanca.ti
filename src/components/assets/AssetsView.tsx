@@ -3,10 +3,13 @@ import { useApp } from '../../context/AppContext.tsx';
 import { formatDate, formatCurrency } from '../../utils/formatters.ts';
 import { garantiaEfetiva } from '../../utils/contratos.ts';
 import { licencaAtiva } from '../../utils/licencas.ts';
-import { fonteCustoLicenca, ROTULO_FORMA_COBRANCA } from '../../utils/financeiro.ts';
+import { assentosOciosos, fonteCustoLicenca, ROTULO_FORMA_COBRANCA } from '../../utils/financeiro.ts';
+import { totaisEquipamentos } from '../../utils/exportarInventario.ts';
+import { ExportarInventario } from './ExportarInventario.tsx';
+import { ATALHOS_FUTURO, dentroDoPeriodo, usePeriodo } from '../ui/FiltroPeriodo.tsx';
 import type { Asset, Contrato, SoftwareLicense } from '../../types/index.ts';
 import { EstoqueAcessorios } from './EstoqueAcessorios.tsx';
-import { Copy, Key, Pencil, Plus, QrCode, ShieldAlert, ShieldCheck, User } from 'lucide-react';
+import { Copy, Download, Key, Pencil, Plus, QrCode, ShieldAlert, ShieldCheck, User } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 import { MenuAcoes } from '../ui/MenuAcoes.tsx';
 import { CHAVE } from '../../utils/especificacoes.ts';
@@ -51,6 +54,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
     currentRole,
     contratos,
     fornecedores,
+    settings,
   } = useApp();
 
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
@@ -64,6 +68,9 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
   const [duplicarDe, setDuplicarDe] = useState<Asset | null>(null);
   const [novoAcessorio, setNovoAcessorio] = useState(false);
   const [mostrarDesativados, setMostrarDesativados] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  // Softwares: filtro pela data de renovação (mês, ano ou de/até)
+  const { periodo: periodoRenovacao, seletor: seletorRenovacao } = usePeriodo('todos', ['todos', ...ATALHOS_FUTURO]);
 
   const acessorios = !softwares && categoryFilter === 'acessorios_tab';
   const termo = searchTerm.toLowerCase();
@@ -90,9 +97,15 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
     return matchesCategory && matchesStatus && matchesGarantia && matchesSearch;
   });
 
-  const licencasFiltradas = licenses.filter(
-    (l) => !termo || `${l.nome} ${fornecedores.find((f) => f.id === l.fornecedorId)?.nome || l.fornecedor || ''} ${l.chaveContrato || ''}`.toLowerCase().includes(termo)
-  );
+  const licencasFiltradas = licenses
+    .filter((l) => !termo || `${l.nome} ${fornecedores.find((f) => f.id === l.fornecedorId)?.nome || l.fornecedor || ''} ${l.chaveContrato || ''}`.toLowerCase().includes(termo))
+    .filter((l) => !periodoRenovacao || dentroDoPeriodo(fonteCustoLicenca(l, contratos).renovacao, periodoRenovacao));
+
+  // Faixa de custo total da lista (com os filtros aplicados) — valores só para a T.I.
+  const totEquip = totaisEquipamentos(filteredAssets, settings.vidaUtil);
+  const ativasDaLista = licencasFiltradas.filter(licencaAtiva);
+  const mensalSoftwares = ativasDaLista.reduce((s, l) => s + fonteCustoLicenca(l, contratos).mensalDaLicenca, 0);
+  const ociosoMensal = assentosOciosos(ativasDaLista, contratos).reduce((s, x) => s + x.custoMensal, 0);
 
   const getCustodian = (colabId?: string) => employees.find((e) => e.id === colabId);
 
@@ -124,7 +137,14 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
             ? 'Assentos contratados, alocação e liberação de colaboradores e faturamento'
             : 'Equipamentos com patrimônio, garantias, especificações técnicas e acessórios em estoque'
         }
-        acoes={acaoPrincipal}
+        acoes={
+          <>
+            <button type="button" onClick={() => setExportando(true)} className="btn btn-secundario">
+              <Download /> Exportar inventário
+            </button>
+            {acaoPrincipal}
+          </>
+        }
         abas={
           softwares ? undefined : (
             <Abas rotulo="Categorias de hardware" itens={ABAS_HARDWARE} ativa={categoryFilter} onMudar={setCategoryFilter} />
@@ -132,7 +152,11 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
         }
         filtros={
           softwares ? (
-            <Busca id="inventario-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar software, fornecedor ou contrato..." />
+            <>
+              <Busca id="inventario-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar software, fornecedor ou contrato..." />
+              <span className="texto-aux">Renovação:</span>
+              {seletorRenovacao}
+            </>
           ) : acessorios ? (
             <>
               <Busca id="inventario-busca" valor={searchTerm} onMudar={setSearchTerm} placeholder="Buscar acessório, marca ou local..." />
@@ -161,6 +185,51 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
           )
         }
       />
+
+      {isTI && !acessorios && (
+        <p className="faixa-totais texto-aux flex flex-wrap gap-x-4 gap-y-1" aria-label="Totais da lista">
+          {softwares ? (
+            <>
+              <span>
+                <span className="num font-semibold text-slate-900">{ativasDaLista.length}</span> {ativasDaLista.length === 1 ? 'software ativo' : 'softwares ativos'}
+              </span>
+              <span>
+                Custo mensal <span className="num font-semibold text-slate-900">{formatCurrency(mensalSoftwares)}</span>
+              </span>
+              <span>
+                Custo anual <span className="num font-semibold text-slate-900">{formatCurrency(mensalSoftwares * 12)}</span>
+              </span>
+              {ociosoMensal > 0 && (
+                <span>
+                  Assentos sem uso <span className="num font-semibold text-amber-800">{formatCurrency(ociosoMensal)}/mês</span>
+                </span>
+              )}
+              {periodoRenovacao && <span>Renovam em {formatDate(periodoRenovacao.de)} a {formatDate(periodoRenovacao.ate)}</span>}
+            </>
+          ) : (
+            <>
+              <span>
+                <span className="num font-semibold text-slate-900">{totEquip.qtd}</span> {totEquip.qtd === 1 ? 'equipamento' : 'equipamentos'}
+              </span>
+              <span>
+                Custo de compra <span className="num font-semibold text-slate-900">{formatCurrency(totEquip.custo)}</span>
+              </span>
+              <span>
+                Valor atual (depreciado) <span className="num font-semibold text-slate-900">{formatCurrency(totEquip.atual)}</span>
+              </span>
+              {totEquip.semValor > 0 && <span className="text-amber-800">{totEquip.semValor} sem valor de compra</span>}
+            </>
+          )}
+        </p>
+      )}
+
+      {exportando && (
+        <ExportarInventario
+          equipamentosDaTela={filteredAssets}
+          tipoInicial={softwares ? 'softwares' : acessorios ? 'acessorios' : 'equipamentos'}
+          onFechar={() => setExportando(false)}
+        />
+      )}
 
       {acessorios ? (
         <EstoqueAcessorios busca={searchTerm} mostrarInativos={mostrarDesativados} novoAberto={novoAcessorio} onFecharNovo={() => setNovoAcessorio(false)} />

@@ -13,6 +13,7 @@ import { ROTULO_STATUS_PEDIDO, SELO_STATUS_PEDIDO, esperaPorMim, proximoPasso, v
 import { normalizar } from '../../utils/processos.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
+import { ATALHOS_PASSADO, dentroDoPeriodo, usePeriodo } from '../ui/FiltroPeriodo.tsx';
 import { FormPedido, pedidoVazio } from './FormPedido.tsx';
 
 type Filtro = 'andamento' | 'aguardando' | 'cotacao' | 'meus' | 'encerrados' | 'todos';
@@ -27,9 +28,13 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
   const [filtro, setFiltro] = useState<Filtro>('andamento');
   const [busca, setBusca] = useState('');
   const [novo, setNovo] = useState<PedidoCompra | null>(null);
+  // Período: pela data do pedido (padrão) ou da aprovação final
+  const { periodo, seletor } = usePeriodo('todos', ['todos', ...ATALHOS_PASSADO]);
+  const [dataBase, setDataBase] = useState<'pedido' | 'aprovacao'>('pedido');
 
   const termo = normalizar(busca.trim());
   const lista = pedidos
+    .filter((p) => dentroDoPeriodo(dataBase === 'pedido' ? p.criadoEm : p.aprovadoEm, periodo))
     .filter((p) =>
       filtro === 'meus'
         ? esperaPorMim(p, currentRole, currentUser?.id)
@@ -45,8 +50,8 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
     baixarCsv(
       'pedidos-de-compra.csv',
       paraCsv(
-        ['Código', 'Pedido', 'Situação', 'Categoria', 'Área', 'Pedido por', 'Criado em', ...(isTI ? ['Valor (R$)'] : [])],
-        lista.map((p) => [p.codigo, p.titulo, ROTULO_STATUS_PEDIDO[p.status], ROTULO_CATEGORIA[p.categoria], p.area, nome(p.solicitanteId, p.solicitanteNome), p.criadoEm.slice(0, 10), ...(isTI ? [valorDoPedido(p)] : [])])
+        ['Código', 'Pedido', 'Situação', 'Categoria', 'Área', 'Pedido por', 'Criado em', 'Aprovado em', ...(isTI ? ['Valor (R$)'] : [])],
+        lista.map((p) => [p.codigo, p.titulo, ROTULO_STATUS_PEDIDO[p.status], ROTULO_CATEGORIA[p.categoria], p.area, nome(p.solicitanteId, p.solicitanteNome), p.criadoEm.slice(0, 10), p.aprovadoEm?.slice(0, 10) || '', ...(isTI ? [valorDoPedido(p)] : [])])
       )
     );
 
@@ -83,6 +88,13 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
               <option value="encerrados">Recebidos e cancelados</option>
               <option value="todos">Todos</option>
             </select>
+            {seletor}
+            {periodo && (
+              <select aria-label="Data usada no período" value={dataBase} onChange={(e) => setDataBase(e.target.value as typeof dataBase)} className="campo campo-sm">
+                <option value="pedido">pela data do pedido</option>
+                <option value="aprovacao">pela data da aprovação</option>
+              </select>
+            )}
             {isTI && (
               <span className="ml-auto texto-aux">
                 Total na lista: <span className="num font-semibold text-slate-900">{brl(totalLista)}</span>
