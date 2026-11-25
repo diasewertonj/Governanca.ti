@@ -12,7 +12,7 @@ import { useCompras } from '../../context/ComprasContext.tsx';
 import { useOrcamentoAtual } from '../gestao/useGestao.ts';
 import { esperaPorMim } from '../../utils/compras.ts';
 import type { Fatura } from '../../types/index.ts';
-import { diasAte, formatDate } from '../../utils/formatters.ts';
+import { diasAte, formatDate, isoLocal } from '../../utils/formatters.ts';
 import { ATALHOS_FUTURO, dentroDoPeriodo, usePeriodo } from '../ui/FiltroPeriodo.tsx';
 import { statusExibido } from '../../utils/faturas.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
@@ -226,6 +226,10 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
   const [status, setStatus] = useState<'abertas' | 'vencidas' | 'pagas' | 'todas'>('abertas');
   const [fornecedorId, setFornecedorId] = useState('');
   const [mes, setMes] = useState('');
+  const [janelaVenc, setJanelaVenc] = useState<'ate_mes' | 'prox_mes' | 'todos'>('ate_mes');
+  const hojeData = new Date();
+  const fimMesAtual = isoLocal(new Date(hojeData.getFullYear(), hojeData.getMonth() + 1, 0));
+  const fimProxMes = isoLocal(new Date(hojeData.getFullYear(), hojeData.getMonth() + 2, 0));
   const [busca, setBusca] = useState('');
   // Decisão 1: Compras paga todas as faturas e vê só o resumo de contratos e licenças
   const [resumo, setResumo] = useState<{ contratos: ContratoResumo[]; licencas: { id: string; nome: string; fornecedorId?: string }[] }>({ contratos: [], licencas: [] });
@@ -274,6 +278,9 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
     })
     .filter((f) => !fornecedorId || fornecedorDe(f) === fornecedorId)
     .filter((f) => !mes || f.competencia.startsWith(mes))
+    // Seção 27: as automáticas nascem 30 dias antes; por padrão a lista mostra só o que vence até o fim
+    // deste mês (as vencidas de meses anteriores continuam aparecendo)
+    .filter((f) => (janelaVenc === 'ate_mes' ? f.vencimento <= fimMesAtual : janelaVenc === 'prox_mes' ? f.vencimento > fimMesAtual && f.vencimento <= fimProxMes : true))
     // Seção 21: a busca acha origem, fornecedor e nº do documento
     .filter(
       (f) =>
@@ -324,6 +331,11 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
               <option value="vencidas">Só vencidas</option>
               <option value="pagas">Pagas</option>
               <option value="todas">Todas</option>
+            </select>
+            <select value={janelaVenc} onChange={(e) => setJanelaVenc(e.target.value as typeof janelaVenc)} aria-label="Vencimento" className="campo campo-sm">
+              <option value="ate_mes">Vence até o fim deste mês</option>
+              <option value="prox_mes">Vence no próximo mês</option>
+              <option value="todos">Qualquer vencimento</option>
             </select>
             <select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} aria-label="Fornecedor" className="campo campo-sm">
               <option value="">Todos os fornecedores</option>
