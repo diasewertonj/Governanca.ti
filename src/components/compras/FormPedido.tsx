@@ -479,11 +479,18 @@ export const ProdutoDoItem: React.FC<PropsProduto> = ({ pedido: p, item: i, n, s
           Opções de compra ({opcoes.length}){!simples && opcoes.length > 0 ? ' · recomendar uma é opcional' : ''}
         </p>
         {opcoes.map((c, k) => (
-          <div key={c.id} className={`grid grid-cols-1 gap-2 rounded-md border bg-white p-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_9rem_auto] ${c.vencedora ? 'border-emerald-300' : 'border-slate-200'}`}>
+          // Seção 21: a loja/fornecedor tem largura mínima (o nome não fica cortado)
+          <div key={c.id} className={`grid grid-cols-1 gap-2 rounded-md border bg-white p-2 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1.4fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_9rem_auto] ${c.vencedora ? 'border-emerald-300' : 'border-slate-200'}`}>
             {simples ? (
               <input aria-label={`Loja da opção ${k + 1}`} value={c.loja || ''} onChange={(e) => mudarOp(c.id, { loja: e.target.value })} placeholder="Loja" className="campo campo-sm" />
             ) : (
-              <select aria-label={`Fornecedor da opção ${k + 1}`} value={c.fornecedorId} onChange={(e) => mudarOp(c.id, { fornecedorId: e.target.value })} className="campo campo-sm">
+              <select
+                aria-label={`Fornecedor da opção ${k + 1}`}
+                title={fornecedores.find((f) => f.id === c.fornecedorId)?.nome || c.loja || undefined}
+                value={c.fornecedorId}
+                onChange={(e) => mudarOp(c.id, { fornecedorId: e.target.value })}
+                className="campo campo-sm"
+              >
                 <option value="">{c.loja ? `Loja: ${c.loja}` : 'Loja / fornecedor…'}</option>
                 {fornecedores.filter((f) => f.ativo || f.id === c.fornecedorId).map((f) => (
                   <option key={f.id} value={f.id}>

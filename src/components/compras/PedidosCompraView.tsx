@@ -4,7 +4,7 @@
  * (menu Pessoas / Minha área), pedem compra e acompanham a situação, sem valores.
  */
 import React, { useState } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { ChevronRight, Download, Plus } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { PedidoCompra, StatusPedido } from '../../types/index.ts';
@@ -13,21 +13,19 @@ import { ROTULO_STATUS_PEDIDO, SELO_STATUS_PEDIDO, esperaPorMim, proximoPasso, v
 import { normalizar } from '../../utils/processos.ts';
 import { formatDate } from '../../utils/formatters.ts';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
-import { FichaPedido } from './FichaPedido.tsx';
 import { FormPedido, pedidoVazio } from './FormPedido.tsx';
 
 type Filtro = 'andamento' | 'aguardando' | 'cotacao' | 'meus' | 'encerrados' | 'todos';
 const EM_ANDAMENTO: StatusPedido[] = ['rascunho', 'em_cotacao', 'aguardando', 'aprovado', 'comprado', 'recusado'];
 
 export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
-  const { currentRole, employees, currentUser } = useApp();
+  const { currentRole, employees, currentUser, abrirFicha } = useApp();
   const { pedidos, podePedirCompra, equipeCompras } = useCompras();
   // T.I. e Compras veem valores e usam o formulário completo
   const isTI = equipeCompras;
   const ehCompras = currentRole === 'compras';
   const [filtro, setFiltro] = useState<Filtro>('andamento');
   const [busca, setBusca] = useState('');
-  const [aberto, setAberto] = useState<string | null>(null);
   const [novo, setNovo] = useState<PedidoCompra | null>(null);
 
   const termo = normalizar(busca.trim());
@@ -94,7 +92,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
         }
       />
       {lista.length === 0 ? (
-        <Vazio acao={podePedirCompra ? <button type="button" onClick={() => setNovo(pedidoVazio({ colaboradorDestinoId: currentUser?.id }))} className="btn btn-sm btn-primario"><Plus /> {isTI && !ehCompras ? 'Novo pedido' : 'Pedir compra'}</button> : undefined}>
+        <Vazio>
           {pedidos.length === 0 ? 'Nenhum pedido de compra ainda.' : 'Nenhum pedido com estes filtros.'}
         </Vazio>
       ) : (
@@ -106,18 +104,34 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
                 <th>Situação</th>
                 <th>Área · quem pediu</th>
                 {isTI && <th className="num">Valor</th>}
-                <th className="num">Ação</th>
+                <th className="col-acoes">
+                  <span className="sr-only">Abrir</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {lista.map((p) => (
-                <tr key={p.id}>
-                  <td data-label="Pedido">
-                    <span className="font-mono text-slate-500">{p.codigo}</span>
-                    <span className="block font-semibold text-slate-900">{p.titulo}</span>
-                    <span className="block text-slate-500">
-                      {p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'} · {formatDate(p.criadoEm.slice(0, 10))}
-                      {p.necessarioEm ? ` · precisa até ${formatDate(p.necessarioEm)}` : ''}
+                // Seção 21: a linha inteira abre a ficha (o botão do título cobre a linha); no máximo 2 linhas de texto
+                <tr key={p.id} className="relative hover:bg-slate-50/70">
+                  <td data-label="Pedido" className="min-w-0">
+                    <span className="block">
+                      <span className="mr-2 font-mono texto-aux">{p.codigo}</span>
+                      <button
+                        type="button"
+                        onClick={() => abrirFicha({ tipo: 'pedido', id: p.id })}
+                        className="text-left font-semibold text-slate-900 after:absolute after:inset-0 after:content-[''] hover:text-blue-700"
+                      >
+                        {p.titulo}
+                      </button>
+                    </span>
+                    <span className="texto-aux block">
+                      <span className="num">{p.itens.length}</span> {p.itens.length === 1 ? 'item' : 'itens'} · <span className="num">{formatDate(p.criadoEm.slice(0, 10))}</span>
+                      {p.necessarioEm && (
+                        <>
+                          {' '}
+                          · precisa até <span className="num">{formatDate(p.necessarioEm)}</span>
+                        </>
+                      )}
                     </span>
                   </td>
                   <td data-label="Situação">
@@ -134,12 +148,8 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
                       {valorDoPedido(p) > 0 ? brl(valorDoPedido(p)) : <span className="texto-aux">A cotar</span>}
                     </td>
                   )}
-                  <td data-label="Ação" className="col-acoes">
-                    <span className="acoes-linha">
-                      <button type="button" onClick={() => setAberto(p.id)} className="btn btn-sm btn-secundario">
-                        Abrir
-                      </button>
-                    </span>
+                  <td className="col-acoes">
+                    <ChevronRight className="ico text-slate-400" aria-hidden="true" />
                   </td>
                 </tr>
               ))}
@@ -147,8 +157,7 @@ export const PedidosCompraView: React.FC<{ abas?: React.ReactNode }> = ({ abas }
           </table>
         </div>
       )}
-      {aberto && <FichaPedido pedidoId={aberto} onClose={() => setAberto(null)} />}
-      {novo && <FormPedido inicial={novo} simples={!isTI} onClose={() => setNovo(null)} onSalvo={(p) => setAberto(p.id)} />}
+      {novo && <FormPedido inicial={novo} simples={!isTI} onClose={() => setNovo(null)} onSalvo={(p) => abrirFicha({ tipo: 'pedido', id: p.id })} />}
     </div>
   );
 };

@@ -627,7 +627,7 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {eventos.map((ev) => (
-                      <li key={ev.id} className="space-y-0.5 py-2 text-sm">
+                      <li key={ev.id} className="space-y-0.5 py-2">
                         <p className="text-slate-900">
                           <span className="font-semibold">{formatDate(ev.em)}</span>
                           {ev.totalDepois != null && (

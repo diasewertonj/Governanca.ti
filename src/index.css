@@ -572,6 +572,14 @@
     background-color: var(--cor-superficie);
     color: var(--cor-texto-aux);
   }
+  /* Linha clicável: o botão .abre-linha cobre a linha; os outros botões e links ficam por cima */
+  tr.linha-clicavel {
+    position: relative;
+    cursor: pointer;
+  }
+  .linha-clicavel :is(button, a):not(.abre-linha) {
+    position: relative;
+  }
   /* Bloco de resumo sem nenhum dado preenchido não aparece */
   .resumo-bloco:not(:has(dd)) {
     display: none;

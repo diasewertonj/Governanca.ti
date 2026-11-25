@@ -84,12 +84,15 @@ export const LinhasLista: React.FC<{
       {erro && <p className="erro" role="alert">{erro}</p>}
 
       {lista.length === 0 ? (
+        // Seção 21: com o botão "Nova linha" no cabeçalho da tela, o vazio só explica
         <Vazio
-          titulo="Nenhuma linha cadastrada"
+          titulo={busca ? 'Nenhuma linha encontrada' : 'Nenhuma linha cadastrada'}
           acao={
-            <button type="button" onClick={() => setEditando('nova')} className="btn btn-sm btn-primario">
-              Nova linha
-            </button>
+            controlada ? undefined : (
+              <button type="button" onClick={() => setEditando('nova')} className="btn btn-sm btn-primario">
+                Nova linha
+              </button>
+            )
           }
         />
       ) : (
@@ -112,33 +115,57 @@ export const LinhasLista: React.FC<{
                 const pessoa = employees.find((e) => e.id === l.colaboradorId);
                 return (
                   <React.Fragment key={l.id}>
-                    <tr className={l.status === 'cancelada' ? 'opacity-60' : ''}>
+                    <tr className={`linha-clicavel ${l.status === 'cancelada' ? 'opacity-60' : ''}`}>
                       <td data-label="Número" className="font-mono font-semibold text-slate-900">
-                        {l.numero}
+                        {/* Seção 21: a linha inteira abre a linha para editar (não há ficha própria de linha) */}
+                        <button type="button" onClick={() => setEditando(l)} className="abre-linha text-left after:absolute after:inset-0 after:content-['']">
+                          {l.numero}
+                        </button>
                         {(l.plano || l.franquia) && <span className="block font-sans font-normal text-slate-500">{[l.plano, l.franquia].filter(Boolean).join(' · ')}</span>}
                       </td>
                       <td data-label="Pessoa">
                         {pessoa ? (
-                          <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: pessoa.id })} className="text-blue-700 hover:underline">
+                          <button type="button" onClick={() => abrirFicha({ tipo: 'colaborador', id: pessoa.id })} className="link text-left">
                             {pessoa.nome}
                           </button>
                         ) : (
-                          <span className="text-slate-500">Em estoque</span>
+                          <span className="texto-aux">Em estoque</span>
                         )}
                         {pessoa?.status === 'desligado' && <span className="block text-red-700">Pessoa desligada</span>}
                       </td>
                       <td data-label="Aparelho" className="hidden xl:table-cell">
                         {aparelho ? (
-                          <button type="button" onClick={() => abrirFicha({ tipo: 'ativo', id: aparelho.id })} className="text-blue-700 hover:underline">
+                          <button
+                            type="button"
+                            onClick={() => abrirFicha({ tipo: 'ativo', id: aparelho.id })}
+                            title={aparelho.nome}
+                            className="link font-mono"
+                          >
                             {aparelho.tag}
                           </button>
                         ) : (
-                          '-'
+                          <span className="texto-aux">—</span>
                         )}
                       </td>
                       {!contratoId && (
                         <td data-label="Contrato">
-                          {contrato ? nomeContrato(contrato) : l.valorMensal ? `Avulsa · ${formatCurrency(l.valorMensal)}/mês` : '-'}
+                          {/* Seção 21: só o código do contrato, com link para a ficha (o nome completo fica no título) */}
+                          {contrato ? (
+                            <button
+                              type="button"
+                              onClick={() => abrirFicha({ tipo: 'contrato', id: contrato.id })}
+                              title={nomeContrato(contrato)}
+                              className={`link text-left ${contrato.numero ? 'font-mono' : 'block max-w-48 truncate'}`}
+                            >
+                              {contrato.numero || contrato.descricao}
+                            </button>
+                          ) : l.valorMensal ? (
+                            <span className="texto-aux">
+                              Avulsa · <span className="num">{formatCurrency(l.valorMensal)}</span>/mês
+                            </span>
+                          ) : (
+                            <span className="texto-aux">—</span>
+                          )}
                         </td>
                       )}
                       <td data-label="Situação">

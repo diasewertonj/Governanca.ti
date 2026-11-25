@@ -154,7 +154,7 @@ export const ComprasView: React.FC<{
   return (
     <div className="space-y-4">
       <CabecalhoTela
-        titulo="Custos recorrentes"
+        titulo="Custos do período"
         subtitulo={`Compras de equipamento de ${formatDate(periodo.de)} a ${formatDate(periodo.ate)}, pela data de aquisição · valor da ficha fiscal, sem lançamento novo`}
         acoes={
           <>

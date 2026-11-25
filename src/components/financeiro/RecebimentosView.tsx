@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Download, HandCoins, Plus, XCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import type { Recebimento, StatusRecebimento, TipoRecebimento } from '../../types/index.ts';
+import type { FichaAberta } from '../../utils/fichas.ts';
 import { listarRecebimentos, salvarRecebimento } from '../../services/financeiroDb.ts';
 import { formatDate, isoLocal } from '../../utils/formatters.ts';
 import { baixarCsv, brl, paraCsv } from '../../utils/financeiro.ts';
@@ -61,7 +62,7 @@ export function useRecebimentos() {
 }
 
 export const RecebimentosView: React.FC = () => {
-  const { currentRole, fornecedores, employees, assets, departments } = useApp();
+  const { currentRole, fornecedores, employees, assets, departments, abrirFicha } = useApp();
   const { lista, salvar } = useRecebimentos();
   const [status, setStatus] = useState<'' | StatusRecebimento>('previsto');
   const [tipo, setTipo] = useState<'' | TipoRecebimento>('');
@@ -83,6 +84,18 @@ export const RecebimentosView: React.FC = () => {
     ]
       .filter(Boolean)
       .join(' · ');
+  // Seção 21: o que está ligado ao recebimento abre a ficha (equipamento, pessoa, fornecedor)
+  const linksDe = (r: Recebimento): { ficha: FichaAberta; texto: string }[] => {
+    const out: { ficha: FichaAberta; texto: string }[] = [];
+    const a = r.ativoId ? assets.find((x) => x.id === r.ativoId) : undefined;
+    if (a) out.push({ ficha: { tipo: 'ativo', id: a.id }, texto: a.tag });
+    const p = r.colaboradorId ? employees.find((x) => x.id === r.colaboradorId) : undefined;
+    if (p) out.push({ ficha: { tipo: 'colaborador', id: p.id }, texto: p.nome });
+    const f = r.fornecedorId ? fornecedores.find((x) => x.id === r.fornecedorId) : undefined;
+    if (f) out.push({ ficha: { tipo: 'fornecedor', id: f.id }, texto: f.nome });
+    return out;
+  };
+  const temFiltro = !!(status || tipo);
 
   const cancelar = async (r: Recebimento) => {
     const ok = await confirmar({
@@ -147,16 +160,31 @@ export const RecebimentosView: React.FC = () => {
           {erro}
         </p>
       )}
-      {filtrada.length === 0 ? (
+      {lista.length === 0 ? (
+        <Vazio
+          titulo="Nenhum recebimento registrado"
+          acao={
+            isTI ? (
+              <button type="button" onClick={() => setNovo(true)} className="btn btn-sm btn-primario">
+                <Plus /> Novo recebimento
+              </button>
+            ) : undefined
+          }
+        >
+          Venda de equipamento baixado, ressarcimento, crédito de fornecedor ou devolução de compra aparecem aqui.
+        </Vazio>
+      ) : filtrada.length === 0 ? (
         <Vazio
           titulo="Nenhum recebimento"
           acao={
-            <button type="button" onClick={() => { setStatus(''); setTipo(''); }} className="btn btn-sm btn-secundario">
-              Limpar filtros
-            </button>
+            temFiltro ? (
+              <button type="button" onClick={() => { setStatus(''); setTipo(''); }} className="btn btn-sm btn-secundario">
+                Limpar filtros
+              </button>
+            ) : undefined
           }
         >
-          Nenhum recebimento com estes filtros.
+          {status === 'previsto' && !tipo ? 'Nada a receber agora.' : 'Nenhum recebimento com estes filtros.'}
         </Vazio>
       ) : (
         <div className="cartao-tabela">
@@ -178,7 +206,16 @@ export const RecebimentosView: React.FC = () => {
                     <span className="font-semibold text-slate-900">{r.descricao}</span>
                     <span className="block text-slate-500">{ROTULO_TIPO_RECEBIMENTO[r.tipo]}</span>
                   </td>
-                  <td data-label="Ligado a">{ligadoA(r) || '—'}</td>
+                  <td data-label="Ligado a">
+                    {linksDe(r).length === 0
+                      ? '—'
+                      : linksDe(r).map((l, i) => (
+                          <React.Fragment key={l.ficha.tipo}>
+                            {i > 0 && ' · '}
+                            <button type="button" onClick={() => abrirFicha(l.ficha)} className="link">{l.texto}</button>
+                          </React.Fragment>
+                        ))}
+                  </td>
                   <td data-label="Valor" className="num">
                     {brl(r.valor)}
                     {r.valorRecebido != null && r.valorRecebido !== r.valor && <span className="block text-slate-500">recebido {brl(r.valorRecebido)}</span>}
@@ -221,6 +258,16 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
   const [valor, setValor] = useState<number | undefined>();
   const [previstoPara, setPrevistoPara] = useState('');
   const [ativoId, setAtivoId] = useState('');
+  const [buscaAtivo, setBuscaAtivo] = useState('');
+  // Seção 21 (escala): filtro de texto; baixados primeiro (é a venda de equipamento baixado); o escolhido nunca some da lista
+  const ativosFiltrados = useMemo(() => {
+    const t = buscaAtivo.trim().toLowerCase();
+    return assets
+      // Venda: só equipamento baixado; ressarcimento: qualquer equipamento (ex.: danificado ou perdido)
+      .filter((a) => a.id === ativoId || tipo !== 'venda_ativo' || a.status === 'descartado')
+      .filter((a) => a.id === ativoId || !t || `${a.tag} ${a.nome}`.toLowerCase().includes(t))
+      .sort((a, b) => Number(b.status === 'descartado') - Number(a.status === 'descartado') || a.tag.localeCompare(b.tag));
+  }, [assets, buscaAtivo, ativoId, tipo]);
   const [colaboradorId, setColaboradorId] = useState('');
   const [fornecedorId, setFornecedorId] = useState('');
   const [departamentoId, setDepartamentoId] = useState('');
@@ -239,9 +286,11 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
       descricao: descricao.trim(),
       valor,
       previstoPara: previstoPara || undefined,
-      ativoId: ativoId || undefined,
-      colaboradorId: colaboradorId || undefined,
-      fornecedorId: fornecedorId || undefined,
+      // Só a venda de equipamento liga o recebimento a um equipamento
+      // Venda do equipamento baixado ou ressarcimento por equipamento danificado/perdido
+      ativoId: tipo === 'venda_ativo' || tipo === 'ressarcimento' ? ativoId || undefined : undefined,
+      colaboradorId: tipo === 'ressarcimento' ? colaboradorId || undefined : undefined,
+      fornecedorId: tipo === 'reembolso_fornecedor' || tipo === 'devolucao_compra' || tipo === 'outro' ? fornecedorId || undefined : undefined,
       departamentoId: departamentoId || undefined,
       observacoes: observacoes.trim() || undefined,
     });
@@ -285,12 +334,20 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
           <input id={`${id}-prev`} type="date" value={previstoPara} onChange={(e) => setPrevistoPara(e.target.value)} className={CLASSE_CAMPO} />
         </div>
         {(tipo === 'venda_ativo' || tipo === 'ressarcimento') && (
-          <div>
-            <label htmlFor={`${id}-ativo`} className={CLASSE_ROTULO}>Equipamento</label>
+          <div className="sm:col-span-2 space-y-1">
+            <label htmlFor={`${id}-ativo`} className={CLASSE_ROTULO}>{tipo === 'venda_ativo' ? 'Equipamento vendido' : 'Equipamento'}</label>
+            <input
+              type="search"
+              aria-label="Filtrar equipamentos"
+              value={buscaAtivo}
+              onChange={(e) => setBuscaAtivo(e.target.value)}
+              placeholder="Filtrar por patrimônio ou nome…"
+              className={CLASSE_CAMPO}
+            />
             <select id={`${id}-ativo`} value={ativoId} onChange={(e) => setAtivoId(e.target.value)} className={CLASSE_CAMPO}>
-              <option value="">—</option>
-              {assets.map((a) => (
-                <option key={a.id} value={a.id}>{a.tag} · {a.nome}</option>
+              <option value="">{ativosFiltrados.length ? 'Escolha o equipamento…' : 'Nenhum equipamento com esse filtro'}</option>
+              {ativosFiltrados.map((a) => (
+                <option key={a.id} value={a.id}>{a.tag} · {a.nome}{a.status === 'descartado' ? ' (baixado)' : ''}</option>
               ))}
             </select>
           </div>

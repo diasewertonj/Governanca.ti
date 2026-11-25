@@ -28,6 +28,8 @@ import {
   Shield,
   Search,
   RefreshCw,
+  ChevronUp,
+  Pencil,
 } from 'lucide-react';
 
 const ROTULO_PAPEL: Record<UserRole, string> = {
@@ -140,6 +142,8 @@ export const SettingsView: React.FC = () => {
   const [telefoneTI, setTelefoneTI] = useState(settings.telefoneTI);
   const [textoTermoEntrega, setTextoTermoEntrega] = useState(settings.textoTermoEntrega);
   const [textoTermoDevolucao, setTextoTermoDevolucao] = useState(settings.textoTermoDevolucao);
+  // Seção 21: o texto legal fica recolhido; o campo grande só aparece ao editar
+  const [textoEditando, setTextoEditando] = useState<string[]>([]);
   // Fase 6: documentos controlados da Qualidade (código, versão, referência ao POP)
   const docEntregaSalvo = settings.docEntrega || DOC_ENTREGA_PADRAO;
   const docDevolucaoSalvo = settings.docDevolucao || DOC_DEVOLUCAO_PADRAO;
@@ -556,8 +560,38 @@ export const SettingsView: React.FC = () => {
                           </div>
                         ))}
                         <div className="md:col-span-3 xl:col-span-4">
-                          <label htmlFor={`doc-${nome}-texto`} className="rotulo">{rotuloTexto}</label>
-                          <textarea id={`doc-${nome}-texto`} rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} className="campo leading-relaxed" />
+                          {textoEditando.includes(nome) ? (
+                            <>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <label htmlFor={`doc-${nome}-texto`} className="rotulo">{rotuloTexto}</label>
+                                <button
+                                  type="button"
+                                  onClick={() => setTextoEditando(textoEditando.filter((x) => x !== nome))}
+                                  aria-controls={`doc-${nome}-texto`}
+                                  aria-expanded="true"
+                                  className="btn btn-sm btn-discreto"
+                                >
+                                  <ChevronUp /> Recolher
+                                </button>
+                              </div>
+                              <textarea id={`doc-${nome}-texto`} rows={10} value={texto} onChange={(e) => setTexto(e.target.value)} className="campo leading-relaxed" />
+                            </>
+                          ) : (
+                            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-slate-100 pt-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="rotulo">{rotuloTexto}</p>
+                                <p className="texto-aux line-clamp-2 whitespace-pre-line">{texto.trim() || 'Sem texto: o termo sai só com os dados do documento.'}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setTextoEditando([...textoEditando, nome])}
+                                aria-expanded="false"
+                                className="btn btn-sm btn-secundario"
+                              >
+                                <Pencil /> Editar texto
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

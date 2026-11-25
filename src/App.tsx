@@ -53,6 +53,9 @@ const Software360Modal = lazy(() => import('./components/assets/Software360Modal
 const SoftwareFormModal = lazy(() => import('./components/assets/SoftwareFormModal.tsx').then((m) => ({ default: m.SoftwareFormModal })));
 const PedidosCompraView = lazy(() => import('./components/compras/PedidosCompraView.tsx').then((m) => ({ default: m.PedidosCompraView })));
 const ConferenciaView = lazy(() => import('./components/compras/ConferenciaView.tsx').then((m) => ({ default: m.ConferenciaView })));
+const ContratoFicha = lazy(() => import('./components/fornecedores/ContratoFicha.tsx').then((m) => ({ default: m.ContratoFicha })));
+const FornecedorFicha = lazy(() => import('./components/fornecedores/FornecedorFicha.tsx').then((m) => ({ default: m.FornecedorFicha })));
+const FichaPedido = lazy(() => import('./components/compras/FichaPedido.tsx').then((m) => ({ default: m.FichaPedido })));
 const TelaProcesso = lazy(() => import('./components/processos/TelaProcesso.tsx').then((m) => ({ default: m.TelaProcesso })));
 
 // Seção 19: enquanto a tela carrega, esqueleto no lugar do conteúdo
@@ -289,6 +292,9 @@ function MainApp() {
             {ficha.tipo === 'colaborador' && <Employee360Modal employeeId={ficha.id} onClose={fechar} />}
             {ficha.tipo === 'chamado' && <TicketDetailModal ticketId={ficha.id} onClose={fechar} />}
             {ficha.tipo === 'software' && <Software360Modal softwareId={ficha.id} onClose={fechar} />}
+            {ficha.tipo === 'contrato' && <ContratoFicha contratoId={ficha.id} onClose={fechar} />}
+            {ficha.tipo === 'fornecedor' && <FornecedorFicha fornecedorId={ficha.id} onClose={fechar} />}
+            {ficha.tipo === 'pedido' && <FichaPedido pedidoId={ficha.id} onClose={fechar} />}
           </div>
         );
       })}

@@ -225,9 +225,18 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
     })
     .filter((f) => !fornecedorId || fornecedorDe(f) === fornecedorId)
     .filter((f) => !mes || f.competencia.startsWith(mes))
-    .filter((f) => !busca || normalizar(`${nomeOrigem(f)} ${f.numeroDocumento || ''}`).includes(normalizar(busca)))
+    // Seção 21: a busca acha origem, fornecedor e nº do documento
+    .filter(
+      (f) =>
+        !busca ||
+        normalizar(`${nomeOrigem(f)} ${fornecedores.find((x) => x.id === fornecedorDe(f))?.nome || ''} ${f.numeroDocumento || ''}`).includes(normalizar(busca))
+    )
     .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
   const total = lista.filter((f) => f.status !== 'cancelada').reduce((s, f) => s + valorEfetivo(f), 0);
+  // Seção 21: o total separa o que já venceu do que ainda vai vencer
+  const somaSituacao = (s: 'vencida' | 'a_pagar') => lista.filter((f) => statusExibido(f, agora) === s).reduce((t, f) => t + valorEfetivo(f), 0);
+  const vencidas = somaSituacao('vencida');
+  const aVencer = somaSituacao('a_pagar');
 
   const exportar = () =>
     baixarCsv(
@@ -260,7 +269,7 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
         abas={abas}
         filtros={
           <>
-            <Busca id="contas-busca" valor={busca} onMudar={setBusca} placeholder="Buscar origem ou documento..." />
+            <Busca id="contas-busca" valor={busca} onMudar={setBusca} placeholder="Buscar origem, fornecedor ou documento..." />
             <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Situação" className="campo campo-sm">
               <option value="abertas">A pagar e vencidas</option>
               <option value="vencidas">Só vencidas</option>
@@ -276,11 +285,17 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
             <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} aria-label="Competência" title="Competência" className="campo campo-sm" />
             <span className="ml-auto texto-aux">
               Total na lista: <span className="num font-semibold text-slate-900">{brl(total)}</span>
+              {vencidas + aVencer > 0 && (
+                <>
+                  {' · '}vencidas <span className={`num font-semibold ${vencidas > 0 ? 'text-red-700' : 'text-slate-900'}`}>{brl(vencidas)}</span>
+                  {' · '}a vencer <span className="num font-semibold text-slate-900">{brl(aVencer)}</span>
+                </>
+              )}
             </span>
           </>
         }
       />
-      <FaturasSecao listaGlobal={lista} nomeOrigem={nomeOrigem} />
+      <FaturasSecao listaGlobal={lista} nomeOrigem={nomeOrigem} fornecedorDe={fornecedorDe} />
     </div>
   );
 };

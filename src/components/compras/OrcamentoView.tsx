@@ -9,7 +9,7 @@ import { Copy, Download, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import type { CategoriaDespesa, Orcamento } from '../../types/index.ts';
-import { ROTULO_CATEGORIA, baixarCsv, brl, paraCsv } from '../../utils/financeiro.ts';
+import { ROTULO_CATEGORIA, baixarCsv, brl, brlOuTraco, paraCsv } from '../../utils/financeiro.ts';
 import {
   MESES_CURTOS,
   copiarOrcamentos,
@@ -24,6 +24,7 @@ import { Janela } from '../ui/Janela.tsx';
 import { CampoMoeda, CampoSugestoes } from '../ui/Campos.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
 import { useRegistrarPendencias } from '../../hooks/usePendencias.ts';
+import { useGestao } from '../gestao/useGestao.ts';
 
 const CATEGORIAS = Object.keys(ROTULO_CATEGORIA) as CategoriaDespesa[];
 const pct = (v?: number) => (v === undefined ? '—' : `${Math.round(v * 100)}%`);
@@ -58,6 +59,8 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
     { previsto: 0, realizado: 0, tendencia: 0, previstoMeses: Array(12).fill(0) as number[], realizadoMeses: Array(12).fill(0) as number[] }
   );
   const usoTotal = total.previsto > 0 ? total.realizado / total.previsto : undefined;
+  const g = useGestao(ano);
+  const projecaoDezembro = g.linhasGestao.filter((l) => !fCategoria || l.categoria === fCategoria).reduce((s, l) => s + l.projecaoDezembro, 0);
   const areas = useMemo(
     () => [...new Set([...departments.map((d) => d.nome), ...orcamentos.map((o) => o.area), ...contratos.map((c) => c.centroCusto || ''), ...licenses.map((l) => l.centroCusto || '')].filter(Boolean))].sort(),
     [departments, orcamentos, contratos, licenses]
@@ -150,18 +153,19 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
           <p className="num text-lg font-semibold text-slate-900">{brl(total.previsto)}</p>
         </div>
         <div className="cartao min-w-0 p-3">
-          <p className="texto-aux">Realizado</p>
+          <p className="texto-aux">Realizado (pago)</p>
           <p className="num text-lg font-semibold text-slate-900">{brl(total.realizado)}</p>
-          <p className={` ${usoTotal !== undefined && usoTotal >= 0.9 ? 'text-red-700 font-semibold' : 'text-slate-500'}`}>{pct(usoTotal)} do previsto</p>
+          <p className={` ${usoTotal !== undefined && usoTotal >= 1 ? 'text-red-700 font-semibold' : usoTotal !== undefined && usoTotal >= 0.9 ? 'text-amber-800 font-semibold' : 'text-slate-500'}`}>{pct(usoTotal)} do previsto</p>
         </div>
         <div className="cartao min-w-0 p-3">
-          <p className="texto-aux">Saldo</p>
+          <p className="texto-aux">Saldo (previsto − realizado)</p>
           <p className={`num text-lg font-semibold ${total.previsto - total.realizado < 0 ? 'text-red-700' : 'text-slate-900'}`}>{brl(total.previsto - total.realizado)}</p>
         </div>
+        {/* Seção 21: o mesmo número e o mesmo nome do Acompanhamento (saiu a "tendência" média × 12) */}
         <div className="cartao min-w-0 p-3">
-          <p className="texto-aux">Tendência até dezembro</p>
-          <p className="num text-lg font-semibold text-slate-900">{ano === anoAtual ? brl(total.tendencia) : '—'}</p>
-          <p className="texto-aux">{ano === anoAtual ? 'no ritmo de gasto atual' : 'só no ano corrente'}</p>
+          <p className="texto-aux">Projeção até dezembro</p>
+          <p className="num text-lg font-semibold text-slate-900">{brl(projecaoDezembro)}</p>
+          <p className="texto-aux">{ano < anoAtual ? 'ano encerrado: igual ao usado' : 'usado + recorrente que falta até 31/12'}</p>
         </div>
       </div>
 
@@ -179,7 +183,6 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
                   <th className="num">Previsto</th>
                   <th className="num">Realizado</th>
                   <th>Uso</th>
-                  <th className="num">Tendência</th>
                   {isAdmin && <th className="col-acoes">Ações</th>}
                 </tr>
               </thead>
@@ -192,7 +195,7 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
                       {!l.orcamentoId && <span className="selo selo-atencao mt-1">Sem orçamento</span>}
                     </td>
                     <td data-label="Previsto" className="num">{l.previsto ? brl(l.previsto) : '—'}</td>
-                    <td data-label="Realizado" className="num">{brl(l.realizado)}</td>
+                    <td data-label="Realizado" className="num">{brlOuTraco(l.realizado)}</td>
                     <td data-label="Uso">
                       <div className="flex min-w-[8rem] items-center gap-2">
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
@@ -200,9 +203,6 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
                         </div>
                         <span className={`font-semibold ${l.pct !== undefined && l.pct >= 1 ? 'text-red-700' : l.pct !== undefined && l.pct >= 0.9 ? 'text-amber-800' : 'text-slate-700'}`}>{pct(l.pct)}</span>
                       </div>
-                    </td>
-                    <td data-label="Tendência" className={`num ${l.tendencia !== undefined && l.previsto > 0 && l.tendencia > l.previsto ? 'text-red-700' : ''}`}>
-                      {l.tendencia !== undefined ? brl(l.tendencia) : '—'}
                     </td>
                     {isAdmin && (
                       <td data-label="Ações" className="col-acoes">
@@ -244,9 +244,9 @@ export const OrcamentoView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) =>
                 return (
                   <tr key={m}>
                     <td data-label="Mês" className="capitalize">{m}/{ano}</td>
-                    <td data-label="Previsto" className="num">{brl(total.previstoMeses[i])}</td>
-                    <td data-label="Realizado" className="num">{brl(total.realizadoMeses[i])}</td>
-                    <td data-label="Diferença" className={`num ${dif < 0 ? 'text-red-700' : ''}`}>{brl(dif)}</td>
+                    <td data-label="Previsto" className="num">{brlOuTraco(total.previstoMeses[i])}</td>
+                    <td data-label="Realizado" className="num">{brlOuTraco(total.realizadoMeses[i])}</td>
+                    <td data-label="Diferença" className={`num ${dif < 0 ? 'text-red-700' : ''}`}>{brlOuTraco(dif)}</td>
                     <td data-label="Acumulado" className="num">{prevAc > 0 ? pct(realAc / prevAc) : '—'}</td>
                   </tr>
                 );
