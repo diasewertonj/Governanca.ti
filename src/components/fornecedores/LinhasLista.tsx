@@ -115,9 +115,12 @@ export const LinhasLista: React.FC<{
                 const pessoa = employees.find((e) => e.id === l.colaboradorId);
                 return (
                   <React.Fragment key={l.id}>
-                    <tr className={l.status === 'cancelada' ? 'opacity-60' : ''}>
+                    <tr className={`linha-clicavel ${l.status === 'cancelada' ? 'opacity-60' : ''}`}>
                       <td data-label="Número" className="font-mono font-semibold text-slate-900">
-                        {l.numero}
+                        {/* Seção 21: a linha inteira abre a linha para editar (não há ficha própria de linha) */}
+                        <button type="button" onClick={() => setEditando(l)} className="abre-linha text-left after:absolute after:inset-0 after:content-['']">
+                          {l.numero}
+                        </button>
                         {(l.plano || l.franquia) && <span className="block font-sans font-normal text-slate-500">{[l.plano, l.franquia].filter(Boolean).join(' · ')}</span>}
                       </td>
                       <td data-label="Pessoa">

@@ -263,9 +263,11 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
   const ativosFiltrados = useMemo(() => {
     const t = buscaAtivo.trim().toLowerCase();
     return assets
+      // Venda: só equipamento baixado; ressarcimento: qualquer equipamento (ex.: danificado ou perdido)
+      .filter((a) => a.id === ativoId || tipo !== 'venda_ativo' || a.status === 'descartado')
       .filter((a) => a.id === ativoId || !t || `${a.tag} ${a.nome}`.toLowerCase().includes(t))
       .sort((a, b) => Number(b.status === 'descartado') - Number(a.status === 'descartado') || a.tag.localeCompare(b.tag));
-  }, [assets, buscaAtivo, ativoId]);
+  }, [assets, buscaAtivo, ativoId, tipo]);
   const [colaboradorId, setColaboradorId] = useState('');
   const [fornecedorId, setFornecedorId] = useState('');
   const [departamentoId, setDepartamentoId] = useState('');
@@ -333,7 +335,7 @@ const FormRecebimento: React.FC<{ departamentos: { id: string; nome: string }[];
         </div>
         {(tipo === 'venda_ativo' || tipo === 'ressarcimento') && (
           <div className="sm:col-span-2 space-y-1">
-            <label htmlFor={`${id}-ativo`} className={CLASSE_ROTULO}>Equipamento vendido</label>
+            <label htmlFor={`${id}-ativo`} className={CLASSE_ROTULO}>{tipo === 'venda_ativo' ? 'Equipamento vendido' : 'Equipamento'}</label>
             <input
               type="search"
               aria-label="Filtrar equipamentos"
