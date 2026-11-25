@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { Asset } from '../../types/index.ts';
 import { Printer, Download, ShieldCheck } from 'lucide-react';
 import { Janela } from '../ui/Janela.tsx';
+import { useApp } from '../../context/AppContext.tsx';
 
 interface QrCodeLabelModalProps {
   asset: Asset;
@@ -11,6 +12,9 @@ interface QrCodeLabelModalProps {
 
 export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClose }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { settings } = useApp();
+  // Nome da empresa das Configurações (antes era fixo "Nexus Corp"/"Nexus Tech")
+  const empresa = settings.nomeFantasia || settings.razaoSocial || 'Empresa';
 
   const assetUrl = `${window.location.origin}/#asset/${asset.id}`;
 
@@ -75,7 +79,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-blue-600" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Nexus Corp · Patrimônio
+                  {empresa} · Patrimônio
                 </span>
               </div>
               <span className="font-mono text-sm font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
@@ -106,7 +110,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
 
             <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
               <span>Inventário TI · Uso Obrigatório</span>
-              <span>Propriedade Nexus Tech</span>
+              <span className="truncate">Propriedade de {empresa}</span>
             </div>
           </div>
 

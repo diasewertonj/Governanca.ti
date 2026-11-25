@@ -65,6 +65,7 @@ import {
   OnboardingData,
   ResponsibilityTerm,
   SoftwareLicense,
+  EventoLicenca,
   AtribuicaoLicenca,
   Ticket,
   TicketAttachment,
@@ -921,10 +922,45 @@ export async function insertLicenseDb(lic: SoftwareLicense) {
 export async function updateLicenseDb(antes: SoftwareLicense, depois: SoftwareLicense) {
   const diff = camposAlterados(linhaLicenca(antes), linhaLicenca(depois));
   delete diff.colaboradores_ids;
+  // O total de assentos só muda por ajustarAssentosLicencaDb (motivo e histórico)
+  delete diff.assentos_totais;
   await atualizar('licencas_software', depois.id, diff);
   if ((antes.chaveContrato || '') !== (depois.chaveContrato || '')) {
     await gravarSegredoLicenca(depois.id, depois.chaveContrato);
   }
+}
+
+/** Ajuste do total de assentos (e, na cobrança própria, do valor): só ti_admin; o banco confere e grava o histórico */
+export async function ajustarAssentosLicencaDb(id: string, total: number, valorMensal: number | undefined, motivo: string) {
+  if (!supabase) return;
+  await checar(
+    supabase.rpc('ajustar_assentos_licenca', {
+      p_licenca: id,
+      p_total: total,
+      p_valor_mensal: valorMensal ?? null,
+      p_motivo: motivo.trim(),
+    })
+  );
+}
+
+/** Histórico de capacidade e valor da licença (T.I. e Compras), mais recente primeiro */
+export async function fetchEventosLicencaDb(licencaId: string): Promise<EventoLicenca[]> {
+  if (!supabase) return [];
+  const data = await checar(
+    supabase.from('licenca_eventos').select('*').eq('licenca_id', licencaId).order('em', { ascending: false }).limit(200)
+  );
+  return (data || []).map((e) => ({
+    id: e.id,
+    licencaId: e.licenca_id,
+    tipo: e.tipo as EventoLicenca['tipo'],
+    totalAntes: e.total_antes ?? undefined,
+    totalDepois: e.total_depois ?? undefined,
+    valorAntes: e.valor_antes == null ? undefined : Number(e.valor_antes),
+    valorDepois: e.valor_depois == null ? undefined : Number(e.valor_depois),
+    motivo: e.motivo,
+    por: e.por ?? undefined,
+    em: e.em,
+  }));
 }
 
 export async function deleteLicenseDb(id: string) {
@@ -1039,7 +1075,7 @@ export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
   const [contratosRes, { data: itensData }] = await Promise.all([
     // A função do banco entrega o pagamento só ao administrador (suporte recebe nulo)
     supabase.rpc('contratos_visiveis' as never) as unknown as PromiseLike<{ data: Tables<'contratos'>[] | null; error: { code?: string; message: string } | null }>,
-    supabase.from('contrato_itens').select('contrato_id, ativo_id, licenca_id'),
+    supabase.from('contrato_itens').select('contrato_id, ativo_id, licenca_id, quantidade_contratada'),
   ]);
   let { data, error } = contratosRes;
   if (error && /contratos_visiveis|PGRST202/i.test(`${error.code} ${error.message}`)) {
@@ -1049,7 +1085,11 @@ export async function fetchContratosFromDb(): Promise<Contrato[] | null> {
   if (error) return erroDeLeitura(error);
   const itensPorContrato: Record<string, ItemContrato[]> = {};
   (itensData || []).forEach((i) => {
-    const item: ItemContrato | null = i.ativo_id ? { ativoId: i.ativo_id } : i.licenca_id ? { licencaId: i.licenca_id } : null;
+    const item: ItemContrato | null = i.ativo_id
+      ? { ativoId: i.ativo_id }
+      : i.licenca_id
+        ? { licencaId: i.licenca_id, ...(i.quantidade_contratada != null ? { quantidadeContratada: i.quantidade_contratada } : {}) }
+        : null;
     if (item) (itensPorContrato[i.contrato_id] ||= []).push(item);
   });
   return (data || []).map((l) => ({
@@ -1110,7 +1150,12 @@ async function salvarContratoDb(c: Contrato) {
   await checar(
     supabase.rpc('salvar_contrato', {
       p_contrato: json(linhaContrato(c)),
-      p_itens: json(c.itens.map((i) => ({ ativo_id: i.ativoId || null, licenca_id: i.licencaId || null }))),
+      p_itens: json(c.itens.map((i) => ({
+        ativo_id: i.ativoId || null,
+        licenca_id: i.licencaId || null,
+        // Só o administrador grava a quantidade contratada (o banco ignora a do suporte)
+        ...(i.licencaId ? { quantidade_contratada: i.quantidadeContratada ?? null } : {}),
+      }))),
     })
   );
 }

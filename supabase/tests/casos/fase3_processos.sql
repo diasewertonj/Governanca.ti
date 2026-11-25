@@ -43,7 +43,8 @@ select harness.rodar('fase3', 'O1 colaborador conclui offboarding', 'bloqueado',
   $q$select public.concluir_offboarding('tkt-off1')$q$);
 select harness.rodar('fase3', 'O2 suporte conclui offboarding: devolve, libera, desliga, resolve', 'ok', :'sup', 'authenticated',
   $q$do $x$ declare r jsonb; begin
-    update public.licencas_software set colaboradores_ids = '["emp-colab","emp-outro"]', assentos_totais = 5 where id = 'lic-1';
+    perform harness.assentos('lic-1', 5);
+    update public.licencas_software set colaboradores_ids = '["emp-colab","emp-outro"]' where id = 'lic-1';
     r := public.concluir_offboarding('tkt-off1');
     if (r->>'ativosDevolvidos')::int <> 1 or (r->>'licencasLiberadas')::int <> 1 then raise exception 'resumo %', r; end if;
     perform harness.espera($s$select 1 from public.ativos where id = 'ast-1' and custodiante_id is null and status = 'disponivel'$s$, 1);
