@@ -11,7 +11,11 @@ import { DOC_DEVOLUCAO_PADRAO, DOC_ENTREGA_PADRAO } from '../../utils/processos.
 import { situacaoTermo, type TomSituacao } from '../../utils/termos.ts';
 import { pendenciaTermo, resumoPendenciaTermo, termoVigente } from '../../utils/inventario.ts';
 import { historicoAssentos } from '../../utils/licencas.ts';
-import { FileText, FilePlus, Pencil, KeyRound, CheckCircle2, AlertCircle, Copy, ShieldOff } from 'lucide-react';
+import { FileText, FilePlus, Pencil, KeyRound, CheckCircle2, AlertCircle, Copy, ShieldOff, FileSpreadsheet, Printer } from 'lucide-react';
+import { custoPorPessoa } from '../../utils/analises.ts';
+import { brl } from '../../utils/financeiro.ts';
+import { ROTULO_PAPEL } from '../../utils/conversa.ts';
+import { baixarExcelColaborador, imprimirRelatorioColaborador, type DadosRelatorioColaborador } from './relatorioColaborador.ts';
 import { avisar, confirmar } from '../ui/dialogo.tsx';
 import { Janela, DadoLinha } from '../ui/Janela.tsx';
 import { CartaoItem, iconeDoAcessorio, iconeDoAtivo } from '../comum/ItemPatrimonio.tsx';
@@ -23,7 +27,21 @@ interface Employee360ModalProps {
   onClose: () => void;
 }
 
-type AbaPessoa = 'resumo' | 'equipamentos' | 'softwares' | 'termos' | 'chamados';
+// Seção 24: 3 abas (eram 5): a visão geral mostra quase tudo; o detalhe e os termos ficam juntos
+type AbaPessoa = 'visao' | 'inventario' | 'chamados';
+
+/** Tempo de casa a partir da admissão (ex.: "2 anos e 3 meses") */
+function tempoDeCasa(admissao?: string, agora = new Date()): string | null {
+  if (!admissao) return null;
+  const d = new Date(`${admissao.slice(0, 10)}T00:00:00`);
+  let meses = (agora.getFullYear() - d.getFullYear()) * 12 + (agora.getMonth() - d.getMonth()) - (agora.getDate() < d.getDate() ? 1 : 0);
+  if (meses < 0) return null;
+  const anos = Math.floor(meses / 12);
+  meses %= 12;
+  const a = anos ? `${anos} ano${anos > 1 ? 's' : ''}` : '';
+  const m = meses ? `${meses} ${meses > 1 ? 'meses' : 'mês'}` : '';
+  return [a, m].filter(Boolean).join(' e ') || 'menos de 1 mês';
+}
 
 const SITUACAO: Record<EmployeeStatus, { rotulo: string; selo: string }> = {
   ativo: { rotulo: 'Ativo', selo: 'selo-ok' },
@@ -70,10 +88,11 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     settings,
     atribuicoesLicenca,
     fornecedores,
+    contratos,
   } = useApp();
   const { linhas, atribuicoesLinha, movimentos, estoque } = useRecursos();
 
-  const [aba, setAba] = useState<AbaPessoa>('resumo');
+  const [aba, setAba] = useState<AbaPessoa>('visao');
   const [termSuccess, setTermSuccess] = useState<string | null>(null);
   const [conferencia, setConferencia] = useState<ItemTermo[] | null>(null);
   const [conferenciaDev, setConferenciaDev] = useState<ItemTermo[] | null>(null);
@@ -195,7 +214,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
   const pendencia = isTIFicha ? pendenciaTermo(employee, { ativos: assets, termos: terms, chamados: tickets, cfg: settings.termoExige }) : null;
   const abrirReciboDevolucao = () => {
     if (!pendencia?.devolvidos.length) return;
-    setAba('termos');
+    setAba('inventario');
     setConferencia(null);
     setConferenciaDev(
       pendencia.devolvidos.map((d) => {
@@ -221,7 +240,7 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
       void avisar('O colaborador não possui equipamentos vinculados para gerar o termo.');
       return;
     }
-    setAba('termos');
+    setAba('inventario');
     setConferenciaDev(null);
     setConferencia(
       currentAssets.map((a) => ({
@@ -291,11 +310,131 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
     manager && podeAbrirFicha(currentRole, 'colaborador', { meuId: currentUser?.id, colaboradorId: manager.id });
   const podeAbrirSoftware = podeAbrirFicha(currentRole, 'software');
 
+  // Seção 24: estrutura (departamento, responsável, gestor e equipe), custo e relatório
+  const responsavelDep = department?.responsavelId ? employees.find((e) => e.id === department.responsavelId) : undefined;
+  const equipe = employees.filter((e) => e.gestorId === employee.id && e.status !== 'desligado').sort((a, b) => a.nome.localeCompare(b.nome));
+  const podeAbrirPessoa = (id: string) => podeAbrirFicha(currentRole, 'colaborador', { meuId: currentUser?.id, colaboradorId: id });
+  const nomePessoa = (id: string, nome: string) =>
+    podeAbrirPessoa(id) ? (
+      <button key={id} type="button" onClick={() => setSelectedEmployeeIdFor360(id)} className="link text-left">
+        {nome}
+      </button>
+    ) : (
+      <span key={id}>{nome}</span>
+    );
+  const casa = tempoDeCasa(employee.dataAdmissao);
+  // Custo da pessoa: só o admin (mesmo cálculo de Análises › Custo por pessoa; equipamento pelo valor de compra)
+  const verCusto = currentRole === 'ti_admin';
+  const custo = verCusto ? custoPorPessoa([employee], { ativos: assets, licencas: licenses, linhas, contratos })[0] : undefined;
+  const mensalDaLicenca = new Map((custo?.licencas || []).map((l) => [l.licenca.id, l.mensal]));
+  const podeRelatorio = (isTIFicha || currentRole === 'rh') && !anonimizado;
+  const montarRelatorio = (): DadosRelatorioColaborador => {
+    const ativosHoje = currentAssets.filter((a) => a.status !== 'descartado');
+    return {
+      empresa: settings.nomeFantasia || settings.razaoSocial,
+      nome: employee.nome,
+      subtitulo: [employee.cargo, department?.nome, situacao.rotulo].filter(Boolean).join(' · '),
+      dados: [
+        ['Matrícula', employee.matricula || '—'],
+        ['E-mail', employee.email],
+        ['Telefone / ramal', employee.telefone || '—'],
+        ['Admissão', employee.dataAdmissao ? `${formatDate(employee.dataAdmissao)}${casa ? ` (${casa})` : ''}` : '—'],
+        ['Departamento', department ? `${department.nome}${responsavelDep ? ` · responsável ${responsavelDep.nome}` : ''}` : '—'],
+        ['Gestor imediato', manager?.nome || 'Diretoria / sem gestor'],
+        ['Equipe que lidera', equipe.length ? equipe.map((e) => e.nome).join(', ') : '—'],
+        ['Perfil de acesso', employee.role ? ROTULO_PAPEL[employee.role] : '—'],
+        ...(custo
+          ? ([
+              ['Equipamentos (valor de compra)', brl(custo.valorEquipamentos)],
+              ['Licenças e linha por mês', `${brl(custo.mensalTotal)} (${brl(custo.mensalTotal * 12)} por ano)`],
+            ] as [string, string][])
+          : []),
+      ],
+      secoes: [
+        {
+          titulo: 'Equipamentos com a pessoa',
+          rotuloData: 'Desde',
+          rotuloValor: 'Valor de compra',
+          vazio: 'Nenhum equipamento com a pessoa.',
+          linhas: ativosHoje.map((a) => ({
+            item: `${a.tag} · ${a.nome}`,
+            detalhe: [[a.marca, a.modelo].filter(Boolean).join(' '), a.serialNumber && `S/N ${a.serialNumber}`].filter(Boolean).join(' · '),
+            data: a.dataEntregaAtual,
+            valor: verCusto ? a.fiscal?.valorCompra || 0 : undefined,
+          })),
+        },
+        ...(isTIFicha
+          ? [
+              {
+                titulo: 'Acessórios com a pessoa',
+                rotuloData: 'Recebeu em',
+                vazio: 'Nenhum acessório com a pessoa.',
+                linhas: acessoriosComPessoa.map((a) => {
+                  const item = estoque.find((i) => i.id === a.itemId);
+                  return { item: item?.nome || 'Acessório', detalhe: `${a.qtd} un.`, data: a.ultimo ? a.ultimo.slice(0, 10) : undefined };
+                }),
+              },
+            ]
+          : []),
+        {
+          titulo: 'Licenças de software',
+          rotuloValor: 'Por mês',
+          vazio: 'Nenhuma licença.',
+          linhas: assignedLicenses.map((l) => ({
+            item: l.nome,
+            detalhe: fornecedores.find((f) => f.id === l.fornecedorId)?.nome || l.fornecedor || undefined,
+            valor: verCusto ? Math.round((mensalDaLicenca.get(l.id) || 0) * 100) / 100 : undefined,
+          })),
+        },
+        ...(isTIFicha
+          ? [
+              {
+                titulo: 'Linhas telefônicas',
+                rotuloValor: 'Por mês',
+                vazio: 'Nenhuma linha.',
+                linhas: minhasLinhas.map((l) => ({ item: l.numero, detalhe: l.plano || undefined, valor: verCusto ? l.valorMensal || 0 : undefined })),
+              },
+            ]
+          : []),
+        {
+          titulo: 'Termos',
+          rotuloData: 'Emissão',
+          vazio: 'Nenhum termo emitido.',
+          linhas: employeeTerms.map((t) => ({
+            item: `${t.codigo} · ${t.tipo === 'entrega' ? 'entrega' : 'devolução'}`,
+            detalhe: situacaoTermo(t, false, terms.find((x) => x.id === t.substituidoPor)?.codigo).rotulo,
+            data: t.dataEmissao?.slice(0, 10),
+          })),
+        },
+        {
+          titulo: 'Equipamentos já devolvidos',
+          rotuloData: 'Devolvido em',
+          vazio: 'Nenhuma devolução.',
+          linhas: returnedHistory.map(({ asset, entry }) => ({
+            item: `${asset.tag} · ${asset.nome}`,
+            detalhe: [`desde ${formatDate(entry.dataEntrega)}`, entry.motivoDevolucao].filter(Boolean).join(' · '),
+            data: entry.dataDevolucao?.slice(0, 10),
+          })),
+        },
+        {
+          titulo: 'Chamados e processos em aberto',
+          rotuloData: 'Aberto em',
+          vazio: 'Nenhum em aberto.',
+          linhas: chamados
+            .filter((t) => t.status !== 'resolvido' && t.status !== 'cancelado')
+            .map((t) => ({ item: `${t.codigo} · ${t.titulo}`, detalhe: ROTULO_PROCESSO[t.tipo] || t.categoria, data: t.dataCriacao?.slice(0, 10) })),
+        },
+      ],
+    };
+  };
+
   const abas: ItemAba<AbaPessoa>[] = [
-    { id: 'resumo', rotulo: 'Resumo' },
-    { id: 'equipamentos', rotulo: 'Equipamentos e acessórios', contador: currentAssets.length },
-    { id: 'softwares', rotulo: 'Softwares e linhas', contador: assignedLicenses.length + (isTIFicha ? minhasLinhas.length : 0) },
-    { id: 'termos', rotulo: 'Termos', contador: employeeTerms.length },
+    { id: 'visao', rotulo: 'Visão geral' },
+    {
+      id: 'inventario',
+      rotulo: 'Inventário e termos',
+      contador: currentAssets.length + assignedLicenses.length + (isTIFicha ? minhasLinhas.length + acessoriosComPessoa.length : 0),
+    },
     { id: 'chamados', rotulo: 'Chamados e processos', contador: chamados.length },
   ];
   const painel = (id: AbaPessoa) => (aba === id ? 'space-y-4' : 'hidden');
@@ -351,6 +490,20 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </>
         }
         onFechar={onClose}
+        acaoTopo={
+          podeRelatorio && (
+            <>
+              <button type="button" title="Relatório do colaborador em PDF (imprimir ou salvar)" aria-label="Relatório em PDF" onClick={() => imprimirRelatorioColaborador(montarRelatorio())} className="btn btn-sm btn-secundario">
+                <Printer aria-hidden="true" />
+                <Rotulo texto="Relatório" />
+              </button>
+              <button type="button" title="Relatório do colaborador em Excel" aria-label="Relatório em Excel" onClick={() => baixarExcelColaborador(montarRelatorio())} className="btn btn-sm btn-secundario">
+                <FileSpreadsheet aria-hidden="true" />
+                <Rotulo texto="Excel" />
+              </button>
+            </>
+          )
+        }
         acoes={
           <>
             {/* Editar dados: T.I. e RH (o banco confere o que cada perfil pode mudar) */}
@@ -397,23 +550,47 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
         )}
 
         {/* ---------------- Resumo ---------------- */}
-        <div role="tabpanel" aria-label="Resumo" className={painel('resumo')}>
+        <div role="tabpanel" aria-label="Visão geral" className={painel('visao')}>
           {avisoTermo}
-          {/* Seção 19: blocos curtos lado a lado (dados da pessoa e acesso / o que ainda está com ela) */}
+          {/* Seção 24: quem é, onde está na estrutura, o que está com a pessoa e quanto custa, numa tela só */}
           <div className="grid items-start gap-4 lg:grid-cols-2">
-          {/* Seção 19: cargo, setor, matrícula e situação já estão no cabeçalho; aqui só o resto, compacto */}
+          {/* Cargo, setor, matrícula e situação já estão no cabeçalho */}
           <section className="cartao space-y-3 p-4">
             <h3 className="secao-titulo">Dados da pessoa</h3>
             <dl className="grid gap-y-1">
               <DadoLinha rotulo="E-mail">
                 <span className="break-all">{employee.email}</span>
               </DadoLinha>
+              <DadoLinha rotulo="Telefone / ramal">{employee.telefone || null}</DadoLinha>
+              <DadoLinha rotulo="Admissão">
+                {employee.dataAdmissao ? (
+                  <>
+                    <span className="num">{formatDate(employee.dataAdmissao)}</span>
+                    {casa && <span className="texto-aux"> · {casa} de casa</span>}
+                  </>
+                ) : null}
+              </DadoLinha>
+              {employee.role && <DadoLinha rotulo="Perfil de acesso">{ROTULO_PAPEL[employee.role]}</DadoLinha>}
+            </dl>
+          </section>
+
+          <section className="cartao space-y-3 p-4">
+            <h3 className="secao-titulo">Estrutura</h3>
+            <dl className="grid gap-y-1">
+              <DadoLinha rotulo="Departamento">
+                {department ? (
+                  <>
+                    {department.nome}
+                    {responsavelDep && responsavelDep.id !== employee.id && <span className="texto-aux"> · responsável </span>}
+                    {responsavelDep && responsavelDep.id !== employee.id && nomePessoa(responsavelDep.id, responsavelDep.nome)}
+                    {responsavelDep?.id === employee.id && <span className="selo selo-info ml-2">Responsável</span>}
+                  </>
+                ) : null}
+              </DadoLinha>
               <DadoLinha rotulo="Gestor imediato">
                 {manager ? (
                   podeAbrirGestor ? (
-                    <button type="button" onClick={() => setSelectedEmployeeIdFor360(manager.id)} className="link text-left">
-                      {manager.nome}
-                    </button>
+                    nomePessoa(manager.id, manager.nome)
                   ) : (
                     manager.nome
                   )
@@ -421,40 +598,102 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
                   <span className="text-slate-600">Diretoria / sem gestor</span>
                 )}
               </DadoLinha>
-              <DadoLinha rotulo="Admissão">{employee.dataAdmissao ? <span className="num">{formatDate(employee.dataAdmissao)}</span> : null}</DadoLinha>
-              <DadoLinha rotulo="Telefone / ramal">{employee.telefone || null}</DadoLinha>
+              <DadoLinha rotulo={`Equipe que lidera${equipe.length ? ` (${equipe.length})` : ''}`}>
+                {equipe.length ? (
+                  <span className="flex flex-wrap gap-x-1">
+                    {equipe.map((e, i) => (
+                      <React.Fragment key={e.id}>
+                        {nomePessoa(e.id, e.nome)}
+                        {i < equipe.length - 1 && <span aria-hidden="true">,</span>}
+                      </React.Fragment>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="text-slate-600">Ninguém</span>
+                )}
+              </DadoLinha>
             </dl>
           </section>
 
-          {/* Revisão 10.5: o RH vê, no desligamento, o que ainda está com a pessoa */}
-          {currentRole === 'rh' &&
-            (employee.status === 'desligado' ||
-              tickets.some(
-                (t) =>
-                  t.tipo === 'offboarding' &&
-                  (t.colaboradorId === employee.id || t.offboarding?.colaboradorId === employee.id) &&
-                  t.status !== 'resolvido' &&
-                  t.status !== 'cancelado'
-              )) && (
-              <section className="cartao space-y-2 p-4">
-                <h3 className="secao-titulo">Ainda com a pessoa</h3>
-                {currentAssets.length === 0 && assignedLicenses.length === 0 ? (
-                  <p className="texto-aux">Nenhum equipamento nem software em nome dela.</p>
+          <section className="cartao space-y-3 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="secao-titulo">Com a pessoa hoje</h3>
+              <button type="button" onClick={() => setAba('inventario')} className="link text-sm">Ver detalhes e termos</button>
+            </div>
+            <dl className="grid gap-y-1">
+              <DadoLinha rotulo={`Equipamentos (${currentAssets.length})`}>
+                {currentAssets.length ? (
+                  <span className="flex flex-wrap gap-x-1">
+                    {currentAssets.map((a, i) => (
+                      <React.Fragment key={a.id}>
+                        <button type="button" onClick={() => handleOpenAsset(a.id)} className="link text-left">{a.tag} · {a.nome}</button>
+                        {i < currentAssets.length - 1 && <span aria-hidden="true">,</span>}
+                      </React.Fragment>
+                    ))}
+                  </span>
                 ) : (
-                  <ul className="space-y-1 text-slate-700">
-                    {currentAssets.map((a) => (
-                      <li key={a.id}>
-                        <span className="font-mono">{a.tag}</span> · {a.nome}
-                      </li>
-                    ))}
-                    {assignedLicenses.map((l) => (
-                      <li key={l.id}>Software: {l.nome}</li>
-                    ))}
-                  </ul>
+                  <span className="text-slate-600">Nenhum</span>
                 )}
-                <p className="ajuda">A T.I. devolve e desvincula tudo pelo checklist do desligamento.</p>
-              </section>
+              </DadoLinha>
+              {isTIFicha && (
+                <DadoLinha rotulo={`Acessórios (${acessoriosComPessoa.reduce((s, a) => s + a.qtd, 0)})`}>
+                  {acessoriosComPessoa.length ? (
+                    acessoriosComPessoa.map((a) => `${estoque.find((i) => i.id === a.itemId)?.nome || 'Acessório'}${a.qtd > 1 ? ` × ${a.qtd}` : ''}`).join(', ')
+                  ) : (
+                    <span className="text-slate-600">Nenhum</span>
+                  )}
+                </DadoLinha>
+              )}
+              <DadoLinha rotulo={`Licenças (${assignedLicenses.length})`}>
+                {assignedLicenses.length ? (
+                  <span className="flex flex-wrap gap-x-1">
+                    {assignedLicenses.map((l, i) => (
+                      <React.Fragment key={l.id}>
+                        {podeAbrirSoftware ? (
+                          <button type="button" onClick={() => setSelectedSoftwareIdFor360(l.id)} className="link text-left">{l.nome}</button>
+                        ) : (
+                          <span>{l.nome}</span>
+                        )}
+                        {i < assignedLicenses.length - 1 && <span aria-hidden="true">,</span>}
+                      </React.Fragment>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="text-slate-600">Nenhuma</span>
+                )}
+              </DadoLinha>
+              {isTIFicha && (
+                <DadoLinha rotulo={`Linhas (${minhasLinhas.length})`}>
+                  {minhasLinhas.length ? <span className="font-mono">{minhasLinhas.map((l) => l.numero).join(', ')}</span> : <span className="text-slate-600">Nenhuma</span>}
+                </DadoLinha>
+              )}
+            </dl>
+            {/* Revisão 10.5: no desligamento, o RH vê aqui o que ainda está com a pessoa */}
+            {currentRole === 'rh' && employee.status === 'desligado' && (currentAssets.length > 0 || assignedLicenses.length > 0) && (
+              <p className="ajuda">A T.I. devolve e desvincula tudo pelo checklist do desligamento.</p>
             )}
+          </section>
+
+          {custo && (
+            <section className="cartao space-y-3 p-4">
+              <h3 className="secao-titulo">Custo da pessoa</h3>
+              <dl className="grid gap-y-1">
+                <DadoLinha rotulo="Equipamentos">
+                  <span className="num">{brl(custo.valorEquipamentos)}</span> <span className="texto-aux">valor de compra</span>
+                </DadoLinha>
+                <DadoLinha rotulo="Licenças">
+                  <span className="num">{brl(custo.mensalLicencas)}</span> <span className="texto-aux">por mês (assento)</span>
+                </DadoLinha>
+                <DadoLinha rotulo="Linha">
+                  <span className="num">{brl(custo.mensalLinhas)}</span> <span className="texto-aux">por mês</span>
+                </DadoLinha>
+                <DadoLinha rotulo="Total recorrente">
+                  <span className="num font-semibold">{brl(custo.mensalTotal)}/mês</span> <span className="texto-aux">· {brl(custo.mensalTotal * 12)} por ano</span>
+                </DadoLinha>
+              </dl>
+              <p className="ajuda">Mesmo cálculo de Gestão de T.I. › Análises › Custo por pessoa.</p>
+            </section>
+          )}
 
           {/* Fase 7: acesso ao Nexus (senha provisória fora do onboarding) */}
           {isTIFicha && (
@@ -520,8 +759,34 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
           </div>
         </div>
 
-        {/* ---------------- Equipamentos e acessórios ---------------- */}
-        <div role="tabpanel" aria-label="Equipamentos e acessórios" className={painel('equipamentos')}>
+        {/* ---------------- Inventário e termos (seção 24: equipamentos, acessórios, softwares, linhas e termos juntos) ---------------- */}
+        <div role="tabpanel" aria-label="Inventário e termos" className={painel('inventario')}>
+          {!conferencia && !conferenciaDev && avisoTermo}
+          {conferencia && (
+            <section className="cartao p-4">
+              <ConferenciaTermo
+                tipo="entrega"
+                linhasIniciais={conferencia}
+                nomePessoa={employee.nome.split(' ')[0]}
+                termoAnterior={vigente}
+                gravando={gerandoTermo}
+                onConfirmar={(itens, motivo) => handleGenerateTerm(itens, motivo, 'entrega')}
+                onVoltar={() => setConferencia(null)}
+              />
+            </section>
+          )}
+          {conferenciaDev && (
+            <section className="cartao p-4">
+              <ConferenciaTermo
+                tipo="devolucao"
+                linhasIniciais={conferenciaDev}
+                nomePessoa={employee.nome.split(' ')[0]}
+                gravando={gerandoTermo}
+                onConfirmar={(itens) => handleGenerateTerm(itens, '', 'devolucao')}
+                onVoltar={() => setConferenciaDev(null)}
+              />
+            </section>
+          )}
           <section className="space-y-2">
             <h3 className="secao-titulo">Equipamentos com a pessoa ({currentAssets.length})</h3>
             {currentAssets.length === 0 ? (
@@ -644,10 +909,6 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               )}
             </section>
           )}
-        </div>
-
-        {/* ---------------- Softwares e linhas ---------------- */}
-        <div role="tabpanel" aria-label="Softwares e linhas" className={painel('softwares')}>
           <section className="space-y-2">
             <h3 className="secao-titulo">Licenças de software e contas ({assignedLicenses.length})</h3>
             {assignedLicenses.length === 0 ? (
@@ -760,37 +1021,6 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               )}
             </section>
           )}
-        </div>
-
-        {/* ---------------- Termos ---------------- */}
-        <div role="tabpanel" aria-label="Termos" className={painel('termos')}>
-          {!conferencia && !conferenciaDev && avisoTermo}
-          {conferencia && (
-            <section className="cartao p-4">
-              <ConferenciaTermo
-                tipo="entrega"
-                linhasIniciais={conferencia}
-                nomePessoa={employee.nome.split(' ')[0]}
-                termoAnterior={vigente}
-                gravando={gerandoTermo}
-                onConfirmar={(itens, motivo) => handleGenerateTerm(itens, motivo, 'entrega')}
-                onVoltar={() => setConferencia(null)}
-              />
-            </section>
-          )}
-          {conferenciaDev && (
-            <section className="cartao p-4">
-              <ConferenciaTermo
-                tipo="devolucao"
-                linhasIniciais={conferenciaDev}
-                nomePessoa={employee.nome.split(' ')[0]}
-                gravando={gerandoTermo}
-                onConfirmar={(itens) => handleGenerateTerm(itens, '', 'devolucao')}
-                onVoltar={() => setConferenciaDev(null)}
-              />
-            </section>
-          )}
-
           <section className="space-y-2">
             <h3 className="secao-titulo">Termos de responsabilidade e devolução ({employeeTerms.length})</h3>
             {employeeTerms.length === 0 ? (
