@@ -116,7 +116,8 @@ export const Carregando: React.FC<{ linhas?: number; formato?: 'tabela' | 'carto
 );
 
 /** Seção 22: aparência (automático, claro, escuro), salva no navegador */
-export const SeletorTema: React.FC = () => {
+/** cheio: ocupa a largura toda, opções do mesmo tamanho (ex.: menu da conta) */
+export const SeletorTema: React.FC<{ cheio?: boolean }> = ({ cheio }) => {
   const [t, setT] = useState<Tema>(lerTema);
   const opcoes: { id: Tema; rotulo: string; icone: React.ReactNode }[] = [
     { id: 'auto', rotulo: 'Automático', icone: <Monitor aria-hidden="true" /> },
@@ -124,7 +125,7 @@ export const SeletorTema: React.FC = () => {
     { id: 'escuro', rotulo: 'Escuro', icone: <Moon aria-hidden="true" /> },
   ];
   return (
-    <div role="radiogroup" aria-label="Aparência" className="abas">
+    <div role="radiogroup" aria-label="Aparência" className={`abas ${cheio ? 'flex w-full' : ''}`}>
       {opcoes.map((o) => (
         <button
           key={o.id}
@@ -135,7 +136,7 @@ export const SeletorTema: React.FC = () => {
             setT(o.id);
             salvarTema(o.id);
           }}
-          className="aba"
+          className={`aba ${cheio ? 'flex-1 justify-center px-2' : ''}`}
           title={o.id === 'auto' ? 'Segue o tema do computador ou celular' : undefined}
         >
           {o.icone}
@@ -147,19 +148,19 @@ export const SeletorTema: React.FC = () => {
 };
 
 /** Densidade das tabelas (confortável / compacta), salva no navegador */
-export const SeletorDensidade: React.FC = () => {
+export const SeletorDensidade: React.FC<{ cheio?: boolean }> = ({ cheio }) => {
   const [d, setD] = useState<Densidade>(lerDensidade);
   const mudar = (nova: Densidade) => {
     setD(nova);
     salvarDensidade(nova);
   };
   return (
-    <div role="radiogroup" aria-label="Densidade das tabelas" className="abas">
-      <button type="button" role="radio" aria-checked={d === 'confortavel'} onClick={() => mudar('confortavel')} className="aba">
+    <div role="radiogroup" aria-label="Densidade das tabelas" className={`abas ${cheio ? 'flex w-full' : ''}`}>
+      <button type="button" role="radio" aria-checked={d === 'confortavel'} onClick={() => mudar('confortavel')} className={`aba ${cheio ? 'flex-1 justify-center px-2' : ''}`}>
         <Rows3 aria-hidden="true" />
         Confortável
       </button>
-      <button type="button" role="radio" aria-checked={d === 'compacta'} onClick={() => mudar('compacta')} className="aba">
+      <button type="button" role="radio" aria-checked={d === 'compacta'} onClick={() => mudar('compacta')} className={`aba ${cheio ? 'flex-1 justify-center px-2' : ''}`}>
         <Rows4 aria-hidden="true" />
         Compacta
       </button>

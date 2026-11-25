@@ -434,6 +434,11 @@
   .abas {
     @apply inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-lg p-1;
     background-color: var(--cor-superficie-realce);
+    /* rola com o dedo/roda do mouse, sem mostrar a barra de rolagem */
+    scrollbar-width: none;
+  }
+  .abas::-webkit-scrollbar {
+    display: none;
   }
   .aba {
     @apply inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 whitespace-nowrap transition-colors;
@@ -661,9 +666,8 @@
     background-color: var(--cor-superficie-suave);
   }
   .janela-faixa .abas {
-    /* a linha da aba ativa encosta na borda de baixo sem criar barra de rolagem */
-    overflow-y: hidden;
-    @apply gap-4 rounded-none bg-transparent p-0;
+    /* Fichas: as abas quebram para a linha de baixo quando não cabem (nada escondido, sem barra de rolagem) */
+    @apply flex-wrap gap-x-4 gap-y-0 overflow-visible rounded-none bg-transparent p-0;
   }
   .janela-faixa .aba {
     @apply -mb-px rounded-none border-b-2 border-transparent px-1 py-2;
@@ -764,6 +768,17 @@
 /* Janela aberta: a página de trás não rola (inclusive no iPhone) */
 body:has(.modal-tela) {
   overflow: hidden;
+}
+
+/* Título da janela nunca vira "Note…": quebra a linha (vence o `truncate` dos títulos das fichas) */
+.janela-titulo .truncate {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+.janela-titulo > span.flex {
+  flex-wrap: wrap;
 }
 
 /* Fase 7: em telas de toque, área mínima de 40px para botões e campos */

@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
         </button>
 
         {showSwitchMenu && (
-          <div role="menu" className="cartao absolute right-0 z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] py-2 shadow-lg">
+          <div role="menu" className="cartao absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-1.5rem)] py-2 shadow-lg">
             <div className="border-b border-slate-100 px-4 py-2">
               <p className="truncate font-semibold text-slate-900">{currentUser?.nome || supabaseUser?.nome}</p>
               <p className="texto-aux truncate">{currentUser?.email || supabaseUser?.email}</p>
@@ -136,9 +136,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
             {/* Seção 19: densidade das tabelas, escolha de cada pessoa (fica neste navegador) */}
             <div className="space-y-1 border-b border-slate-100 px-4 py-2">
               <p className="texto-aux">Tabelas</p>
-              <SeletorDensidade />
+              <SeletorDensidade cheio />
               <p className="texto-aux pt-1">Aparência</p>
-              <SeletorTema />
+              <SeletorTema cheio />
             </div>
             <div className="space-y-1 px-1 pt-1">
               {isTI && onNavigate && (

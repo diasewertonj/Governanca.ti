@@ -51,7 +51,8 @@ export const Janela: React.FC<{
     <div className={`janela-fundo modal-tela ${nav.topo ? '' : 'hidden'}`}>
       <div role="dialog" aria-modal="true" aria-labelledby={idTitulo} className={`janela janela-${tamanho}`}>
         <div className="janela-cabecalho">
-          <div className="flex min-w-[12rem] flex-1 items-center gap-3">
+          {/* Título com espaço garantido: em tela estreita as ações descem para a linha de baixo */}
+          <div className="flex min-w-[min(100%,22rem)] flex-1 items-center gap-3">
             {temAnterior && <BotaoVoltar onClick={onFechar} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
             {avatar ? (
               <span className="avatar avatar-lg" aria-hidden="true">
@@ -68,18 +69,17 @@ export const Janela: React.FC<{
               {subtitulo && <p className="texto-aux truncate">{subtitulo}</p>}
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
-            {acoes}
-            {temAnterior ? (
-              <button type="button" aria-label="Fechar tudo" title="Fechar tudo" onClick={() => void nav.fecharTudo?.()} className="btn-icone">
-                <X className="ico-lg" />
-              </button>
-            ) : (
-              <button type="button" aria-label="Fechar" onClick={onFechar} className="btn-icone">
-                <X className="ico-lg" />
-              </button>
-            )}
-          </div>
+          {/* Fechar sempre no canto de cima; em tela estreita as ações ganham linha própria embaixo */}
+          {temAnterior ? (
+            <button type="button" aria-label="Fechar tudo" title="Fechar tudo" onClick={() => void nav.fecharTudo?.()} className="btn-icone order-2 self-start lg:order-3 lg:self-center">
+              <X className="ico-lg" />
+            </button>
+          ) : (
+            <button type="button" aria-label="Fechar" onClick={onFechar} className="btn-icone order-2 self-start lg:order-3 lg:self-center">
+              <X className="ico-lg" />
+            </button>
+          )}
+          {acoes && <div className="order-3 flex w-full flex-wrap items-center gap-2 lg:order-2 lg:ml-auto lg:w-auto lg:justify-end">{acoes}</div>}
         </div>
         {/* Seção 19: abas da ficha sublinhadas, coladas ao cabeçalho (sem faixa cinza à parte) */}
         {faixa && <div className="janela-faixa">{faixa}</div>}
