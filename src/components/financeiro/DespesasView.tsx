@@ -35,50 +35,7 @@ import {
 import { ComprasView } from './ComprasView.tsx';
 import { Abas } from '../ui/Abas.tsx';
 import { CabecalhoTela, Vazio } from '../ui/Tela.tsx';
-
-type Atalho = 'este_mes' | 'mes_anterior' | 'ult3' | 'ult6' | 'ult12' | 'este_ano' | 'ano_anterior' | 'personalizado';
-const ROTULO_ATALHO: Record<Atalho, string> = {
-  este_mes: 'Este mês',
-  mes_anterior: 'Mês anterior',
-  ult3: 'Últimos 3 meses',
-  ult6: 'Últimos 6 meses',
-  ult12: 'Últimos 12 meses',
-  este_ano: 'Este ano',
-  ano_anterior: 'Ano anterior',
-  personalizado: 'De / até (escolher)',
-};
-
-/** Competências (1º dia) do mês de `de` até o mês de `ate` */
-function mesesEntre(de: string, ate: string): string[] {
-  const out: string[] = [];
-  const [a1, m1] = de.split('-').map(Number);
-  const [a2, m2] = ate.split('-').map(Number);
-  for (let d = new Date(a1, m1 - 1, 1); d <= new Date(a2, m2 - 1, 1); d.setMonth(d.getMonth() + 1)) out.push(isoLocal(d));
-  return out;
-}
-
-function periodoDoAtalho(a: Atalho, hoje = new Date()): { de: string; ate: string } {
-  const y = hoje.getFullYear();
-  const m = hoje.getMonth();
-  const ini = (yy: number, mm: number) => isoLocal(new Date(yy, mm, 1));
-  const fim = (yy: number, mm: number) => isoLocal(new Date(yy, mm + 1, 0));
-  switch (a) {
-    case 'mes_anterior':
-      return { de: ini(y, m - 1), ate: fim(y, m - 1) };
-    case 'ult3':
-      return { de: ini(y, m - 2), ate: fim(y, m) };
-    case 'ult6':
-      return { de: ini(y, m - 5), ate: fim(y, m) };
-    case 'ult12':
-      return { de: ini(y, m - 11), ate: fim(y, m) };
-    case 'este_ano':
-      return { de: ini(y, 0), ate: fim(y, 11) };
-    case 'ano_anterior':
-      return { de: ini(y - 1, 0), ate: fim(y - 1, 11) };
-    default:
-      return { de: ini(y, m), ate: fim(y, m) };
-  }
-}
+import { ATALHOS_PASSADO, mesesEntre, periodoDoAtalho, usePeriodo } from '../ui/FiltroPeriodo.tsx';
 
 /** Período anterior de mesmo tamanho (em meses) */
 function periodoAnterior(de: string, ate: string) {
@@ -104,14 +61,9 @@ interface Origem {
  */
 export const FinanceiroView: React.FC = () => {
   const [aba, setAba] = useState<'despesas' | 'compras'>('despesas');
-  // Período em comum entre Despesas e Compras
-  const [atalho, setAtalho] = useState<Atalho>('ult6');
-  const [deManual, setDeManual] = useState('');
-  const [ateManual, setAteManual] = useState('');
-  const periodo =
-    atalho === 'personalizado' && deManual && ateManual && deManual <= ateManual
-      ? { de: deManual, ate: ateManual }
-      : periodoDoAtalho(atalho === 'personalizado' ? 'este_mes' : atalho);
+  // Período em comum entre Despesas e Compras (seletor comum; aqui sempre há período)
+  const { periodo: p, seletor: filtroPeriodo } = usePeriodo('ult6', ATALHOS_PASSADO);
+  const periodo = p || periodoDoAtalho('este_mes')!;
 
   const abas = (
     <Abas
@@ -123,21 +75,6 @@ export const FinanceiroView: React.FC = () => {
         { id: 'compras' as const, rotulo: 'Compras de equipamento' },
       ]}
     />
-  );
-  const filtroPeriodo = (
-    <>
-      <select aria-label="Período" value={atalho} onChange={(e) => setAtalho(e.target.value as Atalho)} className="campo campo-sm">
-        {Object.entries(ROTULO_ATALHO).map(([k, v]) => (
-          <option key={k} value={k}>{v}</option>
-        ))}
-      </select>
-      {atalho === 'personalizado' && (
-        <>
-          <input aria-label="De" title="De" type="date" value={deManual} onChange={(e) => setDeManual(e.target.value)} className="campo campo-sm" />
-          <input aria-label="Até" title="Até" type="date" value={ateManual} min={deManual || undefined} onChange={(e) => setAteManual(e.target.value)} className="campo campo-sm" />
-        </>
-      )}
-    </>
   );
   if (aba === 'compras') return <ComprasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;
   return <DespesasView abas={abas} periodo={periodo} filtroPeriodo={filtroPeriodo} />;

@@ -582,6 +582,15 @@ export function paraExcel(aba: string, cabecalho: string[], linhas: (string | nu
   );
 }
 
+/** Planilha com várias abas (uma por tipo de item) */
+export function paraExcelAbas(abas: { nome: string; cabecalho: string[]; linhas: (string | number | undefined)[][] }[]): string {
+  const uma = abas.map((a) => paraExcel(a.nome, a.cabecalho, a.linhas).match(/<Worksheet[\s\S]*<\/Worksheet>/)?.[0] || '').join('');
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n' +
+    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${uma}</Workbook>`
+  );
+}
+
 export function baixarExcel(nome: string, conteudo: string) {
   const blob = new Blob([conteudo], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const url = URL.createObjectURL(blob);

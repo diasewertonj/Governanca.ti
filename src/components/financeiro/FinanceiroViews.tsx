@@ -11,7 +11,8 @@ import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
 import { esperaPorMim } from '../../utils/compras.ts';
 import type { Fatura } from '../../types/index.ts';
-import { formatDate } from '../../utils/formatters.ts';
+import { diasAte, formatDate } from '../../utils/formatters.ts';
+import { ATALHOS_FUTURO, dentroDoPeriodo, usePeriodo } from '../ui/FiltroPeriodo.tsx';
 import { statusExibido } from '../../utils/faturas.ts';
 import { nomeContrato } from '../../utils/contratos.ts';
 import { normalizar } from '../../utils/processos.ts';
@@ -38,7 +39,11 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
   const { currentRole, currentUser } = useApp();
   const pedidos = useMemo(() => todosPedidos.filter((p) => esperaPorMim(p, currentRole, currentUser?.id)), [todosPedidos, currentRole, currentUser?.id]);
   const [pedidoAberto, setPedidoAberto] = useState<string | null>(null);
-  const [horizonte, setHorizonte] = useState(60);
+  // "Próximos N dias" ou um mês/ano escolhido (ex.: tudo que renova em março, renovações de 2027)
+  const [janela, setJanela] = useState<'30' | '60' | '90' | '365' | 'periodo'>('60');
+  const { periodo: periodoEscolhido, seletor } = usePeriodo('proximo_mes', ATALHOS_FUTURO);
+  const periodo = janela === 'periodo' ? periodoEscolhido : null;
+  const horizonte = periodo ? Math.max(0, diasAte(periodo.ate)) : Number(janela);
   const [tipo, setTipo] = useState<TipoVencimento | 'todos'>('todos');
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
 
@@ -49,9 +54,19 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
       { ativos: assets, contratos, licencas: licenses, faturas, estoque, linhas, pessoas: employees, processoItens, chamados: tickets, termosDesatualizados, termos: terms, pedidos, alertasOrcamento, papel: currentRole },
       horizonte
     );
-  }, [assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, horizonte, pedidos, alertasOrcamento, currentRole]).filter(
-    (v) => tipo === 'todos' || v.tipo === tipo
-  );
+  }, [assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, horizonte, pedidos, alertasOrcamento, currentRole])
+    .filter((v) => tipo === 'todos' || v.tipo === tipo)
+    // No mês/ano escolhido entra só o que tem data dentro dele (pendências sem data ficam no "próximos dias")
+    .filter((v) => !periodo || dentroDoPeriodo(v.data, periodo));
+
+  const exportar = () =>
+    baixarCsv(
+      periodo ? `vencimentos-${periodo.de}-a-${periodo.ate}.csv` : `vencimentos-proximos-${horizonte}-dias.csv`,
+      paraCsv(
+        ['Quando', 'Tipo', 'O quê', 'Detalhe'],
+        lista.map((v) => [v.data || 'Pendência', ROTULO_VENCIMENTO[v.tipo], v.titulo, v.detalhe || ''])
+      )
+    );
 
   const abrir = (v: Vencimento) => {
     if (v.alvo.tipo === 'processo') setSelectedTicketIdForDetail(v.alvo.id);
@@ -81,13 +96,22 @@ export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) 
                 <option key={k} value={k}>{r}</option>
               ))}
             </select>
-            <select value={horizonte} onChange={(e) => setHorizonte(Number(e.target.value))} aria-label="Período" className="campo campo-sm">
-              <option value={30}>Próximos 30 dias</option>
-              <option value={60}>Próximos 60 dias</option>
-              <option value={90}>Próximos 90 dias</option>
-              <option value={365}>Próximos 12 meses</option>
+            <select value={janela} onChange={(e) => setJanela(e.target.value as typeof janela)} aria-label="Janela" className="campo campo-sm">
+              <option value="30">Próximos 30 dias</option>
+              <option value="60">Próximos 60 dias</option>
+              <option value="90">Próximos 90 dias</option>
+              <option value="365">Próximos 12 meses</option>
+              <option value="periodo">Escolher mês ou ano…</option>
             </select>
+            {janela === 'periodo' && seletor}
           </>
+        }
+        acoes={
+          !noInicio && (
+            <button type="button" onClick={exportar} className="btn btn-secundario">
+              <Download /> Exportar CSV
+            </button>
+          )
         }
       />
       {lista.length === 0 ? (
