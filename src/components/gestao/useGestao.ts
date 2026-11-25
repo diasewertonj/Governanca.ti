@@ -10,7 +10,7 @@ import { useCompras } from '../../context/ComprasContext.tsx';
 import { recorrenteResumo, type RecorrenteResumo } from '../../services/financeiroDb.ts';
 import type { CategoriaDespesa, Orcamento, PedidoCompra } from '../../types/index.ts';
 import { CATEGORIA_DO_TIPO, despesasRecorrentes, type LinhaDespesa } from '../../utils/financeiro.ts';
-import { comprometidoNoOrcamento, valorDoPedido } from '../../utils/compras.ts';
+import { alertasOrcamento, comprometidoNoOrcamento, valorDoPedido, type AlertaOrcamento, type LinhaOrcamento } from '../../utils/compras.ts';
 import {
   type ItemRecorrente,
   LIMITE_CAPITALIZACAO_PADRAO,
@@ -188,4 +188,31 @@ export function useGestao(ano: number, regime: Regime = 'competencia', agora: Da
   const colaboradoresAtivos = useMemo(() => employees.filter((e) => e.status !== 'desligado').length, [employees]);
 
   return { premissas, limite, vida, recorrentes, projecao, lancamentos, linhasGestao, orcamentoDoAno, colaboradoresAtivos, pedidosEmAberto };
+}
+
+/**
+ * Seção 27: orçamento do ano corrente por categoria × área, na MESMA conta do Acompanhamento
+ * (pago + a pagar + comprometido). Alimenta os alertas de 90%/100% e o impacto do pedido.
+ * `realizado` = pago + a pagar (o impacto soma os comprometidos à parte, sem o próprio pedido).
+ */
+export function useOrcamentoAtual(agora: Date = new Date()) {
+  const ano = agora.getFullYear();
+  const { equipeCompras } = useCompras();
+  const g = useGestao(ano, 'competencia', agora);
+  return useMemo(() => {
+    if (!equipeCompras) return { ano, linhas: [] as LinhaOrcamento[], alertas: [] as AlertaOrcamento[] };
+    const chave = (l: { categoria: string; area: string }) => `${l.categoria}|${l.area.trim().toLowerCase()}`;
+    const m = new Map<string, LinhaOrcamento & { comprometido: number }>();
+    g.linhasGestao.forEach((l) => {
+      const k = chave(l);
+      const x = m.get(k) || { chave: k, categoria: l.categoria, area: l.area, previstoMeses: [], realizadoMeses: [], previsto: 0, realizado: 0, comprometido: 0 };
+      x.previsto += l.previsto;
+      x.realizado += l.realizado + l.aPagar;
+      x.comprometido += l.comprometido;
+      m.set(k, x);
+    });
+    const linhas: LinhaOrcamento[] = [...m.values()].map(({ comprometido, ...x }) => ({ ...x, pct: x.previsto > 0 ? (x.realizado + comprometido) / x.previsto : undefined }));
+    const usados = [...m.values()].map(({ comprometido, ...x }) => ({ ...x, realizado: x.realizado + comprometido, pct: x.previsto > 0 ? (x.realizado + comprometido) / x.previsto : undefined }));
+    return { ano, linhas, alertas: alertasOrcamento(usados, ano) };
+  }, [equipeCompras, g.linhasGestao, ano]);
 }

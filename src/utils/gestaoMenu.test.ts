@@ -41,6 +41,8 @@ describe('menu da seção 17 (Financeiro × Gestão de T.I.)', () => {
   const vistas = (papel: Parameters<typeof menuDoPapel>[0], gestor = false) => vistasDoPapel(papel, { gestor });
   it('admin vê painel executivo e relatórios; suporte não', () => {
     expect(vistas('ti_admin')).toEqual(expect.arrayContaining(['financeiro', 'recebimentos', 'despesas', 'painel_executivo', 'orcamento', 'projecao', 'patrimonio', 'relatorios']));
+    // Seção 27: Recebimentos é aba de Contas (não é item próprio do menu)
+    expect(menuDoPapel('ti_admin').flatMap((g) => g.itens.map((i) => i.vista))).not.toContain('recebimentos');
     expect(vistas('ti_suporte')).toEqual(expect.arrayContaining(['financeiro', 'recebimentos', 'despesas', 'orcamento', 'projecao', 'patrimonio']));
     expect(vistas('ti_suporte')).not.toContain('painel_executivo');
     expect(vistas('ti_suporte')).not.toContain('relatorios');

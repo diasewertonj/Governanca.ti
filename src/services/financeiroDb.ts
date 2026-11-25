@@ -88,7 +88,8 @@ const paraRateio = (r: Linha): Rateio => ({
 });
 
 export async function listarRateios(): Promise<Rateio[] | null> {
-  if (!supabase) return null;
+  // Modo demonstração: sem rateios cadastrados (não é falha de carregamento)
+  if (!supabase) return [];
   const d = await ler(bd().from('rateios').select('*'));
   return d ? (d as Linha[]).map(paraRateio) : null;
 }

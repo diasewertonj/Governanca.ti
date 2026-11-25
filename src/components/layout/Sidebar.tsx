@@ -37,7 +37,8 @@ import { itemDoMenu, menuDoPapel, type Contador, type Icone } from '../../utils/
 import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
-import { listarVencimentos, pendenciasConciliacao } from '../../utils/financeiro.ts';
+import { useOrcamentoAtual } from '../gestao/useGestao.ts';
+import { listarVencimentos } from '../../utils/financeiro.ts';
 import { esperaPorMim } from '../../utils/compras.ts';
 import { pendenciasTermo } from '../../utils/inventario.ts';
 
@@ -86,7 +87,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpenNewTicketModal, aberto, onFechar }) => {
   const { currentRole, tickets, currentUser, lembretes, terms, assets, contratos, licenses, faturas, employees, processoItens, settings } = useApp();
   const { estoque, linhas } = useRecursos();
-  const { podePedirCompra, ehGestor, pedidos, alertas: alertasOrcamento } = useCompras();
+  const { podePedirCompra, ehGestor, pedidos } = useCompras();
+  const { alertas: alertasOrcamento } = useOrcamentoAtual();
   // Seção 13: pedidos que esperam uma ação desta pessoa (cotar, aprovar, comprar, receber)
   const pedidosParaMim = useMemo(() => pedidos.filter((p) => esperaPorMim(p, currentRole, currentUser?.id)), [pedidos, currentRole, currentUser?.id]);
   const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
@@ -100,7 +102,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
       30
     ).length;
   }, [isTI, assets, contratos, licenses, faturas, estoque, linhas, employees, processoItens, tickets, terms, settings.termoExige, pedidosParaMim, alertasOrcamento, currentRole]);
-  const qtdConciliar = currentRole === 'ti_admin' ? pendenciasConciliacao(licenses, assets).length : 0;
 
   // Fecha a gaveta com Esc
   useEffect(() => {
@@ -123,7 +124,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
       (t) => t.colaboradorId === currentUser?.id && termoAberto(t) && !t.aceiteColaboradorEm && !termoContestadoAberto(t)
     ).length,
     vencimentos: qtdVencimentos,
-    conciliar: qtdConciliar,
     pedidos: pedidosParaMim.length,
   };
   // Seção 19: contadores por classe (neutro, atenção ou alerta)
@@ -133,7 +133,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     lembretes: 'contador-alerta',
     termos_para_assinar: 'contador-atencao',
     vencimentos: 'contador-atencao',
-    conciliar: 'contador-atencao',
     pedidos: 'contador-atencao',
     processos: '',
   };
@@ -143,7 +142,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onOpe
     lembretes: 'lembretes vencidos ou para hoje',
     termos_para_assinar: 'termos para você assinar',
     vencimentos: 'vencimentos nos próximos 30 dias ou pendências',
-    conciliar: 'cadastros com fornecedor antigo em texto',
     pedidos: 'pedidos de compra esperando por você',
     processos: 'admissões e desligamentos em andamento',
   };

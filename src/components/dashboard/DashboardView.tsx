@@ -9,6 +9,7 @@ import { formatDate, rotuloStatus } from '../../utils/formatters.ts';
 import { DIAS_ALERTA_CONTRATO, garantiaEfetiva, situacaoContrato } from '../../utils/contratos.ts';
 import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts';
 import { listarVencimentos } from '../../utils/financeiro.ts';
+import { licencaAtiva } from '../../utils/licencas.ts';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { VencimentosView } from '../financeiro/FinanceiroViews.tsx';
 import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
@@ -75,8 +76,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
     30
   ).filter((v) => v.tipo === 'contrato' || v.tipo === 'licenca' || v.tipo === 'cancelamento' || v.tipo === 'sem_contrato').length;
   const emManutencao = assets.filter((a) => a.status === 'manutencao').length;
-  const assentosUsados = licenses.reduce((s, l) => s + l.assentosAlocados, 0);
-  const assentosTotais = licenses.reduce((s, l) => s + l.assentosTotais, 0);
+  // Seção 27: só softwares ativos contam (como em Softwares e no Painel executivo)
+  const ativas = licenses.filter(licencaAtiva);
+  const assentosUsados = ativas.reduce((s, l) => s + l.assentosAlocados, 0);
+  const assentosTotais = ativas.reduce((s, l) => s + l.assentosTotais, 0);
 
   const verVencimentos = () => document.getElementById('vencimentos-prazos')?.scrollIntoView({ behavior: 'smooth' });
   const nomeDe = (id: string) => employees.find((e) => e.id === id)?.nome || 'Pessoa';

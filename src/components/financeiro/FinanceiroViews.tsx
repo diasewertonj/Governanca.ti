@@ -9,6 +9,7 @@ import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { useCompras } from '../../context/ComprasContext.tsx';
+import { useOrcamentoAtual } from '../gestao/useGestao.ts';
 import { esperaPorMim } from '../../utils/compras.ts';
 import type { Fatura } from '../../types/index.ts';
 import { diasAte, formatDate } from '../../utils/formatters.ts';
@@ -28,6 +29,8 @@ import {
   valorEfetivo,
 } from '../../utils/financeiro.ts';
 import { FaturasSecao } from './FaturasSecao.tsx';
+import { RecebimentosView } from './RecebimentosView.tsx';
+import { Abas } from '../ui/Abas.tsx';
 
 // -----------------------------------------------------------------------------
 // Vencimentos
@@ -35,7 +38,8 @@ import { FaturasSecao } from './FaturasSecao.tsx';
 export const VencimentosView: React.FC<{ noInicio?: boolean }> = ({ noInicio }) => {
   const { assets, contratos, licenses, faturas, employees, tickets, terms, settings, processoItens, abrirFicha, setSelectedTicketIdForDetail } = useApp();
   const { estoque, linhas } = useRecursos();
-  const { pedidos: todosPedidos, alertas: alertasOrcamento } = useCompras();
+  const { pedidos: todosPedidos } = useCompras();
+  const { alertas: alertasOrcamento } = useOrcamentoAtual();
   const { currentRole, currentUser } = useApp();
   const pedidos = useMemo(() => todosPedidos.filter((p) => esperaPorMim(p, currentRole, currentUser?.id)), [todosPedidos, currentRole, currentUser?.id]);
   const [pedidoAberto, setPedidoAberto] = useState<string | null>(null);
@@ -196,6 +200,25 @@ export const ContratoPorId: React.FC<{ id: string; onClose: () => void }> = ({ i
 };
 
 // -----------------------------------------------------------------------------
+// Seção 27 · Contas: a pagar e a receber num item só do menu
+// -----------------------------------------------------------------------------
+export const ContasView: React.FC<{ abaInicial?: 'pagar' | 'receber' }> = ({ abaInicial = 'pagar' }) => {
+  const [aba, setAba] = useState<'pagar' | 'receber'>(abaInicial);
+  const abas = (
+    <Abas
+      rotulo="Contas"
+      ativa={aba}
+      onMudar={setAba}
+      itens={[
+        { id: 'pagar' as const, rotulo: 'A pagar' },
+        { id: 'receber' as const, rotulo: 'A receber' },
+      ]}
+    />
+  );
+  return aba === 'receber' ? <RecebimentosView abas={abas} /> : <ContasPagarView abas={abas} />;
+};
+
+// -----------------------------------------------------------------------------
 // Contas a pagar
 // -----------------------------------------------------------------------------
 export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) => {
@@ -285,7 +308,7 @@ export const ContasPagarView: React.FC<{ abas?: React.ReactNode }> = ({ abas }) 
   return (
     <div className="space-y-3">
       <CabecalhoTela
-        titulo="Contas a pagar"
+        titulo={abas ? 'Contas' : 'Contas a pagar'}
         subtitulo="Todas as faturas: contratos, licenças, pedidos de compra e contas avulsas"
         acoes={
           <button type="button" onClick={exportar} className="btn btn-secundario">

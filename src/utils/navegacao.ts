@@ -12,10 +12,7 @@ export type Vista =
   | 'linhas'
   | 'fornecedores'
   | 'contratos'
-  | 'vencimentos'
-  | 'contas_pagar'
   | 'despesas'
-  | 'conciliar'
   | 'financeiro'
   | 'collaborators'
   | 'servicedesk'
@@ -44,11 +41,9 @@ export const TITULO_VISTA: Record<Vista, string> = {
   linhas: 'Linhas telefônicas',
   fornecedores: 'Fornecedores',
   contratos: 'Contratos',
-  vencimentos: 'Vencimentos',
-  contas_pagar: 'Contas a pagar',
   despesas: 'Custos do período',
-  conciliar: 'Conciliar fornecedores',
-  financeiro: 'Contas a pagar',
+  // Seção 27: Contas a pagar e Recebimentos num item só, com duas abas
+  financeiro: 'Contas',
   collaborators: 'Colaboradores',
   servicedesk: 'Chamados',
   rh_processes: 'Admissões e desligamentos',
@@ -59,7 +54,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   my_tickets: 'Meus chamados',
   pedidos_compra: 'Pedidos de compra',
   conferencia: 'Inventário físico',
-  recebimentos: 'Recebimentos',
+  recebimentos: 'Contas',
   painel_executivo: 'Painel executivo',
   orcamento: 'Orçamento e projeção',
   projecao: 'Orçamento e projeção',
@@ -68,7 +63,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   custos_area: 'Custos da minha área',
 };
 
-export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'conciliar' | 'processos' | 'pedidos';
+export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'processos' | 'pedidos';
 
 export type Icone =
   | 'inicio'
@@ -147,7 +142,7 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
   if (papel === 'compras') {
     return [
       { itens: [item('pedidos_compra', 'compras', 'pedidos')] },
-      { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('recebimentos', 'recebimentos'), item('fornecedores', 'fornecedores')] },
+      { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('fornecedores', 'fornecedores')] },
       { titulo: 'Acompanhamento', itens: [item('orcamento', 'orcamento'), item('relatorios', 'relatorios')] },
       MINHA_AREA,
     ];
@@ -179,7 +174,7 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
     // Seção 15: pedidos de compra com item próprio (não é mais aba do Financeiro)
     { titulo: 'Compras', itens: [item('pedidos_compra', 'compras', 'pedidos')] },
     // Seção 17: Financeiro (executar e pagar) separado da Gestão de T.I. (planejar e prestar contas)
-    { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('recebimentos', 'recebimentos'), item('despesas', 'despesas')] },
+    { titulo: 'Financeiro', itens: [item('financeiro', 'contas_pagar'), item('despesas', 'despesas')] },
     {
       titulo: 'Gestão de T.I.',
       itens: [
@@ -203,7 +198,7 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
 }
 
 /** Telas que abrem como aba de outro item do menu (seção 23): a tela → o item que fica marcado */
-export const VISTA_NO_MENU: Partial<Record<Vista, Vista>> = { projecao: 'orcamento' };
+export const VISTA_NO_MENU: Partial<Record<Vista, Vista>> = { projecao: 'orcamento', recebimentos: 'financeiro' };
 
 /** Item do menu que fica marcado para a tela atual */
 export const itemDoMenu = (vista: string): string => VISTA_NO_MENU[vista as Vista] || vista;

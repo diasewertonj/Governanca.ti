@@ -26,8 +26,7 @@ const AssetsView = lazy(() => import('./components/assets/AssetsView.tsx').then(
 const LinhasView = lazy(() => import('./components/fornecedores/LinhasView.tsx').then((m) => ({ default: m.LinhasView })));
 const FornecedoresView = lazy(() => import('./components/fornecedores/FornecedoresView.tsx').then((m) => ({ default: m.FornecedoresView })));
 const FinanceiroView = lazy(() => import('./components/financeiro/DespesasView.tsx').then((m) => ({ default: m.FinanceiroView })));
-const ContasPagarView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.ContasPagarView })));
-const RecebimentosView = lazy(() => import('./components/financeiro/RecebimentosView.tsx').then((m) => ({ default: m.RecebimentosView })));
+const ContasView = lazy(() => import('./components/financeiro/FinanceiroViews.tsx').then((m) => ({ default: m.ContasView })));
 const PainelExecutivoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.PainelExecutivoView })));
 const OrcamentoGestaoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.OrcamentoGestaoView })));
 const PatrimonioView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.PatrimonioView })));
@@ -228,8 +227,10 @@ function MainApp() {
           {currentView === 'fornecedores' && <FornecedoresView key="fornecedores" modo="fornecedores" />}
           {currentView === 'contratos' && <FornecedoresView key="contratos" modo="contratos" />}
           {/* Seção 17: Financeiro (executar e pagar) e Gestão de T.I. (planejar e prestar contas) */}
-          {currentView === 'financeiro' && <ContasPagarView />}
-          {currentView === 'recebimentos' && <RecebimentosView />}
+          {/* Seção 27: Contas a pagar e a receber num item só (Recebimentos é a segunda aba) */}
+          {(currentView === 'financeiro' || currentView === 'recebimentos') && (
+            <ContasView key={currentView} abaInicial={currentView === 'recebimentos' ? 'receber' : 'pagar'} />
+          )}
           {currentView === 'despesas' && <FinanceiroView />}
           {currentView === 'painel_executivo' && <PainelExecutivoView onNavigate={navegar} />}
           {/* Seção 23: a projeção abre como aba de Orçamento e projeção */}
