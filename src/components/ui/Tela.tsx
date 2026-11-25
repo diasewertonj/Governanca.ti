@@ -5,8 +5,9 @@
  * e o seletor de densidade das tabelas.
  */
 import React, { useState } from 'react';
-import { Inbox, Rows3, Rows4, Search } from 'lucide-react';
+import { Inbox, Monitor, Moon, Rows3, Rows4, Search, Sun } from 'lucide-react';
 import { lerDensidade, salvarDensidade, type Densidade } from '../../utils/densidade.ts';
+import { lerTema, salvarTema, type Tema } from '../../utils/tema.ts';
 
 export const CabecalhoTela: React.FC<{
   titulo: React.ReactNode;
@@ -113,6 +114,37 @@ export const Carregando: React.FC<{ linhas?: number; formato?: 'tabela' | 'carto
     <span className="sr-only">{rotulo}…</span>
   </div>
 );
+
+/** Seção 22: aparência (automático, claro, escuro), salva no navegador */
+export const SeletorTema: React.FC = () => {
+  const [t, setT] = useState<Tema>(lerTema);
+  const opcoes: { id: Tema; rotulo: string; icone: React.ReactNode }[] = [
+    { id: 'auto', rotulo: 'Automático', icone: <Monitor aria-hidden="true" /> },
+    { id: 'claro', rotulo: 'Claro', icone: <Sun aria-hidden="true" /> },
+    { id: 'escuro', rotulo: 'Escuro', icone: <Moon aria-hidden="true" /> },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Aparência" className="abas">
+      {opcoes.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          role="radio"
+          aria-checked={t === o.id}
+          onClick={() => {
+            setT(o.id);
+            salvarTema(o.id);
+          }}
+          className="aba"
+          title={o.id === 'auto' ? 'Segue o tema do computador ou celular' : undefined}
+        >
+          {o.icone}
+          {o.rotulo}
+        </button>
+      ))}
+    </div>
+  );
+};
 
 /** Densidade das tabelas (confortável / compacta), salva no navegador */
 export const SeletorDensidade: React.FC = () => {

@@ -73,6 +73,123 @@
 :root[data-densidade='compacta'] {
   --tabela-py: 0.3125rem;
 }
+/* =============================================================================
+   Seção 22 — Tema escuro (classe `dark` no <html>, posta por src/utils/tema.ts e
+   public/tema-inicial.js). Só na tela: a impressão continua clara.
+   1) As variáveis do padrão mudam (botões, campos, cartões, selos, tabelas, janelas).
+   2) As escalas de cor do Tailwind usadas nas telas (slate, blue, emerald, amber,
+      red) são redefinidas: tons claros viram fundos escuros e tons escuros viram
+      textos claros — as telas não precisam mudar.
+   ============================================================================= */
+@media screen {
+  .dark {
+    --cor-fundo: #0b1120;
+    --cor-superficie: #111a2b;
+    --cor-superficie-suave: #172033;
+    --cor-superficie-realce: #1e293b;
+    --cor-borda: #2c3a4f;
+    --cor-borda-suave: #1e293b;
+    --cor-borda-forte: #3e4c63;
+    --cor-texto-forte: #f1f5f9;
+    --cor-texto: #cbd5e1;
+    --cor-texto-aux: #a8b4c6;
+    --cor-texto-desligado: #8291a7;
+    --cor-primaria: #3b82f6;
+    --cor-primaria-forte: #2563eb;
+    --cor-primaria-suave: #14213d;
+    --cor-primaria-texto: #bfdbfe;
+    --cor-foco: #60a5fa;
+    --cor-perigo: #dc2626;
+    --cor-perigo-forte: #f87171;
+    --ok-fundo: #0b2a21;
+    --ok-borda: #14533f;
+    --ok-texto: #a7f3d0;
+    --ok-marca: #34d399;
+    --atencao-fundo: #2b1f0a;
+    --atencao-borda: #5c4310;
+    --atencao-texto: #fde68a;
+    --atencao-marca: #fbbf24;
+    --problema-fundo: #2d1215;
+    --problema-borda: #5f1d24;
+    --problema-texto: #fecaca;
+    --problema-marca: #f87171;
+    --info-fundo: #14213d;
+    --info-borda: #1e3a8a;
+    --info-texto: #bfdbfe;
+    --info-marca: #60a5fa;
+    --neutro-fundo: #1e293b;
+    --neutro-borda: #2c3a4f;
+    --neutro-texto: #cbd5e1;
+    --neutro-marca: #64748b;
+
+    --color-slate-50: #172033;
+    --color-slate-100: #1e293b;
+    --color-slate-200: #2c3a4f;
+    --color-slate-300: #3e4c63;
+    --color-slate-400: #64748b;
+    --color-slate-500: #94a3b8;
+    --color-slate-600: #a8b4c6;
+    --color-slate-700: #cbd5e1;
+    --color-slate-800: #e2e8f0;
+    --color-slate-900: #f1f5f9;
+    --color-slate-950: #f8fafc;
+    --color-blue-50: #14213d;
+    --color-blue-100: #172c57;
+    --color-blue-200: #1e3a8a;
+    --color-blue-300: #2b4fa8;
+    --color-blue-400: #60a5fa;
+    --color-blue-500: #3b82f6;
+    --color-blue-600: #3b82f6;
+    --color-blue-700: #93c5fd;
+    --color-blue-800: #bfdbfe;
+    --color-blue-900: #dbeafe;
+    --color-emerald-50: #0b2a21;
+    --color-emerald-100: #0f3a2d;
+    --color-emerald-200: #14533f;
+    --color-emerald-300: #1f6f55;
+    --color-emerald-500: #10b981;
+    --color-emerald-600: #34d399;
+    --color-emerald-700: #6ee7b7;
+    --color-emerald-800: #a7f3d0;
+    --color-emerald-900: #d1fae5;
+    --color-amber-50: #2b1f0a;
+    --color-amber-100: #3a2a0c;
+    --color-amber-200: #5c4310;
+    --color-amber-300: #7a5a14;
+    --color-amber-400: #fbbf24;
+    --color-amber-500: #f59e0b;
+    --color-amber-600: #fbbf24;
+    --color-amber-700: #fcd34d;
+    --color-amber-800: #fde68a;
+    --color-amber-900: #fef3c7;
+    --color-red-50: #2d1215;
+    --color-red-100: #3f171b;
+    --color-red-200: #5f1d24;
+    --color-red-300: #7f2730;
+    --color-red-500: #ef4444;
+    --color-red-600: #ef4444;
+    --color-red-700: #fca5a5;
+    --color-red-800: #fecaca;
+    --color-red-900: #fee2e2;
+  }
+  /* Branco das telas vira a superfície; a logo continua num quadro claro */
+  .dark .bg-white {
+    background-color: var(--cor-superficie);
+  }
+  .dark img.bg-white {
+    background-color: #fff;
+  }
+  /* Fundo escurecido atrás de janelas e do menu no celular */
+  .dark .janela-fundo,
+  .dark .bg-slate-900\/40,
+  .dark .bg-slate-900\/50 {
+    background-color: rgb(0 0 0 / 0.6);
+  }
+  .dark .btn-perigo-cheio:hover:not(:disabled) {
+    background-color: #b91c1c;
+  }
+}
+
 /* Galeria (Configurações › Galeria visual): quadro "Antes" com as medidas antigas */
 .estilo-antigo {
   --fs-corpo: 12px;
