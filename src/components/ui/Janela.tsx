@@ -51,8 +51,8 @@ export const Janela: React.FC<{
     <div className={`janela-fundo modal-tela ${nav.topo ? '' : 'hidden'}`}>
       <div role="dialog" aria-modal="true" aria-labelledby={idTitulo} className={`janela janela-${tamanho}`}>
         <div className="janela-cabecalho">
-          {/* Título com espaço garantido: em tela estreita as ações descem para a linha de baixo */}
-          <div className="flex min-w-[min(100%,22rem)] flex-1 items-center gap-3">
+          {/* Linha de cima: ícone, título e subtítulo ocupam tudo; o fechar fica ao lado */}
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {temAnterior && <BotaoVoltar onClick={onFechar} anterior={nav.niveis[nav.indice - 1]?.rotulo} />}
             {avatar ? (
               <span className="avatar avatar-lg" aria-hidden="true">
@@ -66,20 +66,21 @@ export const Janela: React.FC<{
               <h2 id={idTitulo} className="janela-titulo line-clamp-2 break-words">
                 {titulo}
               </h2>
-              {subtitulo && <p className="texto-aux truncate">{subtitulo}</p>}
+              {subtitulo && <p className="texto-aux line-clamp-2 break-words">{subtitulo}</p>}
             </div>
           </div>
-          {/* Fechar sempre no canto de cima; em tela estreita as ações ganham linha própria embaixo */}
+          {/* Decisão do dono: fechar sempre no canto de cima; as ações sempre numa linha própria,
+              abaixo do título e alinhadas à esquerda (igual em qualquer largura) */}
           {temAnterior ? (
-            <button type="button" aria-label="Fechar tudo" title="Fechar tudo" onClick={() => void nav.fecharTudo?.()} className="btn-icone order-2 self-start lg:order-3 lg:self-center">
+            <button type="button" aria-label="Fechar tudo" title="Fechar tudo" onClick={() => void nav.fecharTudo?.()} className="btn-icone self-start">
               <X className="ico-lg" />
             </button>
           ) : (
-            <button type="button" aria-label="Fechar" onClick={onFechar} className="btn-icone order-2 self-start lg:order-3 lg:self-center">
+            <button type="button" aria-label="Fechar" onClick={onFechar} className="btn-icone self-start">
               <X className="ico-lg" />
             </button>
           )}
-          {acoes && <div className="order-3 flex w-full flex-wrap items-center gap-2 lg:order-2 lg:ml-auto lg:w-auto lg:justify-end">{acoes}</div>}
+          {acoes && <div className="flex w-full flex-wrap items-center gap-2">{acoes}</div>}
         </div>
         {/* Seção 19: abas da ficha sublinhadas, coladas ao cabeçalho (sem faixa cinza à parte) */}
         {faixa && <div className="janela-faixa">{faixa}</div>}

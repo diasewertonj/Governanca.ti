@@ -338,7 +338,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
                 <li key={t.id}>
                   <button type="button" onClick={() => setSelectedTicketIdForDetail(t.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold text-slate-900">{t.titulo}</span>
+                      <span className="line-clamp-2 block break-words font-semibold text-slate-900">{t.titulo}</span>
                       <span className="texto-aux block truncate">
                         <span className="font-mono">{t.codigo}</span> · {t.solicitanteNome} · <span className="num">{formatDate(t.dataCriacao)}</span>
                       </span>
