@@ -547,6 +547,38 @@ export const GaleriaVisual: React.FC = () => {
         </div>
       </Bloco>
 
+      {/* Seção 22: o mesmo trecho no tema atual e forçado no escuro (classe dark local) */}
+      <Bloco titulo="Tema claro e escuro" ajuda="A escolha fica no menu da conta › Aparência (Automático segue o computador ou celular). Impressões saem sempre claras.">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(['', 'dark'] as const).map((tema) => (
+            <div key={tema || 'atual'} className={tema}>
+              <div className="space-y-3 rounded-xl border p-4" style={{ background: 'var(--cor-fundo)', borderColor: 'var(--cor-borda)' }}>
+                <span className="selo selo-neutro">{tema ? 'Escuro' : 'Tema atual'}</span>
+                <div className="cartao space-y-2 p-4">
+                  <p className="tela-titulo">Contas a pagar</p>
+                  <p className="texto-aux">Faturas de contratos, licenças e pedidos</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" className="btn btn-primario">
+                      <Plus aria-hidden="true" /> Lançar fatura
+                    </button>
+                    <button type="button" className="btn btn-secundario">
+                      Exportar CSV
+                    </button>
+                    <span className="selo selo-problema">Vencida</span>
+                    <span className="selo selo-atencao">Vence em 1 dia</span>
+                    <span className="selo selo-ok">Paga</span>
+                  </div>
+                  <input className="campo" placeholder="Buscar origem ou fornecedor…" aria-label="Exemplo de campo" />
+                  <p>
+                    Microsoft 365 E5 · <span className="link">Microsoft Corporation</span> · <span className="num font-semibold">R$ 3.500,00</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Bloco>
+
       <Bloco titulo="Cores de situação" ajuda="Um mapa único: verde ok, âmbar atenção, vermelho problema, azul informação, cinza neutro. Sem roxo, rosa ou índigo.">
         <div className="flex flex-wrap gap-2">
           <span className="selo selo-ok">

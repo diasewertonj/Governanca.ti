@@ -4,7 +4,7 @@ import { MeusDadosModal } from '../lgpd/MeusDadosModal.tsx';
 import { Shield, LogOut, ChevronDown, Menu, Briefcase } from 'lucide-react';
 import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
 import { TITULO_VISTA, type Vista } from '../../utils/navegacao.ts';
-import { SeletorDensidade } from '../ui/Tela.tsx';
+import { SeletorDensidade, SeletorTema } from '../ui/Tela.tsx';
 
 interface HeaderProps {
   currentView: string;
@@ -137,6 +137,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onAbrirMenu, menuAb
             <div className="space-y-1 border-b border-slate-100 px-4 py-2">
               <p className="texto-aux">Tabelas</p>
               <SeletorDensidade />
+              <p className="texto-aux pt-1">Aparência</p>
+              <SeletorTema />
             </div>
             <div className="space-y-1 px-1 pt-1">
               {isTI && onNavigate && (

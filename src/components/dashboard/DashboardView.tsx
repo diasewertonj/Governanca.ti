@@ -126,8 +126,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
       tom: 'atencao',
       texto: plural(termosAguardando.length, 'termo aguardando assinatura', 'termos aguardando assinatura'),
       itens: termosAguardando.map((t) => ({ id: t.id, rotulo: nomeDe(t.colaboradorId), abrir: () => abrirFicha({ tipo: 'colaborador', id: t.colaboradorId }) })),
-      acao: 'Ver termos',
-      onClick: () => onNavigate('terms'),
+      // Termos ficam na ficha de cada pessoa (os nomes acima abrem a ficha)
+      acao: 'Ver pessoas',
+      onClick: () => onNavigate('collaborators'),
     });
   if (termosContestados.length > 0)
     atencao.push({
@@ -135,8 +136,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
       tom: 'atencao',
       texto: plural(termosContestados.length, 'termo contestado — aguardando a T.I.', 'termos contestados — aguardando a T.I.'),
       itens: termosContestados.map((t) => ({ id: t.id, rotulo: nomeDe(t.colaboradorId), abrir: () => abrirFicha({ tipo: 'colaborador', id: t.colaboradorId }) })),
+      // A resposta é feita na ficha da pessoa (aba Termos): com um só, abre direto
       acao: 'Responder',
-      onClick: () => onNavigate('terms'),
+      onClick: () =>
+        termosContestados.length === 1 ? abrirFicha({ tipo: 'colaborador', id: termosContestados[0].colaboradorId }) : onNavigate('collaborators'),
     });
   if (contratosVencendo.length > 0)
     atencao.push({
@@ -181,7 +184,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
         .join(' · ') || 'Tudo assinado',
       tom: termosAguardando.length || termosContestados.length ? 'atencao' : 'ok',
       icone: <FileSignature className="ico" />,
-      vista: 'terms',
+      vista: 'collaborators',
     },
     {
       rotulo: 'Assentos de software',
@@ -201,7 +204,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
       ? [
           { rotulo: 'Equipamentos', icone: <Laptop aria-hidden="true" />, onClick: () => onNavigate('assets') },
           { rotulo: 'Admissões e desligamentos', icone: <ArrowLeftRight aria-hidden="true" />, onClick: () => onNavigate('rh_processes') },
-          { rotulo: 'Termos', icone: <FileSignature aria-hidden="true" />, onClick: () => onNavigate('terms') },
         ]
       : []),
     { rotulo: 'Chamados', icone: <LifeBuoy aria-hidden="true" />, onClick: () => onNavigate('servicedesk') },
