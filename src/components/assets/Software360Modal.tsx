@@ -20,6 +20,8 @@ import type { DadosPagamento, EventoLicenca, SoftwareLicense } from '../../types
 
 interface Software360ModalProps {
   softwareId: string;
+  /** Seção 28: abre já em Pessoas e assentos com esta pessoa escolhida (atalho da ficha da pessoa) */
+  entregarPara?: string;
   onClose: () => void;
 }
 
@@ -97,7 +99,7 @@ const ValoresCusto: React.FC<{ fonte: FonteCusto; license: SoftwareLicense; pg?:
   </dl>
 );
 
-export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, onClose }) => {
+export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, entregarPara, onClose }) => {
   const {
     licenses,
     employees,
@@ -119,11 +121,11 @@ export const Software360Modal: React.FC<Software360ModalProps> = ({ softwareId, 
     mudarSituacaoLicenca,
     faturas,
   } = useApp();
-  const [aba, setAba] = useState<AbaSoftware>('resumo');
+  const [aba, setAba] = useState<AbaSoftware>(entregarPara ? 'pessoas' : 'resumo');
   // Seção 6: contrato aberto por cima da ficha (renovar, ver faturas)
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
 
-  const [selectedColabToAssign, setSelectedColabToAssign] = useState('');
+  const [selectedColabToAssign, setSelectedColabToAssign] = useState(entregarPara || '');
   const [colabFilterSearch, setColabFilterSearch] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isEditingSeats, setIsEditingSeats] = useState(false);

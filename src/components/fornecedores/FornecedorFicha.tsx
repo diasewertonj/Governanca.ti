@@ -10,6 +10,7 @@ import { ROTULO_STATUS_FATURA, rotuloCompetencia, statusExibido, totalPagoNoAno,
 import { SeloContrato } from './ContratoFicha.tsx';
 import { ContratoFormModal } from './ContratoFormModal.tsx';
 import { FornecedorFormModal } from './FornecedorFormModal.tsx';
+import { SoftwareFormModal } from '../assets/SoftwareFormModal.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
 import { Dado, Janela } from '../ui/Janela.tsx';
 import { Abas, type ItemAba } from '../ui/Abas.tsx';
@@ -33,11 +34,13 @@ const BOTAO_LINHA = "text-left font-semibold text-slate-900 after:absolute after
  * de tudo o que ele cobra. Editar abre o cadastro; Desativar/Reativar muda a situação.
  */
 export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => void }> = ({ fornecedorId, onClose }) => {
-  const { fornecedores, contratos, licenses, assets, faturas, editarFornecedor, abrirFicha } = useApp();
+  const { fornecedores, contratos, licenses, assets, faturas, editarFornecedor, abrirFicha, currentRole } = useApp();
+  const isTIFicha = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
   const { linhas } = useRecursos();
   const [aba, setAba] = useState<AbaFicha>('resumo');
   const [editando, setEditando] = useState(false);
   const [novoContrato, setNovoContrato] = useState(false);
+  const [novoSoftware, setNovoSoftware] = useState(false);
   const [mudandoSituacao, setMudandoSituacao] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -277,6 +280,13 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
           </>
         )}
 
+        {aba === 'softwares' && isTIFicha && (
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setNovoSoftware(true)} className="btn btn-sm btn-secundario">
+              <Plus aria-hidden="true" /> Novo software deste fornecedor
+            </button>
+          </div>
+        )}
         {aba === 'softwares' &&
           (seusSoftwares.length === 0 ? (
             <Vazio>Nenhum software com este fornecedor.</Vazio>
@@ -414,6 +424,7 @@ export const FornecedorFicha: React.FC<{ fornecedorId: string; onClose: () => vo
       {/* Janelas por cima da ficha: fora dela, para o fundo desfocado não prender a nova na rolagem */}
       {editando && <FornecedorFormModal fornecedor={fornecedor} onClose={() => setEditando(false)} />}
       {novoContrato && <ContratoFormModal contrato={null} inicial={{ fornecedorId: fornecedor.id }} onClose={() => setNovoContrato(false)} />}
+      {novoSoftware && <SoftwareFormModal fornecedorInicial={fornecedor.id} onClose={() => setNovoSoftware(false)} />}
     </>
   );
 };

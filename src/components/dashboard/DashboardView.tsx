@@ -11,6 +11,7 @@ import { DIAS_ALERTA_FATURA, resumoFaturasAPagar } from '../../utils/faturas.ts'
 import { listarVencimentos } from '../../utils/financeiro.ts';
 import { licencaAtiva } from '../../utils/licencas.ts';
 import { PrimeirosPassos } from './PrimeirosPassos.tsx';
+import { CompletarCadastros } from './CompletarCadastros.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
 import { VencimentosView } from '../financeiro/FinanceiroViews.tsx';
 import { termoAberto, termoContestadoAberto } from '../../utils/termos.ts';
@@ -229,6 +230,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAbri
 
       {/* Seção 28: implantação (só o admin; some quando tudo estiver feito) */}
       {onNavigate && <PrimeirosPassos onNavigate={onNavigate} />}
+      <CompletarCadastros />
 
       {/* Indicadores */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">

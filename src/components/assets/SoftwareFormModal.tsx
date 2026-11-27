@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { CATALOGO_LICENCAS } from '../../data/catalogoLicencas.ts';
 import type { CategoriaDespesa, Contrato, FormaCobranca, FormaPagamento, Moeda, SoftwareLicense } from '../../types/index.ts';
@@ -24,6 +24,8 @@ import { FABRICANTES } from '../../utils/especificacoes.ts';
 interface SoftwareFormModalProps {
   onClose: () => void;
   softwareToEdit?: SoftwareLicense | null;
+  /** Seção 28: cadastro novo já com o fornecedor (atalho da ficha do fornecedor) */
+  fornecedorInicial?: string;
 }
 
 const CAMPO = 'campo';
@@ -41,7 +43,7 @@ const ABAS_SOFT: AbaSoft[] = ['ident', 'pagto', 'assentos'];
  * contrato existente / criar contrato agora, já preenchido) → assentos → área.
  * Só fecha depois de o banco confirmar.
  */
-export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, softwareToEdit }) => {
+export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, softwareToEdit, fornecedorInicial }) => {
   const {
     cadastrarLicenca,
     editarLicenca,
@@ -67,7 +69,7 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
   const [compradoDireto, setCompradoDireto] = useState(!!softwareToEdit?.compradoDireto);
   const [chaveContrato, setChaveContrato] = useState(softwareToEdit?.chaveContrato || '');
   const [categoria, setCategoria] = useState<CategoriaDespesa>(softwareToEdit?.categoriaDespesa || 'software');
-  const [fornecedorId, setFornecedorId] = useState(softwareToEdit?.fornecedorId || '');
+  const [fornecedorId, setFornecedorId] = useState(softwareToEdit?.fornecedorId || fornecedorInicial || '');
   const [novoFornecedor, setNovoFornecedor] = useState<string | null>(null); // nome sugerido
   const opcoesFornecedor = fornecedores.filter((f) => f.ativo || f.id === fornecedorId);
   const fornecedorLegado = !softwareToEdit?.fornecedorId ? softwareToEdit?.fornecedor : undefined;
