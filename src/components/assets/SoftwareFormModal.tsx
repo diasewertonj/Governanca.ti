@@ -1,5 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
+import { CATALOGO_LICENCAS } from '../../data/catalogoLicencas.ts';
 import type { CategoriaDespesa, Contrato, FormaCobranca, FormaPagamento, Moeda, SoftwareLicense } from '../../types/index.ts';
 import { Key, AlertCircle, Plus } from 'lucide-react';
 import { Janela } from '../ui/Janela.tsx';
@@ -98,6 +99,17 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
   const [aba, setAba] = useState<AbaSoft>('ident');
   const [abasComErro, setAbasComErro] = useState<AbaSoft[]>([]);
   const [salvando, setSalvando] = useState(false);
+  // Seção 28: modelo do catálogo; o fornecedor vem se já existir um com o nome do fabricante
+  const usarModelo = (id: string) => {
+    const m = CATALOGO_LICENCAS.find((x) => x.id === id);
+    if (!m) return;
+    setNome(m.nome);
+    setFabricante(m.fabricante);
+    setCategoria(m.categoria);
+    setTipoCobranca(m.cobranca);
+    const forn = fornecedores.find((f) => f.ativo && f.nome.toLowerCase().includes(m.fabricante.toLowerCase()));
+    if (forn && !fornecedorId) setFornecedorId(forn.id);
+  };
   // "Criar contrato agora": depois de gravar a licença, abre o contrato já preenchido
   const [contratoRascunho, setContratoRascunho] = useState<Partial<Contrato> | null>(null);
   const [licencaCriadaId, setLicencaCriadaId] = useState<string | null>(null);
@@ -311,6 +323,25 @@ export const SoftwareFormModal: React.FC<SoftwareFormModalProps> = ({ onClose, s
           <div className={painel('ident')}>
             <div className="cartao space-y-2 p-4">
               <h3 className={TITULO}>Identificação</h3>
+              {/* Seção 28: começar de um modelo (Microsoft e Google) — preenche, tudo editável */}
+              {!isEditing && (
+                <div>
+                  <label htmlFor="licenca-modelo" className={ROTULO}>Começar de um modelo</label>
+                  <select id="licenca-modelo" value="" onChange={(e) => usarModelo(e.target.value)} className={CAMPO}>
+                    <option value="">Escolha (opcional): Microsoft 365, Google Workspace…</option>
+                    {[...new Set(CATALOGO_LICENCAS.map((m) => m.grupo))].map((g) => (
+                      <optgroup key={g} label={g}>
+                        {CATALOGO_LICENCAS.filter((m) => m.grupo === g).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.nome} — {m.descricao}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <p className="ajuda">Preenche nome, fabricante, categoria e cobrança. Assentos, valor e renovação são seus.</p>
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="md:col-span-2 xl:col-span-2">
                   <label htmlFor="licenca-nome" className={ROTULO}>Nome do software *</label>

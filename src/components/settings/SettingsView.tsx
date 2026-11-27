@@ -7,6 +7,7 @@ import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
 import { FinanceiroSettings } from './FinanceiroSettings.tsx';
+import { IniciarUsoReal } from './IniciarUsoReal.tsx';
 import { GaleriaVisual } from './GaleriaVisual.tsx';
 import { UnidadesLista } from '../fornecedores/UnidadesLista.tsx';
 import { Janela } from '../ui/Janela.tsx';
@@ -972,6 +973,9 @@ export const SettingsView: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Seção 28: em produção, a virada segura para uso real (prévia + nome da empresa) */}
+              {isSupabaseConnected && conexaoOk && <IniciarUsoReal />}
 
               {/* Fase 0: com Supabase conectado (produção), "Zerar" e "Restaurar demo" nem aparecem */}
               {!isSupabaseConnected && (

@@ -2337,6 +2337,40 @@ export async function dispensarAssinaturaTermoDb(termoId: string, motivo: string
   await checar(supabase.rpc('dispensar_assinatura_termo', { p_termo: termoId, p_motivo: motivo }));
 }
 
+/** Seção 28: o que sai, o que é opcional e o que fica na virada para uso real */
+export interface ItemPreviaUsoReal {
+  grupo: 'sai' | 'opcional' | 'fica';
+  item: string;
+  quantidade: number;
+}
+export async function previaUsoRealDb(): Promise<ItemPreviaUsoReal[]> {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const r = await supabase.rpc('previa_uso_real' as never);
+  if (r.error) throw new DbError(mensagemDeErro(r.error), 'validacao');
+  return ((r.data as { grupo: string; item: string; quantidade: number }[]) || []).map((x) => ({
+    grupo: x.grupo as ItemPreviaUsoReal['grupo'],
+    item: x.item,
+    quantidade: Number(x.quantidade) || 0,
+  }));
+}
+
+/** Seção 28: vira a base para uso real pela função do servidor (banco, logins e arquivos de teste) */
+export async function iniciarUsoRealDb(confirmacao: string, apagarEstrutura: boolean) {
+  if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
+  const { data, error } = await supabase.functions.invoke('iniciar-uso-real', { body: { confirmacao, apagar_estrutura: apagarEstrutura } });
+  if (error) {
+    let mensagem = error.message;
+    try {
+      const corpo = await (error as { context?: Response }).context?.json();
+      if (corpo?.erro) mensagem = corpo.erro;
+    } catch {
+      // mantém a mensagem padrão
+    }
+    throw new DbError(mensagem, 'validacao');
+  }
+  return data as { loginsRemovidos: number; loginsComFalha: number; arquivosRemovidos: number; falhaArquivos: boolean };
+}
+
 /** 6c: cria o login no Nexus (ou gera nova senha) pela Edge Function; a senha volta uma única vez */
 export async function acessoNexusDb(colaboradorId: string, acao: 'criar' | 'redefinir', chamadoId?: string) {
   if (!supabase) throw new DbError('Disponível apenas com o Supabase configurado.', 'validacao');
