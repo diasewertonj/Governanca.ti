@@ -6,10 +6,11 @@ import { licencaAtiva } from '../../utils/licencas.ts';
 import { assentosOciosos, fonteCustoLicenca, ROTULO_FORMA_COBRANCA } from '../../utils/financeiro.ts';
 import { totaisEquipamentos } from '../../utils/exportarInventario.ts';
 import { ExportarInventario } from './ExportarInventario.tsx';
+import { ImportarLicencas } from './ImportarLicencas.tsx';
 import { ATALHOS_FUTURO, dentroDoPeriodo, usePeriodo } from '../ui/FiltroPeriodo.tsx';
 import type { Asset, Contrato, SoftwareLicense } from '../../types/index.ts';
 import { EstoqueAcessorios } from './EstoqueAcessorios.tsx';
-import { Copy, Download, Key, Pencil, Plus, QrCode, ShieldAlert, ShieldCheck, User } from 'lucide-react';
+import { Copy, Download, Upload, Key, Pencil, Plus, QrCode, ShieldAlert, ShieldCheck, User } from 'lucide-react';
 import { NewAssetModal } from './NewAssetModal.tsx';
 import { MenuAcoes } from '../ui/MenuAcoes.tsx';
 import { CHAVE } from '../../utils/especificacoes.ts';
@@ -69,6 +70,7 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
   const [novoAcessorio, setNovoAcessorio] = useState(false);
   const [mostrarDesativados, setMostrarDesativados] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [importando, setImportando] = useState(false);
   // Softwares: filtro pela data de renovação (mês, ano ou de/até)
   const { periodo: periodoRenovacao, seletor: seletorRenovacao } = usePeriodo('todos', ['todos', ...ATALHOS_FUTURO]);
 
@@ -115,9 +117,15 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
   };
 
   const acaoPrincipal = !isTI ? null : softwares ? (
-    <button type="button" onClick={novaLicenca} className="btn btn-primario">
-      <Plus /> Nova licença
-    </button>
+    <>
+      {/* Seção 28: importar do Microsoft 365 (CSV) e do Google Workspace (texto colado) */}
+      <button type="button" onClick={() => setImportando(true)} className="btn btn-secundario">
+        <Upload /> Importar do Microsoft 365 / Google
+      </button>
+      <button type="button" onClick={novaLicenca} className="btn btn-primario">
+        <Plus /> Nova licença
+      </button>
+    </>
   ) : acessorios ? (
     <button type="button" onClick={() => setNovoAcessorio(true)} className="btn btn-primario">
       <Plus /> Novo acessório
@@ -222,6 +230,8 @@ export const AssetsView: React.FC<{ modo?: 'hardware' | 'softwares' }> = ({ modo
           )}
         </p>
       )}
+
+      {importando && <ImportarLicencas onFechar={() => setImportando(false)} />}
 
       {exportando && (
         <ExportarInventario

@@ -45,7 +45,8 @@ export const CATALOGO_LICENCAS: ModeloLicenca[] = [
   // Microsoft 365 corporativo
   ms('m365-e3', 'Microsoft 365 (corporativo)', 'Microsoft 365 E3', 'Office, e-mail e segurança corporativa'),
   ms('m365-e5', 'Microsoft 365 (corporativo)', 'Microsoft 365 E5', 'E3 + segurança, conformidade e análise avançadas'),
-  ms('m365-f3', 'Microsoft 365 (corporativo)', 'Microsoft 365 F3', 'Linha de frente: apps na web e no celular'),
+  ms('m365-f1', 'Microsoft 365 (corporativo)', 'Microsoft 365 F1', 'Linha de frente: Teams, SharePoint e OneDrive, sem caixa de e-mail'),
+  ms('m365-f3', 'Microsoft 365 (corporativo)', 'Microsoft 365 F3', 'Linha de frente: apps na web e no celular e e-mail de 2 GB'),
   ms('o365-e1', 'Office 365', 'Office 365 E1', 'E-mail, Teams e Office na web'),
   ms('o365-e3', 'Office 365', 'Office 365 E3', 'E1 + Office instalado'),
   // Avulsos
@@ -63,4 +64,6 @@ export const CATALOGO_LICENCAS: ModeloLicenca[] = [
   gw('enterprise-standard', 'Google Workspace Enterprise Standard', 'Corporativo: armazenamento e segurança ampliados'),
   gw('enterprise-plus', 'Google Workspace Enterprise Plus', 'Enterprise Standard + conformidade e análise avançadas'),
   gw('essentials-starter', 'Google Workspace Essentials Starter', 'Drive, Meet e Docs sem Gmail (gratuito)'),
+  gw('cloud-identity-free', 'Cloud Identity Free', 'Contas e login gerenciados, sem Gmail nem Drive (gratuito)'),
+  gw('chrome-enterprise-core', 'Chrome Enterprise Core', 'Gestão central do navegador Chrome (gratuito)'),
 ];

@@ -27,7 +27,13 @@ export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void }> = ({
   const premissas = settings.premissasFinanceiras || {};
   const passos: { titulo: string; detalhe: string; feito: boolean; ir: string }[] = [
     { titulo: 'Dados da empresa e logo', detalhe: 'Configurações › Empresa', feito: !!(settings.razaoSocial || settings.nomeFantasia) && !!settings.logoUrl, ir: 'settings' },
-    { titulo: 'Departamentos e unidades', detalhe: 'O cadastro de pessoas exige o setor', feito: departments.length > 0 && unidades.length > 0, ir: 'settings' },
+    // A unidade é opcional (só para quem tem mais de um endereço): o passo depende dos departamentos
+    {
+      titulo: 'Departamentos',
+      detalhe: unidades.length ? 'O cadastro de pessoas exige o setor' : 'O cadastro de pessoas exige o setor · unidades só se houver mais de um endereço',
+      feito: departments.length > 0,
+      ir: 'settings',
+    },
     { titulo: 'Premissas financeiras', detalhe: 'Limite de CAPEX, câmbio e contas contábeis', feito: Object.keys(premissas).length > 0, ir: 'settings' },
     {
       titulo: 'Usuários de T.I., RH e Compras',
