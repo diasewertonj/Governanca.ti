@@ -2,7 +2,8 @@ import { ROTULO_GRUPO_DEPRECIACAO, VIDA_UTIL_PADRAO } from '../../utils/patrimon
 import { confirmar } from '../ui/dialogo.tsx';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
-import { AssetCategory, Employee, ModeloDocumento, UserRole, VidaUtil } from '../../types/index.ts';
+import { AssetCategory, Employee, ModeloDocumento, PadraoEmail, UserRole, VidaUtil } from '../../types/index.ts';
+import { dominioDe } from '../../utils/emailEmpresa.ts';
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
@@ -141,6 +142,14 @@ export const SettingsView: React.FC = () => {
   const [cep, setCep] = useState(settings.cep);
   const [emailTI, setEmailTI] = useState(settings.emailTI);
   const [telefoneTI, setTelefoneTI] = useState(settings.telefoneTI);
+  // Seção 29: site, domínios de e-mail e padrão do endereço (sugestão no cadastro de pessoas)
+  const [site, setSite] = useState(settings.site || '');
+  const [dominiosTexto, setDominiosTexto] = useState((settings.dominiosEmail || []).join(', '));
+  const [padraoEmail, setPadraoEmail] = useState<PadraoEmail>(settings.padraoEmail || 'nome.sobrenome');
+  const dominiosLista = dominiosTexto.split(/[,;\s]+/).map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean);
+  const emailEmpresaAlterado =
+    site.trim() !== (settings.site || '') || dominiosLista.join(',') !== (settings.dominiosEmail || []).join(',') || padraoEmail !== (settings.padraoEmail || 'nome.sobrenome');
+  const dominioSugerido = dominioDe(site) || dominioDe(emailTI);
   const [textoTermoEntrega, setTextoTermoEntrega] = useState(settings.textoTermoEntrega);
   const [textoTermoDevolucao, setTextoTermoDevolucao] = useState(settings.textoTermoDevolucao);
   // Seção 21: o texto legal fica recolhido; o campo grande só aparece ao editar
@@ -232,6 +241,7 @@ export const SettingsView: React.FC = () => {
       : []),
     ...(docsAlterados ? ['Documentos da Qualidade (código/versão dos termos)'] : []),
     ...(logoAlterado ? ['Logo da empresa'] : []),
+    ...(emailEmpresaAlterado ? ['Site, domínios e padrão do e-mail'] : []),
     ...(termoExigeAlterado ? ['O que exige termo de responsabilidade'] : []),
     ...(vidaUtilAlterada ? ['Vida útil e valor residual (depreciação)'] : []),
   ];
@@ -248,6 +258,9 @@ export const SettingsView: React.FC = () => {
     setCep(settings.cep);
     setEmailTI(settings.emailTI);
     setTelefoneTI(settings.telefoneTI);
+    setSite(settings.site || '');
+    setDominiosTexto((settings.dominiosEmail || []).join(', '));
+    setPadraoEmail(settings.padraoEmail || 'nome.sobrenome');
     setTextoTermoEntrega(settings.textoTermoEntrega);
     setTextoTermoDevolucao(settings.textoTermoDevolucao);
     setDocEntrega(docEntregaSalvo);
@@ -286,12 +299,15 @@ export const SettingsView: React.FC = () => {
     }
     Object.entries(papeisPendentes).forEach(([id, papel]) => updateEmployeeRole(id, papel));
     Object.entries(setoresPendentes).forEach(([id, ativo]) => updateDepartment(id, { ativo }));
-    if (camposEmpresaAlterados.length > 0 || docsAlterados || logoAlterado || termoExigeAlterado || vidaUtilAlterada) {
+    if (camposEmpresaAlterados.length > 0 || docsAlterados || logoAlterado || termoExigeAlterado || vidaUtilAlterada || emailEmpresaAlterado) {
       updateSettings({
         ...empresaRascunho,
         docEntrega,
         docDevolucao,
         logoUrl: logoUrl.trim() || undefined,
+        site: site.trim() || undefined,
+        dominiosEmail: dominiosLista,
+        padraoEmail,
         ...(termoExigeAlterado ? { termoExige } : {}),
         ...(vidaUtilAlterada ? { vidaUtil } : {}),
       });
@@ -497,6 +513,39 @@ export const SettingsView: React.FC = () => {
                       <div>
                         <label htmlFor="emp-telefone" className="rotulo">Telefone / ramal de TI</label>
                         <CampoMascara id="emp-telefone" tipo="telefone" required value={telefoneTI} onChange={setTelefoneTI} />
+                      </div>
+                    </div>
+                    {/* Seção 29: site, domínios e padrão do e-mail — sugerem o e-mail no cadastro de pessoas */}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                      <div>
+                        <label htmlFor="emp-site" className="rotulo">Site</label>
+                        <input id="emp-site" value={site} onChange={(e) => setSite(e.target.value)} placeholder="www.suaempresa.com.br" className="campo" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label htmlFor="emp-dominios" className="rotulo">Domínios de e-mail</label>
+                        <input
+                          id="emp-dominios"
+                          value={dominiosTexto}
+                          onChange={(e) => setDominiosTexto(e.target.value)}
+                          placeholder="suaempresa.com.br, suaempresa.com"
+                          className="campo"
+                          disabled={padraoEmail === 'nenhum'}
+                        />
+                        {padraoEmail !== 'nenhum' && !dominiosLista.length && dominioSugerido && (
+                          <button type="button" onClick={() => setDominiosTexto(dominioSugerido)} className="link mt-1 text-sm">
+                            Usar {dominioSugerido}
+                          </button>
+                        )}
+                        <p className="ajuda">Separe por vírgula. O primeiro é o usado na sugestão de e-mail.</p>
+                      </div>
+                      <div>
+                        <label htmlFor="emp-padrao-email" className="rotulo">A empresa usa e-mail próprio?</label>
+                        <select id="emp-padrao-email" value={padraoEmail} onChange={(e) => setPadraoEmail(e.target.value as PadraoEmail)} className="campo">
+                          <option value="nome.sobrenome">Sim: nome.sobrenome</option>
+                          <option value="nome.inicial">Sim: nome + inicial do sobrenome</option>
+                          <option value="nome">Sim: só o primeiro nome</option>
+                          <option value="nenhum">Não (e-mails pessoais): não sugerir</option>
+                        </select>
                       </div>
                     </div>
                   </div>

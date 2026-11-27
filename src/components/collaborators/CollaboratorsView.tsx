@@ -3,12 +3,18 @@ import { useApp } from '../../context/AppContext.tsx';
 import { UserPlus, Laptop, User } from 'lucide-react';
 import { NewEmployeeModal } from './NewEmployeeModal.tsx';
 import { Busca, CabecalhoTela, Vazio } from '../ui/Tela.tsx';
+import { Abas } from '../ui/Abas.tsx';
+import { ehColaboradorDaEmpresa } from '../../types/index.ts';
+import { ROTULO_PAPEL } from '../../utils/conversa.ts';
 
 const SELO_STATUS: Record<string, string> = { ativo: 'selo-ok', ferias: 'selo-atencao', desligado: 'selo-neutro' };
 const ROTULO_STATUS: Record<string, string> = { ativo: 'Ativo', ferias: 'Férias', desligado: 'Desligado' };
 
 export const CollaboratorsView: React.FC = () => {
-  const { employees, departments, assets, licenses, setSelectedEmployeeIdFor360 } = useApp();
+  const { employees, departments, assets, licenses, setSelectedEmployeeIdFor360, currentRole } = useApp();
+  // Seção 29: Colaboradores (só funcionários) e Usuários do sistema (quem tem acesso, de qualquer tipo)
+  const [aba, setAba] = useState<'colaboradores' | 'usuarios'>('colaboradores');
+  const isTI = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('todos');
@@ -16,6 +22,7 @@ export const CollaboratorsView: React.FC = () => {
   const [showNewEmployeeModal, setShowNewEmployeeModal] = useState(false);
 
   const filteredEmployees = employees.filter((emp) => {
+    if (aba === 'colaboradores' ? !ehColaboradorDaEmpresa(emp) : !(emp.temLogin || !ehColaboradorDaEmpresa(emp))) return false;
     const matchesDept = departmentFilter === 'todos' || emp.setorId === departmentFilter;
     const matchesStatus = statusFilter === 'todos' || emp.status === statusFilter;
     const matchesSearch =
@@ -36,7 +43,20 @@ export const CollaboratorsView: React.FC = () => {
     <div className="space-y-4">
       <CabecalhoTela
         titulo="Colaboradores"
-        subtitulo="Pessoas, setores, equipamentos e licenças em uso"
+        subtitulo={aba === 'usuarios' ? 'Quem acessa o sistema: colaboradores com login e usuários externos, com o perfil de cada um' : 'Pessoas, setores, equipamentos e licenças em uso'}
+        abas={
+          isTI ? (
+            <Abas
+              rotulo="Pessoas"
+              ativa={aba}
+              onMudar={setAba}
+              itens={[
+                { id: 'colaboradores' as const, rotulo: 'Colaboradores' },
+                { id: 'usuarios' as const, rotulo: 'Usuários do sistema' },
+              ]}
+            />
+          ) : undefined
+        }
         acoes={
           <button type="button" onClick={() => setShowNewEmployeeModal(true)} className="btn btn-primario">
             <UserPlus /> Novo colaborador
@@ -93,7 +113,14 @@ export const CollaboratorsView: React.FC = () => {
                         </div>
                         <div>
                           <span className="font-semibold text-slate-900 block">{emp.nome}</span>
-                          <span className="text-slate-500">{emp.cargo}</span>
+                          <span className="text-slate-500">{aba === 'usuarios' ? emp.email : emp.cargo}</span>
+                          {aba === 'usuarios' && (
+                            <span className="mt-1 flex flex-wrap gap-1">
+                              <span className="selo selo-info">{ROTULO_PAPEL[emp.role || 'colaborador']}</span>
+                              {!ehColaboradorDaEmpresa(emp) && <span className="selo selo-neutro">Usuário externo</span>}
+                              {!emp.temLogin && <span className="selo selo-atencao">Sem acesso criado</span>}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>

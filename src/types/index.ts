@@ -21,7 +21,13 @@ export interface Employee {
   avatarUrl?: string;
   /** Lote 1: já tem login (auth_user_id no banco). Só leitura: o banco define. */
   temLogin?: boolean;
+  /** Seção 29: funcionário da empresa (padrão) ou usuário externo (só acessa o sistema; fora do headcount) */
+  tipoVinculo?: TipoVinculo;
 }
+
+export type TipoVinculo = 'colaborador' | 'externo';
+/** Seção 29: só conta como pessoa da empresa quem não é usuário externo */
+export const ehColaboradorDaEmpresa = (e: Pick<Employee, 'tipoVinculo'>) => e.tipoVinculo !== 'externo';
 
 export interface Department {
   id: string;
@@ -842,6 +848,8 @@ export interface CustomFieldDefinition {
   obrigatorio?: boolean;
 }
 
+export type PadraoEmail = 'nome.sobrenome' | 'nome.inicial' | 'nome' | 'nenhum';
+
 export interface CompanySettings {
   razaoSocial: string;
   nomeFantasia: string;
@@ -852,6 +860,10 @@ export interface CompanySettings {
   emailTI: string;
   telefoneTI: string;
   logoUrl?: string;
+  /** Seção 29: site e domínios de e-mail (o primeiro é o usado na sugestão) e padrão do endereço */
+  site?: string;
+  dominiosEmail?: string[];
+  padraoEmail?: PadraoEmail;
   /** Fase 10 C1: prazos por prioridade em minutos úteis (vazio = padrão) */
   sla?: Partial<Record<TicketPriority, { resposta?: number; solucao?: number }>>;
   textoTermoEntrega: string;

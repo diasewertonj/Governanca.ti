@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext.tsx';
-import type { Employee, EmployeeStatus, UserRole } from '../../types/index.ts';
+import type { Employee, EmployeeStatus, TipoVinculo, UserRole } from '../../types/index.ts';
+import { emailDaEmpresa, sugerirEmail } from '../../utils/emailEmpresa.ts';
 import { UserPlus } from 'lucide-react';
 import { Janela } from '../ui/Janela.tsx';
 import { confirmar } from '../ui/dialogo.tsx';
@@ -30,7 +31,7 @@ interface NewEmployeeModalProps {
 }
 
 export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, inicial, onCriado, colaborador }) => {
-  const { employees, departments, cadastrarColaborador, salvarColaborador, setSelectedEmployeeIdFor360, currentRole } = useApp();
+  const { employees, departments, cadastrarColaborador, salvarColaborador, setSelectedEmployeeIdFor360, currentRole, settings } = useApp();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const editando = !!colaborador;
@@ -56,17 +57,30 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
     colaborador?.dataAdmissao || inicial?.dataAdmissao || isoLocal(new Date())
   );
   const [telefone, setTelefone] = useState(colaborador?.telefone ?? '');
+  // Seção 29: tipo de pessoa e e-mail sugerido pelo domínio da empresa
+  const [tipo, setTipo] = useState<TipoVinculo>(colaborador?.tipoVinculo ?? 'colaborador');
+  const externo = tipo === 'externo';
+  const podeEscolherTipo = currentRole === 'ti_admin' || currentRole === 'ti_suporte';
+  const dominios = settings.dominiosEmail || [];
+  const [emailTocado, setEmailTocado] = useState(editando || !!inicial?.email);
+  const usados = employees.filter((x) => x.id !== colaborador?.id).map((x) => x.email);
+  const mudarNome = (v: string) => {
+    setNome(v);
+    if (!emailTocado && !externo && settings.padraoEmail !== 'nenhum') setEmail(sugerirEmail(v, settings.padraoEmail, dominios[0], usados));
+  };
+  const emailSugeridoRepetido = !emailTocado && !!email && usados.some((u) => u.toLowerCase() === email.replace(/\d+@/, '@').toLowerCase());
   const emailMudou = editando && email.trim().toLowerCase() !== colaborador.email;
 
-  const activeEmployees = employees.filter((e) => e.status === 'ativo' && e.id !== colaborador?.id);
+  const activeEmployees = employees.filter((e) => e.status === 'ativo' && e.id !== colaborador?.id && e.tipoVinculo !== 'externo');
 
   // Edição: grava só o que mudou e só fecha depois do banco confirmar
-  const salvarEdicao = async () => {
+  const salvarEdicao = async (tipoFinal: TipoVinculo = tipo) => {
     if (!colaborador) return;
     const novo = {
       nome: nome.trim(),
       email: email.trim().toLowerCase(),
-      cargo: cargo.trim(),
+      tipoVinculo: tipoFinal,
+      cargo: cargo.trim() || (tipoFinal === 'externo' ? 'Usuário externo' : ''),
       setorId,
       gestorId: gestorId || undefined,
       status,
@@ -92,23 +106,41 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
     onClose();
   };
 
+  // Seção 29: e-mail fora do domínio num colaborador → pergunta se é usuário externo (não bloqueia)
+  const conferirDominio = async (): Promise<TipoVinculo> => {
+    if (externo || emailDaEmpresa(email, dominios) !== false) return tipo;
+    if (editando && !emailMudou && colaborador?.tipoVinculo === tipo) return tipo;
+    const externoAgora = await confirmar({
+      titulo: 'E-mail fora do domínio da empresa',
+      mensagem: `${email.trim()} não é de ${dominios.join(' ou ')}. É alguém de fora que só acessa o sistema (consultor, prestadora, administrador externo)? Usuário externo não entra na contagem de colaboradores nem nas listas de entrega.`,
+      confirmar: 'Marcar como usuário externo',
+      cancelar: 'É colaborador mesmo',
+    });
+    if (externoAgora) setTipo('externo');
+    return externoAgora ? 'externo' : 'colaborador';
+  };
+
   // Espera o banco confirmar: quem chamou (ex.: o checklist) usa o id logo em seguida
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !email.trim() || !cargo.trim() || salvando) return;
-    if (editando) return salvarEdicao();
+    if (!nome.trim() || !email.trim() || (!externo && !cargo.trim()) || salvando) return;
+    const tipoFinal = podeEscolherTipo ? await conferirDominio() : tipo;
+    if (editando) return salvarEdicao(tipoFinal);
     setErro(null);
     setSalvando(true);
+    const ehExterno = tipoFinal === 'externo';
     const { colaborador, erro: falha } = await cadastrarColaborador({
       nome: nome.trim(),
       email: email.trim().toLowerCase(),
-      matricula: matricula.trim(),
-      cargo: cargo.trim(),
-      setorId,
+      // Externo: matrícula, cargo e setor são opcionais (o banco exige matrícula e cargo: vão valores padrão)
+      matricula: matricula.trim() || `EXT-${Date.now().toString().slice(-6)}`,
+      cargo: cargo.trim() || (ehExterno ? 'Usuário externo' : ''),
+      setorId: ehExterno && !setorId ? '' : setorId,
       gestorId: gestorId || undefined,
       status,
       dataAdmissao,
       telefone: telefone.trim(),
+      tipoVinculo: tipoFinal,
       ...(inicial?.papel ? { role: inicial.papel } : {}),
     });
     setSalvando(false);
@@ -146,20 +178,57 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
       }
     >
       <form id="form-colaborador" onSubmit={handleSubmit} className="space-y-4">
+        {/* Seção 29: colaborador da empresa ou usuário externo (só a T.I. escolhe) */}
+        {podeEscolherTipo && (
+          <fieldset className="cartao space-y-2 p-4">
+            <legend className="secao-titulo">Tipo de pessoa</legend>
+            <div className="flex flex-wrap gap-4">
+              <label className="inline-flex items-center gap-2 text-slate-700">
+                <input type="radio" name="colab-tipo" checked={!externo} onChange={() => setTipo('colaborador')} />
+                Colaborador da empresa
+              </label>
+              <label className="inline-flex items-center gap-2 text-slate-700">
+                <input type="radio" name="colab-tipo" checked={externo} onChange={() => setTipo('externo')} />
+                Usuário externo (só acessa o sistema)
+              </label>
+            </div>
+            {externo && (
+              <p className="ajuda">
+                Administrador de fora, consultor, técnico da prestadora, contador. Não entra na contagem de colaboradores, nas listas de entrega nem na admissão;
+                matrícula, cargo e setor são opcionais.
+              </p>
+            )}
+          </fieldset>
+        )}
         <div className="cartao space-y-2 p-4">
           <h3 className="secao-titulo">Identificação e contato</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-2">
               <label htmlFor="colab-nome" className="rotulo">Nome completo *</label>
-              <input id="colab-nome" type="text" required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Amanda Silva Castro" className="campo" />
+              <input id="colab-nome" type="text" required value={nome} onChange={(e) => mudarNome(e.target.value)} placeholder="Ex: Amanda Silva Castro" className="campo" />
             </div>
             <div>
-              <label htmlFor="colab-matricula" className="rotulo">Matrícula funcional *</label>
-              <input id="colab-matricula" type="text" required value={matricula} disabled={editando} onChange={(e) => setMatricula(e.target.value)} className="campo font-mono" />
+              <label htmlFor="colab-matricula" className="rotulo">Matrícula funcional{externo ? '' : ' *'}</label>
+              <input id="colab-matricula" type="text" required={!externo} value={matricula} disabled={editando} onChange={(e) => setMatricula(e.target.value)} className="campo font-mono" />
             </div>
             <div className="md:col-span-2">
-              <label htmlFor="colab-email" className="rotulo">E-mail corporativo *</label>
-              <input id="colab-email" type="email" required value={email} disabled={!podeMudarEmail} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com.br" className="campo" />
+              <label htmlFor="colab-email" className="rotulo">{externo ? 'E-mail *' : 'E-mail corporativo *'}</label>
+              <input
+                id="colab-email"
+                type="email"
+                required
+                value={email}
+                disabled={!podeMudarEmail}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailTocado(true);
+                }}
+                placeholder={dominios[0] && !externo ? `nome@${dominios[0]}` : 'nome@empresa.com.br'}
+                className="campo"
+              />
+              {!emailTocado && email && !externo && (
+                <p className="ajuda">Sugerido pelo padrão da empresa{emailSugeridoRepetido ? ' (o endereço comum já existe: número acrescentado)' : ''}. Pode editar.</p>
+              )}
               {editando && temLogin && (
                 <p className="ajuda">Esta pessoa já tem login. Para trocar o e-mail de quem já tem login, use "Trocar login" — em breve.</p>
               )}
@@ -180,12 +249,13 @@ export const NewEmployeeModal: React.FC<NewEmployeeModalProps> = ({ onClose, ini
           <h3 className="secao-titulo">Vínculo e situação</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-2">
-              <label htmlFor="colab-cargo" className="rotulo">Cargo / função *</label>
-              <input id="colab-cargo" type="text" required value={cargo} onChange={(e) => setCargo(e.target.value)} placeholder="Ex: Engenheiro(a) de Software" className="campo" />
+              <label htmlFor="colab-cargo" className="rotulo">Cargo / função{externo ? '' : ' *'}</label>
+              <input id="colab-cargo" type="text" required={!externo} value={cargo} onChange={(e) => setCargo(e.target.value)} placeholder="Ex: Engenheiro(a) de Software" className="campo" />
             </div>
             <div>
-              <label htmlFor="colab-setor" className="rotulo">Setor / departamento *</label>
-              <select id="colab-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} required className="campo">
+              <label htmlFor="colab-setor" className="rotulo">Setor / departamento{externo ? '' : ' *'}</label>
+              <select id="colab-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} required={!externo} className="campo">
+                {externo && <option value="">Sem setor</option>}
                 {departments
                   .filter((d) => d.ativo)
                   .map((dep) => (

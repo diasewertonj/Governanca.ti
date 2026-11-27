@@ -58,6 +58,8 @@ import {
   Department,
   Employee,
   EmployeeStatus,
+  TipoVinculo,
+  PadraoEmail,
   FiscalData,
   ItemTermo,
   ModeloDocumento,
@@ -249,6 +251,8 @@ const linhaColaborador = (e: Employee): TablesInsert<'colaboradores'> => ({
   data_admissao: e.dataAdmissao,
   telefone: e.telefone || null,
   avatar_url: e.avatarUrl || null,
+  // Seção 29: só vai quando é externo (funciona antes da migration para os demais)
+  ...((e.tipoVinculo ? { tipo_vinculo: e.tipoVinculo } : {}) as Record<string, unknown>),
 });
 
 const linhaAtivo = (a: Asset): TablesInsert<'ativos'> => ({
@@ -487,6 +491,7 @@ export async function fetchEmployeesFromDb(): Promise<Employee[] | null> {
     telefone: e.telefone || undefined,
     avatarUrl: e.avatar_url || undefined,
     temLogin: !!e.auth_user_id,
+    tipoVinculo: ((e as unknown as { tipo_vinculo?: string }).tipo_vinculo === 'externo' ? 'externo' : 'colaborador') as TipoVinculo,
   })) : [];
 }
 
@@ -1910,6 +1915,20 @@ export async function fetchSettingsFromDb(): Promise<CompanySettings | null> {
     termoExige: (data.termo_exige || undefined) as CompanySettings['termoExige'],
     vidaUtil: (vida || undefined) as CompanySettings['vidaUtil'],
     premissasFinanceiras: (premissas || undefined) as CompanySettings['premissasFinanceiras'],
+    ...(logado ? await lerDominiosEmpresa() : {}),
+  };
+}
+
+/** Seção 29: site, domínios e padrão do e-mail (consulta à parte: antes da migration as colunas não existem) */
+async function lerDominiosEmpresa(): Promise<Partial<CompanySettings>> {
+  if (!supabase) return {};
+  const r = await supabase.from('configuracoes_empresa').select('site, dominios_email, padrao_email' as never).limit(1).maybeSingle();
+  if (r.error || !r.data) return {};
+  const d = r.data as { site?: string | null; dominios_email?: string[] | null; padrao_email?: string | null };
+  return {
+    site: d.site || undefined,
+    dominiosEmail: d.dominios_email || [],
+    padraoEmail: (d.padrao_email || 'nome.sobrenome') as PadraoEmail,
   };
 }
 
@@ -1938,6 +1957,8 @@ export async function saveSettingsDb(st: CompanySettings) {
         logo_url: st.logoUrl || null,
         sla: st.sla ? json(st.sla) : null,
         updated_at: new Date().toISOString(),
+        // Seção 29: só vão quando preenchidos (funciona antes da migration)
+        ...((st.padraoEmail ? { site: st.site?.trim() || null, dominios_email: st.dominiosEmail || [], padrao_email: st.padraoEmail } : {}) as Record<string, unknown>),
       })
       .select('id')
   );

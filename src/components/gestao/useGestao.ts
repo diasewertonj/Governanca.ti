@@ -185,7 +185,8 @@ export function useGestao(ano: number, regime: Regime = 'competencia', agora: Da
     [orcamentoDoAno, lancamentos, restanteDoAno, departments, mapa]
   );
 
-  const colaboradoresAtivos = useMemo(() => employees.filter((e) => e.status !== 'desligado').length, [employees]);
+  // Seção 29: usuário externo (só acessa o sistema) não conta como colaborador
+  const colaboradoresAtivos = useMemo(() => employees.filter((e) => e.status !== 'desligado' && e.tipoVinculo !== 'externo').length, [employees]);
 
   return { premissas, limite, vida, recorrentes, projecao, lancamentos, linhasGestao, orcamentoDoAno, colaboradoresAtivos, pedidosEmAberto };
 }
