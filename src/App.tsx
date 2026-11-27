@@ -285,15 +285,15 @@ function MainApp() {
         const fechar = () => fecharFicha(posicao);
         return (
           <div
-            key={`${posicao}:${ficha.tipo}:${ficha.id}:${ficha.manutencaoDoChamado ?? ''}`}
+            key={`${posicao}:${ficha.tipo}:${ficha.id}:${ficha.manutencaoDoChamado ?? ''}:${ficha.entregarPara ?? ''}`}
             className={posicao === pilhaFichas.length - 1 ? undefined : 'hidden'}
           >
             {ficha.tipo === 'ativo' && (
-              <Asset360Modal assetId={ficha.id} manutencaoDoChamado={ficha.manutencaoDoChamado} onClose={fechar} />
+              <Asset360Modal assetId={ficha.id} manutencaoDoChamado={ficha.manutencaoDoChamado} entregarPara={ficha.entregarPara} onClose={fechar} />
             )}
             {ficha.tipo === 'colaborador' && <Employee360Modal employeeId={ficha.id} onClose={fechar} />}
             {ficha.tipo === 'chamado' && <TicketDetailModal ticketId={ficha.id} onClose={fechar} />}
-            {ficha.tipo === 'software' && <Software360Modal softwareId={ficha.id} onClose={fechar} />}
+            {ficha.tipo === 'software' && <Software360Modal softwareId={ficha.id} entregarPara={ficha.entregarPara} onClose={fechar} />}
             {ficha.tipo === 'contrato' && <ContratoFicha contratoId={ficha.id} onClose={fechar} />}
             {ficha.tipo === 'fornecedor' && <FornecedorFicha fornecedorId={ficha.id} onClose={fechar} />}
             {ficha.tipo === 'pedido' && <FichaPedido pedidoId={ficha.id} onClose={fechar} />}

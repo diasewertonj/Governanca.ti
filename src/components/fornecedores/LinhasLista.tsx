@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ContratoFormModal } from './ContratoFormModal.tsx';
 import { History, Pencil, Plus, Trash2, Phone } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
@@ -237,12 +238,14 @@ export const LinhasLista: React.FC<{
   );
 };
 
-const FormLinha: React.FC<{
+export const FormLinha: React.FC<{
   linha?: LinhaTelefonica;
   contratoFixo?: string;
+  /** Seção 28: atalho da ficha da pessoa — já vem com ela escolhida */
+  colaboradorInicial?: string;
   onSalvar: (d: Omit<LinhaTelefonica, 'id' | 'criadoEm'> & { id?: string }) => Promise<string | null>;
   onCancelar: () => void;
-}> = ({ linha, contratoFixo, onSalvar, onCancelar }) => {
+}> = ({ linha, contratoFixo, colaboradorInicial, onSalvar, onCancelar }) => {
   const { employees, assets, contratos } = useApp();
   const { linhas } = useRecursos();
   const [d, setD] = useState({
@@ -253,7 +256,7 @@ const FormLinha: React.FC<{
     franquia: linha?.franquia || '',
     chip: linha?.chip || '',
     ativoId: linha?.ativoId || '',
-    colaboradorId: linha?.colaboradorId || '',
+    colaboradorId: colaboradorInicial || linha?.colaboradorId || '',
     status: linha?.status || ('ativa' as LinhaTelefonica['status']),
     valorMensal: linha?.valorMensal ?? undefined,
     centroCusto: linha?.centroCusto || '',
@@ -263,6 +266,15 @@ const FormLinha: React.FC<{
   const [erro, setErro] = useState('');
   const set = (k: keyof typeof d, v: string) => setD((p) => ({ ...p, [k]: v }));
   const contratosTel = contratos.filter((c) => TIPOS_COM_LINHAS.includes(c.tipo) && c.status !== 'encerrado');
+  const [novoContrato, setNovoContrato] = useState(false);
+  const [antesDoNovo, setAntesDoNovo] = useState<Set<string> | null>(null);
+  // O contrato que aparecer depois de "Novo contrato da operadora" vira o contrato da linha
+  const criado = antesDoNovo ? contratos.find((c) => !antesDoNovo.has(c.id) && TIPOS_COM_LINHAS.includes(c.tipo)) : undefined;
+  // Ajuste durante a renderização (padrão do React para reagir a dados novos, sem efeito)
+  if (criado) {
+    setAntesDoNovo(null);
+    setD((p) => ({ ...p, contratoId: criado.id }));
+  }
   const celulares = assets.filter((a) => a.categoria === 'telefonia' && a.status !== 'descartado');
   // Aparelho já usado por outra linha ativa: aviso (não bloqueia — dual chip existe)
   const aparelhoEmUso = d.ativoId && linhas.some((l) => l.id !== linha?.id && l.ativoId === d.ativoId && l.status !== 'cancelada');
@@ -390,7 +402,20 @@ const FormLinha: React.FC<{
         </div>
         {!contratoFixo && (
           <div className="sm:col-span-2">
-            <label htmlFor="ln-ctr" className={CLASSE_ROTULO}>Contrato da operadora</label>
+            <div className="flex items-baseline justify-between gap-2">
+              <label htmlFor="ln-ctr" className={CLASSE_ROTULO}>Contrato da operadora</label>
+              {/* Seção 28: cria o contrato sem sair da linha; ao salvar, ele já fica escolhido */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAntesDoNovo(new Set(contratos.map((c) => c.id)));
+                  setNovoContrato(true);
+                }}
+                className="link inline-flex items-center gap-0.5"
+              >
+                <Plus className="ico-sm" aria-hidden="true" /> Novo contrato da operadora
+              </button>
+            </div>
             <select id="ln-ctr" value={d.contratoId} onChange={(e) => set('contratoId', e.target.value)} className={CLASSE_CAMPO}>
               <option value="">Sem contrato (linha avulsa)</option>
               {contratosTel.map((c) => (
@@ -456,6 +481,7 @@ const FormLinha: React.FC<{
       </div>
       {erro && <p className="erro" role="alert">{erro}</p>}
     </form>
+    {novoContrato && <ContratoFormModal inicial={{ tipo: 'telefonia_movel' }} onClose={() => setNovoContrato(false)} />}
     </Janela>
   );
 };

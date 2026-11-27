@@ -9,6 +9,8 @@ export interface FichaAberta {
   id: string;
   /** Só na ficha do equipamento: já abre "Enviar para manutenção" ligado a este chamado */
   manutencaoDoChamado?: string;
+  /** Seção 28: na ficha do equipamento ou do software, já abre a entrega/atribuição para esta pessoa */
+  entregarPara?: string;
 }
 
 /** Acima disso, a ficha mais antiga (a de baixo) sai da pilha */
@@ -28,7 +30,7 @@ export function empilharFicha(pilha: FichaAberta[], nova: FichaAberta): FichaAbe
   const i = posicaoNaPilha(pilha, nova);
   if (i >= 0) {
     const atual = pilha[i];
-    const manter = nova.manutencaoDoChamado ? nova : atual;
+    const manter = nova.manutencaoDoChamado || nova.entregarPara ? nova : atual;
     if (i === pilha.length - 1 && manter === atual) return pilha;
     return [...pilha.slice(0, i), manter];
   }

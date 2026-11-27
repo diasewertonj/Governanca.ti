@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useRecursos } from '../../context/RecursosContext.tsx';
+import { AtalhosPessoa } from './AtalhosPessoa.tsx';
 import { formatDate } from '../../utils/formatters.ts';
 import { chamadosDaPessoa, papelNoChamado, podeAbrirFicha } from '../../utils/vinculos.ts';
 import { ChamadosVinculados } from '../servicedesk/ChamadosVinculados.tsx';
@@ -620,6 +621,8 @@ export const Employee360Modal: React.FC<Employee360ModalProps> = ({ employeeId, 
               <h3 className="secao-titulo">Com a pessoa hoje</h3>
               <button type="button" onClick={() => setAba('inventario')} className="link text-sm">Ver detalhes e termos</button>
             </div>
+            {/* Seção 28: entregar e atribuir sem sair da pessoa */}
+            {isTIFicha && employee.status !== 'desligado' && <AtalhosPessoa pessoaId={employee.id} pessoaNome={employee.nome} />}
             <dl className="grid gap-y-1">
               <DadoLinha rotulo={`Equipamentos (${currentAssets.length})`}>
                 {currentAssets.length ? (

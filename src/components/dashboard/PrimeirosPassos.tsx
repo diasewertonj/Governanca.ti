@@ -12,7 +12,7 @@ const CHAVE = 'nexus_primeiros_passos_oculto';
 
 export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void }> = ({ onNavigate }) => {
   const { settings, departments, employees, fornecedores, contratos, licenses, assets, currentRole } = useApp();
-  const { unidades } = useRecursos();
+  const { unidades, linhas } = useRecursos();
   const [oculto, setOculto] = useState(() => {
     try {
       return localStorage.getItem(CHAVE) === '1';
@@ -41,9 +41,22 @@ export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void }> = ({
       feito: temPapel('ti_suporte') && temPapel('rh') && temPapel('compras'),
       ir: 'collaborators',
     },
-    { titulo: 'Fornecedores principais', detalhe: 'Microsoft, Google, operadora, internet', feito: fornecedores.length > 0, ir: 'fornecedores' },
-    { titulo: 'Contratos e softwares', detalhe: 'Com eles as faturas passam a ser geradas sozinhas', feito: contratos.length > 0 || licenses.length > 0, ir: 'softwares' },
-    { titulo: 'Colaboradores e equipamentos', detalhe: 'Pode ser aos poucos', feito: ativos.filter((e) => e.role === 'colaborador').length > 0 && assets.length > 0, ir: 'assets' },
+    // Ordem guiada (seção 28): quem cobra → softwares (importar) → contratos → linhas → pessoas e itens
+    { titulo: 'Fornecedores principais', detalhe: 'Quem cobra: revenda, operadora, provedor de internet, suporte', feito: fornecedores.length > 0, ir: 'fornecedores' },
+    {
+      titulo: 'Softwares',
+      detalhe: 'Em Softwares › "Importar do Microsoft 365 / Google" ou "Nova licença" com um modelo',
+      feito: licenses.length > 0,
+      ir: 'softwares',
+    },
+    { titulo: 'Contratos', detalhe: 'Internet, telefonia, suporte, locação: com eles as faturas são geradas sozinhas', feito: contratos.length > 0, ir: 'contratos' },
+    { titulo: 'Linhas telefônicas', detalhe: 'Depois do contrato da operadora (ou avulsas, com valor mensal)', feito: linhas.length > 0, ir: 'linhas' },
+    {
+      titulo: 'Colaboradores e equipamentos',
+      detalhe: 'Na ficha da pessoa: Entregar equipamento, Atribuir software, Entregar linha',
+      feito: ativos.filter((e) => e.role === 'colaborador').length > 0 && assets.length > 0,
+      ir: 'collaborators',
+    },
   ];
   const feitos = passos.filter((p) => p.feito).length;
   if (feitos === passos.length) return null;

@@ -47,6 +47,8 @@ interface Asset360ModalProps {
   assetId: string;
   /** Fase 9: aberta pelo chamado já com "Enviar para manutenção" ligado a ele */
   manutencaoDoChamado?: string;
+  /** Seção 28: abre a entrega já com esta pessoa escolhida (atalho da ficha da pessoa) */
+  entregarPara?: string;
   onClose: () => void;
 }
 
@@ -127,7 +129,7 @@ function eventosDoAtivo(asset: Asset, nomeFornecedor?: string): EventoAtivo[] {
   return ev.sort((a, b) => b.data.localeCompare(a.data));
 }
 
-export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutencaoDoChamado, onClose }) => {
+export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutencaoDoChamado, entregarPara, onClose }) => {
   const {
     assets,
     employees,
@@ -147,11 +149,11 @@ export const Asset360Modal: React.FC<Asset360ModalProps> = ({ assetId, manutenca
     setSelectedTicketIdForDetail,
   } = useApp();
 
-  const [aba, setAba] = useState<AbaAtivo>(manutencaoDoChamado ? 'manutencoes' : 'resumo');
+  const [aba, setAba] = useState<AbaAtivo>(manutencaoDoChamado ? 'manutencoes' : entregarPara ? 'custodia' : 'resumo');
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedBitlocker, setCopiedBitlocker] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [selectedNewUser, setSelectedNewUser] = useState<string>('');
+  const [showTransferModal, setShowTransferModal] = useState(Boolean(entregarPara));
+  const [selectedNewUser, setSelectedNewUser] = useState<string>(entregarPara || '');
   const [motivoDevolucao, setMotivoDevolucao] = useState('');
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [editando, setEditando] = useState(false);
