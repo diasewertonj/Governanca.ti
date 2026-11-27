@@ -287,7 +287,7 @@ export const Landing: React.FC = () => {
   const [tema, setTema] = useState<Tema>(() => (document.documentElement.classList.contains('dark') ? 'escuro' : 'claro'));
   useRevelar();
   // Login por cima da página (o código do login só carrega ao abrir)
-  const [login, setLogin] = useState(false);
+  const [login, setLogin] = useState(() => window.location.hash === '#entrar');
   const alternarTema = () => {
     const novo: Tema = tema === 'escuro' ? 'claro' : 'escuro';
     setTema(novo);
