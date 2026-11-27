@@ -33,6 +33,12 @@ export const LoginView: React.FC = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+  // Um só login: sem erro para mostrar, vai para a landing com o login (fundo desfocado) já aberto
+  const semErro = isSupabaseConnected && !authError && !erroLinkAuth;
+  if (semErro) {
+    window.location.replace('/#entrar');
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
