@@ -58,7 +58,7 @@ export const LoginView: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-2">
       {/* Seção 30: mesmo padrão da landing — painel escuro com textura, logo do Nexus e o ambiente da empresa */}
-      <div className="relative overflow-hidden bg-slate-950 px-6 py-10 text-white sm:px-10 lg:flex lg:flex-col lg:justify-between lg:py-14">
+      <div className="relative overflow-hidden px-6 py-10 sm:px-10 lg:flex lg:flex-col lg:justify-between lg:py-14" style={{ backgroundColor: '#020617', color: '#ffffff' }}>
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
           aria-hidden="true"
@@ -75,7 +75,7 @@ export const LoginView: React.FC = () => {
           <a href="/" aria-label="Nexus — voltar para o site">
             <LogoNexus className="h-9 w-auto" textoBranco />
           </a>
-          <a href="/" className="text-sm text-slate-300 hover:text-white">
+          <a href="/" className="text-sm hover:underline" style={{ color: '#cbd5e1' }}>
             ← Voltar para o site
           </a>
         </div>
@@ -87,7 +87,7 @@ export const LoginView: React.FC = () => {
             Tudo o que a T.I. entrega, paga e controla,{' '}
             <span className="bg-gradient-to-r from-blue-400 to-teal-300 bg-clip-text text-transparent">num só lugar.</span>
           </h1>
-          <ul className="mt-6 space-y-2.5 text-slate-300">
+          <ul className="mt-6 space-y-2.5" style={{ color: '#cbd5e1' }}>
             {['Com quem está cada equipamento, licença e linha', 'Chamados com prazo e histórico', 'Admissões e desligamentos guiados'].map((x) => (
               <li key={x} className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-400" /> {x}
@@ -95,7 +95,7 @@ export const LoginView: React.FC = () => {
             ))}
           </ul>
         </div>
-        <p className="relative mt-10 hidden text-xs text-slate-500 lg:block">Nexus · Governança de T.I. e RH</p>
+        <p className="relative mt-10 hidden text-xs lg:block" style={{ color: '#64748b' }}>Nexus · Governança de T.I. e RH</p>
       </div>
 
       <div className="flex items-center justify-center px-4 py-10 sm:px-8">
