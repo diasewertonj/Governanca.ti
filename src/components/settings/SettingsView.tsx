@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { AssetCategory, Employee, ModeloDocumento, PadraoEmail, UserRole, VidaUtil } from '../../types/index.ts';
 import { dominioDe } from '../../utils/emailEmpresa.ts';
+import { logoParaDataUrl } from '../../utils/logoArquivo.ts';
 import { BarraAlteracoes } from '../comum/BarraAlteracoes.tsx';
 import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
@@ -165,7 +166,20 @@ export const SettingsView: React.FC = () => {
   // Fase 7: logo da empresa (link https)
   const [logoUrl, setLogoUrl] = useState(settings.logoUrl || '');
   const logoAlterado = logoUrl.trim() !== (settings.logoUrl || '');
-  const logoInvalido = logoUrl.trim() !== '' && !/^https:\/\//i.test(logoUrl.trim());
+  const logoEnviado = logoUrl.startsWith('data:image/');
+  const logoInvalido = logoUrl.trim() !== '' && !logoEnviado && !/^https:\/\//i.test(logoUrl.trim());
+  const [erroLogo, setErroLogo] = useState('');
+  // Seção 29: logo por arquivo — reduzido no navegador e guardado na própria configuração
+  // (aparece na tela de login, que é pública, e não sai na virada "Iniciar uso real")
+  const enviarLogo = async (arquivo?: File) => {
+    if (!arquivo) return;
+    setErroLogo('');
+    try {
+      setLogoUrl(await logoParaDataUrl(arquivo));
+    } catch (e) {
+      setErroLogo(e instanceof Error ? e.message : String(e));
+    }
+  };
   // 9.5: o que exige termo de responsabilidade (vazio = tudo marcado)
   const termoExigeSalvo = settings.termoExige || { computador: true, celular: true, monitor: true };
   const [termoExige, setTermoExige] = useState(termoExigeSalvo);
@@ -550,22 +564,47 @@ export const SettingsView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Fase 7: logo (link https) — aparece no cabeçalho do sistema */}
+                  {/* Fase 7: logo — aparece no cabeçalho do sistema. Seção 29: arquivo ou link https */}
                   <div className="cartao p-4">
-                    {secao('Logo', 'Aparece no cabeçalho do sistema')}
+                    {secao('Logo', 'Aparece no cabeçalho do sistema e na tela de entrada')}
                     <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-3 xl:grid-cols-4">
-                      <div className="md:col-span-2 xl:col-span-2">
-                        <label htmlFor="emp-logo" className="rotulo">Logo da empresa (link https)</label>
-                        <input
-                          id="emp-logo"
-                          type="url"
-                          value={logoUrl}
-                          onChange={(e) => setLogoUrl(e.target.value)}
-                          placeholder="https://www.suaempresa.com.br/logo.png"
-                          aria-invalid={logoInvalido}
-                          className="campo"
-                        />
-                        {logoInvalido && <p className="erro">Use um link que começa com https://</p>}
+                      <div className="md:col-span-2 xl:col-span-2 space-y-2">
+                        <div>
+                          <label htmlFor="emp-logo-arquivo" className="rotulo">Enviar arquivo (PNG, JPG, WEBP ou SVG)</label>
+                          <input
+                            id="emp-logo-arquivo"
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            onChange={(e) => {
+                              void enviarLogo(e.target.files?.[0]);
+                              e.target.value = '';
+                            }}
+                            className="campo"
+                          />
+                          {erroLogo && <p className="erro">{erroLogo}</p>}
+                        </div>
+                        {logoEnviado ? (
+                          <p className="ajuda">
+                            Logo enviado por arquivo.{' '}
+                            <button type="button" onClick={() => setLogoUrl('')} className="link">
+                              Remover
+                            </button>
+                          </p>
+                        ) : (
+                          <div>
+                            <label htmlFor="emp-logo" className="rotulo">ou um link https</label>
+                            <input
+                              id="emp-logo"
+                              type="url"
+                              value={logoUrl}
+                              onChange={(e) => setLogoUrl(e.target.value)}
+                              placeholder="https://www.suaempresa.com.br/logo.png"
+                              aria-invalid={logoInvalido}
+                              className="campo"
+                            />
+                            {logoInvalido && <p className="erro">Use um link que começa com https://</p>}
+                          </div>
+                        )}
                       </div>
                       {logoUrl.trim() && !logoInvalido && (
                         <img
