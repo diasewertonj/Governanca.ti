@@ -72,7 +72,7 @@ export async function signInWithGoogleSupabase() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/app/`,
     },
   });
 
@@ -127,7 +127,7 @@ export async function signUpWithPasswordSupabase(email: string, password: string
 export async function solicitarRecuperacaoSenhaSupabase(email: string) {
   if (!supabase) return { error: 'Recuperação de senha disponível apenas com o Supabase configurado.' };
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo: window.location.origin,
+    redirectTo: `${window.location.origin}/app/`,
   });
   // Só repassa erro de limite de tentativas; o resto vira a mensagem genérica
   if (error && /rate|limit|seconds/i.test(error.message)) {

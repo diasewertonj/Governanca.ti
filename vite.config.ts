@@ -14,6 +14,11 @@ export default defineConfig(() => {
     },
     build: {
       rolldownOptions: {
+        // Seção 30: duas páginas — a landing em / e o sistema em /app/
+        input: {
+          landing: path.resolve(import.meta.dirname, 'index.html'),
+          app: path.resolve(import.meta.dirname, 'app/index.html'),
+        },
         output: {
           // Fase 7: bibliotecas em arquivos próprios (cache do navegador entre deploys)
           codeSplitting: {

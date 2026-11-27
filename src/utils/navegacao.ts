@@ -31,7 +31,9 @@ export type Vista =
   | 'projecao'
   | 'patrimonio'
   | 'relatorios'
-  | 'custos_area';
+  | 'custos_area'
+  // Seção 31: implantação (primeiros passos e cadastros a completar), fora do Início
+  | 'implantacao';
 
 /** Título da tela (cabeçalho e aba do navegador) */
 export const TITULO_VISTA: Record<Vista, string> = {
@@ -61,6 +63,7 @@ export const TITULO_VISTA: Record<Vista, string> = {
   patrimonio: 'Patrimônio',
   relatorios: 'Relatórios',
   custos_area: 'Custos da minha área',
+  implantacao: 'Implantação',
 };
 
 export type Contador = 'chamados' | 'lembretes' | 'meus_chamados' | 'termos_para_assinar' | 'vencimentos' | 'processos' | 'pedidos';
@@ -91,7 +94,8 @@ export type Icone =
   | 'orcamento'
   | 'projecao'
   | 'patrimonio'
-  | 'relatorios';
+  | 'relatorios'
+  | 'implantacao';
 
 export interface ItemMenu {
   vista: Vista;
@@ -192,7 +196,7 @@ export function menuDoPapel(papel: UserRole, opcoes: OpcoesMenu = {}): GrupoMenu
   if (papel === 'ti_admin')
     grupos.push({
       titulo: 'Administração',
-      itens: [item('settings', 'configuracoes')],
+      itens: [item('implantacao', 'implantacao'), item('settings', 'configuracoes')],
     });
   return grupos;
 }

@@ -16,7 +16,7 @@ export const QrCodeLabelModal: React.FC<QrCodeLabelModalProps> = ({ asset, onClo
   // Nome da empresa das Configurações (antes era fixo "Nexus Corp"/"Nexus Tech")
   const empresa = settings.nomeFantasia || settings.razaoSocial || 'Empresa';
 
-  const assetUrl = `${window.location.origin}/#asset/${asset.id}`;
+  const assetUrl = `${window.location.origin}/app/#asset/${asset.id}`;
 
   useEffect(() => {
     if (canvasRef.current) {

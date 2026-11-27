@@ -31,6 +31,7 @@ const PainelExecutivoView = lazy(() => import('./components/gestao/GestaoViews.t
 const OrcamentoGestaoView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.OrcamentoGestaoView })));
 const PatrimonioView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.PatrimonioView })));
 const RelatoriosView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.RelatoriosView })));
+const ImplantacaoView = lazy(() => import('./components/dashboard/ImplantacaoView.tsx').then((m) => ({ default: m.ImplantacaoView })));
 const CustosMinhaAreaView = lazy(() => import('./components/gestao/GestaoViews.tsx').then((m) => ({ default: m.CustosMinhaAreaView })));
 const CollaboratorsView = lazy(() => import('./components/collaborators/CollaboratorsView.tsx').then((m) => ({ default: m.CollaboratorsView })));
 const ServiceDeskView = lazy(() => import('./components/servicedesk/ServiceDeskView.tsx').then((m) => ({ default: m.ServiceDeskView })));
@@ -240,6 +241,8 @@ function MainApp() {
           {currentView === 'patrimonio' && <PatrimonioView />}
           {currentView === 'relatorios' && <RelatoriosView />}
           {currentView === 'custos_area' && <CustosMinhaAreaView />}
+          {/* Seção 31: primeiros passos e cadastros a completar, fora do Início */}
+          {currentView === 'implantacao' && <ImplantacaoView onNavigate={navegar} />}
           {currentView === 'collaborators' && <CollaboratorsView />}
           {currentView === 'servicedesk' && (
             <ServiceDeskView onOpenNewTicketModal={() => setShowNewTicketModal(true)} />

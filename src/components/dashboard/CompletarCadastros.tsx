@@ -9,12 +9,18 @@ import { pendenciasDeCadastro } from '../../utils/pendenciasCadastro.ts';
 
 const MOSTRAR = 5;
 
-export const CompletarCadastros: React.FC = () => {
+export const CompletarCadastros: React.FC<{ naTela?: boolean }> = ({ naTela }) => {
   const { fornecedores, licenses, contratos, assets, employees, currentRole, abrirFicha } = useApp();
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   if (currentRole !== 'ti_admin' && currentRole !== 'ti_suporte') return null;
   const grupos = pendenciasDeCadastro({ fornecedores, licencas: licenses, contratos, ativos: assets, pessoas: employees });
-  if (grupos.length === 0) return null;
+  if (grupos.length === 0)
+    return naTela ? (
+      <section className="cartao p-4" aria-label="Completar cadastros">
+        <h3 className="secao-titulo">Completar cadastros</h3>
+        <p className="texto-aux">Nada a completar: fornecedores, softwares, equipamentos e acessos estão com os dados principais.</p>
+      </section>
+    ) : null;
   const total = grupos.reduce((s, g) => s + g.itens.length, 0);
 
   return (
