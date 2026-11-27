@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { PoliticaPrivacidadeModal } from '../lgpd/PoliticaPrivacidadeModal.tsx';
-import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { LogoNexus } from '../../landing/Landing.tsx';
 
 export const LoginView: React.FC = () => {
   const { login, loginWithGoogle, settings, authError, isSupabaseConnected, erroLinkAuth, solicitarRecuperacaoSenha } = useApp();
@@ -55,31 +56,58 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10 sm:px-8">
-      <div className="w-full max-w-5xl grid gap-10 lg:grid-cols-2 lg:items-center">
-        {/* Apresentação: nome da empresa e o que o sistema faz (sem dados internos) */}
-        <div className="text-center lg:text-left">
-          <div className="inline-flex w-12 h-12 rounded-xl bg-blue-600 text-white items-center justify-center font-semibold text-xl shadow-md mb-4">
-            N
-          </div>
-          <p className="secao-titulo text-blue-700">
-            {settings.nomeFantasia || settings.razaoSocial}
-          </p>
-          <h1 className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">
-            Governança de T.I. e RH em um só lugar
+    <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-2">
+      {/* Seção 30: mesmo padrão da landing — painel escuro com textura, logo do Nexus e o ambiente da empresa */}
+      <div className="relative overflow-hidden bg-slate-950 px-6 py-10 text-white sm:px-10 lg:flex lg:flex-col lg:justify-between lg:py-14">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60"
+          aria-hidden="true"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgb(148 163 184 / 0.09) 1px, transparent 1px), linear-gradient(to bottom, rgb(148 163 184 / 0.09) 1px, transparent 1px)',
+            backgroundSize: '44px 44px',
+            maskImage: 'radial-gradient(ellipse 80% 70% at 30% 40%, black 30%, transparent 100%)',
+          }}
+        />
+        <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-blue-600 opacity-30 blur-[80px]" aria-hidden="true" />
+        <div className="pointer-events-none absolute -bottom-20 right-0 h-72 w-72 rounded-full bg-teal-500 opacity-20 blur-[80px]" aria-hidden="true" />
+        <div className="relative flex items-center justify-between gap-4">
+          <a href="/" aria-label="Nexus — voltar para o site">
+            <LogoNexus className="h-9 w-auto" textoBranco />
+          </a>
+          <a href="/" className="text-sm text-slate-300 hover:text-white">
+            ← Voltar para o site
+          </a>
+        </div>
+        <div className="relative mt-10 hidden max-w-md sm:block lg:mt-0">
+          {(settings.nomeFantasia || settings.razaoSocial) && (
+            <p className="text-sm font-semibold uppercase tracking-wider text-teal-400">Ambiente de {settings.nomeFantasia || settings.razaoSocial}</p>
+          )}
+          <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            Tudo o que a T.I. entrega, paga e controla,{' '}
+            <span className="bg-gradient-to-r from-blue-400 to-teal-300 bg-clip-text text-transparent">num só lugar.</span>
           </h1>
-          <p className="mt-3 text-slate-600 max-w-md mx-auto lg:mx-0">
-            Equipamentos, acessos, chamados e admissões organizados, com histórico de cada decisão.
-          </p>
-          <ul className="mt-4 hidden sm:block space-y-2 text-slate-700 max-w-md mx-auto lg:mx-0">
-            <li>✓ Saber com quem está cada equipamento e licença</li>
-            <li>✓ Abrir e acompanhar chamados de suporte</li>
-            <li>✓ Acompanhar admissões e desligamentos</li>
+          <ul className="mt-6 space-y-2.5 text-slate-300">
+            {['Com quem está cada equipamento, licença e linha', 'Chamados com prazo e histórico', 'Admissões e desligamentos guiados'].map((x) => (
+              <li key={x} className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-400" /> {x}
+              </li>
+            ))}
           </ul>
         </div>
+        <p className="relative mt-10 hidden text-xs text-slate-500 lg:block">Nexus · Governança de T.I. e RH</p>
+      </div>
 
+      <div className="flex items-center justify-center px-4 py-10 sm:px-8">
       <div className="w-full max-w-md mx-auto">
-        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200/90 rounded-2xl sm:px-10 space-y-6">
+        <div className="mb-6 flex items-center gap-3">
+          {settings.logoUrl && <img src={settings.logoUrl} alt="" className="h-10 w-auto max-w-[9rem] object-contain" referrerPolicy="no-referrer" />}
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Entrar</h2>
+            <p className="texto-aux">Use seu e-mail e a senha que a T.I. enviou.</p>
+          </div>
+        </div>
+        <div className="bg-white py-8 px-6 shadow-xl shadow-blue-900/5 border border-slate-200/90 rounded-2xl sm:px-10 space-y-6">
           {/* BOTÃO DE LOGIN REAL COM GOOGLE (SUPABASE AUTH) */}
           <div>
             <button

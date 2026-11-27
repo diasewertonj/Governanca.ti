@@ -40,7 +40,7 @@ export function temaInicialLanding(): Tema {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
 }
 
-export const LogoNexus: React.FC<{ className?: string }> = ({ className = 'h-9 w-auto' }) => (
+export const LogoNexus: React.FC<{ className?: string; textoBranco?: boolean }> = ({ className = 'h-9 w-auto', textoBranco }) => (
   <svg viewBox="0 0 520 160" className={className} role="img" aria-label="Nexus">
     <polygon points="80,22 126,48.5 126,101.5 80,128 34,101.5 34,48.5" fill="none" stroke="#2563eb" strokeWidth="7" strokeLinejoin="round" />
     <line x1="80" y1="75" x2="80" y2="36" stroke="#2563eb" strokeWidth="6" strokeLinecap="round" />
@@ -50,7 +50,7 @@ export const LogoNexus: React.FC<{ className?: string }> = ({ className = 'h-9 w
     <circle cx="80" cy="36" r="9" fill="#2563eb" />
     <circle cx="113" cy="94" r="9" fill="#2563eb" />
     <circle cx="47" cy="94" r="9" fill="#2563eb" />
-    <text x="160" y="100" fontFamily="Plus Jakarta Sans, Segoe UI, Arial, sans-serif" fontSize="72" fontWeight="700" className="fill-slate-900 dark:fill-white" letterSpacing="-1">
+    <text x="160" y="100" fontFamily="Plus Jakarta Sans, Segoe UI, Arial, sans-serif" fontSize="72" fontWeight="700" className={textoBranco ? 'fill-white' : 'fill-slate-900 dark:fill-white'} letterSpacing="-1">
       nexus
     </text>
   </svg>
