@@ -1,0 +1,87 @@
+/* Seção 30 · CSS próprio da landing (não herda o tema do sistema). Claro/escuro pela classe .dark no <html>. */
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Textura de grade que some nas bordas */
+.textura-grade {
+  background-image: linear-gradient(to right, rgb(148 163 184 / 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.14) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 75% 60% at 50% 30%, black 40%, transparent 100%);
+}
+.dark .textura-grade {
+  background-image: linear-gradient(to right, rgb(148 163 184 / 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.08) 1px, transparent 1px);
+}
+
+/* Textura de pontos para faixas */
+.textura-pontos {
+  background-image: radial-gradient(rgb(100 116 139 / 0.22) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+/* Brilhos difusos do fundo */
+.brilho {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+.dark .brilho {
+  opacity: 0.3;
+}
+
+/* Texto com degradê */
+.texto-degrade {
+  background: linear-gradient(100deg, #2563eb 10%, #14b8a6 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Borda luminosa nos cartões ao passar o mouse */
+.cartao-luz {
+  position: relative;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.cartao-luz:hover {
+  transform: translateY(-3px);
+  border-color: rgb(37 99 235 / 0.45);
+  box-shadow: 0 18px 40px -18px rgb(37 99 235 / 0.45);
+}
+
+/* Prévia do sistema flutuando */
+@keyframes flutuar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.flutua {
+  animation: flutuar 7s ease-in-out infinite;
+}
+
+/* Revelar ao rolar */
+.revelar {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.revelar.visivel {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .flutua { animation: none; }
+  .revelar { opacity: 1; transform: none; transition: none; }
+  .cartao-luz:hover { transform: none; }
+}
