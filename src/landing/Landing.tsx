@@ -25,6 +25,8 @@ import {
   Users,
 } from 'lucide-react';
 
+import { LoginRapido } from './LoginRapido.tsx';
+
 const URL_BANCO = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const CHAVE_PUBLICA = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const CHAVE_TEMA = 'nexus_landing_tema';
@@ -284,6 +286,8 @@ const Contato: React.FC = () => {
 export const Landing: React.FC = () => {
   const [tema, setTema] = useState<Tema>(() => (document.documentElement.classList.contains('dark') ? 'escuro' : 'claro'));
   useRevelar();
+  // Login por cima da página (o código do login só carrega ao abrir)
+  const [login, setLogin] = useState(false);
   const alternarTema = () => {
     const novo: Tema = tema === 'escuro' ? 'claro' : 'escuro';
     setTema(novo);
@@ -323,9 +327,9 @@ export const Landing: React.FC = () => {
             >
               {tema === 'escuro' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
-            <a href="/app/" className="ml-1 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700">
+            <button type="button" onClick={() => setLogin(true)} className="ml-1 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700">
               <LogIn className="h-4 w-4" /> Entrar
-            </a>
+            </button>
           </nav>
         </div>
       </header>
@@ -355,12 +359,13 @@ export const Landing: React.FC = () => {
                 >
                   Quero conhecer <ArrowRight className="h-4 w-4" />
                 </a>
-                <a
-                  href="/app/"
+                <button
+                  type="button"
+                  onClick={() => setLogin(true)}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white/70 px-6 py-3 font-semibold text-slate-800 backdrop-blur hover:bg-white dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:hover:bg-slate-900"
                 >
                   <LogIn className="h-4 w-4" /> Já sou cliente
-                </a>
+                </button>
               </div>
               <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
                 {['Microsoft 365', 'Google Workspace', 'QR Code', 'Excel e PDF'].map((x) => (
@@ -512,6 +517,7 @@ export const Landing: React.FC = () => {
           </a>
         </div>
       </footer>
+      {login && <LoginRapido onFechar={() => setLogin(false)} />}
     </div>
   );
 };
