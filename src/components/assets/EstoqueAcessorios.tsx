@@ -101,7 +101,7 @@ export const EstoqueAcessorios: React.FC<{
         <FormMovimento
           item={movendo.item}
           tipo={movendo.tipo}
-          pessoas={employees.filter((e) => e.status !== 'desligado')}
+          pessoas={employees.filter((e) => e.status !== 'desligado' && e.tipoVinculo !== 'externo')}
           onSalvar={async (m) => {
             const falha = await movimentarEstoque({ itemId: movendo.item.id, tipo: movendo.tipo, ...m });
             if (falha) return falha;

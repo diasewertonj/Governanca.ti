@@ -91,7 +91,7 @@ export const RhProcessesView: React.FC = () => {
   const onbPerifericos = itensKit.filter(marcado).map((c) => c.nome);
   const onbAcessos = [...itensAcesso.filter(marcado).map((c) => c.nome), ...separarLista(onbOutrosAcessos)];
 
-  const activeEmployees = employees.filter((e) => e.status === 'ativo');
+  const activeEmployees = employees.filter((e) => e.status === 'ativo' && e.tipoVinculo !== 'externo');
   const selectedColaborador = employees.find((e) => e.id === selectedColabId);
   // Lote 1: um desligamento aberto por pessoa (o banco também recusa)
   const desligamentoAberto = (colabId: string) =>

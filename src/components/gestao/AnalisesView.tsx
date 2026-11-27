@@ -127,7 +127,7 @@ export const AnalisesView: React.FC<{ aba: AbaAnalise; abas: React.ReactNode }> 
 
   if (aba === 'pessoas') {
     subtitulo = 'Equipamentos com a pessoa (valor de compra) e o que ela custa por mês: assento das licenças e linha telefônica';
-    const linhasP = custoPorPessoa(employees.filter(passaPessoa), { ativos: assets, licencas: licenses, linhas, contratos }).sort(
+    const linhasP = custoPorPessoa(employees.filter((e) => e.tipoVinculo !== 'externo' && passaPessoa(e)), { ativos: assets, licencas: licenses, linhas, contratos }).sort(
       (a, b) => b.valorEquipamentos + b.mensalTotal * 12 - (a.valorEquipamentos + a.mensalTotal * 12)
     );
     const cargosMedia = mediaPorCargo(linhasP);
