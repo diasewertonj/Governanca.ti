@@ -2482,7 +2482,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (res.error) return { success: false, error: res.error };
     setPrecisaDefinirSenha(false);
     // Recarrega sem o link na URL: a sessão segue ativa e o fluxo normal carrega os dados
-    window.location.replace(window.location.origin);
+    window.location.replace(`${window.location.origin}/app/`);
     return { success: true };
   };
 

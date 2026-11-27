@@ -10,6 +10,7 @@ import { CatalogoSettings } from './CatalogoSettings.tsx';
 import { PrazosSettings } from './PrazosSettings.tsx';
 import { FinanceiroSettings } from './FinanceiroSettings.tsx';
 import { IniciarUsoReal } from './IniciarUsoReal.tsx';
+import { ContatosSite } from './ContatosSite.tsx';
 import { GaleriaVisual } from './GaleriaVisual.tsx';
 import { UnidadesLista } from '../fornecedores/UnidadesLista.tsx';
 import { Janela } from '../ui/Janela.tsx';
@@ -64,7 +65,7 @@ const ROTULO_CAMPO_EMPRESA = {
 } as const;
 
 // Fase 7: abas com nomes do glossário (a chave interna não muda)
-type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'vida_util' | 'financeiro' | 'banco' | 'galeria';
+type Aba = 'empresa' | 'documentos' | 'unidades' | 'setores' | 'equipe' | 'catalogo' | 'prazos' | 'campos' | 'vida_util' | 'financeiro' | 'banco' | 'galeria' | 'contatos';
 const GRUPOS: GrupoNav<Aba>[] = [
   {
     titulo: 'Empresa',
@@ -97,7 +98,7 @@ const GRUPOS: GrupoNav<Aba>[] = [
   },
   // Seção 17: premissas da Gestão de T.I. e mapa de áreas
   { titulo: 'Financeiro', itens: [{ id: 'financeiro', rotulo: 'Premissas e áreas' }] },
-  { titulo: 'Sistema', itens: [{ id: 'banco', rotulo: 'Conexão' }] },
+  { titulo: 'Sistema', itens: [{ id: 'banco', rotulo: 'Conexão' }, { id: 'contatos', rotulo: 'Contatos do site' }] },
 ];
 // Seção 19: galeria de componentes (só admin)
 const GRUPOS_ADMIN: GrupoNav<Aba>[] = GRUPOS.map((g) =>
@@ -1030,6 +1031,9 @@ export const SettingsView: React.FC = () => {
               </div>
             </>
           )}
+
+          {/* Seção 30: pedidos do formulário da landing page */}
+          {activeTab === 'contatos' && <ContatosSite />}
 
           {/* CONEXÃO COM O BANCO DE DADOS */}
           {activeTab === 'banco' && (
