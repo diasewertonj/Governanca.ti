@@ -5,6 +5,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DialogoHost } from './components/ui/dialogo.tsx';
+import { LogoNexus } from './landing/Landing.tsx';
 import { NavegacaoProvider } from './components/ui/navegacao.tsx';
 import { AppProvider, useApp } from './context/AppContext.tsx';
 import { RecursosProvider } from './context/RecursosContext.tsx';
@@ -158,10 +159,8 @@ function MainApp() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-semibold text-lg animate-pulse">
-            N
-          </div>
-          <span className="texto-aux">Carregando governança corporativa...</span>
+          <LogoNexus className="h-10 w-auto animate-pulse" />
+          <span className="texto-aux">Preparando o seu ambiente…</span>
         </div>
       </div>
     );

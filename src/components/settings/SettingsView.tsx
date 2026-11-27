@@ -961,8 +961,8 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Um só contêiner (o cartao-tabela já rola): o segundo prendia o cabeçalho fixo por cima da 1ª linha */}
               <div className="cartao-tabela">
-                <div className="overflow-x-auto">
                   <table className="tabela tabela-cartoes">
                     <thead>
                       <tr>
@@ -1027,7 +1027,6 @@ export const SettingsView: React.FC = () => {
                         })}
                     </tbody>
                   </table>
-                </div>
               </div>
             </>
           )}

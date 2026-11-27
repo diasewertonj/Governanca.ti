@@ -621,8 +621,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSupabaseHealth(health);
 
       if (health.tablesExist) {
-        const [dbDepts, dbEmps, dbAssets, dbLics, dbTickets, dbTerms, dbSettings] =
-          await Promise.all([
+        // Carga inicial (velocidade): tudo em paralelo — antes eram 5 rodadas em série. As faturas
+        // automáticas (seção 26) continuam sendo geradas antes de ler as faturas, sem segurar o resto.
+        const [[dbDepts, dbEmps, dbAssets, dbLics, dbTickets, dbTerms, dbSettings], fase6, fase8, dbAtribuicoes] = await Promise.all([
+          Promise.all([
             fetchDepartmentsFromDb(),
             fetchEmployeesFromDb(),
             fetchAssetsFromDb(),
@@ -630,8 +632,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             fetchTicketsFromDb(),
             fetchTermsFromDb(),
             fetchSettingsFromDb(),
-          ]);
-
+          ]),
+          Promise.all([fetchCatalogoFromDb(), fetchProcessoItensFromDb(), fetchRecursosFromDb(), fetchLembretesFromDb()]),
+          Promise.all([
+            fetchFornecedoresFromDb(),
+            fetchContratosFromDb(),
+            gerarFaturasPrevistasDb()
+              .catch(() => 0)
+              .then(() => fetchFaturasFromDb()),
+          ]),
+          fetchAtribuicoesLicencaFromDb(),
+        ]);
         // Sincronizar departamentos
         if (dbDepts && dbDepts.length > 0) {
           setDepartments(dbDepts);
@@ -674,33 +685,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         // Fase 6 (tabelas novas: se ainda não existirem, as telas seguem sem elas)
-        const [dbCatalogo, dbItens, dbRecursos, dbLembretes] = await Promise.all([
-          fetchCatalogoFromDb(),
-          fetchProcessoItensFromDb(),
-          fetchRecursosFromDb(),
-          fetchLembretesFromDb(),
-        ]);
+        const [dbCatalogo, dbItens, dbRecursos, dbLembretes] = fase6;
         if (dbCatalogo) setCatalogo(dbCatalogo);
         if (dbItens) setProcessoItens(dbItens);
         if (dbRecursos) setRecursos(dbRecursos);
         if (dbLembretes) setLembretes(dbLembretes);
-
-        // Seção 26: reserva do agendador diário — gera as faturas previstas antes de ler (só T.I. e Compras;
-        // para os demais o banco recusa e segue sem gerar)
-        await gerarFaturasPrevistasDb().catch(() => 0);
         // Fase 8: só a T.I. lê (para os demais a RLS devolve vazio; sem a migration, também)
-        const [dbFornecedores, dbContratos, dbFaturas] = await Promise.all([
-          fetchFornecedoresFromDb(),
-          fetchContratosFromDb(),
-          fetchFaturasFromDb(),
-        ]);
+        const [dbFornecedores, dbContratos, dbFaturas] = fase8;
         if (dbFornecedores) setFornecedores(dbFornecedores);
         if (dbContratos) setContratos(dbContratos);
         if (dbFaturas) setFaturas(dbFaturas);
         // Lote 1: histórico de assentos (T.I. vê tudo; a pessoa, só o dela)
-        const dbAtribuicoes = await fetchAtribuicoesLicencaFromDb();
         if (dbAtribuicoes) setAtribuicoesLicenca(dbAtribuicoes);
-
         // Configurações
         if (dbSettings) {
           setSettings(dbSettings);
