@@ -10,7 +10,7 @@ import { useRecursos } from '../../context/RecursosContext.tsx';
 
 const CHAVE = 'nexus_primeiros_passos_oculto';
 
-export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void }> = ({ onNavigate }) => {
+export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void; naTela?: boolean }> = ({ onNavigate, naTela }) => {
   const { settings, departments, employees, fornecedores, contratos, licenses, assets, currentRole } = useApp();
   const { unidades, linhas } = useRecursos();
   const [oculto, setOculto] = useState(() => {
@@ -20,7 +20,7 @@ export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void }> = ({
       return false;
     }
   });
-  if (currentRole !== 'ti_admin' || oculto) return null;
+  if (currentRole !== 'ti_admin' || (oculto && !naTela)) return null;
 
   const ativos = employees.filter((e) => e.status !== 'desligado');
   const temPapel = (p: string) => ativos.some((e) => e.role === p);
@@ -59,7 +59,7 @@ export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void }> = ({
     },
   ];
   const feitos = passos.filter((p) => p.feito).length;
-  if (feitos === passos.length) return null;
+  if (feitos === passos.length && !naTela) return null;
 
   const esconder = () => {
     try {
@@ -79,9 +79,11 @@ export const PrimeirosPassos: React.FC<{ onNavigate: (v: string) => void }> = ({
             {feitos} de {passos.length} feitos · cada passo se marca sozinho
           </p>
         </div>
-        <button type="button" onClick={esconder} className="btn-icone" aria-label="Esconder os primeiros passos" title="Esconder">
-          <X />
-        </button>
+        {!naTela && (
+          <button type="button" onClick={esconder} className="btn-icone" aria-label="Esconder os primeiros passos" title="Esconder">
+            <X />
+          </button>
+        )}
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
         <div className="h-full rounded-full bg-blue-600" style={{ width: `${(feitos / passos.length) * 100}%` }} />
